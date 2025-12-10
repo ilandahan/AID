@@ -54,6 +54,128 @@ make install
 
 > ⚠️ **Important:** After initial installation, restart Claude Code in the project directory to load all MCP servers. Run `claude` or reopen the project in Claude Code.
 
+## Project Setup Guide
+
+### Recommended Structure: AID + Project in Parallel Folders
+
+```
+📁 workspace/
+├── 📁 AID/                    ← This repository (methodology & tools)
+│   ├── .claude/commands/
+│   ├── skills/
+│   ├── CLAUDE.md
+│   └── ...
+│
+└── 📁 my-project/             ← Your project (separate folder)
+    ├── .claude → ../AID/.claude        ← Symbolic link
+    ├── CLAUDE.md → ../AID/CLAUDE.md    ← Symbolic link
+    ├── .aid/                           ← Your project state
+    │   ├── state.json
+    │   └── context.json
+    ├── src/
+    └── ...
+```
+
+### Step-by-Step Setup
+
+#### 1. Clone AID Repository
+
+```bash
+cd ~/workspace  # or your preferred location
+git clone https://github.com/ilandahan/AID.git
+```
+
+#### 2. Create Your Project Folder
+
+```bash
+mkdir my-project
+cd my-project
+```
+
+#### 3. Create Symbolic Links to AID
+
+**Mac / Linux:**
+```bash
+ln -s ../AID/.claude .claude
+ln -s ../AID/CLAUDE.md CLAUDE.md
+ln -s ../AID/skills skills
+```
+
+**Windows (PowerShell as Administrator):**
+```powershell
+New-Item -ItemType SymbolicLink -Path ".claude" -Target "..\AID\.claude"
+New-Item -ItemType SymbolicLink -Path "CLAUDE.md" -Target "..\AID\CLAUDE.md"
+New-Item -ItemType SymbolicLink -Path "skills" -Target "..\AID\skills"
+```
+
+**Windows (Command Prompt as Administrator):**
+```cmd
+mklink /D .claude ..\AID\.claude
+mklink CLAUDE.md ..\AID\CLAUDE.md
+mklink /D skills ..\AID\skills
+```
+
+#### 4. Initialize Your Project with AID
+
+```bash
+# Open Claude Code in your project
+cd my-project
+claude
+
+# Initialize AID phases
+/aid-init
+```
+
+This creates `.aid/state.json` and `.aid/context.json` in your project folder.
+
+#### 5. Verify Setup
+
+```bash
+# Check symbolic links work
+ls -la .claude        # Should show link to ../AID/.claude
+cat CLAUDE.md         # Should display AID instructions
+
+# In Claude Code
+/phase               # Should show "Phase 1: PRD"
+/good-morning        # Should run startup routine
+```
+
+### Benefits of This Structure
+
+| Benefit | Description |
+|---------|-------------|
+| **Clean separation** | AID tools separate from your code |
+| **Easy updates** | `git pull` in AID folder updates all projects |
+| **Multiple projects** | Same AID serves many projects |
+| **Git-friendly** | Your project has its own Git history |
+
+### Updating AID
+
+When a new version of AID is released:
+
+```bash
+cd ~/workspace/AID
+git pull origin main
+```
+
+That's it! All projects using symbolic links automatically get the update.
+
+### Troubleshooting
+
+**Symbolic links not working?**
+- Windows: Run PowerShell/CMD as Administrator
+- Mac/Linux: Check path is correct with `ls -la`
+
+**Claude Code doesn't see commands?**
+- Restart Claude Code after creating links
+- Verify with `ls .claude/commands/`
+
+**Permission denied on Windows?**
+- Enable Developer Mode: Settings → Update & Security → For Developers → Developer Mode
+- Or run terminal as Administrator
+
+---
+
 ## Development Phases (with Phase Gates)
 
 ```
