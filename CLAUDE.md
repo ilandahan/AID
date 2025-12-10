@@ -22,6 +22,11 @@ Before doing ANY work, Claude MUST:
 
 ## Commands
 
+### First Time Setup 🆕
+| Command | Purpose |
+|---------|---------|
+| `/setup` | **Complete guided setup** - walks through entire installation step-by-step (for non-technical users) |
+
 ### Daily Workflow ⭐
 | Command | Purpose |
 |---------|---------|
@@ -93,7 +98,18 @@ docs/TECH-SPEC.md    - Technical specification
 
 ## Quick Start
 
+### For Non-Technical Users (Recommended)
+```
+Just open Claude Code in this folder and type:
+/setup
+```
+This will guide you through everything step-by-step.
+
+### For Technical Users
 ```bash
+# Run install script
+./install.sh
+
 # Initialize new project
 ./scripts/init-project.sh my-app
 cd my-app

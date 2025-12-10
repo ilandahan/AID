@@ -14,6 +14,9 @@
     "test:coverage": "jest --coverage",
     "db:migrate": "node scripts/migrate.js",
     "db:migrate:create": "node scripts/create-migration.js",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio",
     "generate:keys": "node scripts/generate-keys.js",
     "setup": "./install.sh",
     "new-project": "./scripts/init-project.sh",
@@ -32,7 +35,9 @@
     "sass": "^1.94.2",
     "pg": "^8.16.3",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "clsx": "^2.1.1",
+    "@prisma/client": "^6.1.0"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
@@ -50,7 +55,9 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "supertest": "^7.1.4",
-    "puppeteer": "^24.32.1"
+    "puppeteer": "^24.32.1",
+    "prisma": "^6.1.0",
+    "@svgr/webpack": "^8.1.0"
   },
   "optionalDependencies": {
     "chrome-devtools-mcp": "latest"

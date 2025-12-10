@@ -10,6 +10,100 @@
 
 </div>
 
+---
+
+## 🚀 Easy Setup Guide (No Technical Knowledge Required)
+
+This section is for anyone who wants to use AID - no programming experience needed!
+
+### What is AID?
+
+AID (AI Development Methodology) helps you build software with AI assistance. You describe what you want, and Claude guides you through building it step-by-step.
+
+### What You Need
+
+1. **Claude Code** - The AI assistant that will help you (choose one):
+   - [Claude Code Desktop App](https://claude.ai/download) - Easiest option, just download and install
+   - Claude Code Terminal - For those comfortable with command line
+
+2. **This AID folder** - Download it from GitHub
+
+### Step-by-Step Installation
+
+#### Option A: Using Claude Code Desktop App (Recommended)
+
+1. **Download Claude Code Desktop**
+   - Go to [claude.ai/download](https://claude.ai/download)
+   - Download for your system (Windows/Mac)
+   - Install it like any other app
+
+2. **Download AID**
+   - Click the green "Code" button on this GitHub page
+   - Click "Download ZIP"
+   - Extract the ZIP file to a folder (e.g., `Documents/AID`)
+
+3. **Open AID in Claude Code**
+   - Open Claude Code Desktop
+   - Click "Open Folder" or drag the AID folder into Claude Code
+   - You should see the files in the sidebar
+
+4. **Run Setup**
+   - In the chat, type: `/setup`
+   - Press Enter
+   - Claude will guide you through everything!
+
+#### Option B: Using Claude Code in Terminal
+
+1. **Install Claude Code CLI**
+   ```bash
+   npm install -g @anthropic-ai/claude-code
+   ```
+
+2. **Download AID**
+   ```bash
+   git clone https://github.com/ilandahan/AID.git
+   cd AID
+   ```
+
+3. **Open Claude Code**
+   ```bash
+   claude
+   ```
+
+4. **Run Setup**
+   - Type: `/setup`
+   - Press Enter
+   - Follow the instructions
+
+### What Happens During Setup?
+
+When you type `/setup`, Claude will:
+
+1. ✅ Check what's already installed on your computer
+2. ✅ Offer to install any missing tools (you can say yes or no)
+3. ✅ Install the required packages
+4. ✅ Help you set up your API tokens (optional, with instructions)
+5. ✅ Run tests to make sure everything works
+6. ✅ Give you a summary of what to do next
+
+**The entire process takes about 5-10 minutes.**
+
+### After Setup
+
+Once setup is complete:
+- Type `/good-morning` each day to start working
+- Type `/phase` to see where you are in the process
+- Just tell Claude what you want to build!
+
+### Need Help?
+
+If something doesn't work:
+- Just describe the problem to Claude
+- Paste any error messages you see
+- Claude will help you fix it
+
+---
+
 ## Overview
 
 A comprehensive framework for AI-enhanced software development that systematizes the entire journey from raw content discovery through deployment. This methodology leverages Claude Code with MCP integrations to create repeatable, scalable processes for complex software projects.
@@ -40,19 +134,23 @@ A comprehensive framework for AI-enhanced software development that systematizes
 
 See [DEPENDENCIES.md](DEPENDENCIES.md) for complete dependency documentation.
 
-## Quick Start
+---
+
+## Technical Installation (For Developers)
+
+### Quick Start
 
 ```bash
 # Clone and install
-git clone https://github.com/your-org/ai-fullstack-methodology.git
-cd ai-fullstack-methodology
+git clone https://github.com/ilandahan/AID.git
+cd AID
 ./install.sh
 
-# Or manual setup
+# Or use make
 make install
 ```
 
-> ⚠️ **Important:** After initial installation, restart Claude Code in the project directory to load all MCP servers. Run `claude` or reopen the project in Claude Code.
+> ⚠️ **Important:** After installation, restart Claude Code to load MCP servers.
 
 ## Project Setup Guide
 
@@ -264,8 +362,8 @@ ai-fullstack-methodology/
 ### Prerequisites
 
 - Node.js 18+ (React, Backend)
-- Python 3.10+ (Backend, Scripts)
-- PostgreSQL 14+ (Database)
+- Python 3.11+ (Backend, Scripts)
+- PostgreSQL 16+ (Database)
 - Docker (optional, for services)
 - Claude Code CLI
 - Chrome/Chromium (for Chrome DevTools MCP)

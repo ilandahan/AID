@@ -8,6 +8,7 @@ Full E2E stack dependencies for AI Full Stack Development Methodology.
 |-------------|---------|---------|
 | Node.js | 18.0.0+ | Runtime environment |
 | npm | 8.0.0+ | Package manager |
+| Python | 3.11+ | Scripts and backend tools |
 | Docker | 20.0.0+ | Optional - containerized deployment |
 | Docker Compose | 2.0.0+ | Optional - multi-container orchestration |
 | PostgreSQL | 16+ | Database (via Docker or local) |
@@ -26,11 +27,13 @@ Required for the application to run:
   "sass": "^1.94.2",           // CSS preprocessor for styling
   "pg": "^8.16.3",             // PostgreSQL client
   "bcryptjs": "^2.4.3",        // Password hashing
-  "jsonwebtoken": "^9.0.2"     // JWT authentication tokens
+  "jsonwebtoken": "^9.0.2",    // JWT authentication tokens
+  "clsx": "^2.1.1",            // Utility for constructing className strings
+  "@prisma/client": "^6.1.0"   // Prisma ORM client
 }
 ```
 
-**Total production dependencies: 7 packages**
+**Total production dependencies: 9 packages**
 
 ---
 
@@ -73,7 +76,16 @@ Required for the application to run:
 }
 ```
 
-**Total dev dependencies: 16 packages**
+### Database & Build Tools
+
+```json
+{
+  "prisma": "^6.1.0",          // Prisma ORM CLI
+  "@svgr/webpack": "^8.1.0"    // SVG to React component transformer
+}
+```
+
+**Total dev dependencies: 18 packages**
 
 ---
 
@@ -276,9 +288,9 @@ docker-compose down -v
 
 | Category | Count |
 |----------|-------|
-| Production dependencies | 7 |
-| Development dependencies | 16 |
-| **Total direct** | **23** |
+| Production dependencies | 9 |
+| Development dependencies | 18 |
+| **Total direct** | **27** |
 | Transitive dependencies | ~1000+ |
 | node_modules size | ~500-800 MB |
 

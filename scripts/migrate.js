@@ -35,7 +35,7 @@ function log(message, color = 'reset') {
 function checkEnvironment() {
   if (!DATABASE_URL) {
     log('❌ DATABASE_URL environment variable is not set', 'red');
-    log('   Please set it in your .env.local file', 'dim');
+    log('   Please set it in your .env file', 'dim');
     process.exit(1);
   }
   

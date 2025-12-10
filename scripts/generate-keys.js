@@ -58,7 +58,7 @@ function generateAllKeys() {
 function displayKeys(keys) {
   log('\n🔐 Generated Security Keys', 'blue');
   log('===========================', 'dim');
-  log('\nCopy these to your .env.local file:\n', 'yellow');
+  log('\nCopy these to your .env file:\n', 'yellow');
   
   Object.entries(keys).forEach(([name, value]) => {
     log(`${name}:`, 'cyan');
@@ -79,7 +79,7 @@ function displayKeys(keys) {
 function displayEnvFormat(keys) {
   log('# Generated Security Keys', 'dim');
   log(`# Generated at: ${new Date().toISOString()}`, 'dim');
-  log('# Add these to your .env.local file\n', 'dim');
+  log('# Add these to your .env file\n', 'dim');
   
   Object.entries(keys).forEach(([name, value]) => {
     console.log(`${name}=${value}`);
