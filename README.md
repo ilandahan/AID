@@ -334,8 +334,7 @@ ai-fullstack-methodology/
 │   ├── atomic-design/         # Design system development
 │   ├── atomic-page-builder/   # Page composition
 │   ├── code-review/           # Code review automation
-│   ├── test-driven/           # TDD methodology
-│   └── commands/              # Legacy commands
+│   └── test-driven/           # TDD methodology
 │
 ├── integrations/              # MCP integration guides
 │   ├── jira/                  # Jira setup guide
@@ -432,7 +431,7 @@ claude "/start-project my-new-project"
 
 ### Available Commands
 
-Commands are defined in `.claude/commands/` and `skills/commands/`:
+Commands are defined in `.claude/commands/`:
 
 #### Daily Workflow ⭐
 | Command | Description |
@@ -455,10 +454,15 @@ Commands are defined in `.claude/commands/` and `skills/commands/`:
 |---------|-------------|
 | `/aid-test` | Run full methodology test suite |
 
+#### Project Setup Commands
+| Command | Description |
+|---------|-------------|
+| `/start-project [name]` | Initialize new project with methodology |
+| `/link-project [path]` | Link existing project to AID via symbolic links |
+
 #### Development Commands
 | Command | Description | Phase |
 |---------|-------------|-------|
-| `/start-project [name]` | Initialize new project with methodology | Setup |
 | `/prd [feature]` | Generate Product Requirements Document | 1 |
 | `/tech-spec [feature]` | Create technical specification | 2 |
 | `/jira-breakdown [feature]` | Generate Jira project structure | 3 |

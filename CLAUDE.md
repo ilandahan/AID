@@ -25,7 +25,8 @@ Before doing ANY work, Claude MUST:
 ### First Time Setup 🆕
 | Command | Purpose |
 |---------|---------|
-| `/setup` | **Complete guided setup** - walks through entire installation step-by-step (for non-technical users) |
+| `/setup` | **Complete guided setup** - walks through entire installation step-by-step |
+| `/link-project` | **Link existing project** - connect a project folder to AID via symbolic links |
 
 ### Daily Workflow ⭐
 | Command | Purpose |

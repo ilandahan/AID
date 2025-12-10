@@ -1,22 +1,22 @@
 # AID Upgrade Guide
 
-## מדריך עדכון למשתמשים קיימים
+## Upgrade Guide for Existing Users
 
 ---
 
-## הבנת המבנה
+## Understanding the Structure
 
 ```
 your-workspace/
-├── AID/                      ← ה-METHODOLOGY (כלים, פקודות, skills)
+├── AID/                      ← THE METHODOLOGY (tools, commands, skills)
 │   ├── .claude/commands/
 │   ├── skills/
 │   ├── docs/
 │   ├── scripts/
 │   └── ...
 │
-└── my-project/               ← הפרויקט שלך (הקוד שכתבת)
-    ├── .aid/                 ← State של הפרויקט
+└── my-project/               ← YOUR PROJECT (the code you wrote)
+    ├── .aid/                 ← This project's state
     │   ├── state.json
     │   └── context.json
     ├── src/
@@ -26,35 +26,35 @@ your-workspace/
     └── ...
 ```
 
-**חשוב להבין:**
-- **AID** = התבנית/הכלים (מתעדכן מהריפו)
-- **my-project** = הקוד שלך (לא נוגעים!)
+**Important to understand:**
+- **AID** = The template/tools (updated from repo)
+- **my-project** = Your code (don't touch!)
 
 ---
 
-## תרחיש 1: הפרויקט בתוך תיקיית AID
+## Scenario 1: Project Inside AID Folder
 
-אם המבנה שלך נראה ככה:
+If your structure looks like this:
 ```
 AID/
 ├── skills/
 ├── docs/
-├── my-project/        ← הפרויקט שלך בתוך AID
+├── my-project/        ← Your project inside AID
 │   ├── src/
 │   └── ...
 └── ...
 ```
 
-### מה לעשות:
+### What to do:
 
 ```bash
-# 1. גבה את הפרויקט שלך
+# 1. Backup your project
 cp -r AID/my-project ~/backup-my-project
 
-# 2. פרוס את ה-ZIP החדש לתיקייה זמנית
+# 2. Extract new ZIP to temp folder
 unzip AID-with-tests.zip -d /tmp/aid-update
 
-# 3. העתק רק את קבצי ה-methodology (לא את הפרויקט!)
+# 3. Copy only methodology files (not the project!)
 cp -r /tmp/aid-update/.claude AID/
 cp -r /tmp/aid-update/skills AID/
 cp -r /tmp/aid-update/docs AID/
@@ -64,58 +64,58 @@ cp /tmp/aid-update/CLAUDE.md AID/
 cp /tmp/aid-update/README.md AID/
 cp /tmp/aid-update/.gitignore AID/
 
-# 4. הפרויקט שלך לא נפגע!
-ls AID/my-project  # עדיין שם
+# 4. Your project is untouched!
+ls AID/my-project  # Still there
 ```
 
-### קבצים שבטוח להעתיק (לא יפגעו בפרויקט):
+### Files safe to copy (won't affect your project):
 
-| תיקייה/קובץ | מה זה | בטוח? |
-|-------------|-------|-------|
-| `.claude/commands/` | פקודות slash | ✅ כן |
-| `skills/` | Claude skills | ✅ כן |
-| `docs/` (של AID) | דוקומנטציה של המתודולוגיה | ✅ כן |
-| `scripts/` | סקריפטים | ✅ כן |
-| `templates/` | תבניות | ✅ כן |
-| `CLAUDE.md` | הוראות ל-Claude | ✅ כן |
-| `.gitignore` | Git ignore | ✅ כן |
+| Folder/File | What it is | Safe? |
+|-------------|------------|-------|
+| `.claude/commands/` | Slash commands | Yes |
+| `skills/` | Claude skills | Yes |
+| `docs/` (AID's) | Methodology documentation | Yes |
+| `scripts/` | Scripts | Yes |
+| `templates/` | Templates | Yes |
+| `CLAUDE.md` | Claude instructions | Yes |
+| `.gitignore` | Git ignore | Yes |
 
-### קבצים שלא לגעת בהם:
+### Files NOT to touch:
 
-| תיקייה/קובץ | מה זה | לגעת? |
-|-------------|-------|-------|
-| `my-project/` | הקוד שלך | ❌ לא! |
-| `.aid/` (בפרויקט) | State של הפרויקט | ❌ לא! |
-| `node_modules/` | Dependencies | ❌ לא! |
-| `.env` | משתני סביבה | ❌ לא! |
+| Folder/File | What it is | Touch? |
+|-------------|------------|--------|
+| `my-project/` | Your code | NO! |
+| `.aid/` (in project) | Project state | NO! |
+| `node_modules/` | Dependencies | NO! |
+| `.env` | Environment variables | NO! |
 
 ---
 
-## תרחיש 2: הפרויקט בתיקייה נפרדת (מומלץ)
+## Scenario 2: Project in Separate Folder (Recommended)
 
-אם המבנה שלך נראה ככה:
+If your structure looks like this:
 ```
 ~/projects/
-├── AID/               ← המתודולוגיה
-└── my-project/        ← הפרויקט שלך (נפרד)
+├── AID/               ← The methodology
+└── my-project/        ← Your project (separate)
 ```
 
-### מה לעשות:
+### What to do:
 
 ```bash
-# פשוט החלף את כל תיקיית AID
+# Simply replace the entire AID folder
 rm -rf AID
 unzip AID-with-tests.zip
-mv ai-fullstack-repo AID  # אם ה-ZIP מכיל תיקייה עוטפת
+mv ai-fullstack-repo AID  # If ZIP contains a wrapper folder
 
-# הפרויקט שלך בכלל לא הושפע
+# Your project wasn't affected at all
 ```
 
 ---
 
-## סקריפט עדכון אוטומטי
+## Automatic Upgrade Script
 
-שמור את זה כ-`upgrade-aid.sh`:
+Save this as `upgrade-aid.sh`:
 
 ```bash
 #!/bin/bash
@@ -170,13 +170,13 @@ echo ""
 echo "Updating methodology files..."
 
 # Update only methodology files (safe)
-echo "  ✓ .claude/commands/"
+echo "  .claude/commands/"
 cp -r "$SOURCE_DIR/.claude" "$AID_DIR/"
 
-echo "  ✓ skills/"
+echo "  skills/"
 cp -r "$SOURCE_DIR/skills" "$AID_DIR/"
 
-echo "  ✓ docs/ (methodology docs only)"
+echo "  docs/ (methodology docs only)"
 # Be careful with docs - only copy AID docs, not project docs
 for doc in PHASE-GATES.md MORNING-STARTUP.md WORK-CONTEXT-TRACKER.md TEST-SCENARIOS.md; do
     if [ -f "$SOURCE_DIR/docs/$doc" ]; then
@@ -184,16 +184,16 @@ for doc in PHASE-GATES.md MORNING-STARTUP.md WORK-CONTEXT-TRACKER.md TEST-SCENAR
     fi
 done
 
-echo "  ✓ scripts/"
+echo "  scripts/"
 cp -r "$SOURCE_DIR/scripts" "$AID_DIR/"
 
-echo "  ✓ templates/"
+echo "  templates/"
 cp -r "$SOURCE_DIR/templates" "$AID_DIR/"
 
-echo "  ✓ CLAUDE.md"
+echo "  CLAUDE.md"
 cp "$SOURCE_DIR/CLAUDE.md" "$AID_DIR/"
 
-echo "  ✓ .gitignore"
+echo "  .gitignore"
 cp "$SOURCE_DIR/.gitignore" "$AID_DIR/"
 
 # Cleanup
@@ -201,7 +201,7 @@ rm -rf "$TEMP_DIR"
 
 echo ""
 echo "═══════════════════════════════════════════════════════════"
-echo "           ✅ UPGRADE COMPLETE"
+echo "           UPGRADE COMPLETE"
 echo "═══════════════════════════════════════════════════════════"
 echo ""
 echo "Backup saved to: $BACKUP_DIR"
@@ -216,7 +216,7 @@ echo "Your project files were NOT touched."
 echo ""
 ```
 
-### איך להשתמש:
+### How to use:
 
 ```bash
 chmod +x upgrade-aid.sh
@@ -225,105 +225,105 @@ chmod +x upgrade-aid.sh
 
 ---
 
-## אתחול Phase Gates בפרויקט קיים
+## Initializing Phase Gates in Existing Project
 
-אחרי העדכון, אם הפרויקט שלך עדיין לא מאותחל עם Phase Gates:
+After the update, if your project isn't initialized with Phase Gates yet:
 
 ```bash
 cd my-project
 
-# הרץ את Claude Code
+# Run Claude Code
 claude
 
-# אתחל (יצור .aid/state.json ו-.aid/context.json)
+# Initialize (creates .aid/state.json and .aid/context.json)
 /aid-init
 ```
 
-**אם כבר יש לך PRD ו-Tech Spec:**
+**If you already have a PRD and Tech Spec:**
 
 ```bash
-# Claude ישאל באיזה שלב אתה
-# תגיד לו: "יש לי כבר PRD ו-Tech Spec, אני בשלב 4 Development"
+# Claude will ask what phase you're in
+# Tell it: "I already have a PRD and Tech Spec, I'm in Phase 4 Development"
 ```
 
-Claude יתאים את ה-state.json לשלב הנכון.
+Claude will adjust state.json to the correct phase.
 
 ---
 
-## מבנה עבודה מומלץ
+## Recommended Work Structure
 
 ```
 ~/dev/
-├── AID/                          ← Clone של הריפו (methodology)
+├── AID/                          ← Clone of the repo (methodology)
 │   ├── .claude/commands/
 │   ├── skills/
 │   ├── docs/
 │   └── ...
 │
 └── projects/
-    ├── project-a/                ← פרויקט 1
-    │   ├── .aid/                 ← State של פרויקט זה
+    ├── project-a/                ← Project 1
+    │   ├── .aid/                 ← This project's state
     │   ├── src/
     │   └── ...
     │
-    └── project-b/                ← פרויקט 2
-        ├── .aid/                 ← State של פרויקט זה
+    └── project-b/                ← Project 2
+        ├── .aid/                 ← This project's state
         └── ...
 ```
 
-### Symbolic Links (אופציונלי - מתקדם)
+### Symbolic Links (optional - advanced)
 
 ```bash
-# במקום להעתיק, צור קישורים
+# Instead of copying, create links
 cd my-project
 ln -s ../AID/.claude .claude
 ln -s ../AID/skills skills
 ```
 
-כך כשתעדכן את AID, כל הפרויקטים יקבלו את העדכון אוטומטית.
+This way when you update AID, all projects get the update automatically.
 
 ---
 
-## שאלות נפוצות
+## FAQ
 
-### ש: מה קורה ל-.aid/state.json שלי?
-**ת:** לא נוגעים בו! הוא בתיקיית הפרויקט שלך, לא בתיקיית AID.
+### Q: What happens to my .aid/state.json?
+**A:** Not touched! It's in your project folder, not in the AID folder.
 
-### ש: מה קורה לקוד שכתבתי?
-**ת:** לא נוגעים בו! רק מעדכנים את הכלים (skills, commands).
+### Q: What happens to the code I wrote?
+**A:** Not touched! Only the tools (skills, commands) are updated.
 
-### ש: איך אני יודע באיזה שלב אני?
-**ת:** הרץ `/phase` או תסתכל ב-.aid/state.json
+### Q: How do I know what phase I'm in?
+**A:** Run `/phase` or look at .aid/state.json
 
-### ש: מה אם יש לי שינויים מקומיים ב-skills?
-**ת:** הם יידרסו. אם עשית התאמות אישיות, גבה אותן קודם.
+### Q: What if I have local changes to skills?
+**A:** They will be overwritten. If you made custom changes, back them up first.
 
 ---
 
-## בדיקה אחרי עדכון
+## Verification After Update
 
 ```bash
-# וודא שהכל עובד
+# Verify everything works
 ./scripts/test-methodology.sh
 
-# בדוק שהפקודות זמינות
+# Check commands are available
 claude
-/good-morning  # צריך לעבוד
-/phase         # צריך להראות את השלב שלך
+/good-morning  # Should work
+/phase         # Should show your phase
 ```
 
 ---
 
-## סיכום - מה בטוח ומה לא
+## Summary - What's Safe and What's Not
 
-| פעולה | בטוח? |
-|-------|-------|
-| העתקת `.claude/commands/` | ✅ |
-| העתקת `skills/` | ✅ |
-| העתקת `scripts/` | ✅ |
-| העתקת `templates/` | ✅ |
-| העתקת `CLAUDE.md` | ✅ |
-| מחיקת הפרויקט שלך | ❌ |
-| מחיקת `.aid/` של הפרויקט | ❌ |
-| מחיקת `src/` | ❌ |
-| מחיקת `node_modules/` | ⚠️ (אפשר לשחזר עם npm install) |
+| Action | Safe? |
+|--------|-------|
+| Copy `.claude/commands/` | Yes |
+| Copy `skills/` | Yes |
+| Copy `scripts/` | Yes |
+| Copy `templates/` | Yes |
+| Copy `CLAUDE.md` | Yes |
+| Delete your project | NO |
+| Delete project's `.aid/` | NO |
+| Delete `src/` | NO |
+| Delete `node_modules/` | Warning (can restore with npm install) |
