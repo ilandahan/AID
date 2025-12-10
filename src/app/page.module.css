@@ -1,0 +1,98 @@
+.main {
+  min-height: 100vh;
+  padding: var(--spacing-8) var(--spacing-4);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .main {
+    padding: var(--spacing-12) var(--spacing-8);
+  }
+}
+
+/* Hero Section */
+.hero {
+  text-align: center;
+  padding: var(--spacing-16) 0;
+}
+
+.tagline {
+  margin-top: var(--spacing-4);
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  margin-top: var(--spacing-8);
+  align-items: center;
+}
+
+@media (min-width: 640px) {
+  .actions {
+    flex-direction: row;
+    justify-content: center;
+    gap: var(--spacing-4);
+  }
+}
+
+/* Phases Section */
+.phases {
+  padding: var(--spacing-16) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.phaseGrid {
+  display: grid;
+  gap: var(--spacing-4);
+  margin-top: var(--spacing-8);
+}
+
+@media (min-width: 640px) {
+  .phaseGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .phaseGrid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--spacing-6);
+  }
+}
+
+.phase {
+  padding: var(--spacing-6);
+  background: var(--color-background-subtle);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+/* Principles Section */
+.principles {
+  padding: var(--spacing-16) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.principleGrid {
+  display: grid;
+  gap: var(--spacing-6);
+  margin-top: var(--spacing-8);
+}
+
+@media (min-width: 768px) {
+  .principleGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.principle {
+  padding: var(--spacing-6);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
