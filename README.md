@@ -230,6 +230,11 @@ Commands are defined in `.claude/commands/` and `skills/commands/`:
 | `/phase-approve` | Human sign-off for current phase |
 | `/phase-advance` | Move to next phase |
 
+#### Testing ⭐
+| Command | Description |
+|---------|-------------|
+| `/aid-test` | Run full methodology test suite |
+
 #### Development Commands
 | Command | Description | Phase |
 |---------|-------------|-------|

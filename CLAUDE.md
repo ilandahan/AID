@@ -29,6 +29,11 @@ Before doing ANY work, Claude MUST:
 | `/context` | Show current work context (tasks + steps) |
 | `/context-update` | Update context manually |
 
+### Testing
+| Command | Purpose |
+|---------|---------|
+| `/aid-test` | Run full methodology test suite with simulated approvals |
+
 ### Phase Management ⭐
 | Command | Purpose |
 |---------|---------|
