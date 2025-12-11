@@ -1,301 +1,485 @@
 ---
 name: test-driven
-description: "Comprehensive TDD (Test-Driven Development) methodology for writing production-quality tests. Use this skill when writing tests before implementation, reviewing test quality, ensuring comprehensive coverage, avoiding test anti-patterns, or when asked about testing best practices. Covers minimal mocking strategies, realistic test data, strong assertions, and test independence."
+description: "TDD methodology with document-driven testing. Separates Backend/API tests from GUI tests (DevTools MCP). Always references PRD, Tech Spec, and Implementation Plan."
 ---
 
 # Test-Driven Development Skill
 
-Write production-quality tests using strict TDD methodology with minimal mocking and real integration.
+Write tests FIRST, driven by project documents (PRD, Tech Spec, Implementation Plan).
 
-## TDD Workflow
+## CRITICAL: Document-Driven Testing
 
-### Step 1: Understand Requirements
-- Read feature specifications thoroughly
-- Identify all user scenarios (happy paths, edge cases, errors)
-- Define expected inputs and outputs clearly
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  BEFORE WRITING ANY TEST:                                       │
+│                                                                 │
+│  1. Read latest PRD         → docs/prd/[latest].md              │
+│  2. Read latest Tech Spec   → docs/tech-spec/[latest].md        │
+│  3. Read Implementation Plan → docs/implementation-plan/[latest].md │
+│                                                                 │
+│  4. CONFIRM with user: "Is [filename] the current document?"    │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-### Step 2: Design Test Cases BEFORE Coding
-1. List all scenarios to be tested
-2. Design realistic test data matching production patterns
-3. Plan assertion strategy
-4. Identify what should NOT be mocked
+### Document Workflow
 
-### Step 3: Write Tests FIRST
-- Tests must fail initially (no implementation exists)
-- Use clear, descriptive test names
-- Follow AAA pattern (Arrange, Act, Assert)
+```
+User Request: "Write tests for feature X"
+     │
+     ├─► Step 1: FIND DOCUMENTS
+     │        │
+     │        ├─► ls docs/prd/ → Find latest PRD
+     │        ├─► ls docs/tech-spec/ → Find latest Tech Spec
+     │        └─► ls docs/implementation-plan/ → Find latest Plan
+     │
+     ├─► Step 2: CONFIRM WITH USER
+     │        │
+     │        └─► "I found these documents for feature X:
+     │             - PRD: 2024-06-15-feature-x.md
+     │             - Tech Spec: 2024-06-16-feature-x.md
+     │             - Plan: 2024-06-17-feature-x.md
+     │             Are these the current documents?"
+     │
+     ├─► Step 3: READ & EXTRACT
+     │        │
+     │        ├─► From PRD: User stories, requirements
+     │        ├─► From Tech Spec: API contracts, schemas, errors
+     │        └─► From Plan: Test strategy, phases
+     │
+     └─► Step 4: WRITE TESTS
+              │
+              ├─► Backend/API Tests (Unit + Integration)
+              └─► GUI Tests (DevTools MCP)
+```
 
-### Step 4: Implement to Pass
-- Write minimal code to pass tests
-- Keep implementation general (no test-specific logic)
-- Avoid hardcoding values
+---
 
-### Step 5: Verify & Refactor
-- All tests pass
-- Run independent verification with different data
-- Check for overfitting
+## Test Types Separation
 
-## Minimal Mocking Strategy
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         TEST PYRAMID                            │
+│                                                                 │
+│                         ┌─────────┐                             │
+│                         │   GUI   │  ← DevTools MCP             │
+│                         │  Tests  │    (E2E, Visual)            │
+│                       ┌─┴─────────┴─┐                           │
+│                       │ Integration │  ← Real DB, APIs          │
+│                       │    Tests    │    (supertest, etc.)      │
+│                     ┌─┴─────────────┴─┐                         │
+│                     │   Unit Tests    │  ← Fast, isolated       │
+│                     │   (Backend)     │    (jest, vitest)       │
+│                     └─────────────────┘                         │
+│                                                                 │
+│  MORE tests at bottom, FEWER at top                             │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-**Target: <20% mocking in test suites**
+| Test Type | Location | Tools | Speed | What to Test |
+|-----------|----------|-------|-------|--------------|
+| **Unit** | `tests/unit/` | Jest, Vitest | Fast | Functions, classes, logic |
+| **Integration** | `tests/integration/` | Supertest, real DB | Medium | APIs, DB operations |
+| **GUI/E2E** | `tests/e2e/` | DevTools MCP | Slow | User flows, visual |
 
-### When NOT to Mock (Use Real)
+---
 
-| Component | Approach |
-|-----------|----------|
-| Database | Use test database with transaction rollback |
-| Redis/Cache | Use test instance or embedded Redis |
-| Internal functions | Refactor if needed, don't mock |
-| File system | Use temp directories |
-| HTTP requests | Use `responses`, `httpretty`, `vcrpy` |
-| Time-based logic | Use `freezegun` or similar |
+## Part 1: Backend & API Testing
 
-### When to Mock (Limited Cases)
-- External paid APIs (Stripe, payment gateways)
-- Services you don't control
-- Non-deterministic external dependencies
+### API Contract Testing (from Tech Spec)
 
-## Realistic Test Data
+```typescript
+// Read from Tech Spec: API Design section
+// docs/tech-spec/2024-06-15-user-auth.md
 
-**Test data must reflect production complexity:**
+describe('POST /api/auth/login', () => {
+  // From Tech Spec: Request Schema
+  test('accepts valid credentials', async () => {
+    const response = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: 'user@example.com',
+        password: 'SecurePass123!'
+      })
+      .expect(200);
 
-```python
-# ✅ GOOD - Realistic, comprehensive test data
-test_users = [
-    {
-        "name": "María García-López",
-        "email": "maria.garcia@example.com",
-        "bio": "Passionate about AI and machine learning. 🤖",
-        "phone": "+1-555-123-4567"
-    },
-    {
-        "name": "李明",
-        "email": "li.ming+test@example.co.uk",
-        "bio": "",  # Edge case: empty bio
-        "phone": None  # Edge case: missing phone
-    },
-    {
-        "name": "O'Brien-Smith III",
-        "email": "test.user@subdomain.example.org",
-        "bio": "A" * 500,  # Edge case: max length
-        "phone": "555.123.4567 ext 123"
+    // From Tech Spec: Response Schema
+    expect(response.body).toEqual({
+      token: expect.stringMatching(/^eyJ/),
+      user: {
+        id: expect.stringMatching(/^usr_/),
+        email: 'user@example.com',
+        role: expect.stringMatching(/^(admin|user)$/)
+      },
+      expiresIn: 3600
+    });
+  });
+
+  // From Tech Spec: Error Handling section
+  test('returns 401 for invalid password', async () => {
+    const response = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: 'user@example.com',
+        password: 'wrong'
+      })
+      .expect(401);
+
+    expect(response.body).toEqual({
+      error: 'INVALID_CREDENTIALS',
+      message: 'Invalid email or password'
+    });
+  });
+
+  // From Tech Spec: Rate Limiting
+  test('returns 429 after 5 failed attempts', async () => {
+    for (let i = 0; i < 5; i++) {
+      await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'user@example.com', password: 'wrong' });
     }
-]
 
-# ❌ BAD - Simplified, unrealistic test data
-test_user = {
-    "name": "a",
-    "email": "a@a.com",
-    "bio": "test"
-}
+    const response = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'user@example.com', password: 'wrong' })
+      .expect(429);
+
+    expect(response.body.error).toBe('RATE_LIMITED');
+  });
+});
 ```
 
-## Strong Assertions
+### Database Integration Testing
 
-```python
-# ✅ GOOD - Specific, comprehensive assertions
-def test_create_configuration():
-    config = create_configuration(user_input)
-    
-    assert config['tenant_name'] == 'acme_corp'
-    assert config['company_name'] == 'ACME Corporation'
-    assert isinstance(config['metadata'], dict)
-    assert 'shopify' in config['integrations']
-    assert config['integrations']['shopify']['store_url'] == 'https://acme.myshopify.com'
-    assert len(config['tools']) >= 2
+```typescript
+// tests/integration/user.integration.test.ts
+import { prisma } from '../setup/database';
 
-# ❌ BAD - Weak assertions
-def test_create_configuration():
-    config = create_configuration(user_input)
-    assert config is not None  # Useless
-    assert len(config) > 0  # Too vague
+describe('UserRepository', () => {
+  beforeEach(async () => {
+    await prisma.$transaction([
+      prisma.user.deleteMany(),
+    ]);
+  });
+
+  // From PRD: User Stories
+  test('creates user with all required fields', async () => {
+    const user = await userRepository.create({
+      email: 'new@example.com',
+      name: 'New User',
+      password: 'SecurePass123!'
+    });
+
+    // Verify in database
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id }
+    });
+
+    expect(dbUser).not.toBeNull();
+    expect(dbUser?.email).toBe('new@example.com');
+    expect(dbUser?.passwordHash).not.toBe('SecurePass123!'); // Hashed!
+  });
+
+  // From Tech Spec: Data Constraints
+  test('enforces unique email constraint', async () => {
+    await userRepository.create({
+      email: 'existing@example.com',
+      name: 'First User'
+    });
+
+    await expect(userRepository.create({
+      email: 'existing@example.com',
+      name: 'Second User'
+    })).rejects.toThrow('Email already exists');
+  });
+});
 ```
 
-## Comprehensive Coverage Checklist
+### Unit Testing (Business Logic)
 
-- [ ] Happy path (normal, expected usage)
-- [ ] Edge cases (boundary values, empty, null, max/min)
-- [ ] Error conditions (invalid input, missing data)
-- [ ] Exception handling (correct exception types)
-- [ ] Async flows (concurrent operations, timeouts)
-- [ ] Integration scenarios (multi-component)
-- [ ] Regression tests (previously fixed bugs)
+```typescript
+// tests/unit/orderCalculator.test.ts
 
-## Test Independence
+describe('OrderCalculator', () => {
+  // From PRD: Business Rules
+  describe('calculateTotal', () => {
+    test('applies percentage discount correctly', () => {
+      const items = [
+        { price: 100, quantity: 2 },
+        { price: 50, quantity: 1 }
+      ];
 
-```python
-# ✅ GOOD - Independent tests with fixtures
-@pytest.fixture
-def test_config():
-    """Fresh config for each test."""
-    return create_config()
+      const total = calculateTotal(items, { discountPercent: 10 });
 
-def test_create_config(test_config):
-    assert test_config is not None
+      expect(total).toBe(225); // (200 + 50) * 0.9
+    });
 
-def test_update_config(test_config):
-    """Doesn't depend on test_create_config."""
-    test_config['name'] = "Updated"
-    save_config(test_config)
-    loaded = load_config(test_config['id'])
-    assert loaded['name'] == "Updated"
+    // From Tech Spec: Edge Cases
+    test('handles empty cart', () => {
+      expect(calculateTotal([], {})).toBe(0);
+    });
 
-# ❌ BAD - Shared state
-class TestConfig:
-    config = None  # Shared class variable - BAD!
-    
-    def test_01_create(self):
-        self.config = create_config()
+    test('rounds to 2 decimal places', () => {
+      const items = [{ price: 10.333, quantity: 3 }];
+      expect(calculateTotal(items, {})).toBe(31.00);
+    });
+  });
+});
 ```
-
-## Anti-Patterns to Avoid
-
-| Pattern | Detection Signal | Action |
-|---------|-----------------|--------|
-| Mock Hell | >5 `@patch` decorators | Use real integration |
-| Weak Assertion | `is not None`, `> 0` | Assert exact values |
-| Simplified Data | Single-char values | Use production-like data |
-| Test Modification | Tests weakened to pass | Fix implementation |
-| Overfitting | `if is_test:` in code | Remove test-specific code |
-| Shared State | Class variables | Use fixtures |
-| Hidden Failures | `except: pass` | Let tests fail |
-| Happy Path Only | No `pytest.raises` | Add error tests |
 
 ---
 
-## Prompt: Test Review
+## Part 2: GUI Testing (DevTools MCP)
 
-```markdown
-**Role**: You are a senior QA engineer and testing expert specializing in TDD methodology, test architecture, and quality assurance. You are ruthlessly critical of test quality because bad tests create false confidence.
+### DevTools MCP Integration
 
-**Task**: Review the provided test suite for quality, coverage, and adherence to TDD best practices. Identify anti-patterns, weak assertions, and gaps in coverage.
+GUI tests use the **Chrome DevTools MCP** server for:
+- Visual regression testing
+- User flow testing
+- Accessibility testing
+- Performance monitoring
 
-**Context**:
-- Test files to review: [FILES]
-- Testing framework: pytest / jest / vitest
-- Target: <20% mocking, real integration preferred
-- Standards: See references/anti-patterns.md and references/review-checklist.md
+### GUI Test Structure
 
-**Reasoning**:
-- Tests written BEFORE implementation (check git history if possible)
-- Tests should NOT be modified to pass—fix implementation instead
-- Prefer real integration over mocks (database, Redis, HTTP)
-- Test data must be realistic, not simplified
-- Assertions must be specific and meaningful
-- Tests must be independent (no shared state)
-- Coverage must include happy paths, edge cases, AND error conditions
+```typescript
+// tests/e2e/login.e2e.test.ts
+// Uses DevTools MCP for browser automation
 
-**Output Format**:
-```
-# Test Review Summary
+describe('Login Page', () => {
+  // From PRD: User Story - "As a user, I can log in"
+  test('successful login redirects to dashboard', async () => {
+    // DevTools MCP: Navigate to page
+    await mcp.devtools.navigate('http://localhost:3000/login');
 
-## Overall Quality Score: XX%
+    // DevTools MCP: Fill form
+    await mcp.devtools.type('#email', 'user@example.com');
+    await mcp.devtools.type('#password', 'SecurePass123!');
+    await mcp.devtools.click('#submit-btn');
 
-### Statistics
-- Total test files: X
-- Mock ratio: X% (target: <20%)
-- Coverage: Happy paths ✓/✗ | Edge cases ✓/✗ | Errors ✓/✗
+    // DevTools MCP: Wait for navigation
+    await mcp.devtools.waitForNavigation();
 
-### Critical Issues 🔴 (Must Fix)
-1. **[Anti-Pattern Type]** - `file:line`
-   - Problem: [description]
-   - Impact: [why this matters]
-   - Fix: [specific recommendation]
+    // DevTools MCP: Verify URL
+    const url = await mcp.devtools.getCurrentUrl();
+    expect(url).toBe('http://localhost:3000/dashboard');
 
-### Major Issues 🟠 (Should Fix)
-[same format]
+    // DevTools MCP: Verify element visible
+    const welcomeText = await mcp.devtools.getText('.welcome-message');
+    expect(welcomeText).toContain('Welcome');
+  });
 
-### Minor Issues 🟡 (Consider)
-[same format]
+  // From PRD: Error handling
+  test('shows error message for invalid credentials', async () => {
+    await mcp.devtools.navigate('http://localhost:3000/login');
+    await mcp.devtools.type('#email', 'user@example.com');
+    await mcp.devtools.type('#password', 'wrong');
+    await mcp.devtools.click('#submit-btn');
 
-### Strengths
-- [What's done well]
+    // DevTools MCP: Wait for error
+    await mcp.devtools.waitForSelector('.error-message');
 
-## Verdict
-[WORLD-CLASS ✓✓✓ | PROFESSIONAL ✓✓ | NEEDS IMPROVEMENT ⚠️ | POOR ✗]
-```
+    const errorText = await mcp.devtools.getText('.error-message');
+    expect(errorText).toBe('Invalid email or password');
+  });
 
-**Stopping Condition**:
-- All test files reviewed
-- Anti-patterns identified and documented
-- Mock ratio calculated
-- Coverage gaps identified
-- Clear verdict with actionable improvements
-- No ambiguous findings
+  // Visual regression test
+  test('login form matches design', async () => {
+    await mcp.devtools.navigate('http://localhost:3000/login');
 
-**Steps**:
-1. Read references/anti-patterns.md for detection signals
-2. Read references/review-checklist.md for evaluation criteria
-3. List all test files to review
-4. For each file:
-   a. Count mock usage (target <20%)
-   b. Check assertion strength (specific values vs. `is not None`)
-   c. Evaluate test data realism
-   d. Check for shared state / test dependencies
-   e. Verify coverage (happy + edge + error)
-   f. Look for try-except hiding failures
-5. Calculate overall mock ratio
-6. Identify coverage gaps
-7. Document all issues with file:line references
-8. Categorize by severity
-9. Provide verdict and prioritized action items
+    // DevTools MCP: Take screenshot
+    const screenshot = await mcp.devtools.screenshot();
 
----
-[TEST FILES TO REVIEW HERE]
----
+    // Compare with baseline
+    expect(screenshot).toMatchImageSnapshot();
+  });
+});
 ```
 
-## Prompt: Write Tests (TDD)
+### GUI Test Checklist (from PRD User Stories)
 
-```markdown
-**Role**: You are a senior test engineer practicing strict TDD. You write tests BEFORE implementation, use minimal mocking, and create realistic test data.
+```typescript
+// For each user story in PRD, create GUI test:
 
-**Task**: Write comprehensive tests for the specified feature BEFORE any implementation exists. Tests must fail initially.
+// PRD User Story: "As a user, I can register an account"
+describe('Registration Flow', () => {
+  test('complete registration creates account', async () => { });
+  test('shows validation errors for invalid input', async () => { });
+  test('shows success message after registration', async () => { });
+});
 
-**Context**:
-- Feature to test: [FEATURE DESCRIPTION]
-- Testing framework: pytest / jest / vitest
-- Integration: Use real database/Redis where possible
-- Mock only: External paid APIs, services you don't control
-
-**Reasoning**:
-- Tests define the contract—write them first
-- Use realistic test data matching production patterns
-- Cover happy paths, edge cases, AND error conditions
-- Assertions must be specific (exact values, not just truthy)
-- Each test must be independent (use fixtures)
-- Prefer real integration over mocks
-
-**Output Format**:
-1. Test file with complete test cases
-2. Fixtures for setup/teardown
-3. Realistic test data
-4. Comments explaining each test's purpose
-
-**Stopping Condition**:
-- All scenarios covered (happy, edge, error)
-- Tests run and FAIL (no implementation yet)
-- Zero mock abuse (<20% mocking)
-- All assertions are specific
-- Tests are independent
-
-**Steps**:
-1. Analyze feature requirements
-2. List all scenarios: happy paths, edge cases, errors
-3. Design realistic test data
-4. Write test fixtures for setup/teardown
-5. Write tests in order: happy path → edge cases → errors
-6. Use strong, specific assertions
-7. Verify tests can run (and fail)
-8. Document test purpose in docstrings
-
----
-[FEATURE DESCRIPTION HERE]
----
+// PRD User Story: "As a user, I can reset my password"
+describe('Password Reset Flow', () => {
+  test('sends reset email', async () => { });
+  test('reset link works', async () => { });
+  test('can set new password', async () => { });
+});
 ```
 
-## References
+### Accessibility Testing (DevTools MCP)
 
-- `references/anti-patterns.md` - Detailed anti-pattern examples
-- `references/test-writing-guide.md` - Comprehensive test writing guide
-- `references/review-checklist.md` - Test review checklist
+```typescript
+describe('Accessibility', () => {
+  test('login page passes accessibility audit', async () => {
+    await mcp.devtools.navigate('http://localhost:3000/login');
+
+    // DevTools MCP: Run Lighthouse accessibility audit
+    const audit = await mcp.devtools.runAccessibilityAudit();
+
+    expect(audit.score).toBeGreaterThanOrEqual(90);
+    expect(audit.violations).toHaveLength(0);
+  });
+
+  test('all form inputs have labels', async () => {
+    await mcp.devtools.navigate('http://localhost:3000/login');
+
+    const inputs = await mcp.devtools.querySelectorAll('input');
+    for (const input of inputs) {
+      const label = await mcp.devtools.getAttribute(input, 'aria-label');
+      const labelledBy = await mcp.devtools.getAttribute(input, 'aria-labelledby');
+      expect(label || labelledBy).toBeTruthy();
+    }
+  });
+});
+```
+
+---
+
+## Test File Organization
+
+```
+tests/
+├── unit/                          # Fast, isolated tests
+│   ├── services/
+│   │   ├── userService.test.ts
+│   │   └── orderService.test.ts
+│   ├── utils/
+│   │   └── validators.test.ts
+│   └── models/
+│       └── user.test.ts
+│
+├── integration/                   # API & DB tests
+│   ├── api/
+│   │   ├── auth.integration.test.ts
+│   │   └── users.integration.test.ts
+│   └── repositories/
+│       └── userRepository.integration.test.ts
+│
+├── e2e/                          # GUI tests (DevTools MCP)
+│   ├── flows/
+│   │   ├── login.e2e.test.ts
+│   │   ├── registration.e2e.test.ts
+│   │   └── checkout.e2e.test.ts
+│   ├── visual/
+│   │   └── components.visual.test.ts
+│   └── accessibility/
+│       └── audit.a11y.test.ts
+│
+├── factories/                     # Test data factories
+│   ├── userFactory.ts
+│   └── orderFactory.ts
+│
+└── setup/
+    ├── database.ts               # Test DB setup
+    ├── mcp.ts                    # DevTools MCP setup
+    └── jest.setup.ts
+```
+
+---
+
+## The TDD Cycle
+
+```
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│    1. RED      →    2. GREEN    →    3. REFACTOR   │
+│    Write test       Make it          Clean up      │
+│    (fails)          pass             (tests pass)  │
+│                                                     │
+│         ↑                                 │        │
+│         └─────────────────────────────────┘        │
+│                     REPEAT                         │
+└─────────────────────────────────────────────────────┘
+```
+
+| Phase | Action | Rule |
+|-------|--------|------|
+| **RED** | Write failing test | Test MUST fail first |
+| **GREEN** | Write minimal code to pass | No extra features |
+| **REFACTOR** | Clean up code | Tests still pass |
+
+---
+
+## Document-to-Test Mapping
+
+### From PRD → GUI Tests
+
+| PRD Section | Test Type |
+|-------------|-----------|
+| User Stories | E2E flow tests |
+| Requirements | Feature tests |
+| Success Metrics | Performance tests |
+
+### From Tech Spec → Backend Tests
+
+| Tech Spec Section | Test Type |
+|-------------------|-----------|
+| API Design | Contract tests |
+| Data Model | DB integration tests |
+| Error Handling | Error scenario tests |
+| Security | Security tests |
+
+### From Implementation Plan → Test Phases
+
+| Plan Phase | Test Focus |
+|------------|------------|
+| Phase 1 | Unit tests for core logic |
+| Phase 2 | Integration tests |
+| Phase 3 | E2E tests |
+| Phase 4 | Performance/load tests |
+
+---
+
+## Quick Commands
+
+```bash
+# Run all tests
+npm test
+
+# Run only unit tests
+npm test -- --testPathPattern=unit
+
+# Run only integration tests
+npm test -- --testPathPattern=integration
+
+# Run only E2E tests (requires DevTools MCP)
+npm run test:e2e
+
+# Run with coverage
+npm test -- --coverage
+
+# Run specific file
+npm test -- path/to/test.ts
+```
+
+---
+
+## Checklist Before Writing Tests
+
+- [ ] Found latest PRD in `docs/prd/`
+- [ ] Found latest Tech Spec in `docs/tech-spec/`
+- [ ] Found latest Implementation Plan in `docs/implementation-plan/`
+- [ ] Confirmed with user these are current documents
+- [ ] Extracted user stories (→ GUI tests)
+- [ ] Extracted API contracts (→ Backend tests)
+- [ ] Extracted error scenarios (→ Error tests)
+- [ ] Identified test phases from plan
+
+---
+
+## References (Read When Needed)
+
+| File | When to Read |
+|------|--------------|
+| `references/test-patterns.md` | Extended test patterns by framework |
+| `references/integration-testing.md` | Database, API, and service testing |
+| `references/test-data-factories.md` | Building realistic test data |
+| `references/gui-testing-mcp.md` | DevTools MCP detailed guide |

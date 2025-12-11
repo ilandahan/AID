@@ -1,183 +1,354 @@
 ---
 name: code-review
-description: "Comprehensive code review for commits and pull requests. Use when asked to review code changes, audit commits, verify code quality, check for shortcuts or workarounds, validate architectural patterns, or assess production-readiness. Covers pre-implementation workflow, code quality, security, testing, and Claude Code best practices."
+description: "Code review for commits and PRs. Use when reviewing changes, auditing code quality, checking for security issues, or validating TDD practices."
 ---
 
 # Code Review Skill
 
-Conduct thorough reviews of code changes, commits, or pull requests against professional standards.
+Thorough review of code changes against professional standards with emphasis on **Security** and **TDD**.
 
-## Review Process
+## Review Flow
 
-1. **Gather context**: Identify files changed, read relevant code, understand the purpose
-2. **Apply checklists**: Work through each section systematically
-3. **Document findings**: Note file path, line numbers, severity, and recommendations
-4. **Provide verdict**: Ready to commit ✓, Needs Review ⚠️, or Needs Rework ✗
+```
+Code Changes Received
+     │
+     ├─► 1. GATHER CONTEXT
+     │        • List all changed files
+     │        • Understand the purpose/ticket
+     │        • Identify scope (feature/bugfix/refactor)
+     │
+     ├─► 2. SECURITY SCAN (Priority 1)
+     │        • OWASP Top 10 vulnerabilities
+     │        • Input validation
+     │        • Authentication/Authorization
+     │
+     ├─► 3. TDD VALIDATION (Priority 2)
+     │        • Tests written BEFORE implementation?
+     │        • Test coverage adequate?
+     │        • Tests test behavior, not implementation?
+     │
+     ├─► 4. CODE QUALITY REVIEW
+     │        • Apply checklists below
+     │        • Document issues with file:line
+     │
+     └─► 5. VERDICT
+              • Ready ✓ | Needs Review ⚠️ | Needs Rework ✗
+```
 
-## Checklists
+---
 
-### 0. Pre-Implementation Workflow
-- Exploration phase completed before coding
-- TDD approach followed for testable features
-- Root cause analysis performed, not just symptom fixes
+## Security Checklist (CRITICAL)
+
+### OWASP Top 10 Scan
+
+| Vulnerability | What to Check | Red Flag |
+|--------------|---------------|----------|
+| **Injection** (SQL/NoSQL/Command) | User input in queries | String concatenation in queries |
+| **Broken Auth** | Session handling, password storage | Plain text passwords, weak tokens |
+| **Sensitive Data Exposure** | Logging, error messages | Secrets in logs, stack traces to users |
+| **XXE** | XML parsing | External entity processing enabled |
+| **Broken Access Control** | Authorization checks | Missing role/permission validation |
+| **Security Misconfiguration** | Headers, CORS, defaults | Debug mode in prod, open CORS |
+| **XSS** | Output encoding | `innerHTML`, `dangerouslySetInnerHTML` |
+| **Insecure Deserialization** | Object parsing | `eval()`, `pickle.loads()` on user data |
+| **Vulnerable Components** | Dependencies | Outdated packages with CVEs |
+| **Insufficient Logging** | Audit trails | No logging of auth events |
+
+### Security Code Patterns
+
+```typescript
+// ❌ CRITICAL: SQL Injection
+const query = `SELECT * FROM users WHERE id = ${userId}`;
+
+// ✅ SAFE: Parameterized query
+const query = 'SELECT * FROM users WHERE id = ?';
+db.query(query, [userId]);
+
+// ❌ CRITICAL: XSS vulnerability
+element.innerHTML = userInput;
+
+// ✅ SAFE: Text content or sanitization
+element.textContent = userInput;
+
+// ❌ CRITICAL: Command injection
+exec(`ls ${userPath}`);
+
+// ✅ SAFE: Avoid shell, use APIs
+fs.readdir(userPath);
+
+// ❌ CRITICAL: Hardcoded secrets
+const apiKey = 'sk-1234567890';
+
+// ✅ SAFE: Environment variables
+const apiKey = process.env.API_KEY;
+```
+
+### Security Review Questions
+
+- [ ] Is ALL user input validated and sanitized?
+- [ ] Are queries parameterized (no string concatenation)?
+- [ ] Are secrets stored in environment variables?
+- [ ] Is authentication checked on every protected route?
+- [ ] Is authorization (roles/permissions) enforced?
+- [ ] Are error messages safe (no stack traces to users)?
+- [ ] Is sensitive data encrypted at rest and in transit?
+- [ ] Are dependencies up to date (no known CVEs)?
+
+---
+
+## TDD Checklist (PRIORITY)
+
+### TDD Process Validation
+
+| Question | Expected | Red Flag |
+|----------|----------|----------|
+| Were tests written first? | Yes, commit history shows tests before impl | Implementation committed without tests |
+| Do tests define behavior? | Tests describe WHAT, not HOW | Tests check internal implementation details |
+| Do tests fail first? | Red → Green → Refactor cycle | Tests that never failed |
+| Is coverage adequate? | Critical paths covered | Only happy path tested |
+| Are tests independent? | Each test runs in isolation | Tests depend on execution order |
+
+### Test Quality Standards
+
+```typescript
+// ❌ BAD: Testing implementation details
+test('calls internal method', () => {
+  const spy = jest.spyOn(service, '_privateMethod');
+  service.doThing();
+  expect(spy).toHaveBeenCalled();  // Testing HOW, not WHAT
+});
+
+// ✅ GOOD: Testing behavior/outcome
+test('returns processed result', () => {
+  const result = service.doThing();
+  expect(result).toEqual(expectedOutput);  // Testing WHAT
+});
+
+// ❌ BAD: Unrealistic mock data
+const mockUser = { id: 1, name: 'test' };
+
+// ✅ GOOD: Realistic test data
+const mockUser = {
+  id: 'usr_abc123',
+  name: 'Jane Smith',
+  email: 'jane@example.com',
+  createdAt: new Date('2024-01-15'),
+  roles: ['user', 'admin']
+};
+
+// ❌ BAD: Only happy path
+test('creates user', () => {
+  const user = createUser(validData);
+  expect(user).toBeDefined();
+});
+
+// ✅ GOOD: Edge cases covered
+test('creates user with valid data', () => { /* ... */ });
+test('throws on missing email', () => { /* ... */ });
+test('throws on duplicate username', () => { /* ... */ });
+test('handles unicode names', () => { /* ... */ });
+```
+
+### TDD Review Questions
+
+- [ ] Do tests exist for ALL new/changed functionality?
+- [ ] Are tests testing behavior, not implementation?
+- [ ] Is test data realistic (not just `{ id: 1 }`)?
+- [ ] Are edge cases covered (nulls, empty, boundaries)?
+- [ ] Are error scenarios tested?
+- [ ] Do tests run independently (no shared state)?
+- [ ] Were tests NOT modified just to make them pass?
+
+---
+
+## ISO 27001 Compliance Checklist
+
+Quick checks aligned with ISO 27001 security controls:
+
+| Control | Check | Review Question |
+|---------|-------|-----------------|
+| **A.8.1** Asset Management | Dependencies | Are all dependencies documented and licensed? |
+| **A.8.2** Classification | Data Sensitivity | Is sensitive data (PII, credentials) identified and protected? |
+| **A.9.2** Authentication | Auth Security | Is authentication secure (strong passwords, MFA, secure sessions)? |
+| **A.9.4** Access Control | Authorization | Are permissions checked on all protected resources? |
+| **A.12.2** Change Management | PR Process | Does change follow branching/review standards? |
+| **A.12.4** Env Separation | Environments | Is prod data never used in dev? Configs separated? |
+| **A.12.6** Logging | Audit Trail | Are security events logged (auth, access, changes)? |
+| **A.14.2** Secure Dev | Security Tests | Are security tests included? Pre-commit hooks active? |
+| **A.18.1** Compliance | Regulatory | Does code meet GDPR/PCI/HIPAA requirements if applicable? |
+
+### Project Organization (ISO 27001 Aligned)
+
+```
+Required Files:
+✓ SECURITY.md          - Security policy, vulnerability reporting
+✓ .github/CODEOWNERS   - Code ownership for access control
+✓ .gitignore           - Exclude secrets, logs, sensitive files
+✓ .env.example         - Template only (no real values)
+✓ docs/security/       - Security documentation
+
+Must NOT be in repo:
+✗ .env with credentials
+✗ Private keys (*.pem, *.key)
+✗ Database dumps
+✗ Log files with sensitive data
+```
+
+---
+
+## Code Quality Checklists
 
 ### 1. No Shortcuts or Workarounds
-- No try-except blocks silently catching exceptions
-- No conditional checks bypassing validation
-- No commented-out code or temporary "fixes"
-- No TODO, FIXME, HACK comments indicating incomplete work
-- No logic disabled just to make tests pass
+
+| Pattern | Problem |
+|---------|---------|
+| `catch (e) { }` | Silent exception swallowing |
+| `// TODO`, `// FIXME`, `// HACK` | Incomplete work |
+| Commented-out code | Dead code, unclear intent |
+| `if (false) { }` or disabled logic | Tests/features disabled to pass |
+| `any` type overuse | Type safety bypassed |
 
 ### 2. No Hardcoded Values
-- No hardcoded strings, numbers, or paths
-- No environment-specific values hardcoded
-- Magic numbers extracted to named constants
-- Configuration from YAML/env files
 
-### 3. No Default Value Abuse
-- Default values are semantically correct
-- Optional fields have proper None handling
-- Default values match business requirements
-- Required fields not filled with placeholder defaults
+| Bad | Good |
+|-----|------|
+| `if (status === 3)` | `if (status === Status.APPROVED)` |
+| `setTimeout(fn, 5000)` | `setTimeout(fn, TIMEOUT_MS)` |
+| `'http://localhost:3000'` | `process.env.API_URL` |
+| `width: '768px'` | `width: var(--breakpoint-md)` |
 
-### 4. Root Cause Fixes
-- Bug fixes address underlying cause
-- Fixes don't just move the problem elsewhere
-- Validation added at the source
-- Error handling addresses why errors occur
+### 3. Root Cause Fixes
 
-### 5. Code Quality Standards
-- DRY principles followed
-- Functions have single, clear responsibilities
-- Proper type hints on all public functions
-- Error messages help debugging
-- No overly broad exception handling
+| Symptom Fix (Bad) | Root Cause Fix (Good) |
+|-------------------|----------------------|
+| Add null check where crash occurs | Validate data at entry point |
+| Retry failed request 3 times | Fix why request fails |
+| Catch and ignore error | Handle error appropriately |
+| Add delay to avoid race condition | Fix the race condition |
 
-### 6. Architecture & Design Patterns
-- Changes follow existing architectural patterns
-- State management is thread-safe where required
-- Proper separation of concerns
-- No circular dependencies
+### 4. Code Quality Standards
 
-### 7. Testing & Validation
-- Tests validate actual functionality
-- No tests modified just to pass
-- Edge cases properly handled
-- Mock data is realistic
+- [ ] Functions have single responsibility
+- [ ] DRY: No copy-pasted logic
+- [ ] Type hints on public functions
+- [ ] Meaningful variable/function names
+- [ ] No overly broad exception handling
+- [ ] Error messages aid debugging
 
-### 8. Documentation & Maintainability
-- Complex logic has explanatory comments
-- Function docstrings accurately describe behavior
-- No misleading variable or function names
-- Changes consistent with existing patterns
+### 5. Architecture & Patterns
 
-## Red Flags to Report
+- [ ] Follows existing project patterns
+- [ ] Proper separation of concerns
+- [ ] No circular dependencies
+- [ ] Thread-safe where required
+- [ ] No business logic in controllers/routes
 
-- **Fragile code**: Depends on specific execution order
-- **Limited scope**: Only works in certain scenarios
-- **Quick fixes**: Might break in edge cases
-- **Performance shortcuts**: Sacrifice correctness
-- **Security gaps**: Input validation missing
-- **Missing exploration**: Code written without understanding
-- **Test manipulation**: Tests modified to pass instead of fixing code
+---
+
+## Red Flags (Instant Attention)
+
+| Flag | Severity | Action |
+|------|----------|--------|
+| SQL/Command injection | 🔴 CRITICAL | Block merge |
+| Hardcoded secrets | 🔴 CRITICAL | Block merge |
+| XSS vulnerability | 🔴 CRITICAL | Block merge |
+| No tests for new code | 🟠 MAJOR | Request tests |
+| Tests modified to pass | 🟠 MAJOR | Investigate |
+| Silent exception catch | 🟠 MAJOR | Require logging |
+| TODO/FIXME comments | 🟡 MINOR | Track in backlog |
+| Magic numbers | 🟡 MINOR | Extract constants |
+
+---
 
 ## Output Format
 
-For each file changed:
-
 ```markdown
-## [file_path]
-**Purpose**: [brief description]
-**Quality**: [Professional ✓ | Needs Review ⚠️ | Poor ✗]
-
-### Issues Found
-- Line [N]: [severity] - [description]
-
-### Recommendations
-- [specific actionable recommendation]
-```
-
-### Overall Verdict
-- **Ready to commit** ✓ - No significant issues
-- **Needs review** ⚠️ - Minor issues to address
-- **Needs rework** ✗ - Significant issues found
-
----
-
-## Prompt: Code Review
-
-```markdown
-**Role**: You are a senior software engineer conducting a thorough code review. You have expertise in clean code principles, security best practices, performance optimization, and architectural patterns. You are meticulous but constructive.
-
-**Task**: Review the provided code changes (commit, PR, or files) against professional standards. Identify issues, assess quality, and provide a clear verdict with actionable recommendations.
-
-**Context**:
-- Code to review: [FILES/COMMIT/PR]
-- Project type: [TypeScript/Python/etc.]
-- Existing patterns: [Follow project conventions]
-- Focus areas: Code quality, security, testing, architecture
-
-**Reasoning**:
-- Check for shortcuts and workarounds (try-except abuse, commented code, TODOs)
-- Verify no hardcoded values (magic numbers, environment-specific strings)
-- Validate root cause fixes (not symptom masking)
-- Assess test quality (not modified to pass, realistic data)
-- Look for security gaps (input validation, SQL injection, XSS)
-- Evaluate architecture (separation of concerns, no circular deps)
-- Consider maintainability (clear names, proper docs, consistent patterns)
-
-**Output Format**:
-```
-# Code Review: [Branch/Commit Name]
+# Code Review: [Branch/PR Name]
 
 ## Summary
-- Files reviewed: X
-- Issues found: X (Y critical, Z major)
-- Test coverage: Adequate/Inadequate
-- Verdict: [Ready ✓ / Needs Review ⚠️ / Needs Rework ✗]
+| Metric | Value |
+|--------|-------|
+| Files reviewed | X |
+| Security issues | X (Y critical) |
+| TDD compliance | ✓/⚠️/✗ |
+| Code quality | ✓/⚠️/✗ |
+| **Verdict** | Ready ✓ / Review ⚠️ / Rework ✗ |
 
-## Critical Issues 🔴
-1. **[Issue Type]** - `file:line`
+## Security Issues 🔒
+### Critical 🔴
+1. **[Vulnerability Type]** - `file:line`
    - Problem: [description]
-   - Impact: [why it matters]
-   - Fix: [specific recommendation]
+   - Impact: [potential damage]
+   - Fix: [specific code fix]
 
-## Major Issues 🟠
+### Warning 🟠
 [same format]
 
-## Minor Issues 🟡
-[same format]
+## TDD Issues 🧪
+1. **[Issue]** - `file:line`
+   - Problem: [description]
+   - Fix: [what tests to add/change]
 
-## Suggestions 🔵
-[optional improvements]
+## Code Quality Issues 📝
+### Major 🟠
+[issues]
+
+### Minor 🟡
+[issues]
 
 ## Verdict
-[Final recommendation with reasoning]
+[Final decision with reasoning]
+
+### Required Before Merge
+- [ ] [specific action item]
+- [ ] [specific action item]
 ```
 
-**Stopping Condition**:
-- All changed files reviewed
-- All severity levels addressed
-- Security implications assessed
-- Test coverage evaluated
-- Clear verdict provided with specific action items
-- No issues left ambiguous
-
-**Steps**:
-1. Gather context: Identify all changed files
-2. Read each file, understanding purpose and changes
-3. Apply checklist 0: Pre-implementation workflow
-4. Apply checklist 1-4: Shortcuts, hardcoding, defaults, root causes
-5. Apply checklist 5-6: Code quality, architecture
-6. Apply checklist 7: Testing quality
-7. Apply checklist 8: Documentation
-8. Identify security vulnerabilities
-9. Assess overall code quality
-10. Document all issues with file:line references
-11. Categorize by severity (critical, major, minor, suggestion)
-12. Provide clear verdict and action items
-
 ---
-[CODE TO REVIEW HERE]
----
+
+## Review Workflow
+
+### Step 1: Security Scan First
+```bash
+# Check for secrets
+grep -r "password\|secret\|api_key\|token" --include="*.ts" --include="*.js"
+
+# Check for SQL injection patterns
+grep -r "SELECT.*\${" --include="*.ts" --include="*.js"
+
+# Check for XSS patterns
+grep -r "innerHTML\|dangerouslySetInnerHTML" --include="*.tsx" --include="*.jsx"
 ```
+
+### Step 2: TDD Validation
+```bash
+# Check test coverage
+npm test -- --coverage
+
+# Verify tests exist for changed files
+# For each src/foo.ts, check if src/foo.test.ts exists
+```
+
+### Step 3: Code Quality
+- Read each changed file
+- Apply checklists
+- Document issues with `file:line` references
+
+### Step 4: Verdict
+| Condition | Verdict |
+|-----------|---------|
+| Any critical security issue | ✗ Needs Rework |
+| No tests for new functionality | ⚠️ Needs Review |
+| Minor issues only | ✓ Ready (with suggestions) |
+| No issues found | ✓ Ready to merge |
+
+---
+
+## References (Read When Needed)
+
+| File | When to Read |
+|------|--------------|
+| `references/review-templates.md` | Need copy-paste review template |
+| `references/security-patterns.md` | Deep-dive on vulnerability patterns |
+| `references/tdd-patterns.md` | Extended TDD examples and anti-patterns |
+| `references/iso27001-guidelines.md` | Compliance and project organization standards |

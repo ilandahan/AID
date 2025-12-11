@@ -1,236 +1,238 @@
 ---
 name: atomic-page-builder
-description: "Build complete pages, views, and features using ONLY existing atomic-design components. REQUIRES atomic-design skill. Use when composing pages from existing design system components, building new views/features that must maintain design consistency, creating layouts that combine organisms and templates, or when the user asks to 'build a page', 'create a view', or 'compose a feature' from existing components. Enforces design system usage."
+description: "Build pages using ONLY existing design system components. Use when composing pages, views, or features from existing atoms/molecules/organisms."
 ---
 
 # Atomic Page Builder
 
-Build production-ready pages by composing ONLY from existing atomic-design components. This skill enforces design system consistency.
+Compose production-ready pages using ONLY existing atomic-design components.
 
-## Critical Dependency
-
-**This skill REQUIRES the atomic-design skill.**
-
-Before proceeding:
-1. Verify atomic-design skill exists
-2. Read atomic-design to understand available components
-3. Check which atoms, molecules, organisms, and templates exist
-
-If atomic-design is not available → STOP and inform the user.
-
-## Core Principle: Compose, Never Create
+## Critical Rule
 
 ```
-❌ FORBIDDEN: Creating new atoms, molecules, or base styles
+❌ FORBIDDEN: Creating new atoms, molecules, organisms, or base styles
 ✅ REQUIRED: Compose pages using ONLY existing components
 ```
 
-### Decision Tree
+**Prerequisite:** atomic-design skill must exist. If not → STOP and inform user.
+
+---
+
+## Shared Resources (from atomic-design)
+
+This skill uses resources from the `atomic-design` skill:
+
+| Need | Read From |
+|------|-----------|
+| Color values | `atomic-design/tokens/colors.json` |
+| Spacing/shadows | `atomic-design/tokens/spacing.json` |
+| Typography specs | `atomic-design/tokens/typography.json` |
+| Component specs | `atomic-design/tokens/components.json` |
+| Breakpoints | `atomic-design/tokens/breakpoints.json` |
+| Component patterns | `atomic-design/references/` |
+
+**Do NOT duplicate tokens or create new ones here.**
+
+---
+
+## Decision Tree
 
 ```
-User Request → "Build me a dashboard page"
-                    ↓
-    1. Read atomic-design/SKILL.md
-    2. Scan project for existing components:
-       - /src/atoms/
-       - /src/molecules/
-       - /src/organisms/
-       - /src/templates/
-    3. Map request to available components
-    4. Identify GAPS (missing components)
-                    ↓
-         ┌─────────┴─────────┐
-         ↓                   ↓
-    No Gaps              Gaps Found
-         ↓                   ↓
-    Compose page      STOP: Report to user
-    from existing     "Missing components needed:
-    components        - DataChart (organism)
-                      Switch to atomic-design
-                      to create these first."
+User Request: "Build a [page/view/feature]"
+     │
+     ├─► Step 1: INVENTORY
+     │        │
+     │        └─► Scan project for existing components:
+     │            • src/design-system/atoms/
+     │            • src/design-system/molecules/
+     │            • src/design-system/organisms/
+     │            • src/design-system/templates/
+     │
+     ├─► Step 2: GAP ANALYSIS
+     │        │
+     │        └─► Map requirements to components
+     │            Create table: Requirement → Component → ✅/❌
+     │
+     └─► Step 3: BUILD OR STOP
+              │
+              ├─► All components exist?
+              │        └─► YES → Compose page (Phase 3)
+              │
+              └─► Missing components?
+                       └─► STOP → Report gaps → Switch to atomic-design
 ```
 
-## Workflow
+---
+
+## Workflow Phases
 
 ### Phase 1: Component Inventory
 
-Before writing ANY code, document available components:
+**Before ANY code, list available components:**
 
-```markdown
-## Available Components Inventory
-
-### Atoms
-- Button (primary, secondary, ghost variants)
-- Input (text, email, password)
-- Typography (h1-h6, body, caption)
-- Icon (from lucide-react)
-
-### Molecules
-- FormField (Label + Input + Error)
-- SearchBar (Input + Button + Icon)
-- Card (container with header, body, footer)
-
-### Organisms
-- Header (Logo + Nav + UserMenu)
-- Sidebar (NavLinks + UserInfo)
-- DataTable (headers, rows, pagination)
-
-### Templates
-- DashboardLayout (Header + Sidebar + MainContent)
-- AuthLayout (centered card)
+```
+ATOMS:      Button, Input, Typography, Icon, Avatar, Badge, Spinner
+MOLECULES:  FormField, SearchBar, Card, NavItem, Toast
+ORGANISMS:  Header, Sidebar, Footer, Form, DataTable, Modal
+TEMPLATES:  DashboardLayout, AuthLayout, SettingsLayout
 ```
 
 ### Phase 2: Gap Analysis
 
-Map user requirements to components:
+| Requirement | Needed Component | Status |
+|------------|------------------|--------|
+| Page header | Typography (h1) | ✅ |
+| Stats display | Card + Typography | ✅ |
+| Data chart | Chart (organism) | ❌ MISSING |
+| User table | DataTable | ✅ |
 
-| Requirement | Component | Status |
-|------------|-----------|--------|
-| User greeting | Typography (h1) | ✅ Exists |
-| Stats cards | Card + Typography | ✅ Exists |
-| Activity chart | ??? | ❌ MISSING |
-| Recent orders table | DataTable | ✅ Exists |
-
-**If gaps exist → Report and switch to atomic-design skill.**
+**Gap Found?** → STOP. Report: "Missing: Chart organism. Switch to atomic-design to create."
 
 ### Phase 3: Page Composition
 
-Only proceed if ALL components exist.
+**Only if ALL components exist:**
 
-```typescript
+```tsx
 // pages/Dashboard.tsx
 import { DashboardLayout } from '@/templates/DashboardLayout';
 import { Card } from '@/molecules/Card';
 import { Typography } from '@/atoms/Typography';
 import { DataTable } from '@/organisms/DataTable';
 
-// ✅ CORRECT: Using only existing components
 export const Dashboard = () => (
   <DashboardLayout>
-    <Typography variant="h1">Welcome back</Typography>
-    
-    <div className="grid grid-cols-3 gap-6">
-      <Card>
-        <Typography variant="h3">Revenue</Typography>
-        <Typography variant="display">$12,450</Typography>
-      </Card>
+    <Typography variant="h1">Dashboard</Typography>
+
+    <div className={styles.statsGrid}>
+      <Card title="Revenue">$12,450</Card>
+      <Card title="Users">1,234</Card>
     </div>
-    
-    <DataTable 
-      columns={orderColumns}
-      data={recentOrders}
-    />
+
+    <DataTable columns={columns} data={data} />
   </DashboardLayout>
 );
 ```
 
-### Forbidden Patterns
+---
 
-```typescript
-// ❌ FORBIDDEN: Inline styles that bypass design system
+## Rules: Allowed vs Forbidden
+
+| Allowed | Forbidden |
+|---------|-----------|
+| Import from design system | Import from external UI libs (MUI, Chakra) |
+| Layout utilities (grid, flex) | Inline styles (`style={{ }}`) |
+| Content/behavior props | Visual props (color, fontSize) |
+| CSS Modules with tokens | Hardcoded values (`#333`, `24px`) |
+| Conditional rendering | Creating new base components |
+| Composition patterns | `styled-components` new definitions |
+
+### Code Examples
+
+```tsx
+// ✅ ALLOWED
+<div className={styles.grid}>
+  <Card>{content}</Card>
+</div>
+
+// ❌ FORBIDDEN
 <div style={{ padding: '24px', color: '#333' }}>
-
-// ❌ FORBIDDEN: Hardcoded values instead of tokens
 <div className="p-6 text-gray-700">
-
-// ❌ FORBIDDEN: Creating new base components
-const NewButton = styled.button`...`;
-
-// ❌ FORBIDDEN: Mixing design systems
+const NewCard = styled.div`...`;
 import { Button } from '@chakra-ui/react';
 ```
 
-### Allowed Patterns
+---
 
-```typescript
-// ✅ ALLOWED: Layout composition with existing components
-<div className="grid grid-cols-2 gap-component">
-  <ExistingCard />
-  <ExistingCard />
-</div>
+## Layout Patterns
 
-// ✅ ALLOWED: Passing content props to existing components
-<Button label="Submit" onClick={handleSubmit} />
+### Grid Layouts
+```tsx
+// Use CSS Module with token-based spacing
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-section-gap);
+}
 
-// ✅ ALLOWED: Conditional rendering of existing components
-{isLoading ? <Spinner /> : <DataTable data={data} />}
+.twoColumn {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-component-gap);
+}
 ```
+
+### Responsive Composition
+```tsx
+.pageContent {
+  padding: var(--spacing-page-margin);
+}
+
+@media (min-width: 768px) {
+  .pageContent {
+    padding: var(--spacing-page-margin-lg);
+  }
+}
+```
+
+---
 
 ## Output Checklist
 
-Before delivering any page:
+Before delivering:
 
-- [ ] All components imported from design system
-- [ ] Zero hardcoded colors, spacing, or typography
+- [ ] All imports from design system only
+- [ ] Zero hardcoded colors/spacing/typography
 - [ ] Zero new component definitions
 - [ ] Zero external UI library imports
-- [ ] Layout uses only design system spacing tokens
-- [ ] Page compiles without errors
+- [ ] Layout uses CSS Modules + tokens
+- [ ] Responsive at all breakpoints
+- [ ] TypeScript types complete
 
-## When to Switch Skills
+---
+
+## Skill Switching Guide
 
 | Situation | Action |
 |-----------|--------|
-| Missing atom/molecule/organism | → Switch to atomic-design |
-| Need new design tokens | → Switch to atomic-design |
-| Building component library | → Switch to atomic-design |
-| Composing pages from existing | → Stay here ✓ |
+| Missing atom/molecule/organism | → Switch to **atomic-design** |
+| Need new design tokens | → Switch to **atomic-design** |
+| Need to modify existing component | → Switch to **atomic-design** |
+| Composing from existing components | → **Stay here** ✓ |
 
 ---
 
-## Prompt: Page Composition
+## Common Page Types
 
-```markdown
-**Role**: You are a frontend developer specializing in component composition and page assembly. You strictly adhere to design system constraints and never create new base components.
-
-**Task**: Build the requested page/view by composing ONLY from existing design system components. No new atoms, molecules, or organisms may be created.
-
-**Context**:
-- Design system location: /src/design-system/ (or /src/components/)
-- Page request: [USER REQUEST]
-- Available components: Must be inventoried before starting
-- Framework: React with TypeScript
-- Styling: Must use only design system tokens and layout utilities
-
-**Reasoning**:
-- NEVER create new base components—compose only
-- NEVER use hardcoded colors, spacing, or typography
-- NEVER import external UI libraries (Chakra, MUI, etc.)
-- If a component is missing, STOP and report the gap
-- Layout utilities (grid, flex, gap) are allowed
-- Content and behavior props are the only customization
-
-**Output Format**:
-1. Component Inventory (what exists)
-2. Gap Analysis (what's missing, if any)
-3. Page Implementation (if no gaps):
-   - TypeScript React component
-   - Only imports from design system
-   - Zero hardcoded values
-4. Usage example
-
-**Stopping Condition**:
-- If ANY required component is missing → STOP immediately
-- Report missing components
-- Suggest switching to atomic-design skill to create them
-- Do not proceed with partial implementation
-
-**Steps**:
-1. Read atomic-design/SKILL.md to understand the system
-2. Scan project for existing components:
-   - List all atoms in /src/atoms/ or /src/design-system/atoms/
-   - List all molecules
-   - List all organisms
-   - List all templates
-3. Parse user request into component requirements
-4. Map each requirement to existing components
-5. Identify gaps (requirements with no matching component)
-6. If gaps exist → STOP, report gaps, suggest atomic-design skill
-7. If no gaps → Compose page using only existing components
-8. Verify: zero hardcoded values, zero new components
-9. Deliver final page code
+| Page Type | Typical Components |
+|-----------|-------------------|
+| Dashboard | DashboardLayout + Card + DataTable + Typography |
+| Settings | SettingsLayout + Form + FormField + Button |
+| Auth (Login/Register) | AuthLayout + Card + Form + Input + Button |
+| List/Table | PageLayout + DataTable + Pagination + SearchBar |
+| Detail/Profile | PageLayout + Card + Avatar + Typography + Tabs |
+| Form Page | PageLayout + Form + FormField + Button + Toast |
 
 ---
-[PAGE REQUEST HERE]
----
+
+## Quick Reference
+
+### Import Pattern
+```tsx
+// Always import from design system paths
+import { Button } from '@/design-system/atoms/Button';
+import { Card } from '@/design-system/molecules/Card';
+import { Header } from '@/design-system/organisms/Header';
+import { DashboardLayout } from '@/design-system/templates/DashboardLayout';
+```
+
+### Styling Pattern
+```tsx
+// Page-specific layout in CSS Module
+import styles from './Dashboard.module.css';
+
+// Use ONLY token-based values
+.container {
+  padding: var(--spacing-page-margin);
+  gap: var(--spacing-section-gap);
+}
 ```

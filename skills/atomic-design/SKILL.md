@@ -1,258 +1,302 @@
 ---
 name: atomic-design
-description: "Expert-level Atomic Design System development from Figma style guides. Use this skill when building a design system from Figma designs, creating reusable component libraries with atoms, molecules, organisms, templates, and pages, extracting design tokens from Figma via MCP, developing responsive React/Vue/HTML component systems, or ensuring design consistency across an application. Integrates with Figma MCP for design token extraction and automated component generation."
+description: "Atomic Design System development. Use when building UI components, styling, or creating pages. Read token files only when needed."
 ---
 
-# Atomic Design System Development
+# Atomic Design System
 
-Build production-ready, fully typed design systems from Figma style guides using Atomic Design methodology. All visual properties (typography, spacing, colors, responsiveness) are encapsulated in components—only content/labels remain as props.
+Build production-ready design systems using Atomic Design methodology.
 
-## Core Workflow
+## When to Load This Skill
 
-### Phase 1: Design Token Extraction from Figma
+| Trigger | Action |
+|---------|--------|
+| "Create a Button component" | Load this skill |
+| "Style this element" | Load this skill |
+| "Build a page/form/layout" | Load this skill |
+| "Extract tokens from Figma" | Load this skill |
+| "What color should I use?" | Read `tokens/colors.json` |
 
-**Using Official Figma Dev Mode MCP:**
+---
 
-1. Open Figma Desktop → Enable Dev Mode (Shift+D) → Enable MCP server
-2. Navigate to style guide page in Figma
-3. Select token frames (Colors, Typography, Spacing sections)
-4. Ask Claude Code to extract:
-
-```
-"Extract design tokens from my current Figma selection"
-"Get all color styles and generate CSS custom properties"
-"Extract typography tokens from the selected text styles"
-```
-
-**Two approaches:**
-- **Selection-based**: Select in Figma → Ask Claude to extract
-- **Link-based**: Copy Figma link → Paste with request
-
-See `references/figma-mcp-integration.md` for detailed workflow.
-
-### Phase 2: Token System Architecture
-
-Create hierarchical token structure:
-
-```typescript
-// tokens/primitives.ts - Raw values
-export const primitives = {
-  colors: {
-    blue: { 50: '#eff6ff', 500: '#3b82f6', 900: '#1e3a8a' },
-    // ... extracted from Figma
-  },
-  spacing: { 0: '0', 1: '4px', 2: '8px', 3: '12px', 4: '16px', /* ... */ },
-  fontSizes: { xs: '12px', sm: '14px', base: '16px', lg: '18px', /* ... */ },
-}
-
-// tokens/semantic.ts - Purpose-driven aliases
-export const semantic = {
-  colors: {
-    primary: primitives.colors.blue[500],
-    primaryHover: primitives.colors.blue[600],
-    textPrimary: primitives.colors.gray[900],
-    textSecondary: primitives.colors.gray[600],
-    surface: primitives.colors.white,
-    border: primitives.colors.gray[200],
-  },
-  spacing: {
-    componentPadding: primitives.spacing[4],
-    sectionGap: primitives.spacing[8],
-  }
-}
-```
-
-### Phase 3: Atomic Component Hierarchy
-
-Build components in strict order—each level composes the previous:
+## Decision Tree: What to Do
 
 ```
-ATOMS → MOLECULES → ORGANISMS → TEMPLATES → PAGES
+User Request
+     │
+     ├─► "Create new component"
+     │        │
+     │        ├─► Is it an Atom? (Button, Input, Icon)
+     │        │        └─► Read tokens/*.json → Build from scratch
+     │        │
+     │        ├─► Is it a Molecule? (FormField, Card)
+     │        │        └─► Use existing Atoms → Compose
+     │        │
+     │        └─► Is it an Organism? (Header, Form)
+     │                 └─► Use existing Molecules + Atoms → Compose
+     │
+     ├─► "Build a page"
+     │        └─► Switch to atomic-page-builder skill
+     │            (Only compose, never create new components)
+     │
+     ├─► "Extract from Figma"
+     │        └─► Read references/figma-mcp-integration.md
+     │            Use Figma MCP to extract tokens
+     │
+     └─► "Style something"
+              └─► Read relevant tokens/*.json
+                  Apply semantic token names
 ```
 
-**See:** `references/atomic-hierarchy.md` for complete component breakdown and examples.
+---
 
-### Phase 4: Component Development Standards
+## Design Tokens (Read On-Demand)
 
-**Every component MUST include:**
+| Need | Read File | Key Values |
+|------|-----------|------------|
+| Colors, backgrounds | `tokens/colors.json` | `semantic.primary`, `semantic.error` |
+| Font sizes, weights | `tokens/typography.json` | `semantic.heading-1`, `semantic.body` |
+| Padding, margins | `tokens/spacing.json` | `semantic.component-padding` |
+| Button/Input specs | `tokens/components.json` | `button.variants`, `input.states` |
+| Breakpoints | `tokens/breakpoints.json` | `md: 768px`, `lg: 1024px` |
 
-1. **All visual styles encapsulated** - typography, colors, spacing, borders
-2. **Responsive behavior built-in** - breakpoint-based adjustments
-3. **Only content as props** - labels, text, icons, handlers
-4. **Full TypeScript types** - strict prop interfaces
-5. **Accessibility** - ARIA attributes, keyboard navigation
-
-**Component prop pattern:**
-```typescript
-// ✅ CORRECT - Only content/behavior as props
-interface ButtonProps {
-  label: string;
-  onClick: () => void;
-  icon?: ReactNode;
-  disabled?: boolean;
-  variant?: 'primary' | 'secondary' | 'ghost'; // Predefined visual variants
-}
-
-// ❌ WRONG - Visual properties as props
-interface ButtonProps {
-  label: string;
-  fontSize?: string;      // NO - encapsulate in component
-  padding?: string;       // NO - encapsulate in component
-  backgroundColor?: string; // NO - use variants
-}
-```
-
-### Phase 5: Responsive Design Integration
-
-**Breakpoint system (from Figma):**
-```typescript
-const breakpoints = {
-  xs: '320px',   // Small mobile (iPhone SE)
-  sm: '480px',   // Mobile landscape
-  md: '768px',   // Tablet portrait (iPad)
-  lg: '1024px',  // Tablet landscape / Small laptop
-  xl: '1280px',  // Desktop
-  '2xl': '1440px', // Large desktop
-  '3xl': '1920px', // Full HD / Wide screens
-}
-```
-
-**Every component handles its own responsiveness:**
+### Token Usage Pattern
 ```css
-.button {
-  /* Mobile first - base styles */
-  padding: var(--spacing-2) var(--spacing-3);
-  font-size: var(--font-size-sm);
-  width: 100%;
-  
-  @media (min-width: 480px) {
-    width: auto;
-  }
-  
-  @media (min-width: 768px) {
-    padding: var(--spacing-3) var(--spacing-4);
-    font-size: var(--font-size-base);
-  }
-  
-  @media (min-width: 1440px) {
-    padding: var(--spacing-3) var(--spacing-5);
-  }
+/* DO: Use semantic names */
+color: var(--color-primary);
+padding: var(--spacing-component-padding);
+
+/* DON'T: Use primitives directly */
+color: var(--blue-500);  /* Wrong */
+padding: 16px;           /* Wrong */
+```
+
+---
+
+## Atomic Hierarchy
+
+```
+┌─────────────────────────────────────────────────────┐
+│  PAGES        Dashboard, Settings, UserProfile      │
+│       ↑                                             │
+│  TEMPLATES    DashboardLayout, AuthLayout           │
+│       ↑                                             │
+│  ORGANISMS    Header, Sidebar, Form, DataTable      │
+│       ↑                                             │
+│  MOLECULES    FormField, SearchBar, Card, NavItem   │
+│       ↑                                             │
+│  ATOMS        Button, Input, Typography, Icon       │
+│       ↑                                             │
+│  TOKENS       colors, typography, spacing           │
+└─────────────────────────────────────────────────────┘
+```
+
+| Level | Rule | Example |
+|-------|------|---------|
+| **Atom** | Uses ONLY tokens, no other components | `Button` uses color/spacing tokens |
+| **Molecule** | Combines 2+ Atoms | `FormField` = Label + Input + ErrorText |
+| **Organism** | Combines Molecules + Atoms | `Header` = Logo + NavItems + UserMenu |
+| **Template** | Layout structure, no content | `DashboardLayout` = Header + Sidebar + Main |
+| **Page** | Template + real content | `Dashboard` = DashboardLayout + widgets |
+
+---
+
+## Core Rules
+
+### 1. Props = Content Only
+```typescript
+// ✅ CORRECT
+interface ButtonProps {
+  children: ReactNode;      // Content
+  onClick: () => void;      // Behavior
+  variant?: 'primary' | 'secondary';  // Predefined visual
+  disabled?: boolean;       // State
+}
+
+// ❌ WRONG - Visual properties exposed
+interface ButtonProps {
+  backgroundColor?: string; // NO
+  fontSize?: string;        // NO
+  padding?: string;         // NO
 }
 ```
 
-## File Structure
-
-```
-design-system/
-├── tokens/
-│   ├── primitives.ts      # Raw Figma values
-│   ├── semantic.ts        # Purpose-driven aliases
-│   └── index.ts           # Unified export
-├── atoms/
-│   ├── Button/
-│   │   ├── Button.tsx
-│   │   ├── Button.module.css
-│   │   └── index.ts
-│   ├── Input/
-│   ├── Typography/
-│   ├── Icon/
-│   └── index.ts
-├── molecules/
-│   ├── FormField/
-│   ├── SearchBar/
-│   ├── Card/
-│   └── index.ts
-├── organisms/
-│   ├── Header/
-│   ├── Form/
-│   ├── DataTable/
-│   └── index.ts
-├── templates/
-│   ├── DashboardLayout/
-│   ├── AuthLayout/
-│   └── index.ts
-└── index.ts               # Public API
+### 2. All Styles Encapsulated
+```typescript
+// Component handles ALL its visual styles internally
+// Read tokens/components.json for button specs
+.button {
+  background: var(--color-primary);
+  padding: var(--spacing-button-padding-y) var(--spacing-button-padding-x);
+  font-size: var(--font-size-button);
+  border-radius: var(--radius-md);
+}
 ```
 
-## Implementation Checklist
+### 3. Responsive Built-In
+```css
+/* Mobile-first: Start small, add breakpoints up */
+.card {
+  padding: var(--spacing-4);        /* Mobile */
+}
 
-Before delivering any component:
+@media (min-width: 768px) {
+  .card { padding: var(--spacing-6); }  /* Tablet+ */
+}
 
-- [ ] Visual tokens extracted from Figma
-- [ ] Component uses only semantic tokens (no hardcoded values)
-- [ ] Responsive styles at all breakpoints
-- [ ] Props limited to content/behavior only
+@media (min-width: 1024px) {
+  .card { padding: var(--spacing-8); }  /* Desktop+ */
+}
+```
+
+### 4. Accessibility Required
+```tsx
+<button
+  aria-label={iconOnly ? label : undefined}
+  aria-busy={loading}
+  aria-disabled={disabled}
+  disabled={disabled}
+>
+  {label}
+</button>
+```
+
+---
+
+## Anti-Patterns (Don't Do This)
+
+| Anti-Pattern | Problem | Fix |
+|--------------|---------|-----|
+| `style={{ color: '#3B82F6' }}` | Hardcoded color | Use `var(--color-primary)` |
+| `className="p-4 text-sm"` | Tailwind in design system | Use CSS Modules + tokens |
+| `<Button fontSize="14px">` | Visual prop exposed | Remove prop, encapsulate |
+| Creating Atom inside Organism | Wrong hierarchy | Create Atom separately first |
+| Importing external UI lib | Inconsistent design | Use only internal components |
+
+---
+
+## Workflow: Create New Component
+
+### Step 1: Classify Level
+```
+Is this component breakable into smaller parts?
+├─► No  → It's an ATOM
+└─► Yes → What does it compose?
+         ├─► Only Atoms → MOLECULE
+         └─► Molecules + Atoms → ORGANISM
+```
+
+### Step 2: Read Required Tokens
+```
+For Button (Atom):
+1. Read tokens/components.json → button section
+2. Read tokens/colors.json → semantic colors
+3. Read tokens/spacing.json → padding values
+4. Read tokens/typography.json → font specs
+```
+
+### Step 3: Create Files
+```
+src/design-system/atoms/Button/
+├── Button.tsx           # Component + Props
+├── Button.module.css    # All styles (tokens only)
+├── Button.test.tsx      # Tests
+└── index.ts             # Export
+```
+
+### Step 4: Implement Pattern
+```tsx
+// Button.tsx
+import styles from './Button.module.css';
+import clsx from 'clsx';
+
+interface ButtonProps {
+  children: ReactNode;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  onClick?: () => void;
+}
+
+export const Button = ({
+  children,
+  variant = 'primary',
+  size = 'md',
+  disabled,
+  onClick
+}: ButtonProps) => (
+  <button
+    className={clsx(styles.button, styles[variant], styles[size])}
+    disabled={disabled}
+    onClick={onClick}
+  >
+    {children}
+  </button>
+);
+```
+
+---
+
+## Workflow: Extract from Figma
+
+### Prerequisites
+- Figma Desktop with Dev Mode enabled (Shift+D)
+- MCP server running at `http://127.0.0.1:3845/mcp`
+
+### Process
+```
+1. Open Figma → Navigate to style guide
+2. Select token frames (Colors, Typography, Spacing)
+3. Ask Claude:
+   "Extract design tokens from my current Figma selection"
+4. Claude generates tokens/*.json files
+5. Update CSS variables from JSON
+```
+
+**Detailed guide:** `references/figma-mcp-integration.md`
+
+---
+
+## Quick Reference
+
+### Common Components by Level
+
+**Atoms:**
+`Button`, `Input`, `Textarea`, `Select`, `Checkbox`, `Radio`, `Switch`, `Icon`, `Avatar`, `Badge`, `Spinner`, `Typography`
+
+**Molecules:**
+`FormField`, `SearchBar`, `Card`, `NavItem`, `MenuItem`, `Toast`, `Tooltip`, `Dropdown`, `Tabs`, `Breadcrumb`
+
+**Organisms:**
+`Header`, `Sidebar`, `Footer`, `Form`, `DataTable`, `Modal`, `Drawer`, `Pagination`, `Calendar`
+
+**Templates:**
+`DashboardLayout`, `AuthLayout`, `SettingsLayout`, `MarketingLayout`
+
+---
+
+## Checklist Before Delivery
+
+- [ ] Correct atomic level (atom/molecule/organism)
+- [ ] Uses ONLY semantic tokens (no hardcoded values)
+- [ ] Props are content/behavior only (no visual props)
+- [ ] Responsive at all breakpoints
 - [ ] TypeScript interfaces complete
-- [ ] Accessibility attributes included
-- [ ] Storybook story created (if applicable)
+- [ ] Accessibility attributes (ARIA, keyboard)
+- [ ] CSS Module file with token-based styles
 
 ---
 
-## Prompt: Design System Creation
+## References (Read When Needed)
 
-```markdown
-**Role**: You are an expert UI engineer specializing in design systems, component architecture, and Figma-to-code workflows. You have deep expertise in Atomic Design methodology, CSS architecture, TypeScript, and accessibility standards.
-
-**Task**: Build a complete design system from the provided Figma style guide, creating a hierarchical component library following Atomic Design principles (atoms → molecules → organisms → templates → pages).
-
-**Context**:
-- Figma style guide: [Link or selection]
-- Target framework: React with TypeScript
-- Styling approach: CSS Modules with CSS custom properties
-- Design tokens available in Figma: colors, typography, spacing, shadows, borders
-- Must be responsive (mobile-first)
-- Must meet WCAG 2.1 AA accessibility standards
-
-**Reasoning**:
-- Extract ALL visual properties into design tokens first
-- Build atoms before molecules, molecules before organisms
-- Encapsulate ALL styling in components—props should only be content/behavior
-- Use semantic token names (--color-primary) not primitive values
-- Every component must handle its own responsive behavior
-- Never expose visual properties as component props
-
-**Output Format**:
-1. Design Tokens (tokens/primitives.ts, tokens/semantic.ts)
-2. CSS Variables file (tokens/variables.css)
-3. Component files per atomic level:
-   - ComponentName.tsx (TypeScript + JSX)
-   - ComponentName.module.css (all styles)
-   - index.ts (exports)
-4. Full TypeScript interfaces for all props
-5. Usage examples for each component
-
-**Stopping Condition**:
-- All Figma tokens extracted and organized
-- Complete atom set (Button, Input, Typography, Icon, Badge, etc.)
-- At least 3 molecules composed from atoms
-- At least 2 organisms composed from molecules
-- All components have responsive styles
-- All components have accessibility attributes
-- No hardcoded colors, spacing, or typography values
-
-**Steps**:
-1. Connect to Figma via MCP or use provided link
-2. Extract color tokens → create primitives and semantic colors
-3. Extract typography tokens → font families, sizes, weights, line heights
-4. Extract spacing scale → base unit and multipliers
-5. Extract effects → shadows, borders, radii
-6. Generate CSS custom properties file
-7. Build atoms one by one (Button, Input, Typography first)
-8. Compose molecules from atoms (FormField, SearchBar, Card)
-9. Compose organisms from molecules (Header, Form, DataTable)
-10. Create template layouts (DashboardLayout, AuthLayout)
-11. Verify all components use only semantic tokens
-12. Test responsive behavior at all breakpoints
-13. Audit accessibility (ARIA, focus states, contrast)
-
----
-[FIGMA LINK OR DESCRIPTION HERE]
----
-```
-
-## References
-
-- `references/atomic-hierarchy.md` - Detailed atom/molecule/organism examples
-- `references/figma-mcp-integration.md` - Figma MCP commands and token extraction
-- `references/responsive-patterns.md` - Mobile-first responsive patterns
-- `references/component-templates.md` - Copy-paste component templates
+| File | When to Read |
+|------|--------------|
+| `tokens/colors.json` | Need color values |
+| `tokens/typography.json` | Need font specs |
+| `tokens/spacing.json` | Need spacing/shadows |
+| `tokens/components.json` | Building Button/Input/Card |
+| `tokens/breakpoints.json` | Adding responsive styles |
+| `references/atomic-hierarchy.md` | Full component examples |
+| `references/component-templates.md` | Copy-paste templates |
+| `references/figma-mcp-integration.md` | Extracting from Figma |
+| `references/responsive-patterns.md` | Responsive patterns |
