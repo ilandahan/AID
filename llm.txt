@@ -1,0 +1,158 @@
+# AID - AI Development Methodology
+# LLM Context File (llm.txt)
+# Version: 1.0.0
+# Author: Ilan Dahan
+# Last Updated: 2025-12-11
+
+## Overview
+
+AID (AI Development Methodology) is a comprehensive, end-to-end framework for AI-assisted software development. It transforms raw requirements into production-ready software using Claude Code with integrated MCP (Model Context Protocol) services.
+
+Core Philosophy: Systematic, repeatable processes with built-in quality gates and continuous context tracking.
+
+## Quick Start
+
+For Non-Technical Users:
+```
+Open Claude Code in AID folder → Type: /setup
+```
+
+For Technical Users:
+```bash
+./install.sh
+./scripts/init-project.sh my-app
+cd my-app
+/good-morning
+```
+
+## The 5-Phase Gated Methodology
+
+CRITICAL: Phases are enforced. Work from future phases is blocked.
+
+| Phase | Name | Allowed Work | Blocked |
+|-------|------|--------------|---------|
+| 1 | PRD | Requirements, scope, user stories | Code, architecture |
+| 2 | Tech Spec | + Architecture, schemas, APIs | Code, Jira |
+| 3 | Breakdown | + Jira epics, stories, tasks | Production code |
+| 4 | Development | + Code, tests, components | Deployment |
+| 5 | QA & Ship | Everything | - |
+
+Phase State: `.aid/state.json`
+Work Context: `.aid/context.json`
+
+## Essential Commands
+
+### Daily Workflow
+- `/good-morning` - Morning startup, load context, continue work
+- `/context` - Show current task and step
+- `/context-update` - Update progress manually
+
+### Phase Management
+- `/phase` - Show current phase
+- `/gate-check` - Check if ready to advance
+- `/phase-approve` - Human sign-off required
+- `/phase-advance` - Move to next phase
+
+### Development
+- `/prd [feature]` - Create Product Requirements (Phase 1)
+- `/tech-spec [feature]` - Technical Specification (Phase 2)
+- `/jira-breakdown` - Break into tasks (Phase 3)
+- `/design-system` - Build from Figma (Phase 4)
+- `/build-page` - Compose pages (Phase 4)
+- `/write-tests` - TDD methodology (Phase 4)
+- `/code-review` - Review code (Phase 5)
+
+## Skills System
+
+7 Specialized skills loaded based on phase:
+
+1. **phase-enforcement** - Blocks future phase work (Always active)
+2. **context-tracking** - Maintains work continuity (Always active)
+3. **system-architect** - Architecture design (Phase 2)
+4. **atomic-design** - Design system from Figma (Phase 4)
+5. **atomic-page-builder** - Compose pages (Phase 4)
+6. **code-review** - Code quality review (Phase 4-5)
+7. **test-driven** - TDD methodology (Phase 4-5)
+
+## MCP Integrations
+
+6 Configured MCP servers:
+- **Atlassian** - Jira/Confluence for project management
+- **GitHub** - Repository operations
+- **Figma** - Design token extraction
+- **Chrome DevTools** - Browser automation/testing
+- **PostgreSQL** - Database queries
+- **Filesystem** - File operations
+
+## Project Structure
+
+```
+AID/
+├── .claude/commands/     # 21 slash commands
+├── skills/               # 7 specialized skills
+├── docs/                 # Documentation
+├── integrations/         # MCP setup guides
+├── templates/            # Project templates
+├── scripts/              # Automation scripts
+├── .aid/                 # State & context (project-specific)
+│   ├── state.json        # Phase state
+│   └── context.json      # Work context
+└── CLAUDE.md             # Critical Claude instructions
+```
+
+## Technology Stack
+
+- **Frontend**: Next.js 16, React 19, TypeScript 5.9, SCSS
+- **Backend**: Node.js 18+, Next.js API Routes, JWT
+- **Database**: PostgreSQL 16+, Prisma 6.1
+- **Testing**: Jest 29, Testing Library, Puppeteer
+- **DevOps**: Docker, Docker Compose
+
+## Key Principles
+
+### Phase Gate Enforcement
+- Claude MUST read `.aid/state.json` before any work
+- Work is classified and validated against current phase
+- Future phase work is REFUSED with clear message
+
+### TDD Methodology
+- Tests written BEFORE implementation
+- Minimal mocking (<20%)
+- Realistic test data
+- Strong assertions
+
+### Atomic Design
+- Design tokens from Figma
+- Hierarchy: Atoms → Molecules → Organisms → Templates → Pages
+- Zero hardcoded values
+- All styles encapsulated in components
+
+## Critical Files
+
+| File | Purpose |
+|------|---------|
+| `CLAUDE.md` | Phase enforcement rules |
+| `.aid/state.json` | Current phase state |
+| `.aid/context.json` | Work context tracking |
+| `docs/PRD.md` | Product requirements |
+| `docs/TECH-SPEC.md` | Technical specification |
+| `.mcp.json` | MCP server configuration |
+
+## Documentation Links
+
+- Phase System: `docs/PHASE-GATES.md`
+- Context Tracking: `docs/WORK-CONTEXT-TRACKER.md`
+- Daily Workflow: `docs/MORNING-STARTUP.md`
+- Skills: `skills/*/SKILL.md`
+- MCP Setup: `docs/mcp-setup.md`
+
+## Contact & Support
+
+- Repository: https://github.com/ilandahan/AID
+- Issues: GitHub Issues
+- Author: Ilan Dahan
+
+---
+
+For detailed documentation, see: llms-full.txt
+For shorter summary, see: llms.txt

@@ -1,0 +1,57 @@
+# AID - AI Development Methodology
+# Short LLM Context Summary
+
+> Transform raw requirements into production-ready software using Claude Code
+
+## What is AID?
+
+AID is a 5-phase gated methodology for AI-assisted development:
+
+1. **PRD** - Product Requirements Document
+2. **Tech Spec** - Architecture & API design
+3. **Breakdown** - Jira epics/stories/tasks
+4. **Development** - TDD coding with atomic design
+5. **QA & Ship** - Review, test, deploy
+
+## Key Constraint
+
+**Phase gates are enforced.** You cannot write code in Phase 1, cannot create Jira issues in Phase 2, etc. Human approval required between phases.
+
+## Essential Commands
+
+```
+/good-morning     # Daily startup
+/phase            # Show current phase
+/phase-approve    # Get sign-off
+/phase-advance    # Move to next phase
+/context          # Show current task
+```
+
+## State Files
+
+- `.aid/state.json` - Which phase we're in
+- `.aid/context.json` - Current task/step tracking
+
+## Skills
+
+- phase-enforcement - Blocks future phase work
+- context-tracking - Work continuity
+- system-architect - Architecture (Phase 2)
+- atomic-design - Figma → components (Phase 4)
+- atomic-page-builder - Compose pages (Phase 4)
+- code-review - Quality review (Phase 5)
+- test-driven - TDD methodology (Phase 4-5)
+
+## MCP Integrations
+
+Atlassian (Jira), GitHub, Figma, Chrome DevTools, PostgreSQL, Filesystem
+
+## Tech Stack
+
+Next.js 16 | React 19 | TypeScript | PostgreSQL | Prisma | Jest
+
+## More Info
+
+- Full docs: llms-full.txt
+- Main docs: llm.txt
+- Instructions: CLAUDE.md

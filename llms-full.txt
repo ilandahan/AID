@@ -1,0 +1,1569 @@
+# AID - AI Development Methodology
+# Comprehensive LLM Context Documentation
+# Version: 1.0.0
+# Author: Ilan Dahan
+# Last Updated: 2025-12-11
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+1. Overview & Philosophy
+2. The 5-Phase Gated Methodology (Detailed)
+3. State Management System
+4. Complete Command Reference
+5. Skills System (Detailed)
+6. MCP Integrations (Detailed)
+7. Project Structure & Files
+8. Technology Stack
+9. Installation & Setup
+10. Daily Workflow
+11. Development Standards
+12. Testing Standards
+13. Atomic Design System
+14. Code Quality Rules
+15. Environment Configuration
+16. Troubleshooting
+
+================================================================================
+1. OVERVIEW & PHILOSOPHY
+================================================================================
+
+AID (AI Development Methodology) is a comprehensive, end-to-end framework for
+AI-assisted software development created by Ilan Dahan.
+
+MISSION: Transform raw requirements into production-ready software using Claude
+Code with integrated MCP (Model Context Protocol) services.
+
+CORE PHILOSOPHY:
+- Systematic, repeatable processes
+- Built-in quality gates
+- Continuous context tracking
+- Phase-based workflow enforcement
+- TDD-first development
+- Atomic design principles
+
+KEY DIFFERENTIATORS:
+1. Phase gates prevent premature coding
+2. Context tracking ensures session continuity
+3. MCP integrations connect to real tools (Jira, Figma, GitHub)
+4. Specialized skills for each development phase
+5. Human approval required between phases
+
+================================================================================
+2. THE 5-PHASE GATED METHODOLOGY (DETAILED)
+================================================================================
+
+CRITICAL: Phases are strictly enforced. Claude MUST check `.aid/state.json`
+before accepting ANY work request.
+
+------------------------------------------------------------------------------
+PHASE 1: PRD (Product Requirements Document)
+------------------------------------------------------------------------------
+Purpose: Transform raw requirements into structured PRD
+
+ALLOWED:
+- Requirements gathering
+- Scope definition
+- User stories
+- Acceptance criteria
+- Stakeholder input analysis
+
+BLOCKED:
+- Code writing
+- Architecture design
+- Database schemas
+- API design
+- Jira issue creation
+
+Input: Raw requirements, notes, stakeholder input
+Output: docs/PRD.md, .aid/approvals/prd-approved.md
+
+------------------------------------------------------------------------------
+PHASE 2: Technical Specification
+------------------------------------------------------------------------------
+Purpose: Design system architecture and technical approach
+
+ALLOWED:
+- All Phase 1 work
+- System architecture
+- Database schema design
+- API endpoint design
+- Technology decisions
+- Component architecture
+- Security design
+
+BLOCKED:
+- Production code
+- Jira issue creation
+- Deployment
+
+Input: Approved PRD
+Output: docs/TECH-SPEC.md, .aid/approvals/tech-spec-approved.md
+
+------------------------------------------------------------------------------
+PHASE 3: Breakdown
+------------------------------------------------------------------------------
+Purpose: Break technical spec into actionable tasks
+
+ALLOWED:
+- All Phase 1-2 work
+- Jira epic creation
+- Story creation
+- Task breakdown
+- Estimation
+- Sprint planning
+
+BLOCKED:
+- Production code
+- Deployment
+
+Input: Approved tech spec
+Output: docs/JIRA-BREAKDOWN.md, .aid/approvals/breakdown-approved.md
+
+------------------------------------------------------------------------------
+PHASE 4: Development
+------------------------------------------------------------------------------
+Purpose: Implement features using TDD and atomic design
+
+ALLOWED:
+- All Phase 1-3 work
+- Writing production code
+- Writing tests (TDD)
+- Component development
+- Database migrations
+- API implementation
+
+BLOCKED:
+- Production deployment
+
+Input: Approved breakdown
+Output: Working code with tests
+
+------------------------------------------------------------------------------
+PHASE 5: QA & Ship
+------------------------------------------------------------------------------
+Purpose: Quality assurance and deployment
+
+ALLOWED:
+- Everything
+- Code review
+- Test review
+- Performance testing
+- Security audit
+- Documentation
+- Deployment
+
+Input: Completed development
+Output: Production-ready application
+
+------------------------------------------------------------------------------
+PHASE TRANSITIONS
+------------------------------------------------------------------------------
+
+To advance between phases:
+1. Complete all phase requirements
+2. Run: /gate-check (verify readiness)
+3. Run: /phase-approve (human sign-off)
+4. Run: /phase-advance (move to next phase)
+
+Override: User can say "override: [reason]" - logged to .aid/overrides.log
+
+================================================================================
+3. STATE MANAGEMENT SYSTEM
+================================================================================
+
+------------------------------------------------------------------------------
+Phase State: .aid/state.json
+------------------------------------------------------------------------------
+
+Tracks which phase the project is currently in.
+
+Structure:
+```json
+{
+  "current_phase": 1,
+  "phase_name": "PRD",
+  "started_at": "2025-12-11T10:00:00Z",
+  "phases": {
+    "1": { "status": "in_progress", "started_at": "...", "completed_at": null },
+    "2": { "status": "locked" },
+    "3": { "status": "locked" },
+    "4": { "status": "locked" },
+    "5": { "status": "locked" }
+  },
+  "artifacts": {
+    "prd": "docs/PRD.md",
+    "tech_spec": null,
+    "breakdown": null
+  }
+}
+```
+
+Status Values:
+- not_started: Phase hasn't begun
+- in_progress: Currently active phase
+- blocked: Waiting for dependency
+- complete: Phase finished and approved
+- locked: Cannot access until previous phases complete
+
+------------------------------------------------------------------------------
+Work Context: .aid/context.json
+------------------------------------------------------------------------------
+
+Real-time tracking of current work at task and step levels.
+
+Structure:
+```json
+{
+  "last_updated": "2025-12-11T14:30:00Z",
+  "session_id": "2025-12-11-afternoon",
+
+  "tasks": {
+    "previous": {
+      "key": "PROJ-123",
+      "title": "Implement login form",
+      "status": "done"
+    },
+    "current": {
+      "key": "PROJ-124",
+      "title": "Add password validation",
+      "status": "in_progress"
+    },
+    "next": {
+      "key": "PROJ-125",
+      "title": "Create forgot password flow",
+      "status": "todo"
+    }
+  },
+
+  "current_task_steps": {
+    "previous": {
+      "name": "Write validation tests",
+      "status": "done",
+      "completed_at": "2025-12-11T13:45:00Z"
+    },
+    "current": {
+      "name": "Implement validation logic",
+      "status": "in_progress",
+      "progress": "60%",
+      "notes": "Regex patterns complete, strength meter pending"
+    },
+    "next": {
+      "name": "Add error messages",
+      "status": "pending"
+    }
+  },
+
+  "blockers": [],
+
+  "session_log": [
+    {
+      "timestamp": "2025-12-11T09:00:00Z",
+      "action": "session_started",
+      "details": "Morning startup via /good-morning"
+    },
+    {
+      "timestamp": "2025-12-11T09:05:00Z",
+      "action": "task_started",
+      "details": "Started PROJ-124: Add password validation"
+    }
+  ]
+}
+```
+
+Context Update Triggers:
+- Before starting work (read context)
+- Starting new task (shift tasks, reset steps)
+- Starting new step (shift steps, add to log)
+- Completing step (mark done, add notes)
+- Completing task (mark done, shift all)
+- End of session (save full state)
+
+Session Log Actions:
+- session_started
+- session_ended
+- task_started
+- task_completed
+- step_started
+- step_completed
+- progress_update
+- blocker_noted
+- context_saved
+
+================================================================================
+4. COMPLETE COMMAND REFERENCE
+================================================================================
+
+------------------------------------------------------------------------------
+SETUP COMMANDS
+------------------------------------------------------------------------------
+
+/setup
+  Purpose: Complete guided setup for non-technical users
+  When: First time using AID
+  Action: Interactive installation wizard
+
+/link-project [path]
+  Purpose: Link existing project to AID via symbolic links
+  When: Using AID with separate project folder
+  Action: Creates symlinks for .claude/, CLAUDE.md, skills/
+
+------------------------------------------------------------------------------
+DAILY WORKFLOW COMMANDS
+------------------------------------------------------------------------------
+
+/good-morning
+  Purpose: Daily startup routine
+  When: Beginning of each work session
+  Action:
+    1. Check Docker status
+    2. Check MCP connections
+    3. Load phase state
+    4. Load work context
+    5. Display where you left off
+    6. Ask what to continue
+
+/context
+  Purpose: Show current work context
+  When: Need to see current task/step
+  Action: Display tasks.current and current_task_steps.current
+
+/context-update
+  Purpose: Manually update work context
+  When: Progress made outside Claude Code
+  Action: Interactive context modification
+
+------------------------------------------------------------------------------
+PHASE MANAGEMENT COMMANDS
+------------------------------------------------------------------------------
+
+/aid-init
+  Purpose: Initialize project with AID phases
+  When: Starting new project
+  Action: Create .aid/ directory with state.json and context.json
+
+/phase
+  Purpose: Show current phase status
+  When: Check which phase you're in
+  Action: Display current_phase, phase_name, progress
+
+/gate-check
+  Purpose: Verify readiness to advance
+  When: Before requesting phase approval
+  Action: Check all phase requirements are met
+
+/phase-approve
+  Purpose: Human sign-off for current phase
+  When: Phase work is complete
+  Action: Create approval file, update state
+
+/phase-advance
+  Purpose: Move to next phase
+  When: After approval received
+  Action: Update state.json, unlock next phase
+
+------------------------------------------------------------------------------
+TESTING COMMANDS
+------------------------------------------------------------------------------
+
+/aid-test
+  Purpose: Run full methodology test suite
+  When: Verify AID installation works
+  Action: Simulate full workflow with mock approvals
+
+------------------------------------------------------------------------------
+DEVELOPMENT COMMANDS
+------------------------------------------------------------------------------
+
+/prd [feature]
+  Purpose: Create Product Requirements Document
+  Phase: 1
+  Skill: None
+  Action: Interactive PRD creation from requirements
+
+/tech-spec [feature]
+  Purpose: Create Technical Specification
+  Phase: 2
+  Skill: system-architect
+  Action: Architecture design from approved PRD
+
+/jira-breakdown
+  Purpose: Break spec into Jira issues
+  Phase: 3
+  Skill: None
+  Action: Create epics, stories, tasks in Jira
+
+/architecture
+  Purpose: System architecture design
+  Phase: 2
+  Skill: system-architect
+  Action: Design system architecture
+
+/design-system
+  Purpose: Build design system from Figma
+  Phase: 4
+  Skill: atomic-design
+  Action: Extract tokens, create components
+
+/build-page
+  Purpose: Compose pages from components
+  Phase: 4
+  Skill: atomic-page-builder
+  Action: Build pages using existing design system
+
+/write-tests
+  Purpose: Write tests using TDD
+  Phase: 4
+  Skill: test-driven
+  Action: Create tests before implementation
+
+/test-review [path]
+  Purpose: Review test quality
+  Phase: 5
+  Skill: test-driven
+  Action: Audit tests against TDD standards
+
+/code-review [path]
+  Purpose: Review code changes
+  Phase: 5
+  Skill: code-review
+  Action: Comprehensive code quality review
+
+/start-project [name]
+  Purpose: Initialize new project
+  Phase: Any
+  Action: Create project structure
+
+================================================================================
+5. SKILLS SYSTEM (DETAILED)
+================================================================================
+
+Skills are specialized knowledge bases with workflows and prompts.
+Location: skills/*/SKILL.md
+
+------------------------------------------------------------------------------
+SKILL 1: Phase Enforcement (Always Active)
+------------------------------------------------------------------------------
+File: skills/phase-enforcement/SKILL.md
+
+Purpose: Enforce phase gates - block work from future phases
+
+Workflow:
+1. Read .aid/state.json
+2. Classify requested work by category
+3. Check if category allowed in current phase
+4. REFUSE if not allowed
+
+Work Categories:
+- requirements: PRD, scope, user stories
+- architecture: Tech spec, schemas, APIs
+- planning: Jira, task breakdown
+- coding: Implementation, tests
+- qa: Review, deployment
+
+Phase Permissions Matrix:
+| Phase | requirements | architecture | planning | coding | qa |
+|-------|--------------|--------------|----------|--------|-----|
+| 1     | ✓            | ✗            | ✗        | ✗      | ✗   |
+| 2     | ✓            | ✓            | ✗        | ✗      | ✗   |
+| 3     | ✓            | ✓            | ✓        | ✗      | ✗   |
+| 4     | ✓            | ✓            | ✓        | ✓      | ✗   |
+| 5     | ✓            | ✓            | ✓        | ✓      | ✓   |
+
+------------------------------------------------------------------------------
+SKILL 2: Context Tracking (Always Active)
+------------------------------------------------------------------------------
+File: skills/context-tracking/SKILL.md
+
+Purpose: Maintain real-time work context for session continuity
+
+Standard Component Development Steps:
+1. Load task context
+2. Read Tech Spec section
+3. Write tests (TDD)
+4. Implement component
+5. Run tests / fix
+6. Apply styling
+7. Self code review
+8. Update Jira
+9. Commit
+
+Update Protocol:
+- BEFORE starting: Read context
+- Starting task: Shift tasks, reset steps
+- Starting step: Shift steps, log
+- Completing step: Mark done, add notes
+- Completing task: Mark done, shift all
+
+------------------------------------------------------------------------------
+SKILL 3: System Architect (Phase 2)
+------------------------------------------------------------------------------
+File: skills/system-architect/SKILL.md
+
+Purpose: Architecture design for distributed systems
+
+Philosophy: "Make it work, make it right, make it fast - in that order"
+
+Guiding Principles:
+1. User journeys drive architecture
+2. Simplicity first, scale when needed
+3. Boring technology wins
+4. Design for failure
+
+Technology Defaults:
+- Database: PostgreSQL
+- Cache: Redis
+- Queue: Redis/BullMQ or SQS
+- API: REST + OpenAPI
+- Auth: OAuth2 + JWT
+- Cloud: AWS or GCP
+- Container: Docker + ECS/Cloud Run
+- Monitoring: Datadog or CloudWatch
+
+Workflows:
+1. Tech Spec Creation
+   - Analyze PRD
+   - Design data model
+   - Define API contracts
+   - Plan authentication
+   - Document architecture
+
+2. Architecture Design
+   - Identify components
+   - Define boundaries
+   - Plan communication
+   - Design for scale
+
+------------------------------------------------------------------------------
+SKILL 4: Atomic Design (Phase 4)
+------------------------------------------------------------------------------
+File: skills/atomic-design/SKILL.md
+
+Purpose: Build production design systems from Figma
+
+Methodology: Brad Frost's Atomic Design
+
+Hierarchy:
+1. Design Tokens (primitives → semantic)
+2. Atoms (Button, Input, Typography, Icon)
+3. Molecules (FormField, SearchBar, Card)
+4. Organisms (Header, Form, DataTable)
+5. Templates (DashboardLayout, AuthLayout)
+6. Pages (Complete views)
+
+Component Structure:
+```
+design-system/
+├── tokens/
+│   ├── primitives.ts    # Raw values
+│   └── semantic.ts      # Contextual tokens
+├── atoms/
+│   ├── Button/
+│   ├── Input/
+│   └── Typography/
+├── molecules/
+│   ├── FormField/
+│   └── Card/
+├── organisms/
+│   ├── Header/
+│   └── Form/
+├── templates/
+│   └── DashboardLayout/
+└── index.ts             # Public API
+```
+
+Key Rules:
+- All visual styles encapsulated (NO visual props)
+- Only content/behavior as props
+- Full TypeScript types
+- Accessibility built-in (WCAG 2.1 AA)
+- Zero hardcoded colors/spacing/typography
+- Responsive by default
+
+------------------------------------------------------------------------------
+SKILL 5: Atomic Page Builder (Phase 4)
+------------------------------------------------------------------------------
+File: skills/atomic-page-builder/SKILL.md
+
+Purpose: Compose pages using ONLY existing components
+
+Dependency: Requires atomic-design skill
+
+Core Principle: COMPOSE, NEVER CREATE
+
+Workflow:
+1. Component Inventory
+   - List all existing components
+   - Categorize by level
+
+2. Gap Analysis
+   - Identify needed components
+   - Check if they exist
+
+3. STOP if gaps exist
+   - Switch to atomic-design skill
+   - Create missing components first
+
+4. Page Composition (if no gaps)
+   - Import components
+   - Compose layout
+   - Pass content props only
+
+Forbidden Patterns:
+- Creating new atoms/molecules in page files
+- Inline styles
+- Hardcoded values (colors, spacing, fonts)
+- External UI libraries
+- CSS classes for styling
+
+Output Checklist:
+- [ ] All components from design system
+- [ ] Zero hardcoded colors
+- [ ] Zero hardcoded spacing
+- [ ] Zero hardcoded typography
+- [ ] Zero new component definitions
+- [ ] Layout uses only design tokens
+
+------------------------------------------------------------------------------
+SKILL 6: Code Review (Phase 4-5)
+------------------------------------------------------------------------------
+File: skills/code-review/SKILL.md
+
+Purpose: Thorough review against professional standards
+
+Review Checklists:
+
+1. Pre-implementation Workflow
+   - Was the task understood before coding?
+   - Was design considered?
+
+2. No Shortcuts
+   - No silent try-except
+   - No magic numbers
+   - No copy-paste code
+
+3. No Hardcoded Values
+   - Colors from tokens
+   - Strings externalized
+   - Paths configurable
+
+4. No Default Value Abuse
+   - Defaults make sense
+   - No hidden behavior
+
+5. Root Cause Fixes
+   - Fix cause, not symptom
+   - No workarounds
+
+6. Code Quality
+   - Single responsibility
+   - Clear naming
+   - Appropriate abstraction
+
+7. Architecture & Patterns
+   - Consistent patterns
+   - Proper boundaries
+
+8. Testing & Validation
+   - Tests exist
+   - Edge cases covered
+
+9. Documentation
+   - Complex logic documented
+   - API documented
+
+Red Flags:
+- Fragile code
+- Quick fixes
+- Performance shortcuts
+- Security gaps
+- Test manipulation
+
+Verdict Options:
+- Ready ✓ - Ship it
+- Needs Review ⚠️ - Minor issues
+- Needs Rework ✗ - Major problems
+
+------------------------------------------------------------------------------
+SKILL 7: Test-Driven Development (Phase 4-5)
+------------------------------------------------------------------------------
+File: skills/test-driven/SKILL.md
+
+Purpose: Write tests BEFORE implementation
+
+TDD Workflow:
+1. Understand requirements
+2. Design test cases
+3. Write tests FIRST (must fail - red)
+4. Implement to pass (green)
+5. Refactor (clean)
+
+Minimal Mocking Strategy:
+Target: <20% mocking in test suite
+
+USE REAL:
+- Database (test instance)
+- Redis
+- File system
+- HTTP (test server)
+- Time-based logic
+
+MOCK ONLY:
+- External paid APIs
+- Non-deterministic services
+- Third-party services with rate limits
+
+Test Data Requirements:
+- Realistic, production-like
+- Not simplified "test" strings
+- Proper dates, names, amounts
+- Edge case values
+
+Strong Assertions:
+BAD:
+```javascript
+expect(result).toBeDefined()
+expect(user).not.toBeNull()
+```
+
+GOOD:
+```javascript
+expect(result.status).toBe('success')
+expect(user.email).toBe('john@example.com')
+```
+
+Coverage Checklist:
+- [ ] Happy path
+- [ ] Edge cases
+- [ ] Error conditions
+- [ ] Exception handling
+- [ ] Async flows
+- [ ] Integration scenarios
+- [ ] Regression tests
+
+Anti-Patterns to Avoid:
+- Mock Hell: Excessive mocking
+- Weak Assertions: toBeDefined, not toBeNull
+- Simplified Data: "test", "foo", "bar"
+- Test Modification: Changing tests to pass
+- Overfitting: Tests tied to implementation
+- Shared State: Tests affecting each other
+- Hidden Failures: Silent catches in tests
+
+================================================================================
+6. MCP INTEGRATIONS (DETAILED)
+================================================================================
+
+Configuration: .mcp.json
+
+------------------------------------------------------------------------------
+ATLASSIAN (Jira/Confluence)
+------------------------------------------------------------------------------
+Type: SSE (Server-Sent Events)
+URL: https://mcp.atlassian.com/v1/sse
+
+Purpose:
+- Create/manage Jira epics
+- Create stories and tasks
+- Update issue status
+- Access Confluence docs
+
+Setup:
+1. Go to .mcp.json
+2. SSE connection is pre-configured
+3. OAuth authentication in browser when first used
+
+Capabilities:
+- jira_create_issue
+- jira_update_issue
+- jira_search
+- jira_get_issue
+- confluence_get_page
+- confluence_create_page
+
+------------------------------------------------------------------------------
+GITHUB
+------------------------------------------------------------------------------
+Command: npx @modelcontextprotocol/server-github
+Env Var: GITHUB_PERSONAL_ACCESS_TOKEN
+
+Purpose:
+- Repository operations
+- Pull request management
+- Issue tracking
+- Code review
+
+Setup:
+1. Create Personal Access Token at github.com/settings/tokens
+2. Add to .env: GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxx
+
+Capabilities:
+- github_create_repo
+- github_create_pr
+- github_merge_pr
+- github_create_issue
+- github_get_file
+- github_push_files
+
+------------------------------------------------------------------------------
+FIGMA
+------------------------------------------------------------------------------
+Command: npx figma-developer-mcp
+Env Var: FIGMA_API_KEY
+
+Purpose:
+- Extract design tokens
+- Get component specs
+- Export assets
+- Read styles
+
+Setup Options:
+
+Option A: API-Based
+1. Go to Figma → Settings → Account → Personal access tokens
+2. Create token
+3. Add to .env: FIGMA_API_KEY=figd_xxx
+
+Option B: Dev Mode Local
+1. Open Figma file
+2. Press Shift+D for Dev Mode
+3. Enable MCP server in Dev Mode settings
+4. Local connection established
+
+Capabilities:
+- figma_get_file
+- figma_get_styles
+- figma_get_components
+- figma_export_images
+
+------------------------------------------------------------------------------
+CHROME DEVTOOLS
+------------------------------------------------------------------------------
+Command: npx chrome-devtools-mcp@latest
+
+Purpose:
+- Browser automation
+- UI testing
+- Performance audits
+- Screenshot capture
+
+Use Cases:
+1. Development
+   - Live UI verification
+   - Console monitoring
+   - Network inspection
+
+2. Testing
+   - Screenshot comparison
+   - E2E flow automation
+   - Visual regression
+
+3. Review
+   - Performance audits
+   - Core Web Vitals
+   - Accessibility checks
+
+Test Artifacts: Saved to test-recordings/
+
+Capabilities:
+- chrome_navigate
+- chrome_screenshot
+- chrome_click
+- chrome_type
+- chrome_evaluate
+- chrome_get_console
+- chrome_performance_audit
+
+------------------------------------------------------------------------------
+POSTGRESQL
+------------------------------------------------------------------------------
+Command: npx @modelcontextprotocol/server-postgres
+Env Var: DATABASE_URL
+
+Purpose:
+- Database queries
+- Schema inspection
+- Data management
+
+Setup:
+1. Add to .env: DATABASE_URL=postgresql://user:pass@host:5432/db
+
+Capabilities:
+- postgres_query
+- postgres_get_schema
+- postgres_list_tables
+
+------------------------------------------------------------------------------
+FILESYSTEM
+------------------------------------------------------------------------------
+Command: npx @modelcontextprotocol/server-filesystem
+Root: Current directory
+
+Purpose:
+- File operations
+- Directory management
+
+Capabilities:
+- fs_read_file
+- fs_write_file
+- fs_list_directory
+- fs_create_directory
+
+================================================================================
+7. PROJECT STRUCTURE & FILES
+================================================================================
+
+```
+AID/
+├── .claude/                          # Claude Code integration
+│   ├── commands/                     # Slash commands (21 files)
+│   │   ├── aid-init.md
+│   │   ├── aid-test.md
+│   │   ├── architecture.md
+│   │   ├── build-page.md
+│   │   ├── code-review.md
+│   │   ├── context-update.md
+│   │   ├── context.md
+│   │   ├── design-system.md
+│   │   ├── gate-check.md
+│   │   ├── good-morning.md
+│   │   ├── jira-breakdown.md
+│   │   ├── link-project.md
+│   │   ├── phase-advance.md
+│   │   ├── phase-approve.md
+│   │   ├── phase.md
+│   │   ├── prd.md
+│   │   ├── setup.md
+│   │   ├── start-project.md
+│   │   ├── tech-spec.md
+│   │   ├── test-review.md
+│   │   └── write-tests.md
+│   └── settings.local.json           # Local Claude settings
+│
+├── .mcp.json                         # MCP server configuration
+│
+├── skills/                           # Specialized skills
+│   ├── phase-enforcement/
+│   │   └── SKILL.md
+│   ├── context-tracking/
+│   │   └── SKILL.md
+│   ├── system-architect/
+│   │   ├── SKILL.md
+│   │   └── references/
+│   ├── atomic-design/
+│   │   ├── SKILL.md
+│   │   └── references/
+│   │       ├── atomic-methodology.md
+│   │       ├── component-structure.md
+│   │       ├── design-tokens.md
+│   │       └── figma-mcp-integration.md
+│   ├── atomic-page-builder/
+│   │   └── SKILL.md
+│   ├── code-review/
+│   │   ├── SKILL.md
+│   │   └── references/
+│   └── test-driven/
+│       ├── SKILL.md
+│       └── references/
+│           ├── anti-patterns.md
+│           └── review-checklist.md
+│
+├── docs/                             # Documentation
+│   ├── PHASE-GATES.md                # Phase system details
+│   ├── WORK-CONTEXT-TRACKER.md       # Context tracking system
+│   ├── MORNING-STARTUP.md            # Daily workflow
+│   ├── TEST-SCENARIOS.md             # Testing workflows
+│   ├── UPGRADE-GUIDE.md              # Version upgrades
+│   ├── mcp-setup.md                  # MCP configuration
+│   ├── phases/
+│   │   └── overview.md               # 8-phase detailed guide
+│   └── prompts/                      # Prompt templates
+│
+├── integrations/                     # MCP integration guides
+│   ├── jira/README.md
+│   ├── github/README.md
+│   ├── figma/README.md
+│   └── chrome-devtools/README.md
+│
+├── templates/                        # Project templates
+│   ├── .aid/
+│   │   ├── state.json.template
+│   │   └── context.json.template
+│   └── prd-template.md
+│
+├── scripts/                          # Automation
+│   ├── init-project.sh
+│   ├── startup-check.sh
+│   ├── migrate.js
+│   ├── create-migration.js
+│   └── generate-keys.js
+│
+├── src/                              # Example application
+│   ├── app/                          # Next.js app
+│   ├── components/                   # React components
+│   └── styles/                       # SCSS styles
+│
+├── prisma/                           # Database ORM
+│   └── schema.prisma
+│
+├── public/                           # Static assets
+├── testing/                          # Test utilities
+├── test-recordings/                  # Browser test artifacts
+│
+├── CLAUDE.md                         # Critical Claude instructions
+├── README.md                         # Main documentation
+├── DEPENDENCIES.md                   # Dependency guide
+├── package.json                      # Node dependencies
+├── .env.example                      # Environment template
+├── tsconfig.json                     # TypeScript config
+├── jest.config.js                    # Jest config
+├── next.config.js                    # Next.js config
+├── Makefile                          # Build automation
+├── Dockerfile                        # Container definition
+├── docker-compose.yml                # Multi-container setup
+└── install.sh                        # Installation script
+```
+
+================================================================================
+8. TECHNOLOGY STACK
+================================================================================
+
+FRONTEND
+- Framework: Next.js 16
+- Library: React 19
+- Language: TypeScript 5.9
+- Styling: SCSS (CSS Modules)
+- UI System: Atomic Design
+
+BACKEND
+- Runtime: Node.js 18+
+- Framework: Next.js API Routes
+- Language: TypeScript
+- Authentication: JWT + bcryptjs
+
+DATABASE
+- Primary: PostgreSQL 16+
+- ORM: Prisma 6.1
+- Client: pg
+- Dev Environment: Docker Compose
+
+TESTING
+- Framework: Jest 29
+- React: @testing-library/react
+- DOM: @testing-library/jest-dom
+- E2E: Puppeteer 24
+- API: Supertest
+- TypeScript: ts-jest
+
+BUILD & DEPLOYMENT
+- Bundler: Next.js (built-in)
+- Container: Docker
+- Orchestration: Docker Compose
+- Package Manager: npm
+
+UTILITIES
+- Class Names: clsx
+- SVG: @svgr/webpack
+- Environment: dotenv
+
+================================================================================
+9. INSTALLATION & SETUP
+================================================================================
+
+------------------------------------------------------------------------------
+NON-TECHNICAL USERS (Recommended)
+------------------------------------------------------------------------------
+
+1. Download Claude Code Desktop
+2. Download/extract AID folder
+3. Open folder in Claude Code
+4. Type: /setup
+5. Follow interactive guide
+
+------------------------------------------------------------------------------
+TECHNICAL USERS
+------------------------------------------------------------------------------
+
+# Clone repository
+git clone https://github.com/ilandahan/AID.git
+cd AID
+
+# Run installation
+./install.sh
+
+# Or use Makefile
+make install
+
+# IMPORTANT: Restart Claude Code after installation
+
+------------------------------------------------------------------------------
+MANUAL SETUP
+------------------------------------------------------------------------------
+
+# Install dependencies
+npm install
+
+# Pre-install MCP servers
+npm install -g @modelcontextprotocol/server-github
+npm install -g @modelcontextprotocol/server-postgres
+npm install -g @modelcontextprotocol/server-filesystem
+npm install -g figma-developer-mcp
+npm install -g chrome-devtools-mcp
+
+# Copy environment file
+cp .env.example .env
+
+# Edit .env with your credentials
+# - GITHUB_PERSONAL_ACCESS_TOKEN
+# - FIGMA_API_KEY
+# - DATABASE_URL
+# - ATLASSIAN credentials (if using)
+
+------------------------------------------------------------------------------
+PROJECT LINKING (Separate Projects)
+------------------------------------------------------------------------------
+
+Structure:
+```
+workspace/
+├── AID/                    ← This repo (shared tools)
+└── my-project/             ← Your project
+```
+
+Mac/Linux:
+```bash
+cd my-project
+ln -s ../AID/.claude .claude
+ln -s ../AID/CLAUDE.md CLAUDE.md
+ln -s ../AID/skills skills
+mkdir -p .aid
+```
+
+Windows (PowerShell as Admin):
+```powershell
+cd my-project
+New-Item -ItemType SymbolicLink -Path ".claude" -Target "..\AID\.claude"
+New-Item -ItemType SymbolicLink -Path "CLAUDE.md" -Target "..\AID\CLAUDE.md"
+New-Item -ItemType SymbolicLink -Path "skills" -Target "..\AID\skills"
+mkdir .aid
+```
+
+Or use: /link-project [path]
+
+================================================================================
+10. DAILY WORKFLOW
+================================================================================
+
+------------------------------------------------------------------------------
+MORNING STARTUP (/good-morning)
+------------------------------------------------------------------------------
+
+1. System Checks
+   - Docker status
+   - MCP connections (Figma, Jira, GitHub)
+   - Database connection
+
+2. Context Loading
+   - Read .aid/state.json (phase)
+   - Read .aid/context.json (tasks)
+
+3. Status Display
+   - Current phase
+   - Current task
+   - Current step
+   - Progress notes
+
+4. Options Presented
+   a. Continue current step
+   b. Mark step complete, move to next
+   c. Mark task complete, move to next task
+   d. Switch to different task
+   e. Offline update (describe what you did)
+
+------------------------------------------------------------------------------
+TYPICAL DEVELOPMENT DAY
+------------------------------------------------------------------------------
+
+Morning:
+```
+/good-morning
+> Continue current step
+```
+
+During Work:
+```
+# Check context anytime
+/context
+
+# Update progress
+/context-update
+```
+
+Completing Steps:
+```
+# Step done
+/context-update step done
+
+# Task done
+/context-update task done
+```
+
+End of Day:
+```
+# Context auto-saves
+# Or explicitly save notes
+/context-update notes "Stopped mid-refactor, tests passing"
+```
+
+================================================================================
+11. DEVELOPMENT STANDARDS
+================================================================================
+
+CODE QUALITY REQUIREMENTS
+
+1. No Silent Failures
+   BAD:  try { ... } catch { }
+   GOOD: try { ... } catch(e) { logger.error(e); throw e; }
+
+2. No Magic Numbers
+   BAD:  if (status === 3)
+   GOOD: if (status === Status.APPROVED)
+
+3. No Hardcoded Values
+   BAD:  color: '#FF5733'
+   GOOD: color: tokens.colors.primary
+
+4. No Copy-Paste Code
+   BAD:  Duplicate logic in multiple places
+   GOOD: Extract to shared function/component
+
+5. Single Responsibility
+   BAD:  Function does 5 things
+   GOOD: Function does 1 thing well
+
+6. Clear Naming
+   BAD:  const d = getData()
+   GOOD: const userData = fetchUserProfile()
+
+7. Proper Error Handling
+   BAD:  Swallow errors
+   GOOD: Handle, log, and propagate appropriately
+
+8. No TODOs in Production
+   BAD:  // TODO: fix this later
+   GOOD: Complete the implementation
+
+================================================================================
+12. TESTING STANDARDS
+================================================================================
+
+TDD WORKFLOW
+
+1. RED: Write failing test
+2. GREEN: Write minimal code to pass
+3. REFACTOR: Clean up while tests pass
+
+MOCKING GUIDELINES
+
+Mock (<20% of tests):
+- External paid APIs (Stripe, SendGrid)
+- Non-deterministic services
+- Rate-limited third-party services
+
+Use Real:
+- Database (test instance)
+- Redis (test instance)
+- File system (temp directory)
+- HTTP (test server)
+- Time (control with libraries)
+
+TEST DATA
+
+BAD:
+```javascript
+const user = { name: 'test', email: 'test@test.com' }
+```
+
+GOOD:
+```javascript
+const user = {
+  name: 'Sarah Johnson',
+  email: 'sarah.johnson@company.com',
+  createdAt: new Date('2024-03-15T10:30:00Z'),
+  role: 'admin'
+}
+```
+
+ASSERTIONS
+
+BAD:
+```javascript
+expect(result).toBeDefined()
+expect(user).toBeTruthy()
+expect(items.length).toBeGreaterThan(0)
+```
+
+GOOD:
+```javascript
+expect(result.status).toBe('success')
+expect(user.email).toBe('sarah@company.com')
+expect(items).toHaveLength(3)
+expect(items[0].name).toBe('First Item')
+```
+
+COVERAGE REQUIREMENTS
+
+- Happy path: 100%
+- Error conditions: 100%
+- Edge cases: As many as reasonable
+- Integration: Key flows
+
+================================================================================
+13. ATOMIC DESIGN SYSTEM
+================================================================================
+
+HIERARCHY
+
+1. DESIGN TOKENS
+   - Primitives: Raw values (colors, spacing numbers)
+   - Semantic: Contextual meaning (primary, danger, spacing-md)
+
+2. ATOMS
+   - Smallest UI elements
+   - Button, Input, Typography, Icon, Badge
+
+3. MOLECULES
+   - Combinations of atoms
+   - FormField (Label + Input + Error)
+   - SearchBar (Input + Button)
+   - Card (Container + Content)
+
+4. ORGANISMS
+   - Complex UI sections
+   - Header (Logo + Nav + UserMenu)
+   - Form (Multiple FormFields + Submit)
+   - DataTable (Headers + Rows + Pagination)
+
+5. TEMPLATES
+   - Page layouts
+   - DashboardLayout (Sidebar + Header + Content)
+   - AuthLayout (Centered card)
+
+6. PAGES
+   - Complete views
+   - Specific content in templates
+
+COMPONENT RULES
+
+DO:
+- Use only design tokens for visual styles
+- Accept only content/behavior props
+- Include TypeScript types
+- Build in accessibility
+- Support all breakpoints
+
+DON'T:
+- Accept color/size/spacing props
+- Hardcode any values
+- Import external UI libraries
+- Create inline styles
+- Skip TypeScript
+
+EXAMPLE COMPONENT
+
+```typescript
+// atoms/Button/Button.tsx
+import styles from './Button.module.scss'
+
+interface ButtonProps {
+  children: React.ReactNode
+  onClick?: () => void
+  type?: 'button' | 'submit'
+  disabled?: boolean
+}
+
+export function Button({
+  children,
+  onClick,
+  type = 'button',
+  disabled = false
+}: ButtonProps) {
+  return (
+    <button
+      className={styles.button}
+      onClick={onClick}
+      type={type}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  )
+}
+```
+
+```scss
+// atoms/Button/Button.module.scss
+@use '../../tokens' as *;
+
+.button {
+  background: $color-primary;
+  color: $color-on-primary;
+  padding: $spacing-sm $spacing-md;
+  border-radius: $radius-md;
+  font-family: $font-family-base;
+  font-size: $font-size-md;
+
+  &:hover {
+    background: $color-primary-hover;
+  }
+
+  &:disabled {
+    background: $color-disabled;
+    cursor: not-allowed;
+  }
+}
+```
+
+================================================================================
+14. CODE QUALITY RULES
+================================================================================
+
+PROHIBITED PATTERNS
+
+1. Silent Exception Handling
+   ```javascript
+   // PROHIBITED
+   try { doSomething() } catch {}
+
+   // REQUIRED
+   try { doSomething() } catch(e) {
+     logger.error('Operation failed', e)
+     throw new OperationError('Failed to do something', e)
+   }
+   ```
+
+2. Commented-Out Code
+   ```javascript
+   // PROHIBITED
+   // const oldImplementation = () => {...}
+
+   // REQUIRED: Delete unused code, use git history
+   ```
+
+3. TODO/FIXME Comments
+   ```javascript
+   // PROHIBITED in production
+   // TODO: handle edge case
+
+   // REQUIRED: Complete implementation before merge
+   ```
+
+4. Hardcoded Strings
+   ```javascript
+   // PROHIBITED
+   return 'User not found'
+
+   // REQUIRED
+   return messages.USER_NOT_FOUND
+   ```
+
+5. Magic Numbers
+   ```javascript
+   // PROHIBITED
+   if (retries > 3)
+
+   // REQUIRED
+   if (retries > MAX_RETRIES)
+   ```
+
+6. Default Parameter Abuse
+   ```javascript
+   // PROHIBITED
+   function fetch(url, timeout = 0) // 0 means infinite??
+
+   // REQUIRED
+   function fetch(url, timeout = DEFAULT_TIMEOUT_MS)
+   ```
+
+================================================================================
+15. ENVIRONMENT CONFIGURATION
+================================================================================
+
+Copy .env.example to .env and configure:
+
+```bash
+# =============================================================================
+# ATLASSIAN (Jira / Confluence)
+# =============================================================================
+ATLASSIAN_SITE_URL=https://your-domain.atlassian.net
+ATLASSIAN_USER_EMAIL=your-email@company.com
+ATLASSIAN_API_TOKEN=your-api-token
+
+# =============================================================================
+# GITHUB
+# =============================================================================
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+
+# =============================================================================
+# FIGMA
+# =============================================================================
+FIGMA_API_KEY=figd_xxxxxxxxxxxxxxxxxxxx
+
+# =============================================================================
+# DATABASE
+# =============================================================================
+DATABASE_URL=postgresql://user:password@localhost:5432/database
+
+# =============================================================================
+# APPLICATION
+# =============================================================================
+JWT_SECRET=your-secret-key
+NODE_ENV=development
+```
+
+================================================================================
+16. TROUBLESHOOTING
+================================================================================
+
+COMMON ISSUES
+
+1. "Phase violation" error
+   - Check current phase: /phase
+   - Requested work is for a future phase
+   - Complete current phase first, or use override
+
+2. MCP connection failed
+   - Check .mcp.json configuration
+   - Verify environment variables in .env
+   - Restart Claude Code
+
+3. Context not loading
+   - Check .aid/context.json exists
+   - Verify JSON syntax
+   - Run /aid-init to recreate
+
+4. Commands not recognized
+   - Check .claude/commands/ exists
+   - Verify symbolic links if using linked project
+   - Restart Claude Code
+
+5. Tests failing
+   - Don't modify tests to pass
+   - Fix implementation instead
+   - Check test database connection
+
+6. Docker not running
+   - Start Docker Desktop
+   - Run: docker-compose up -d
+   - Check logs: docker-compose logs
+
+GETTING HELP
+
+- Documentation: docs/*.md
+- GitHub Issues: https://github.com/ilandahan/AID/issues
+- Slash command help: /help
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
