@@ -1,0 +1,133 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Variants */
+.primary {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.primary:active:not(:disabled) {
+  background: var(--color-primary-active);
+}
+
+.secondary {
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--color-primary-subtle);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--color-text-primary);
+}
+
+.ghost:hover:not(:disabled) {
+  background: var(--color-background-muted);
+}
+
+.danger {
+  background: var(--color-error);
+  color: var(--color-text-inverse);
+}
+
+.danger:hover:not(:disabled) {
+  background: var(--color-error-hover);
+}
+
+/* Sizes - Mobile first */
+.sm {
+  min-height: 36px;
+  padding: var(--spacing-2) var(--spacing-3);
+  font-size: var(--font-size-sm);
+}
+
+.md {
+  min-height: 44px;
+  padding: var(--spacing-2) var(--spacing-4);
+  font-size: var(--font-size-sm);
+}
+
+.lg {
+  min-height: 52px;
+  padding: var(--spacing-3) var(--spacing-5);
+  font-size: var(--font-size-base);
+}
+
+@media (min-width: 768px) {
+  .sm {
+    min-height: 32px;
+  }
+
+  .md {
+    min-height: 40px;
+    font-size: var(--font-size-base);
+  }
+
+  .lg {
+    min-height: 48px;
+  }
+}
+
+/* Full width */
+.fullWidth {
+  width: 100%;
+}
+
+/* Loading */
+.loading {
+  position: relative;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Icons */
+.iconLeft,
+.iconRight {
+  display: flex;
+  width: 1em;
+  height: 1em;
+}

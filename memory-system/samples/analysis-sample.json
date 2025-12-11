@@ -1,0 +1,166 @@
+{
+  "$schema": "aid-analysis-v1",
+  "version": "1.0",
+  
+  "batch_id": "BATCH-2025-01-15",
+  "analyzed_at": "2025-01-15T16:00:00Z",
+  
+  "input_summary": {
+    "feedback_count": 8,
+    "date_range": {
+      "from": "2025-01-01",
+      "to": "2025-01-15"
+    },
+    "by_role": {
+      "product-manager": 4,
+      "developer": 3,
+      "qa-engineer": 1
+    },
+    "by_phase": {
+      "discovery": 3,
+      "prd": 2,
+      "development": 2,
+      "qa-ship": 1
+    }
+  },
+  
+  "analysis_summary": {
+    "overall_avg_rating": 3.6,
+    "overall_avg_revisions": 2.4,
+    "positive_patterns_found": 3,
+    "negative_patterns_found": 2,
+    "suggestions_generated": 4
+  },
+  
+  "patterns_found": {
+    "positive": [
+      {
+        "id": "PAT-P01",
+        "description": "Asking about data flow early catches stakeholders",
+        "occurrences": 4,
+        "avg_rating_when_present": 4.2,
+        "avg_revisions_when_present": 1.5,
+        "supporting_quotes": [
+          "Data flow question helped identify IT team",
+          "Asking who touches data was useful"
+        ]
+      },
+      {
+        "id": "PAT-P02",
+        "description": "SCQ format produces clear problem statements",
+        "occurrences": 3,
+        "avg_rating_when_present": 4.5,
+        "avg_revisions_when_present": 1.0,
+        "supporting_quotes": [
+          "SCQ format was very clear",
+          "Problem statement structure helped"
+        ]
+      },
+      {
+        "id": "PAT-P03",
+        "description": "TDD approach reduces debugging time",
+        "occurrences": 3,
+        "avg_rating_when_present": 4.3,
+        "avg_revisions_when_present": 1.2,
+        "supporting_quotes": [
+          "Writing tests first caught edge cases",
+          "TDD prevented bugs"
+        ]
+      }
+    ],
+    "negative": [
+      {
+        "id": "PAT-N01",
+        "description": "Missing stakeholders in first draft",
+        "occurrences": 3,
+        "avg_rating_when_present": 2.3,
+        "avg_revisions_when_present": 4.5,
+        "supporting_quotes": [
+          "Missed IT department as stakeholder",
+          "Forgot compliance team"
+        ]
+      },
+      {
+        "id": "PAT-N02",
+        "description": "Vague acceptance criteria causing rework",
+        "occurrences": 2,
+        "avg_rating_when_present": 2.5,
+        "avg_revisions_when_present": 3.5,
+        "supporting_quotes": [
+          "Acceptance criteria weren't testable",
+          "Unclear what 'fast' means"
+        ]
+      }
+    ]
+  },
+  
+  "suggestions": [
+    {
+      "id": "SUG-001",
+      "type": "skill_update",
+      "confidence": 0.85,
+      "pattern_id": "PAT-P01",
+      "target": {
+        "file": "skills/roles/product-manager/cumulative.md",
+        "section": "High-Confidence Patterns"
+      },
+      "content": "- **Ask about data flow early**: \"Who else touches this data?\" prevents stakeholder misses (Evidence: 4 sessions, 4.2 avg rating)",
+      "reasoning": "Strong pattern with 4 occurrences and consistent positive outcomes"
+    },
+    {
+      "id": "SUG-002",
+      "type": "skill_update",
+      "confidence": 0.88,
+      "pattern_id": "PAT-P02",
+      "target": {
+        "file": "skills/roles/product-manager/cumulative.md",
+        "section": "High-Confidence Patterns"
+      },
+      "content": "- **Use SCQ format**: Situation-Complication-Question produces clear problem statements (Evidence: 3 sessions, 4.5 avg rating)",
+      "reasoning": "Very high rating correlation, clear methodology"
+    },
+    {
+      "id": "SUG-003",
+      "type": "skill_update",
+      "confidence": 0.75,
+      "pattern_id": "PAT-N01",
+      "target": {
+        "file": "skills/phases/discovery/cumulative.md",
+        "section": "Anti-Patterns Identified"
+      },
+      "content": "- **Don't skip stakeholder verification**: Always ask \"Who else touches this?\" before finalizing stakeholder list (Evidence: 3 sessions with misses)",
+      "reasoning": "Recurring issue with clear fix"
+    },
+    {
+      "id": "SUG-004",
+      "type": "memory_add",
+      "confidence": 0.78,
+      "pattern_id": "PAT-P01",
+      "entry": "AID:PM:DISC:ASK \"Who else touches this data?\" for stakeholders",
+      "reasoning": "Meets promotion criteria: 4 occurrences, 4.2 avg rating, 1.5 avg revisions"
+    }
+  ],
+  
+  "memory_candidates": [
+    {
+      "entry": "AID:PM:DISC:ASK \"Who else touches this data?\" for stakeholders",
+      "confidence": 0.78,
+      "meets_criteria": {
+        "occurrences": true,
+        "avg_rating": true,
+        "avg_revisions": true,
+        "fits_limit": true,
+        "is_context_free": true
+      }
+    }
+  ],
+  
+  "processing_notes": {
+    "feedback_quality": "good",
+    "confidence_level": "medium-high",
+    "suggested_actions": [
+      "Review and approve skill updates",
+      "Consider memory promotion for high-confidence patterns"
+    ]
+  }
+}
