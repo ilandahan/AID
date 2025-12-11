@@ -26,7 +26,17 @@ const nextConfig = {
     ],
   },
 
-  // Webpack configuration
+  // Turbopack configuration (Next.js 16+)
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
+
+  // Webpack configuration (fallback for non-Turbopack builds)
   webpack: (config, { isServer }) => {
     // Handle SVG imports
     config.module.rules.push({

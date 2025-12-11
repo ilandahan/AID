@@ -650,17 +650,141 @@ Browser automation and debugging - configured in `.mcp.json`:
 claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
 ```
 
-## Skills Overview
+## Skills & Sub-Agents
+
+AID uses a skill-based architecture where Claude loads specialized capabilities based on the current role and phase. Skills are sub-agent prompts that provide domain expertise for specific tasks.
+
+### How Skills Work
+
+```
+User Request → Claude identifies task type → Loads relevant skill → Applies expertise
+```
+
+Skills are defined in `.claude/skills/` and are loaded automatically based on:
+- **Current Phase** - Different skills for PRD vs Development vs QA
+- **User Role** - Product Manager, Developer, QA Engineer, Tech Lead
+- **Task Type** - Design system, testing, code review, architecture
+
+### Available Skills
+
+#### Core Skills (Always Active)
 
 | Skill | Description |
 |-------|-------------|
-| `phase-enforcement` | Phase gate enforcement (blocks work out of order) ⭐ |
-| `context-tracking` | Work context tracking (tasks, steps, progress) ⭐ |
-| `system-architect` | Architecture design, tech specs, API patterns |
-| `atomic-design` | Design system from Figma, tokens extraction |
-| `atomic-page-builder` | Page composition from existing components |
-| `code-review` | Automated code quality assessment |
-| `test-driven` | TDD methodology and test quality |
+| `phase-enforcement` | Phase gate enforcement - blocks work out of order ⭐ |
+| `context-tracking` | Work context tracking - tasks, steps, progress ⭐ |
+
+#### Phase Skills (Loaded Per-Phase)
+
+| Skill | Phase | Description |
+|-------|-------|-------------|
+| `aid-discovery` | 0 | Problem validation, stakeholder identification |
+| `aid-prd` | 1 | Product requirements, user stories, acceptance criteria |
+| `aid-tech-spec` | 2 | Architecture design, API contracts, data models |
+| `aid-development` | 4 | Implementation guidance, TDD practices |
+| `aid-qa-ship` | 5 | QA validation, release preparation |
+
+#### Development Skills
+
+| Skill | Command | Description |
+|-------|---------|-------------|
+| `atomic-design` | `/design-system` | Build design systems from Figma using atomic methodology |
+| `atomic-page-builder` | `/build-page` | Compose pages from existing design system components |
+| `system-architect` | `/architecture` | System architecture, API design, technical specifications |
+| `code-review` | `/code-review` | Comprehensive code quality and security review |
+| `test-driven` | `/write-tests` | TDD methodology with document-driven testing |
+
+#### Role Skills
+
+| Skill | Description |
+|-------|-------------|
+| `role-product-manager` | PM responsibilities: requirements, stories, scope |
+| `role-developer` | Dev responsibilities: implementation, code quality |
+| `role-qa-engineer` | QA responsibilities: test strategy, validation |
+| `role-tech-lead` | Lead responsibilities: architecture, reviews |
+
+### Skill Loading by Phase
+
+```
+Phase 1 (PRD)        → aid-prd + role-* skills
+Phase 2 (Tech Spec)  → aid-tech-spec + system-architect
+Phase 3 (Breakdown)  → role-* skills
+Phase 4 (Development)→ aid-development + atomic-design + test-driven
+Phase 5 (QA & Ship)  → aid-qa-ship + code-review + test-driven
+```
+
+### Using Skills Manually
+
+Skills can be invoked directly via slash commands:
+
+```bash
+# Build design system from Figma
+/design-system
+
+# Compose pages from existing components
+/build-page
+
+# Write tests using TDD methodology
+/write-tests
+
+# Review code for quality and security
+/code-review
+
+# Create system architecture
+/architecture
+```
+
+### Sub-Agent System
+
+The memory system includes a sub-agent that:
+- Analyzes feedback from development sessions
+- Identifies patterns (positive and negative)
+- Suggests skill file improvements
+- Recommends Claude Memory entries
+
+See `memory-system/docs/SUB-AGENT.md` for the full sub-agent specification.
+
+### Creating Custom Skills
+
+Skills are defined as Markdown files in `.claude/skills/{skill-name}/SKILL.md`:
+
+```yaml
+---
+name: my-skill
+description: Description shown when Claude decides to use this skill
+---
+
+# Skill Name
+
+## When to Use This Skill
+
+| Trigger | Action |
+|---------|--------|
+| "User says X" | Do Y |
+
+## Decision Tree
+
+[Skill-specific guidance...]
+```
+
+### Skill File Structure
+
+```
+.claude/skills/
+├── atomic-design/
+│   ├── SKILL.md              # Main skill definition
+│   └── references/           # Supporting documentation
+│       ├── figma-mcp-integration.md
+│       └── component-templates.md
+├── test-driven/
+│   ├── SKILL.md
+│   └── references/
+│       ├── review-checklist.md
+│       └── anti-patterns.md
+└── [other skills...]
+```
+
+---
 
 ### Slash Commands
 
@@ -693,13 +817,146 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
 | `/test-review` | Review test quality |
 | `/code-review` | Review code changes |
 
+## Testing
+
+This project uses Jest and React Testing Library for comprehensive testing.
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
+### Test Structure
+
+Tests are co-located with their source files:
+
+```
+src/
+├── components/
+│   └── atoms/
+│       └── Button/
+│           ├── Button.tsx
+│           ├── Button.test.tsx    # Unit tests
+│           └── Button.module.css
+```
+
+### Testing Utilities
+
+Custom test utilities are available in `src/test-utils/`:
+
+```typescript
+import { render, renderWithUser, testData } from '@test-utils';
+
+// Render with providers
+const { getByText } = render(<MyComponent />);
+
+// Render with userEvent for interactions
+const { user, getByRole } = renderWithUser(<Button label="Click" />);
+await user.click(getByRole('button'));
+
+// Generate test data
+const email = testData.email(); // random@test.com
+const id = testData.uuid();     // uuid-like string
+```
+
+### Coverage Requirements
+
+The project enforces minimum 70% coverage thresholds:
+
+| Metric | Threshold |
+|--------|-----------|
+| Branches | 70% |
+| Functions | 70% |
+| Lines | 70% |
+| Statements | 70% |
+
+### Writing Tests
+
+Follow these principles:
+
+1. **Test Behavior, Not Implementation**
+   ```typescript
+   // ✅ Good
+   expect(screen.getByRole('button')).toBeDisabled();
+
+   // ❌ Bad
+   expect(component.state.isDisabled).toBe(true);
+   ```
+
+2. **Use Accessible Queries**
+   ```typescript
+   // Priority: getByRole > getByLabelText > getByText > getByTestId
+   screen.getByRole('button', { name: 'Submit' });
+   ```
+
+3. **Test User Interactions**
+   ```typescript
+   const user = userEvent.setup();
+   await user.click(screen.getByRole('button'));
+   expect(handleClick).toHaveBeenCalled();
+   ```
+
+---
+
+## Best Practices
+
+See [BEST-PRACTICES.md](BEST-PRACTICES.md) for comprehensive guidelines covering:
+
+- **Code Organization** - Directory structure, file naming conventions
+- **TypeScript Guidelines** - Type definitions, strict mode, utility types
+- **React Component Patterns** - Functional components, hooks, compound components
+- **Testing Standards** - Unit tests, integration tests, coverage
+- **Accessibility (A11y)** - ARIA attributes, semantic HTML, keyboard navigation
+- **Performance** - Memoization, code splitting, image optimization
+- **Security** - Input validation, XSS prevention, authentication
+- **Documentation** - Component docs, README structure
+- **Git Workflow** - Commit messages, branch naming, PR checklist
+- **Error Handling** - Error boundaries, API errors, form validation
+
+### Quick Reference
+
+#### Do's ✅
+
+- Use TypeScript strict mode
+- Write tests before implementation (TDD)
+- Use semantic HTML elements
+- Handle loading and error states
+- Document public APIs
+
+#### Don'ts ❌
+
+- Use `any` type
+- Skip error handling
+- Ignore TypeScript errors
+- Commit secrets or credentials
+
+---
+
 ## Contributing
 
 1. Fork the repository
 2. Create feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open Pull Request
+3. Write tests first (TDD approach)
+4. Commit changes (`git commit -m 'Add amazing feature'`)
+5. Push to branch (`git push origin feature/amazing`)
+6. Open Pull Request
+
+### Contribution Checklist
+
+- [ ] Tests pass (`npm test`)
+- [ ] No linting errors (`npm run lint`)
+- [ ] Documentation updated
+- [ ] Code reviewed for security
+- [ ] Accessible (a11y compliant)
+- [ ] TypeScript strict mode passes
 
 ## Author
 

@@ -43,7 +43,10 @@ Before doing ANY work, Claude MUST:
 ### Phase Management ⭐
 | Command | Purpose |
 |---------|---------|
-| `/aid-init` | Initialize project with AID phases |
+| `/aid-init` | Initialize project with AID phases + memory system |
+| `/aid-start` | Start work session - select role & phase |
+| `/aid-status` | Show current state (phase + session) |
+| `/aid-end` | End phase and provide feedback |
 | `/phase` | Show current phase status |
 | `/gate-check` | Check if ready to advance |
 | `/phase-approve` | Human sign-off for current phase |
@@ -58,6 +61,7 @@ Before doing ANY work, Claude MUST:
 | `/code-review` | code-review | Review code quality |
 | `/write-tests` | test-driven | TDD test writing |
 | `/test-review` | test-driven | Review test quality |
+| `/qa-ship` | aid-qa-ship | QA validation and release |
 | `/prd` | - | Create PRD from requirements |
 | `/tech-spec` | - | Create technical specification |
 | `/jira-breakdown` | - | Break spec into Jira issues |
@@ -127,7 +131,50 @@ cd my-app
 ## Documentation
 
 - Phase system: `docs/PHASE-GATES.md`
-- Context tracking: `docs/WORK-CONTEXT-TRACKER.md`  
+- Context tracking: `docs/WORK-CONTEXT-TRACKER.md`
 - Daily workflow: `docs/MORNING-STARTUP.md`
 - Components: `skills/atomic-design/references/`
 - Testing: `skills/test-driven/references/`
+
+---
+
+## Memory & Learning System
+
+AID includes a learning system that improves Claude's assistance over time.
+
+### Additional Commands
+
+| Command | Description |
+|---------|-------------|
+| `/aid-improve` | Run learning cycle (weekly) |
+| `/aid-memory` | Manage Claude Memory entries |
+| `/aid-reset` | Reset memory system |
+
+### Session Flow
+
+1. **Init**: `/aid-init` → Creates project state + memory system
+2. **Start**: `/aid-start` → Select role (PM/Dev/QA/Lead) → Select phase → Skills loaded
+3. **Work**: Claude applies loaded skills automatically
+4. **End**: `/aid-end` → Rate session (1-5) → Describe what worked/didn't
+5. **Learn**: `/aid-improve` → Analyze feedback → Update skills
+
+### Skills Location
+
+**Primary Skills** (Source of truth):
+- `.claude/skills/` - All skill definitions and prompts
+
+**Memory System** (References + learnings):
+- `memory-system/skills/roles/{role}/` - Quick reference + cumulative learnings
+- `memory-system/skills/phases/{phase}/` - Quick reference + cumulative learnings
+
+Claude loads skills from `.claude/skills/` based on role and phase.
+
+### Runtime State
+
+- Project state: `.aid/state.json` (phase tracking)
+- Session state: `~/.aid/state.json` (role, session info)
+- Feedback: `~/.aid/feedback/pending/`
+
+### Memory System Documentation
+
+Full documentation: `memory-system/docs/`

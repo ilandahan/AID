@@ -1,158 +1,173 @@
-# AID - AI Development Methodology
-# LLM Context File (llm.txt)
-# Version: 1.0.0
-# Author: Ilan Dahan
-# Last Updated: 2025-12-11
+AID - AI Development Methodology for Claude Code
 
-## Overview
+PROJECT OVERVIEW
+AID is a comprehensive framework that transforms raw requirements into production-ready software using Claude Code and AI assistance. It systematizes the entire development journey with structured phases, phase gates, skills system, and memory learning.
 
-AID (AI Development Methodology) is a comprehensive, end-to-end framework for AI-assisted software development. It transforms raw requirements into production-ready software using Claude Code with integrated MCP (Model Context Protocol) services.
+CORE PURPOSE
+Provide a methodical, enforced workflow for building full-stack applications with Claude Code assistance. The methodology ensures quality, consistency, and progressive disclosure of work through phase gates.
 
-Core Philosophy: Systematic, repeatable processes with built-in quality gates and continuous context tracking.
+KEY FEATURES
+- Phase Gates (5 phases): PRD → Tech Spec → Breakdown → Development → QA & Ship
+- Phase Enforcement: Work is blocked out-of-order, critical rule enforced
+- Context Tracking: Real-time tracking of tasks/steps in .aid/context.json
+- Skills System: Automatic skill loading based on role and phase
+- Memory System: Learning-based improvements through feedback loops
+- MCP Integrations: Jira, GitHub, Figma, Chrome DevTools, PostgreSQL
+- One-Command Setup: Automated installation and initialization
+- Slash Commands: 27+ commands for workflow management
 
-## Quick Start
+PHASE SYSTEM
+Phase 1 (PRD): Transform raw requirements into PRD document with user stories
+Phase 2 (Tech Spec): Create architecture, schemas, API contracts from PRD
+Phase 3 (Breakdown): Create Jira epics/stories/tasks from Tech Spec
+Phase 4 (Development): Write tests first (TDD), then implement features
+Phase 5 (QA & Ship): Testing, code review, deployment preparation
 
-For Non-Technical Users:
-```
-Open Claude Code in AID folder → Type: /setup
-```
+Each phase has entry criteria, required work, exit criteria, and artifacts.
 
-For Technical Users:
-```bash
-./install.sh
-./scripts/init-project.sh my-app
-cd my-app
-/good-morning
-```
+TECHNOLOGY STACK
+Frontend: Next.js 16, React 19, TypeScript, SCSS
+Backend: Node.js 18+, Next.js API Routes
+Database: PostgreSQL 16+
+Testing: Jest, Testing Library, Supertest, Puppeteer
+Authentication: JWT + bcryptjs
+Deployment: Docker, Docker Compose
 
-## The 5-Phase Gated Methodology
+KEY SYSTEMS
 
-CRITICAL: Phases are enforced. Work from future phases is blocked.
+Phase Gates (phase-enforcement skill)
+- Reads .aid/state.json to check current phase
+- Refuses work that belongs to future phases
+- Enforces sequential progression
 
-| Phase | Name | Allowed Work | Blocked |
-|-------|------|--------------|---------|
-| 1 | PRD | Requirements, scope, user stories | Code, architecture |
-| 2 | Tech Spec | + Architecture, schemas, APIs | Code, Jira |
-| 3 | Breakdown | + Jira epics, stories, tasks | Production code |
-| 4 | Development | + Code, tests, components | Deployment |
-| 5 | QA & Ship | Everything | - |
+Work Context Tracking (context-tracking skill)
+- Maintains .aid/context.json with task/step tracking
+- Tracks previous/current/next tasks
+- Tracks previous/current/next steps within tasks
+- Session logging for continuity
 
-Phase State: `.aid/state.json`
-Work Context: `.aid/context.json`
+Memory System (learning-based improvements)
+- Collects feedback at end of each phase
+- Detects patterns in feedback
+- Updates skills based on patterns
+- Promotes insights to Claude Memory for cross-session learning
+- 30 slots in Claude Memory (roles: PM/Dev/QA/Lead, phases, universal)
 
-## Essential Commands
+SLASH COMMANDS
 
-### Daily Workflow
-- `/good-morning` - Morning startup, load context, continue work
-- `/context` - Show current task and step
-- `/context-update` - Update progress manually
+Daily Workflow:
+  /good-morning - Morning startup, load context, check MCPs
+  /context - Show current task and step
+  /context-update - Update context manually
 
-### Phase Management
-- `/phase` - Show current phase
-- `/gate-check` - Check if ready to advance
-- `/phase-approve` - Human sign-off required
-- `/phase-advance` - Move to next phase
+Phase Management:
+  /aid-init - Initialize new project
+  /aid-start - Start work session with role selection
+  /aid-status - Show current state
+  /aid-end - End phase with feedback
+  /phase - Show current phase status
+  /gate-check - Check if ready to advance
+  /phase-approve - Get human sign-off
+  /phase-advance - Move to next phase
 
-### Development
-- `/prd [feature]` - Create Product Requirements (Phase 1)
-- `/tech-spec [feature]` - Technical Specification (Phase 2)
-- `/jira-breakdown` - Break into tasks (Phase 3)
-- `/design-system` - Build from Figma (Phase 4)
-- `/build-page` - Compose pages (Phase 4)
-- `/write-tests` - TDD methodology (Phase 4)
-- `/code-review` - Review code (Phase 5)
+Development:
+  /prd - Generate PRD from requirements
+  /tech-spec - Create technical specification
+  /jira-breakdown - Break spec into Jira issues
+  /design-system - Build design system from Figma
+  /build-page - Compose pages from components
+  /write-tests - Write tests (TDD)
+  /code-review - Review code quality
+  /test-review - Review test quality
 
-## Skills System
+Learning System:
+  /aid-improve - Run improvement cycle (weekly)
+  /aid-memory - Manage Claude Memory entries
+  /aid-reset - Reset memory system
 
-7 Specialized skills loaded based on phase:
+SKILLS
+Phase-specific skills loaded automatically:
+- phase-enforcement: Gate checking and phase validation
+- context-tracking: Work context management
+- system-architect: Tech spec and architecture (Phase 2)
+- atomic-design: Figma-to-code design systems (Phase 4)
+- atomic-page-builder: Compose pages from components (Phase 4)
+- code-review: Code quality assessment (Phase 5)
+- test-driven: TDD methodology (Phase 4-5)
 
-1. **phase-enforcement** - Blocks future phase work (Always active)
-2. **context-tracking** - Maintains work continuity (Always active)
-3. **system-architect** - Architecture design (Phase 2)
-4. **atomic-design** - Design system from Figma (Phase 4)
-5. **atomic-page-builder** - Compose pages (Phase 4)
-6. **code-review** - Code quality review (Phase 4-5)
-7. **test-driven** - TDD methodology (Phase 4-5)
+Memory System Skills (by role):
+- memory-system/skills/roles/developer/
+- memory-system/skills/roles/product-manager/
+- memory-system/skills/roles/qa-engineer/
+- memory-system/skills/roles/tech-lead/
 
-## MCP Integrations
+Memory System Skills (by phase):
+- memory-system/skills/phases/discovery/
+- memory-system/skills/phases/prd/
+- memory-system/skills/phases/tech-spec/
+- memory-system/skills/phases/development/
+- memory-system/skills/phases/qa-ship/
 
-6 Configured MCP servers:
-- **Atlassian** - Jira/Confluence for project management
-- **GitHub** - Repository operations
-- **Figma** - Design token extraction
-- **Chrome DevTools** - Browser automation/testing
-- **PostgreSQL** - Database queries
-- **Filesystem** - File operations
+STATE FILES
+.aid/state.json      - Phase state (which phase we're in)
+.aid/context.json    - Work context (current task, step, progress)
+.aid/approvals/      - Approval markers for phase gates
+~/.aid/state.json    - Session state (role, phase, session info)
+~/.aid/feedback/     - Feedback for learning system
 
-## Project Structure
+MCP INTEGRATIONS
+Atlassian (Jira/Confluence) - Project management via OAuth
+GitHub - Repository operations and version control
+Figma - Design token extraction and component documentation
+Chrome DevTools - Browser automation, testing, performance
+PostgreSQL - Direct database query access
+Filesystem - File operations and project access
 
-```
-AID/
-├── .claude/commands/     # 21 slash commands
-├── skills/               # 7 specialized skills
-├── docs/                 # Documentation
-├── integrations/         # MCP setup guides
-├── templates/            # Project templates
-├── scripts/              # Automation scripts
-├── .aid/                 # State & context (project-specific)
-│   ├── state.json        # Phase state
-│   └── context.json      # Work context
-└── CLAUDE.md             # Critical Claude instructions
-```
+WORKFLOW EXAMPLE
+1. /aid-init → Creates .aid structure, starts Phase 1
+2. /good-morning → Load context each morning
+3. /prd user-auth → Create PRD for feature
+4. /phase-approve → Get approval
+5. /phase-advance → Move to Phase 2
+6. /tech-spec user-auth → Create architecture
+7. /phase-approve → Get approval
+8. /phase-advance → Move to Phase 3
+9. /jira-breakdown → Create Jira issues
+10. /phase-approve → Get approval
+11. /phase-advance → Move to Phase 4 (code allowed)
+12. /context → See current task
+13. [Implement feature, tests first]
+14. /context-update → Update progress
+15. /phase-advance → Move to Phase 5
+16. /test-review → Review test coverage
+17. /code-review → Review code quality
 
-## Technology Stack
+PROJECT STRUCTURE
+.claude/commands/ - 27 slash commands
+docs/ - Documentation (phases, startup, context, MCP setup)
+skills/ - Role/phase-specific skills and references (7 skills)
+memory-system/ - Learning system (feedback, improvement cycle)
+  - skills/roles/ - 4 role-based skills
+  - skills/phases/ - 5 phase-based skills
+  - docs/ - Memory system documentation
+integrations/ - MCP integration guides
+templates/ - State and context templates
+scripts/ - Automation (init, startup check)
+prisma/ - Database schema and migrations
+src/ - Application source code
+testing/ - Test utilities and configurations
 
-- **Frontend**: Next.js 16, React 19, TypeScript 5.9, SCSS
-- **Backend**: Node.js 18+, Next.js API Routes, JWT
-- **Database**: PostgreSQL 16+, Prisma 6.1
-- **Testing**: Jest 29, Testing Library, Puppeteer
-- **DevOps**: Docker, Docker Compose
+FILE LOCATIONS
+.aid/state.json - Phase tracking
+.aid/context.json - Work context
+docs/PRD.md - Product requirements
+docs/TECH-SPEC.md - Technical specification
+.mcp.json - MCP server configuration
+CLAUDE.md - Main AID instructions
 
-## Key Principles
+CRITICAL RULE
+Before any work, Claude MUST read .aid/state.json to determine current phase and REFUSE work that belongs to a later phase.
 
-### Phase Gate Enforcement
-- Claude MUST read `.aid/state.json` before any work
-- Work is classified and validated against current phase
-- Future phase work is REFUSED with clear message
-
-### TDD Methodology
-- Tests written BEFORE implementation
-- Minimal mocking (<20%)
-- Realistic test data
-- Strong assertions
-
-### Atomic Design
-- Design tokens from Figma
-- Hierarchy: Atoms → Molecules → Organisms → Templates → Pages
-- Zero hardcoded values
-- All styles encapsulated in components
-
-## Critical Files
-
-| File | Purpose |
-|------|---------|
-| `CLAUDE.md` | Phase enforcement rules |
-| `.aid/state.json` | Current phase state |
-| `.aid/context.json` | Work context tracking |
-| `docs/PRD.md` | Product requirements |
-| `docs/TECH-SPEC.md` | Technical specification |
-| `.mcp.json` | MCP server configuration |
-
-## Documentation Links
-
-- Phase System: `docs/PHASE-GATES.md`
-- Context Tracking: `docs/WORK-CONTEXT-TRACKER.md`
-- Daily Workflow: `docs/MORNING-STARTUP.md`
-- Skills: `skills/*/SKILL.md`
-- MCP Setup: `docs/mcp-setup.md`
-
-## Contact & Support
-
-- Repository: https://github.com/ilandahan/AID
-- Issues: GitHub Issues
-- Author: Ilan Dahan
-
----
-
-For detailed documentation, see: llms-full.txt
-For shorter summary, see: llms.txt
+AUTHOR
+Created by Ilan Dahan
+Built with Claude Code by Anthropic

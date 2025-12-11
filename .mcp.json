@@ -1,0 +1,44 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/mcp-schema.json",
+  "mcpServers": {
+    "atlassian": {
+      "type": "sse",
+      "url": "https://mcp.atlassian.com/v1/sse",
+      "description": "Official Atlassian Remote MCP Server for Jira & Confluence (OAuth)"
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "description": "GitHub integration for repository management",
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
+    },
+    "figma": {
+      "command": "npx",
+      "args": ["-y", "figma-developer-mcp"],
+      "description": "Figma API for design token extraction",
+      "env": {
+        "FIGMA_API_KEY": "${FIGMA_API_KEY}"
+      }
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"],
+      "description": "Browser automation and debugging"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+      "description": "File system access for project files"
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "description": "PostgreSQL database access",
+      "env": {
+        "DATABASE_URL": "${DATABASE_URL}"
+      }
+    }
+  }
+}
