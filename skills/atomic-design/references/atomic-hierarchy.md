@@ -2,6 +2,26 @@
 
 Complete breakdown of component levels with implementation patterns.
 
+## ⚠️ CRITICAL: Extract from Figma First
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  🚨 BEFORE CREATING ANY COMPONENT:                                   │
+│                                                                      │
+│  1. Extract specs from Figma using MCP                              │
+│  2. Document the Figma link in your component                       │
+│  3. Use EXACT values - no rounding or "improving"                   │
+│                                                                      │
+│  The examples below show STRUCTURE, not actual values.              │
+│  Your values MUST come from your Figma design system.               │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Related documents:**
+- `figma-design-fidelity.md` - Complete extraction workflow
+- `design-deviation-rules.md` - Zero deviation policy
+- `figma-mcp-integration.md` - MCP commands for extraction
+
 ## Level 1: Atoms
 
 **Definition:** Smallest, indivisible UI elements. Cannot be broken down further.
@@ -9,6 +29,15 @@ Complete breakdown of component levels with implementation patterns.
 ### Typography Atoms
 
 ```typescript
+/**
+ * Typography Atom
+ *
+ * @figma https://figma.com/file/xxx/Design-System?node-id=typography
+ * @extracted [DATE]
+ *
+ * ⚠️ All font sizes, weights, and line-heights from Figma - DO NOT MODIFY
+ */
+
 // atoms/Typography/Typography.tsx
 import { ReactNode } from 'react';
 import styles from './Typography.module.css';
@@ -40,22 +69,35 @@ export const Typography = ({
 };
 
 /* Typography.module.css - ALL styles encapsulated */
+/* ⚠️ ALL values EXACT from Figma - verify before using */
+
 .h1 {
-  font-family: var(--font-heading);
-  font-size: var(--font-size-4xl);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-tight);
-  letter-spacing: var(--letter-spacing-tight);
+  font-family: var(--font-heading);      /* From Figma */
+  font-size: var(--font-size-4xl);       /* From Figma */
+  font-weight: var(--font-weight-bold);  /* From Figma */
+  line-height: var(--line-height-tight); /* From Figma */
+  letter-spacing: var(--letter-spacing-tight); /* From Figma */
 }
+
+/* Responsive: Check Figma Mobile frame for these values */
 @media (max-width: 768px) {
-  .h1 { font-size: var(--font-size-2xl); }
+  .h1 { font-size: var(--font-size-2xl); } /* From Figma Mobile */
 }
-/* ... all variants defined */
+/* ... all variants defined - ALL from Figma */
 ```
 
 ### Button Atom
 
 ```typescript
+/**
+ * Button Atom
+ *
+ * @figma https://figma.com/file/xxx/Design-System?node-id=button
+ * @extracted [DATE]
+ *
+ * ⚠️ All sizes, padding, colors from Figma - DO NOT MODIFY
+ */
+
 // atoms/Button/Button.tsx
 interface ButtonProps {
   label: string;
@@ -110,6 +152,15 @@ export const Button = ({
 ### Input Atom
 
 ```typescript
+/**
+ * Input Atom
+ *
+ * @figma https://figma.com/file/xxx/Design-System?node-id=input
+ * @extracted [DATE]
+ *
+ * ⚠️ All sizes, padding, border styles from Figma - DO NOT MODIFY
+ */
+
 // atoms/Input/Input.tsx
 interface InputProps {
   value: string;
@@ -167,6 +218,16 @@ export const Input = ({
 ### FormField Molecule
 
 ```typescript
+/**
+ * FormField Molecule
+ *
+ * @figma https://figma.com/file/xxx/Design-System?node-id=formfield
+ * @extracted [DATE]
+ *
+ * Composes: Typography (label) + Input + Typography (error/hint)
+ * ⚠️ Layout spacing from Figma - DO NOT MODIFY
+ */
+
 // molecules/FormField/FormField.tsx
 interface FormFieldProps {
   label: string;
@@ -236,6 +297,15 @@ export const FormField = ({
 ### Card Molecule
 
 ```typescript
+/**
+ * Card Molecule
+ *
+ * @figma https://figma.com/file/xxx/Design-System?node-id=card
+ * @extracted [DATE]
+ *
+ * ⚠️ All padding, shadows, border-radius from Figma - DO NOT MODIFY
+ */
+
 // molecules/Card/Card.tsx
 interface CardProps {
   title?: string;
@@ -297,6 +367,16 @@ export const Card = ({
 ### Header Organism
 
 ```typescript
+/**
+ * Header Organism
+ *
+ * @figma https://figma.com/file/xxx/Design-System?node-id=header
+ * @extracted [DATE]
+ *
+ * Composes: Logo + NavItems + UserMenu + MobileMenu
+ * ⚠️ All heights, spacing, responsive behavior from Figma - DO NOT MODIFY
+ */
+
 // organisms/Header/Header.tsx
 interface NavItem {
   label: string;
@@ -381,6 +461,16 @@ export const Header = ({
 ### Form Organism
 
 ```typescript
+/**
+ * Form Organism
+ *
+ * @figma https://figma.com/file/xxx/Design-System?node-id=form
+ * @extracted [DATE]
+ *
+ * Composes: FormFields + Buttons
+ * ⚠️ All field gaps, button alignment from Figma - DO NOT MODIFY
+ */
+
 // organisms/Form/Form.tsx
 interface FormField {
   name: string;
@@ -466,6 +556,16 @@ export const Form = ({
 **Definition:** Page-level layouts that arrange organisms without specific content.
 
 ```typescript
+/**
+ * DashboardLayout Template
+ *
+ * @figma https://figma.com/file/xxx/Design-System?node-id=dashboard-layout
+ * @extracted [DATE]
+ *
+ * ⚠️ All grid columns, sidebar width, main area padding from Figma
+ * Check Figma for Desktop, Tablet, Mobile frame variations
+ */
+
 // templates/DashboardLayout/DashboardLayout.tsx
 interface DashboardLayoutProps {
   header: ReactNode;
@@ -502,6 +602,16 @@ export const DashboardLayout = ({
 **Definition:** Specific instances of templates with real content.
 
 ```typescript
+/**
+ * Dashboard Page
+ *
+ * @figma https://figma.com/file/xxx/App?node-id=dashboard-page
+ * @extracted [DATE]
+ *
+ * Uses: DashboardLayout template + real content
+ * ⚠️ All layout, spacing, responsive behavior from Figma page frames
+ */
+
 // pages/Dashboard/Dashboard.tsx
 export const DashboardPage = () => {
   const { user } = useAuth();

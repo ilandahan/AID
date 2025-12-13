@@ -142,13 +142,32 @@ cd my-app
 
 AID includes a learning system that improves Claude's assistance over time.
 
-### Additional Commands
+### Learning Mode Commands
 
 | Command | Description |
 |---------|-------------|
 | `/aid-improve` | Run learning cycle (weekly) |
 | `/aid-memory` | Manage Claude Memory entries |
 | `/aid-reset` | Reset memory system |
+| `/aid-analyze` | Full quality analysis with metrics and patterns |
+| `/aid-dashboard` | Generate quality dashboard report |
+| `/aid-recommendations` | View/manage skill update recommendations |
+
+### Sub-Agent CLI
+
+```bash
+# Run quality analysis
+python -m memory_system --analyze
+
+# Generate dashboard
+python -m memory_system --dashboard --days 14
+
+# Sync learnings to memory
+python -m memory_system --sync-memory
+
+# Show status
+python -m memory_system --status
+```
 
 ### Session Flow
 
