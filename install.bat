@@ -114,33 +114,12 @@ REM Create .mcp.json if not exists
 echo.
 echo [STEP 5/5] Creating MCP configuration...
 if not exist ".mcp.json" (
-    (
-echo {
-echo   "mcpServers": {
-echo     "filesystem": {
-echo       "command": "npx",
-echo       "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
-echo     },
-echo     "github": {
-echo       "command": "npx",
-echo       "args": ["-y", "@modelcontextprotocol/server-github"],
-echo       "env": {
-echo         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
-echo       }
-echo     },
-echo     "atlassian": {
-echo       "command": "npx",
-echo       "args": ["-y", "@modelcontextprotocol/server-atlassian"],
-echo       "env": {
-echo         "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL}",
-echo         "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL}",
-echo         "ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN}"
-echo       }
-echo     }
-echo   }
-echo }
-    ) > ".mcp.json"
-    echo [OK] MCP configuration created
+    if exist ".mcp.json.example" (
+        copy ".mcp.json.example" ".mcp.json" >nul
+        echo [OK] MCP configuration created from template
+    ) else (
+        echo [WARNING] .mcp.json.example not found, skipping MCP config
+    )
 ) else (
     echo [OK] MCP configuration already exists
 )
@@ -153,12 +132,27 @@ if not exist ".env" (
     )
 )
 
-REM Pre-install MCP servers
+REM Pre-install MCP servers (no dependencies first, then ones requiring tokens)
 echo.
 echo [BONUS] Pre-installing MCP servers (for faster startup)...
+echo.
+echo Installing MCP servers without dependencies...
+echo   - Filesystem server...
 call npx -y @modelcontextprotocol/server-filesystem --help >nul 2>nul
+echo   - Docker server...
+call npx -y @modelcontextprotocol/server-docker --help >nul 2>nul
+echo   - Chrome DevTools server...
+call npx -y chrome-devtools-mcp@latest --help >nul 2>nul
+echo [OK] Base MCP servers cached
+echo.
+echo Installing MCP servers that require API tokens...
+echo   - Atlassian (Jira) server...
+call npx -y @modelcontextprotocol/server-atlassian --help >nul 2>nul
+echo   - Figma server...
+call npx -y @anthropic/mcp-server-figma --help >nul 2>nul
+echo   - GitHub server...
 call npx -y @modelcontextprotocol/server-github --help >nul 2>nul
-echo [OK] MCP servers cached
+echo [OK] All MCP servers cached
 
 echo.
 echo ========================================
