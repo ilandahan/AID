@@ -141,15 +141,18 @@ echo }
     echo [SKIP] context.json already exists
 )
 
-REM Copy .mcp.json
+REM Copy .mcp.json (prefer configured one over template)
 echo.
 echo Copying MCP configuration...
 if not exist "%TARGET_PATH%\.mcp.json" (
-    if exist "%AID_PATH%\.mcp.json.example" (
+    if exist "%AID_PATH%\.mcp.json" (
+        copy "%AID_PATH%\.mcp.json" "%TARGET_PATH%\.mcp.json" >nul
+        echo [OK] .mcp.json copied (with your API tokens)
+    ) else if exist "%AID_PATH%\.mcp.json.example" (
         copy "%AID_PATH%\.mcp.json.example" "%TARGET_PATH%\.mcp.json" >nul
         echo [OK] .mcp.json created (edit with your API tokens)
     ) else (
-        echo [WARNING] .mcp.json.example not found
+        echo [WARNING] .mcp.json not found
     )
 ) else (
     echo [SKIP] .mcp.json already exists
