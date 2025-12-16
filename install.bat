@@ -39,15 +39,28 @@ if %ERRORLEVEL% NEQ 0 (
     echo [WARNING] npm install had issues, continuing...
 )
 
-REM Create .claude/commands directory
+REM Create .claude directories
 echo.
-echo [STEP 2/5] Setting up Claude commands...
+echo [STEP 2/5] Setting up Claude commands and skills...
 if not exist ".claude\commands" mkdir ".claude\commands"
+if not exist ".claude\skills" mkdir ".claude\skills"
 
 REM Copy command files
 copy /Y "memory-system\integration\commands\*.md" ".claude\commands\" >nul 2>nul
 copy /Y "skills\commands\*.md" ".claude\commands\" >nul 2>nul
 echo [OK] Commands installed
+
+REM Copy skills to .claude/skills
+echo Copying skills...
+xcopy /E /I /Y "skills\atomic-design" ".claude\skills\atomic-design" >nul 2>nul
+xcopy /E /I /Y "skills\atomic-page-builder" ".claude\skills\atomic-page-builder" >nul 2>nul
+xcopy /E /I /Y "skills\code-review" ".claude\skills\code-review" >nul 2>nul
+xcopy /E /I /Y "skills\context-tracking" ".claude\skills\context-tracking" >nul 2>nul
+xcopy /E /I /Y "skills\learning-mode" ".claude\skills\learning-mode" >nul 2>nul
+xcopy /E /I /Y "skills\phase-enforcement" ".claude\skills\phase-enforcement" >nul 2>nul
+xcopy /E /I /Y "skills\system-architect" ".claude\skills\system-architect" >nul 2>nul
+xcopy /E /I /Y "skills\test-driven" ".claude\skills\test-driven" >nul 2>nul
+echo [OK] Skills installed
 
 REM Create .aid directory
 echo.
