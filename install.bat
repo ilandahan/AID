@@ -173,4 +173,7 @@ echo 3. Run /aid-status to verify installation
 echo.
 echo 4. Run /aid-start to begin working!
 echo.
-pause
+echo ========================================
+echo.
+echo Press any key to close this window...
+pause >nul
