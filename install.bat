@@ -123,9 +123,34 @@ echo }
 
 echo [OK] State files created
 
+REM Create global ~/.aid directory for learning system
+echo.
+echo [STEP 5/6] Setting up global AID learning system...
+set "AID_HOME=%USERPROFILE%\.aid"
+if not exist "%AID_HOME%" mkdir "%AID_HOME%"
+if not exist "%AID_HOME%\feedback" mkdir "%AID_HOME%\feedback"
+if not exist "%AID_HOME%\feedback\pending" mkdir "%AID_HOME%\feedback\pending"
+if not exist "%AID_HOME%\feedback\processed" mkdir "%AID_HOME%\feedback\processed"
+if not exist "%AID_HOME%\metrics" mkdir "%AID_HOME%\metrics"
+if not exist "%AID_HOME%\logs" mkdir "%AID_HOME%\logs"
+if not exist "%AID_HOME%\skills" mkdir "%AID_HOME%\skills"
+
+REM Copy templates to global config
+if exist "memory-system\templates\config.yaml" (
+    if not exist "%AID_HOME%\config.yaml" (
+        copy "memory-system\templates\config.yaml" "%AID_HOME%\config.yaml" >nul
+    )
+)
+if exist "memory-system\templates\state.json" (
+    if not exist "%AID_HOME%\state.json" (
+        copy "memory-system\templates\state.json" "%AID_HOME%\state.json" >nul
+    )
+)
+echo [OK] Global learning system initialized at %AID_HOME%
+
 REM Create .mcp.json if not exists
 echo.
-echo [STEP 5/5] Creating MCP configuration...
+echo [STEP 6/6] Creating MCP configuration...
 if not exist ".mcp.json" (
     if exist ".mcp.json.example" (
         copy ".mcp.json.example" ".mcp.json" >nul
