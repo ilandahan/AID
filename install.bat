@@ -132,27 +132,24 @@ if not exist ".env" (
     )
 )
 
-REM Pre-install MCP servers (no dependencies first, then ones requiring tokens)
+REM Pre-install MCP servers (download packages for faster startup)
 echo.
 echo [BONUS] Pre-installing MCP servers (for faster startup)...
 echo.
-echo Installing MCP servers without dependencies...
+echo Downloading MCP server packages...
 echo   - Filesystem server...
-call npx -y @modelcontextprotocol/server-filesystem --help >nul 2>nul
+call npm pack @modelcontextprotocol/server-filesystem --pack-destination="%TEMP%" >nul 2>nul
 echo   - Docker server...
-call npx -y @modelcontextprotocol/server-docker --help >nul 2>nul
+call npm pack @modelcontextprotocol/server-docker --pack-destination="%TEMP%" >nul 2>nul
 echo   - Chrome DevTools server...
-call npx -y chrome-devtools-mcp@latest --help >nul 2>nul
-echo [OK] Base MCP servers cached
-echo.
-echo Installing MCP servers that require API tokens...
+call npm pack chrome-devtools-mcp --pack-destination="%TEMP%" >nul 2>nul
 echo   - Atlassian (Jira) server...
-call npx -y @modelcontextprotocol/server-atlassian --help >nul 2>nul
+call npm pack @modelcontextprotocol/server-atlassian --pack-destination="%TEMP%" >nul 2>nul
 echo   - Figma server...
-call npx -y @anthropic/mcp-server-figma --help >nul 2>nul
+call npm pack @anthropic/mcp-server-figma --pack-destination="%TEMP%" >nul 2>nul
 echo   - GitHub server...
-call npx -y @modelcontextprotocol/server-github --help >nul 2>nul
-echo [OK] All MCP servers cached
+call npm pack @modelcontextprotocol/server-github --pack-destination="%TEMP%" >nul 2>nul
+echo [OK] MCP servers cached
 
 echo.
 echo ========================================
