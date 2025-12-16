@@ -12,7 +12,7 @@ Begin a tracked work session. Selects role and phase, loads relevant skills.
    - Show status of configured servers
    - Warn if required servers are not connected
 
-2. **Check State**: Load `~/.aid/state.json`
+2. **Check State**: Load `.aid/state.json` (project directory)
    - If active session exists, ask to continue or start new
 
 3. **Select Role**:
@@ -34,18 +34,28 @@ Begin a tracked work session. Selects role and phase, loads relevant skills.
    5. QA & Ship
    ```
 
-5. **Load Skills**:
-   - Read `memory-system/skills/roles/{role}/SKILL.md`
-   - Read `memory-system/skills/phases/{phase}/SKILL.md`
-   - Apply guidelines from both
+5. **Load Skills** (from `.claude/skills/`):
 
-6. **Update State**:
+   Based on role and phase, load relevant skills:
+
+   | Phase | Skills to Load |
+   |-------|----------------|
+   | PRD | phase-enforcement, context-tracking |
+   | Tech Spec | system-architect, phase-enforcement, context-tracking |
+   | Development | atomic-design, atomic-page-builder, code-review, test-driven, context-tracking |
+   | QA & Ship | code-review, test-driven, context-tracking |
+
+   Always load: `.claude/skills/phase-enforcement/SKILL.md`, `.claude/skills/context-tracking/SKILL.md`
+
+6. **Update State** (in `.aid/state.json`):
    ```json
    {
-     "role": "developer",
-     "phase": "development",
-     "session_start": "2024-01-15T09:00:00Z",
-     "status": "active"
+     "current_session": {
+       "active": true,
+       "role": "Developer",
+       "phase": 4,
+       "started_at": "2024-01-15T09:00:00Z"
+     }
    }
    ```
 
