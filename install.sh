@@ -1,7 +1,8 @@
 #!/bin/bash
 
 #==============================================================================
-# AI Full Stack Development Methodology - Installation Script
+# AID - AI Development Methodology Installer
+# For macOS/Linux
 #==============================================================================
 
 set -e
@@ -15,685 +16,262 @@ NC='\033[0m' # No Color
 
 # Logging functions
 log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_success() { echo -e "[OK] $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# Detect OS
-detect_os() {
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "linux"
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "macos"
-    elif [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
-        echo "windows"
-    else
-        echo "unknown"
-    fi
-}
-
-# Install Node.js 18+
-install_nodejs() {
-    local os_type=$(detect_os)
-
-    log_info "Attempting to install Node.js 18+..."
-
-    case $os_type in
-        "macos")
-            if command -v brew &> /dev/null; then
-                log_info "Installing Node.js via Homebrew..."
-                brew install node@18
-                export PATH="/opt/homebrew/opt/node@18/bin:$PATH"
-                export PATH="/usr/local/opt/node@18/bin:$PATH"
-                log_success "Node.js installed via Homebrew"
-            else
-                log_info "Installing Node.js via nvm..."
-                curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-                export NVM_DIR="$HOME/.nvm"
-                [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-                nvm install 18
-                nvm use 18
-                log_success "Node.js installed via nvm"
-            fi
-            ;;
-        "linux")
-            if command -v apt-get &> /dev/null; then
-                log_info "Installing Node.js via NodeSource..."
-                curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-                sudo apt-get install -y nodejs
-                log_success "Node.js installed via apt"
-            elif command -v dnf &> /dev/null; then
-                log_info "Installing Node.js via dnf..."
-                sudo dnf install -y nodejs
-                log_success "Node.js installed via dnf"
-            elif command -v pacman &> /dev/null; then
-                log_info "Installing Node.js via pacman..."
-                sudo pacman -S --noconfirm nodejs npm
-                log_success "Node.js installed via pacman"
-            else
-                log_info "Installing Node.js via nvm..."
-                curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-                export NVM_DIR="$HOME/.nvm"
-                [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-                nvm install 18
-                nvm use 18
-                log_success "Node.js installed via nvm"
-            fi
-            ;;
-        "windows")
-            if command -v winget &> /dev/null; then
-                log_info "Installing Node.js via winget..."
-                winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
-                log_success "Node.js installed via winget"
-                log_warning "Please restart your terminal to use Node.js"
-            elif command -v choco &> /dev/null; then
-                log_info "Installing Node.js via Chocolatey..."
-                choco install nodejs-lts -y
-                log_success "Node.js installed via Chocolatey"
-                log_warning "Please restart your terminal to use Node.js"
-            else
-                log_error "No package manager found. Please install Node.js manually:"
-                echo "  Download from: https://nodejs.org/"
-                return 1
-            fi
-            ;;
-        *)
-            log_error "Unsupported operating system: $os_type"
-            echo "Please install Node.js manually from: https://nodejs.org/"
-            return 1
-            ;;
-    esac
-
-    return 0
-}
-
-# Install Git
-install_git() {
-    local os_type=$(detect_os)
-
-    log_info "Attempting to install Git..."
-
-    case $os_type in
-        "macos")
-            if command -v brew &> /dev/null; then
-                log_info "Installing Git via Homebrew..."
-                brew install git
-                log_success "Git installed via Homebrew"
-            else
-                log_info "Installing Xcode Command Line Tools (includes Git)..."
-                xcode-select --install 2>/dev/null || true
-                log_success "Git installed via Xcode CLT"
-            fi
-            ;;
-        "linux")
-            if command -v apt-get &> /dev/null; then
-                log_info "Installing Git via apt..."
-                sudo apt-get update
-                sudo apt-get install -y git
-                log_success "Git installed via apt"
-            elif command -v dnf &> /dev/null; then
-                log_info "Installing Git via dnf..."
-                sudo dnf install -y git
-                log_success "Git installed via dnf"
-            elif command -v yum &> /dev/null; then
-                log_info "Installing Git via yum..."
-                sudo yum install -y git
-                log_success "Git installed via yum"
-            elif command -v pacman &> /dev/null; then
-                log_info "Installing Git via pacman..."
-                sudo pacman -S --noconfirm git
-                log_success "Git installed via pacman"
-            else
-                log_error "No supported package manager found"
-                return 1
-            fi
-            ;;
-        "windows")
-            if command -v winget &> /dev/null; then
-                log_info "Installing Git via winget..."
-                winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements
-                log_success "Git installed via winget"
-                log_warning "Please restart your terminal to use Git"
-            elif command -v choco &> /dev/null; then
-                log_info "Installing Git via Chocolatey..."
-                choco install git -y
-                log_success "Git installed via Chocolatey"
-                log_warning "Please restart your terminal to use Git"
-            else
-                log_error "No package manager found. Please install Git manually:"
-                echo "  Download from: https://git-scm.com/downloads"
-                return 1
-            fi
-            ;;
-        *)
-            log_error "Unsupported operating system: $os_type"
-            return 1
-            ;;
-    esac
-
-    return 0
-}
-
-# Install Docker
-install_docker() {
-    local os_type=$(detect_os)
-
-    log_info "Attempting to install Docker..."
-
-    case $os_type in
-        "macos")
-            if command -v brew &> /dev/null; then
-                log_info "Installing Docker Desktop via Homebrew..."
-                brew install --cask docker
-                log_success "Docker Desktop installed"
-                log_warning "Please open Docker Desktop to complete setup"
-            else
-                log_error "Please install Docker Desktop manually:"
-                echo "  Download from: https://www.docker.com/products/docker-desktop/"
-                return 1
-            fi
-            ;;
-        "linux")
-            if command -v apt-get &> /dev/null; then
-                log_info "Installing Docker via apt..."
-                sudo apt-get update
-                sudo apt-get install -y ca-certificates curl gnupg
-                sudo install -m 0755 -d /etc/apt/keyrings
-                curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-                sudo chmod a+r /etc/apt/keyrings/docker.gpg
-                echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-                sudo apt-get update
-                sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-                sudo usermod -aG docker $USER
-                log_success "Docker installed via apt"
-                log_warning "Please log out and back in to use Docker without sudo"
-            elif command -v dnf &> /dev/null; then
-                log_info "Installing Docker via dnf..."
-                sudo dnf -y install dnf-plugins-core
-                sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-                sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-                sudo systemctl start docker
-                sudo systemctl enable docker
-                sudo usermod -aG docker $USER
-                log_success "Docker installed via dnf"
-            elif command -v pacman &> /dev/null; then
-                log_info "Installing Docker via pacman..."
-                sudo pacman -S --noconfirm docker docker-compose
-                sudo systemctl start docker
-                sudo systemctl enable docker
-                sudo usermod -aG docker $USER
-                log_success "Docker installed via pacman"
-            else
-                log_error "No supported package manager found"
-                return 1
-            fi
-            ;;
-        "windows")
-            if command -v winget &> /dev/null; then
-                log_info "Installing Docker Desktop via winget..."
-                winget install -e --id Docker.DockerDesktop --accept-source-agreements --accept-package-agreements
-                log_success "Docker Desktop installed via winget"
-                log_warning "Please restart and open Docker Desktop to complete setup"
-            elif command -v choco &> /dev/null; then
-                log_info "Installing Docker Desktop via Chocolatey..."
-                choco install docker-desktop -y
-                log_success "Docker Desktop installed via Chocolatey"
-                log_warning "Please restart and open Docker Desktop to complete setup"
-            else
-                log_error "Please install Docker Desktop manually:"
-                echo "  Download from: https://www.docker.com/products/docker-desktop/"
-                return 1
-            fi
-            ;;
-        *)
-            log_error "Unsupported operating system: $os_type"
-            return 1
-            ;;
-    esac
-
-    return 0
-}
-
-# Install Python 3.11
-install_python() {
-    local os_type=$(detect_os)
-
-    log_info "Attempting to install Python 3.11..."
-
-    case $os_type in
-        "macos")
-            if command -v brew &> /dev/null; then
-                log_info "Installing Python 3.11 via Homebrew..."
-                brew install python@3.11
-                # Add to PATH for current session
-                export PATH="/opt/homebrew/opt/python@3.11/bin:$PATH"
-                export PATH="/usr/local/opt/python@3.11/bin:$PATH"
-                log_success "Python 3.11 installed via Homebrew"
-            else
-                log_error "Homebrew not found. Please install Homebrew first:"
-                echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-                return 1
-            fi
-            ;;
-        "linux")
-            if command -v apt-get &> /dev/null; then
-                log_info "Installing Python 3.11 via apt..."
-                sudo apt-get update
-                sudo apt-get install -y software-properties-common
-                sudo add-apt-repository -y ppa:deadsnakes/ppa
-                sudo apt-get update
-                sudo apt-get install -y python3.11 python3.11-venv python3.11-dev python3-pip
-                # Update alternatives
-                sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
-                log_success "Python 3.11 installed via apt"
-            elif command -v dnf &> /dev/null; then
-                log_info "Installing Python 3.11 via dnf..."
-                sudo dnf install -y python3.11 python3.11-pip
-                log_success "Python 3.11 installed via dnf"
-            elif command -v yum &> /dev/null; then
-                log_info "Installing Python 3.11 via yum..."
-                sudo yum install -y python3.11 python3.11-pip
-                log_success "Python 3.11 installed via yum"
-            elif command -v pacman &> /dev/null; then
-                log_info "Installing Python 3.11 via pacman..."
-                sudo pacman -S --noconfirm python
-                log_success "Python installed via pacman"
-            else
-                log_error "No supported package manager found (apt, dnf, yum, pacman)"
-                return 1
-            fi
-            ;;
-        "windows")
-            if command -v winget &> /dev/null; then
-                log_info "Installing Python 3.11 via winget..."
-                winget install -e --id Python.Python.3.11 --accept-source-agreements --accept-package-agreements
-                log_success "Python 3.11 installed via winget"
-                log_warning "Please restart your terminal to use Python 3.11"
-            elif command -v choco &> /dev/null; then
-                log_info "Installing Python 3.11 via Chocolatey..."
-                choco install python311 -y
-                log_success "Python 3.11 installed via Chocolatey"
-                log_warning "Please restart your terminal to use Python 3.11"
-            else
-                log_error "No package manager found. Please install Python 3.11 manually:"
-                echo "  Download from: https://www.python.org/downloads/"
-                echo "  Or install winget/chocolatey first"
-                return 1
-            fi
-            ;;
-        *)
-            log_error "Unsupported operating system: $os_type"
-            echo "Please install Python 3.11 manually from: https://www.python.org/downloads/"
-            return 1
-            ;;
-    esac
-
-    return 0
-}
-
 # Banner
 print_banner() {
-    echo -e "${BLUE}"
-    echo "╔══════════════════════════════════════════════════════════════════╗"
-    echo "║     AI Full Stack Development Methodology - Installation         ║"
-    echo "╚══════════════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
+    echo ""
+    echo "========================================"
+    echo "   AID Installation Script (macOS/Linux)"
+    echo "========================================"
+    echo ""
 }
 
-# Helper function to offer installation
-offer_install() {
-    local name=$1
-    local install_func=$2
-
-    echo ""
-    read -p "Would you like to install $name automatically? (y/n) " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        if $install_func; then
-            return 0
-        else
-            return 1
-        fi
-    else
-        return 1
-    fi
-}
-
-# Check prerequisites
+# Check prerequisites (simple check like Windows version)
 check_prerequisites() {
-    log_info "Checking prerequisites..."
-
-    local missing=()
-    local need_restart=false
-
     # Check Node.js
-    local need_node=false
     if ! command -v node &> /dev/null; then
-        need_node=true
-        log_warning "Node.js not found"
-    else
-        NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-        if [ "$NODE_VERSION" -lt 18 ]; then
-            need_node=true
-            log_warning "Node.js version too old (current: $(node -v), required: v18+)"
-        fi
-    fi
-
-    # Offer to install Node.js if needed
-    if [ "$need_node" = true ]; then
-        if offer_install "Node.js 18+" install_nodejs; then
-            log_success "Node.js installed"
-            need_restart=true
-        else
-            missing+=("Node.js v18+")
-        fi
-    fi
-
-    # Check Git (before other tools that might need it)
-    if ! command -v git &> /dev/null; then
-        log_warning "Git not found"
-        if offer_install "Git" install_git; then
-            log_success "Git installed"
-            need_restart=true
-        else
-            missing+=("Git")
-        fi
-    fi
-
-    # Check Python
-    local need_python=false
-    if ! command -v python3 &> /dev/null; then
-        need_python=true
-        log_warning "Python not found"
-    else
-        PYTHON_MINOR=$(python3 -c 'import sys; print(sys.version_info.minor)')
-        if [ "$PYTHON_MINOR" -lt 11 ]; then
-            PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-            need_python=true
-            log_warning "Python version too old (current: $PYTHON_VERSION, required: 3.11+)"
-        fi
-    fi
-
-    # Offer to install Python if needed
-    if [ "$need_python" = true ]; then
-        if offer_install "Python 3.11" install_python; then
-            log_success "Python 3.11 installed"
-            need_restart=true
-        else
-            missing+=("Python 3.11+")
-        fi
-    fi
-
-    # Check pip (usually comes with Python)
-    if ! command -v pip3 &> /dev/null && ! command -v pip &> /dev/null; then
-        log_warning "pip not found (usually installed with Python)"
-        missing+=("pip3")
-    fi
-
-    # Check Docker (optional but recommended)
-    if ! command -v docker &> /dev/null; then
-        log_warning "Docker not found (optional, recommended for database)"
-        echo ""
-        read -p "Would you like to install Docker? (y/n) " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            if install_docker; then
-                log_success "Docker installed"
-                need_restart=true
-            else
-                log_warning "Docker installation failed - you can install it later"
-            fi
-        else
-            log_info "Skipping Docker installation (you can use local PostgreSQL instead)"
-        fi
-    else
-        log_info "Docker found: $(docker --version 2>/dev/null | head -1)"
-    fi
-
-    # Show restart warning if needed
-    if [ "$need_restart" = true ]; then
-        echo ""
-        log_warning "Some tools were installed. You may need to restart your terminal."
-        echo ""
-        read -p "Press Enter to continue or Ctrl+C to exit and restart terminal..." -r
-        echo ""
-    fi
-
-    # Final check for required tools
-    if [ ${#missing[@]} -ne 0 ]; then
-        log_error "Missing required prerequisites:"
-        for item in "${missing[@]}"; do
-            echo "  - $item"
-        done
-        echo ""
-        echo "Please install the missing prerequisites and run this script again."
+        log_error "Node.js not found!"
+        echo "Please install Node.js 18+ from https://nodejs.org/"
         exit 1
     fi
+    log_success "Node.js found"
 
-    log_success "All prerequisites met"
+    # Check npm
+    if ! command -v npm &> /dev/null; then
+        log_error "npm not found!"
+        exit 1
+    fi
+    log_success "npm found"
 }
 
-# Setup environment file
-setup_environment() {
-    log_info "Setting up environment..."
-    
-    if [ ! -f ".env" ]; then
-        if [ -f ".env.example" ]; then
-            cp .env.example .env
-            log_info "Created .env from .env.example - please edit with your values"
+# Step 1: Install npm dependencies
+install_npm_deps() {
+    echo ""
+    echo "[STEP 1/6] Installing npm dependencies..."
+    npm install || log_warning "npm install had issues, continuing..."
+}
+
+# Step 2: Setup Claude commands and skills
+setup_claude_commands_and_skills() {
+    echo ""
+    echo "[STEP 2/6] Setting up Claude commands and skills..."
+
+    # Create .claude directories (project level)
+    mkdir -p ".claude/commands"
+    mkdir -p ".claude/skills"
+
+    # Copy command files
+    cp -f memory-system/integration/commands/*.md .claude/commands/ 2>/dev/null || true
+    cp -f skills/commands/*.md .claude/commands/ 2>/dev/null || true
+    log_success "Commands installed"
+
+    # Copy skills to .claude/skills (project level, like Windows)
+    echo "Copying skills..."
+    cp -r skills/atomic-design .claude/skills/ 2>/dev/null || true
+    cp -r skills/atomic-page-builder .claude/skills/ 2>/dev/null || true
+    cp -r skills/code-review .claude/skills/ 2>/dev/null || true
+    cp -r skills/context-tracking .claude/skills/ 2>/dev/null || true
+    cp -r skills/learning-mode .claude/skills/ 2>/dev/null || true
+    cp -r skills/phase-enforcement .claude/skills/ 2>/dev/null || true
+    cp -r skills/system-architect .claude/skills/ 2>/dev/null || true
+    cp -r skills/test-driven .claude/skills/ 2>/dev/null || true
+    log_success "Skills installed"
+}
+
+# Step 3: Create project state directory
+create_aid_directory() {
+    echo ""
+    echo "[STEP 3/6] Creating project state directory..."
+    mkdir -p ".aid"
+}
+
+# Step 4: Create state files
+create_state_files() {
+    echo "[STEP 4/6] Creating state files..."
+
+    CURRENT_DATE=$(date '+%Y-%m-%d %H:%M:%S')
+
+    # Create state.json
+    cat > ".aid/state.json" << EOF
+{
+  "\$schema": "aid-state-v1",
+  "version": "1.0",
+  "initialized_at": "$CURRENT_DATE",
+  "last_updated": "$CURRENT_DATE",
+  "current_phase": 1,
+  "phase_name": "PRD",
+  "phase_approved": false,
+  "current_session": {
+    "active": false,
+    "role": null,
+    "phase": null,
+    "started_at": null,
+    "revision_count": 0
+  },
+  "last_session": {
+    "role": null,
+    "phase": null,
+    "completed_at": null
+  },
+  "statistics": {
+    "total_sessions": 0,
+    "total_feedback_collected": 0,
+    "pending_feedback_count": 0,
+    "last_improvement_run": null,
+    "sessions_since_last_improvement": 0
+  },
+  "notifications": {
+    "improvement_suggested": false,
+    "reason": null
+  }
+}
+EOF
+
+    # Create context.json
+    cat > ".aid/context.json" << EOF
+{
+  "\$schema": "aid-context-v1",
+  "version": "1.0",
+  "last_updated": "$CURRENT_DATE",
+  "current_task": null,
+  "current_step": null,
+  "progress": {
+    "steps_completed": [],
+    "steps_pending": []
+  },
+  "session_notes": [],
+  "blockers": []
+}
+EOF
+
+    log_success "State files created"
+}
+
+# Step 5: Setup global AID learning system
+setup_global_aid() {
+    echo ""
+    echo "[STEP 5/6] Setting up global AID learning system..."
+
+    AID_HOME="$HOME/.aid"
+    mkdir -p "$AID_HOME"
+    mkdir -p "$AID_HOME/feedback"
+    mkdir -p "$AID_HOME/feedback/pending"
+    mkdir -p "$AID_HOME/feedback/processed"
+    mkdir -p "$AID_HOME/metrics"
+    mkdir -p "$AID_HOME/logs"
+    mkdir -p "$AID_HOME/skills"
+
+    # Copy templates to global config
+    if [ -f "memory-system/templates/config.yaml" ]; then
+        if [ ! -f "$AID_HOME/config.yaml" ]; then
+            cp "memory-system/templates/config.yaml" "$AID_HOME/config.yaml"
+        fi
+    fi
+    if [ -f "memory-system/templates/state.json" ]; then
+        if [ ! -f "$AID_HOME/state.json" ]; then
+            cp "memory-system/templates/state.json" "$AID_HOME/state.json"
+        fi
+    fi
+
+    log_success "Global learning system initialized at $AID_HOME"
+}
+
+# Step 6: Create MCP configuration and .env
+setup_mcp_and_env() {
+    echo ""
+    echo "[STEP 6/6] Creating MCP configuration..."
+
+    # Create .mcp.json if not exists
+    if [ ! -f ".mcp.json" ]; then
+        if [ -f ".mcp.json.example" ]; then
+            cp ".mcp.json.example" ".mcp.json"
+            log_success "MCP configuration created from template"
+        else
+            log_warning ".mcp.json.example not found, skipping MCP config"
         fi
     else
-        log_info ".env file already exists"
+        log_success "MCP configuration already exists"
     fi
-    
-    log_success "Environment setup complete"
-}
 
-# Install MCP servers (pre-cache for faster startup)
-install_mcp_servers() {
-    log_info "Pre-installing MCP servers for faster startup..."
-    
-    # Install npm dependencies (including puppeteer)
-    if [ -f "package.json" ]; then
-        log_info "Installing npm dependencies (puppeteer + Chromium)..."
-        npm install --silent
-    fi
-    
-    # Pre-install common MCP servers
-    log_info "Installing Atlassian (Jira) MCP server..."
-    npx -y @modelcontextprotocol/server-atlassian --help &>/dev/null || true
-    
-    log_info "Installing GitHub MCP server..."
-    npx -y @modelcontextprotocol/server-github --help &>/dev/null || true
-    
-    log_info "Installing Filesystem MCP server..."
-    npx -y @modelcontextprotocol/server-filesystem --help &>/dev/null || true
-    
-    log_info "Installing PostgreSQL MCP server..."
-    npx -y @modelcontextprotocol/server-postgres --help &>/dev/null || true
-    
-    log_info "Installing Chrome DevTools MCP server..."
-    npx -y chrome-devtools-mcp@latest --help &>/dev/null || true
-    
-    log_success "MCP servers pre-installed"
-}
-
-# Configure Claude Code settings
-configure_claude_settings() {
-    log_info "Configuring Claude Code settings..."
-    
-    # Create Claude configuration directory
-    CLAUDE_CONFIG_DIR="$HOME/.claude"
-    mkdir -p "$CLAUDE_CONFIG_DIR"
-    
-    # Copy Claude settings (not MCP - that stays in .mcp.json)
-    if [ -f ".claude/settings.json" ]; then
-        cp .claude/settings.json "$CLAUDE_CONFIG_DIR/settings.local.json"
-        log_info "Claude settings template copied to $CLAUDE_CONFIG_DIR/settings.local.json"
-    fi
-    
-    # Note: MCP configuration is in .mcp.json in project root
-    # This is the new standard - MCP config stays with the project
-    log_info "MCP configuration is in .mcp.json (project-level)"
-    
-    log_success "Claude Code configured"
-}
-
-# Install skills
-install_skills() {
-    log_info "Installing skills..."
-    
-    SKILLS_DIR="$HOME/.claude/skills"
-    mkdir -p "$SKILLS_DIR"
-    
-    # Copy each skill
-    for skill_dir in skills/*/; do
-        skill_name=$(basename "$skill_dir")
-        log_info "Installing skill: $skill_name"
-        cp -r "$skill_dir" "$SKILLS_DIR/"
-    done
-    
-    log_success "Skills installed to $SKILLS_DIR"
-}
-
-# Setup Git hooks
-setup_git_hooks() {
-    log_info "Setting up Git hooks..."
-    
-    if [ -d ".git" ]; then
-        # Pre-commit hook for type checking
-        cat > .git/hooks/pre-commit << 'EOF'
-#!/bin/bash
-# AI Full Stack Methodology - Pre-commit hook
-
-echo "Running pre-commit checks..."
-
-# TypeScript type check (if applicable)
-if [ -f "tsconfig.json" ]; then
-    echo "Running TypeScript type check..."
-    npx tsc --noEmit || exit 1
-fi
-
-# Run tests
-if [ -f "package.json" ] && grep -q '"test"' package.json; then
-    echo "Running tests..."
-    npm test || exit 1
-fi
-
-echo "Pre-commit checks passed!"
-EOF
-        chmod +x .git/hooks/pre-commit
-        log_success "Git hooks installed"
-    else
-        log_warning "Not a git repository, skipping hooks setup"
+    # Create .env if not exists
+    if [ ! -f ".env" ]; then
+        if [ -f ".env.example" ]; then
+            cp ".env.example" ".env"
+            log_success "Created .env from template"
+        fi
     fi
 }
 
-# Verify installation
-verify_installation() {
-    log_info "Verifying installation..."
-    
-    local errors=0
-    
-    # Check .mcp.json exists
-    if [ -f ".mcp.json" ]; then
-        log_info "MCP configuration found (.mcp.json)"
-    else
-        log_warning "MCP configuration not found"
-        ((errors++))
-    fi
-    
-    # Check .env exists
-    if [ -f ".env" ]; then
-        log_info "Environment file found (.env)"
-    else
-        log_warning "Environment file not found - copy .env.example to .env"
-    fi
-    
-    # Check skills directory
-    if [ -d "$HOME/.claude/skills" ]; then
-        skill_count=$(ls -1 "$HOME/.claude/skills" 2>/dev/null | wc -l)
-        log_info "Found $skill_count skills installed"
-    else
-        log_warning "Skills directory not found"
-        ((errors++))
-    fi
-    
-    # Check Claude config
-    if [ -f "$HOME/.claude/settings.local.json" ]; then
-        log_info "Claude settings file exists"
-    else
-        log_warning "Claude settings not found"
-    fi
-    
-    if [ $errors -eq 0 ]; then
-        log_success "Installation verified successfully"
-    else
-        log_warning "Installation completed with warnings"
-    fi
+# Bonus: Pre-install MCP servers
+preinstall_mcp_servers() {
+    echo ""
+    echo "[BONUS] Pre-installing MCP servers (for faster startup)..."
+    echo ""
+    echo "Downloading MCP server packages..."
+
+    # Create temp directory for npm pack
+    TEMP_DIR="${TMPDIR:-/tmp}"
+
+    echo "  - Filesystem server..."
+    npm pack @modelcontextprotocol/server-filesystem --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+
+    echo "  - Docker server..."
+    npm pack @modelcontextprotocol/server-docker --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+
+    echo "  - Chrome DevTools server..."
+    npm pack chrome-devtools-mcp --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+
+    echo "  - Atlassian (Jira) server..."
+    npm pack @modelcontextprotocol/server-atlassian --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+
+    echo "  - Figma server..."
+    npm pack @anthropic/mcp-server-figma --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+
+    echo "  - GitHub server..."
+    npm pack @modelcontextprotocol/server-github --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+
+    log_success "MCP servers cached"
 }
 
 # Print next steps
 print_next_steps() {
     echo ""
-    echo -e "${GREEN}═══════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}                    Installation Complete!                          ${NC}"
-    echo -e "${GREEN}═══════════════════════════════════════════════════════════════════${NC}"
-    echo ""
-    echo -e "${YELLOW}⚠️  IMPORTANT: Restart Claude Code to load MCP servers!${NC}"
+    echo "========================================"
+    echo "   Installation Complete!"
+    echo "========================================"
     echo ""
     echo "Next steps:"
     echo ""
-    echo "  1. Configure environment variables:"
-    echo "     - Copy .env.example to .env"
-    echo "     - Fill in your API tokens:"
-    echo "       • ATLASSIAN_API_TOKEN (from https://id.atlassian.com/manage-profile/security/api-tokens)"
-    echo "       • GITHUB_PERSONAL_ACCESS_TOKEN (from https://github.com/settings/tokens)"
-    echo "       • FIGMA_API_KEY (from Figma Settings → Account → Personal access tokens)"
+    echo "1. Edit .env file with your API tokens:"
+    echo "   - ATLASSIAN_API_TOKEN"
+    echo "   - GITHUB_PERSONAL_ACCESS_TOKEN"
+    echo "   - FIGMA_API_KEY (optional)"
     echo ""
-    echo -e "  2. ${YELLOW}Restart Claude Code to load MCP servers:${NC}"
-    echo "     - Close Claude Code completely"
-    echo "     - Reopen in the project directory:"
-    echo "       cd $(pwd)"
-    echo "       claude"
-    echo "     - Verify with: claude mcp list"
+    echo "2. Start Claude Code in this folder:"
+    echo "   claude"
     echo ""
-    echo "  3. Optional: Enable Figma Dev Mode MCP (alternative to API)"
-    echo "     - Open Figma Desktop"
-    echo "     - Toggle Dev Mode (Shift+D)"
-    echo "     - Enable desktop MCP server in inspect panel"
+    echo "3. Run /aid-status to verify installation"
     echo ""
-    echo "  4. Start a new project:"
-    echo "     ./scripts/init-project.sh my-project-name"
+    echo "4. Run /aid-start to begin working!"
     echo ""
-    echo "  5. Or use Claude Code commands:"
-    echo "     claude \"/start-project my-project\""
-    echo ""
-    echo "Configuration files:"
-    echo "  • MCP Servers: .mcp.json (project-level)"
-    echo "  • Claude Settings: ~/.claude/settings.local.json"
-    echo "  • Skills: ~/.claude/skills/"
-    echo "  • Environment: .env"
+    echo "========================================"
     echo ""
 }
 
 # Main installation flow
 main() {
     print_banner
-    
-    # Check if we're in the right directory
-    if [ ! -f "README.md" ] || [ ! -d "skills" ]; then
-        log_error "Please run this script from the ai-fullstack-methodology root directory"
-        exit 1
-    fi
-    
     check_prerequisites
-    setup_environment
-    install_mcp_servers
-    configure_claude_settings
-    install_skills
-    setup_git_hooks
-    verify_installation
+    install_npm_deps
+    setup_claude_commands_and_skills
+    create_aid_directory
+    create_state_files
+    setup_global_aid
+    setup_mcp_and_env
+    preinstall_mcp_servers
     print_next_steps
 }
 
