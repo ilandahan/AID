@@ -30,6 +30,15 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_GITHUB_TOKEN"
       }
+    },
+    "confluence": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@aashari/mcp-server-atlassian-confluence"],
+      "env": {
+        "ATLASSIAN_SITE_URL": "https://YOUR_SITE.atlassian.net",
+        "ATLASSIAN_USER_EMAIL": "your@email.com",
+        "ATLASSIAN_API_TOKEN": "YOUR_ATLASSIAN_API_TOKEN"
+      }
     }
   }
 }
