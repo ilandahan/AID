@@ -170,43 +170,34 @@ if not exist ".env" (
     )
 )
 
-REM Pre-install MCP servers (download packages for faster startup)
-echo.
-echo [BONUS] Pre-installing MCP servers (for faster startup)...
-echo.
-echo Downloading MCP server packages...
-echo   - Filesystem server...
-call npm pack @modelcontextprotocol/server-filesystem --pack-destination="%TEMP%" >nul 2>nul
-echo   - Docker server...
-call npm pack @modelcontextprotocol/server-docker --pack-destination="%TEMP%" >nul 2>nul
-echo   - Chrome DevTools server...
-call npm pack chrome-devtools-mcp --pack-destination="%TEMP%" >nul 2>nul
-echo   - Atlassian (Jira) server...
-call npm pack @modelcontextprotocol/server-atlassian --pack-destination="%TEMP%" >nul 2>nul
-echo   - Figma server...
-call npm pack @anthropic/mcp-server-figma --pack-destination="%TEMP%" >nul 2>nul
-echo   - GitHub server...
-call npm pack @modelcontextprotocol/server-github --pack-destination="%TEMP%" >nul 2>nul
-echo [OK] MCP servers cached
-
+:finish
 echo.
 echo ========================================
 echo    Installation Complete!
 echo ========================================
 echo.
+echo MCP servers configured in .mcp.json:
+if exist ".mcp.json" (
+    node -e "const f=require('./.mcp.json'); Object.keys(f.mcpServers||{}).forEach(s=>console.log('  - '+s))" 2>nul
+)
+echo.
 echo Next steps:
 echo.
-echo 1. Edit .env file with your API tokens:
-echo    - ATLASSIAN_API_TOKEN
-echo    - GITHUB_PERSONAL_ACCESS_TOKEN
-echo    - FIGMA_API_KEY (optional)
+echo 1. Edit .mcp.json with your API tokens:
+echo    - ATLASSIAN_API_TOKEN (for Jira)
+echo    - FIGMA_API_KEY (for Figma)
+echo    - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)
 echo.
-echo 2. Start Claude Code in this folder:
+echo 2. Start Claude Code FROM THIS FOLDER:
+echo    cd "%CD%"
 echo    claude
 echo.
-echo 3. Run /aid-status to verify installation
+echo 3. Inside Claude Code, verify MCP with: /mcp
 echo.
 echo 4. Run /aid-start to begin working!
+echo.
+echo NOTE: MCP servers are PROJECT-SCOPED.
+echo       They only work when running Claude from this folder.
 echo.
 echo ========================================
 echo.
