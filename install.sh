@@ -205,7 +205,7 @@ setup_mcp_and_env() {
     fi
 }
 
-# Bonus: Pre-install MCP servers
+# Bonus: Pre-install MCP servers (optional - for faster startup)
 preinstall_mcp_servers() {
     echo ""
     echo "[BONUS] Pre-installing MCP servers (for faster startup)..."
@@ -218,17 +218,14 @@ preinstall_mcp_servers() {
     echo "  - Filesystem server..."
     npm pack @modelcontextprotocol/server-filesystem --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
 
-    echo "  - Docker server..."
-    npm pack @modelcontextprotocol/server-docker --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
-
     echo "  - Chrome DevTools server..."
     npm pack chrome-devtools-mcp --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
 
-    echo "  - Atlassian (Jira) server..."
-    npm pack @modelcontextprotocol/server-atlassian --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+    echo "  - Jira server..."
+    npm pack @aashari/mcp-server-atlassian-jira --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
 
     echo "  - Figma server..."
-    npm pack @anthropic/mcp-server-figma --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+    npm pack figma-developer-mcp --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
 
     echo "  - GitHub server..."
     npm pack @modelcontextprotocol/server-github --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
@@ -243,19 +240,28 @@ print_next_steps() {
     echo "   Installation Complete!"
     echo "========================================"
     echo ""
+    echo "MCP servers configured in .mcp.json:"
+    if [ -f ".mcp.json" ]; then
+        node -e "const f=require('./.mcp.json'); Object.keys(f.mcpServers||{}).forEach(s=>console.log('  - '+s))" 2>/dev/null || true
+    fi
+    echo ""
     echo "Next steps:"
     echo ""
-    echo "1. Edit .env file with your API tokens:"
-    echo "   - ATLASSIAN_API_TOKEN"
-    echo "   - GITHUB_PERSONAL_ACCESS_TOKEN"
-    echo "   - FIGMA_API_KEY (optional)"
+    echo "1. Edit .mcp.json with your API tokens:"
+    echo "   - ATLASSIAN_API_TOKEN (for Jira)"
+    echo "   - FIGMA_API_KEY (for Figma)"
+    echo "   - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)"
     echo ""
-    echo "2. Start Claude Code in this folder:"
+    echo "2. Start Claude Code FROM THIS FOLDER:"
+    echo "   cd $(pwd)"
     echo "   claude"
     echo ""
-    echo "3. Run /aid-status to verify installation"
+    echo "3. Inside Claude Code, verify MCP with: /mcp"
     echo ""
     echo "4. Run /aid-start to begin working!"
+    echo ""
+    echo "NOTE: MCP servers are PROJECT-SCOPED."
+    echo "      They only work when running Claude from this folder."
     echo ""
     echo "========================================"
     echo ""
