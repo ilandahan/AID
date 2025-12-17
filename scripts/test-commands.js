@@ -214,7 +214,7 @@ function testStateFiles() {
       const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
 
       // Check required fields
-      const requiredFields = ['current_phase', 'phase_name', 'phase_approved', 'current_session'];
+      const requiredFields = ['current_phase', 'phase_name', 'phase_approved', 'feedback_provided', 'current_session'];
       const missingFields = requiredFields.filter(f => !(f in state));
 
       if (missingFields.length > 0) {
