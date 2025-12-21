@@ -139,9 +139,25 @@ echo }
 
 echo [OK] State files created
 
+REM Install memory-system Python package
+echo.
+echo [STEP 5/7] Installing memory-system Python package...
+where python >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo [WARNING] Python not found, skipping memory-system install
+    echo          Install Python 3.8+ and run: pip install -e memory-system
+) else (
+    pip install -e memory-system >nul 2>nul
+    if %ERRORLEVEL% EQU 0 (
+        echo [OK] Memory system installed
+    ) else (
+        echo [WARNING] Memory system install failed, try manually: pip install -e memory-system
+    )
+)
+
 REM Create global ~/.aid directory for learning system
 echo.
-echo [STEP 5/6] Setting up global AID learning system...
+echo [STEP 6/7] Setting up global AID learning system...
 set "AID_HOME=%USERPROFILE%\.aid"
 if not exist "%AID_HOME%" mkdir "%AID_HOME%"
 if not exist "%AID_HOME%\feedback" mkdir "%AID_HOME%\feedback"
@@ -166,7 +182,7 @@ echo [OK] Global learning system initialized at %AID_HOME%
 
 REM Create .mcp.json if not exists
 echo.
-echo [STEP 6/6] Creating MCP configuration...
+echo [STEP 7/7] Creating MCP configuration...
 if not exist ".mcp.json" (
     if exist ".mcp.json.example" (
         copy ".mcp.json.example" ".mcp.json" >nul
