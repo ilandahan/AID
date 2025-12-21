@@ -41,8 +41,6 @@
     "install:mcp:github": "npx -y @modelcontextprotocol/server-github --help || true",
     "install:mcp:postgres": "npx -y @modelcontextprotocol/server-postgres --help || true",
     "install:mcp:chrome": "npx -y chrome-devtools-mcp@latest --help || true",
-    "prepare": "node -e \"try { require('husky').install() } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') throw e }\"",
-    "precommit": "lint-staged",
     "security:audit": "npm audit && cd memory-system && pip-audit || true"
   },
   "dependencies": {
@@ -98,18 +96,5 @@
   "overrides": {
     "jsdom": "^26.1.0",
     "glob": "^11.0.0"
-  },
-  "lint-staged": {
-    "*.{ts,tsx,js,jsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "*.{json,css,scss,md}": [
-      "prettier --write"
-    ],
-    "*.py": [
-      "ruff check --fix",
-      "ruff format"
-    ]
   }
 }
