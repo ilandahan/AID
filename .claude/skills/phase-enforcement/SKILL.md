@@ -1,6 +1,6 @@
 ---
 name: phase-enforcement
-description: AID methodology phase gate enforcement. Use this skill to ensure work follows the correct development phase order (PRD → Tech Spec → Implementation Plan → Development → QA). Enforces phase gates, validates transitions, and collects quality feedback. Essential for maintaining development discipline.
+description: AID methodology phase gate enforcement. Use this skill to ensure work follows the correct development phase order (Discovery → PRD → Tech Spec → Implementation Plan → Development → QA). Enforces phase gates, validates transitions, and collects quality feedback. Essential for maintaining development discipline.
 ---
 
 # Phase Enforcement Skill
@@ -64,6 +64,31 @@ Enforces AID phase gates with mandatory quality feedback collection. Claude MUST
 ```
 
 ### Sub-Agent Review Prompts by Phase
+
+#### Phase 0 (Discovery) → Phase 1 (PRD) Review
+
+```markdown
+**SUB-AGENT TASK: Discovery Review**
+
+Review the research artifacts at: [docs/research/YYYY-MM-DD-project-name/]
+
+**Checklist - ALL must pass:**
+1. [ ] Problem statement validated (SCQ format: Situation, Complication, Question)
+2. [ ] Stakeholders identified and mapped
+3. [ ] Competitive landscape documented
+4. [ ] Root causes identified (not just symptoms)
+5. [ ] Success metrics defined and measurable
+6. [ ] Research findings have IDs (RES-XXX) for traceability
+7. [ ] Traceability matrix created (research → requirements mapping)
+8. [ ] Go/No-Go decision documented with justification
+
+**Return Format:**
+- PASS: All 8 items checked, ready for PRD
+- PARTIAL: [List items that need minor fixes]
+- FAIL: [List critical missing items]
+
+**Provide specific file references for any issues found.**
+```
 
 #### Phase 1 (PRD) → Phase 2 (Tech Spec) Review
 
@@ -245,10 +270,11 @@ Cannot override critical failures.
 
 ## Phase Structure
 
-### 5-Phase Development Lifecycle
+### 6-Phase Development Lifecycle
 
 | Phase | Name | Document Output | Folder |
 |-------|------|-----------------|--------|
+| 0 | Discovery | Research & Validation | `docs/research/` |
 | 1 | PRD | Product Requirements | `docs/prd/` |
 | 2 | Tech Spec | Technical Specification | `docs/tech-spec/` |
 | 3 | Implementation Plan | Task Breakdown | `docs/implementation-plan/` |
@@ -261,6 +287,11 @@ All documents follow: `YYYY-MM-DD-[feature-name].md`
 
 ```
 docs/
+├── research/
+│   └── 2024-12-10-user-authentication/
+│       ├── research-report.md
+│       ├── traceability-matrix.md
+│       └── stakeholder-map.png
 ├── prd/
 │   └── 2024-12-11-user-authentication.md
 ├── tech-spec/
@@ -273,6 +304,7 @@ docs/
 
 | Category | Examples | First Allowed | Gate Document |
 |----------|----------|---------------|---------------|
+| `research` | Discovery, stakeholders, competitive analysis | Phase 0 | `docs/research/` |
 | `requirements` | PRD, user stories, scope | Phase 1 | `docs/prd/` |
 | `architecture` | System design, DB schema, APIs | Phase 2 | `docs/tech-spec/` |
 | `planning` | Jira issues, task breakdown | Phase 3 | `docs/implementation-plan/` |
@@ -283,14 +315,16 @@ docs/
 
 ```javascript
 const PHASE_ALLOWED = {
-  1: ["requirements"],
-  2: ["requirements", "architecture"],
-  3: ["requirements", "architecture", "planning"],
-  4: ["requirements", "architecture", "planning", "coding"],
-  5: ["requirements", "architecture", "planning", "coding", "qa"],
+  0: ["research"],
+  1: ["research", "requirements"],
+  2: ["research", "requirements", "architecture"],
+  3: ["research", "requirements", "architecture", "planning"],
+  4: ["research", "requirements", "architecture", "planning", "coding"],
+  5: ["research", "requirements", "architecture", "planning", "coding", "qa"],
 };
 
 const PHASE_OUTPUT_FOLDERS = {
+  0: "docs/research/",
   1: "docs/prd/",
   2: "docs/tech-spec/",
   3: "docs/implementation-plan/",
@@ -300,6 +334,11 @@ const PHASE_OUTPUT_FOLDERS = {
 ```
 
 ## Detection Patterns
+
+### Phase 0 Work (research)
+- "research", "discovery", "validate problem"
+- "stakeholder", "competitive analysis", "market research"
+- "root cause", "problem validation", "traceability matrix"
 
 ### Phase 1 Work (requirements)
 - "create PRD", "write requirements", "define scope"
@@ -367,10 +406,21 @@ const PHASE_OUTPUT_FOLDERS = {
 
 ## Gate Check Requirements
 
+### Phase 0 → Phase 1 Gate
+- [ ] Research folder exists in `docs/research/YYYY-MM-DD-[project]/`
+- [ ] research-report.md present with problem statement
+- [ ] Stakeholders identified and mapped
+- [ ] Competitive analysis documented
+- [ ] traceability-matrix.md created
+- [ ] Go/No-Go decision documented
+- [ ] **⚠️ SUB-AGENT REVIEW PASSED** (mandatory)
+- [ ] **Feedback collected** via `/aid end`
+
 ### Phase 1 → Phase 2 Gate
 - [ ] PRD exists in `docs/prd/YYYY-MM-DD-[feature].md`
 - [ ] All user stories defined
 - [ ] Acceptance criteria complete
+- [ ] Requirements trace to research IDs
 - [ ] **⚠️ SUB-AGENT REVIEW PASSED** (mandatory)
 - [ ] **Feedback collected** via `/aid end`
 
@@ -431,11 +481,14 @@ Deliverables:
 - [Document/Output created]
 - Location: [path]
 
-Before advancing to Phase [N+1], please provide feedback:
+⚠️ MANDATORY: Sub-Agent Review Required
 
-Run: /aid end
+Before advancing to Phase [N+1], Claude must:
+1. Spawn review sub-agent to validate deliverables
+2. Address any issues found
+3. Collect feedback via /aid end
 
-This helps improve the methodology for future sessions.
+This ensures quality gates are enforced.
 ```
 
 ## Exceptions
@@ -454,6 +507,7 @@ This helps improve the methodology for future sessions.
 - User can say "override: [reason]"
 - Log override in `.aid/overrides.log`
 - Override does NOT skip feedback requirement
+- **Override does NOT skip sub-agent review for critical failures**
 
 ## Skill Integration
 
@@ -461,10 +515,14 @@ This skill coordinates with other skills based on phase:
 
 | Skill | Available From | Gate Requirement |
 |-------|----------------|------------------|
-| `system-architect` | Phase 2+ | PRD approved |
-| `atomic-design` | Phase 4+ | Tech Spec approved |
-| `code-review` | Phase 4+ | Implementation Plan approved |
-| `test-driven` | Phase 4+ | Implementation Plan approved |
+| `pre-prd-research` | Phase 0 | None (starting phase) |
+| `aid-discovery` | Phase 0 | None (starting phase) |
+| `nano-banana-visual` | Phase 0+ | Optional - for visual artifacts |
+| `aid-prd` | Phase 1+ | Discovery approved + sub-agent review passed |
+| `system-architect` | Phase 2+ | PRD approved + sub-agent review passed |
+| `atomic-design` | Phase 4+ | Tech Spec approved + sub-agent review passed |
+| `code-review` | Phase 4+ | Implementation Plan approved + sub-agent review passed |
+| `test-driven` | Phase 4+ | Implementation Plan approved + sub-agent review passed |
 
 ## State Management
 
@@ -472,29 +530,50 @@ This skill coordinates with other skills based on phase:
 
 ```json
 {
-  "current_phase": 2,
-  "phase_name": "tech-spec",
+  "current_phase": 0,
+  "phase_name": "Discovery",
   "feature_name": "user-authentication",
   "started_at": "2024-12-11T10:00:00Z",
-  "phases_completed": [1],
+  "phases_completed": [],
   "documents": {
-    "prd": "docs/prd/2024-12-11-user-authentication.md",
+    "research": null,
+    "prd": null,
     "tech_spec": null,
     "implementation_plan": null
   },
   "feedback_collected": {
-    "phase_1": true,
+    "phase_0": false,
+    "phase_1": false,
     "phase_2": false
+  },
+  "subagent_review": {
+    "phase_0": {"status": "pending"},
+    "phase_1": {"status": "pending"},
+    "phase_2": {"status": "pending"}
   }
 }
+```
+
+### Phase Name Mapping
+
+```javascript
+const PHASE_NAMES = {
+  0: "Discovery",
+  1: "PRD",
+  2: "Tech Spec",
+  3: "Implementation Plan",
+  4: "Development",
+  5: "QA & Ship"
+};
 ```
 
 ## Commands Reference
 
 | Command | Purpose | Phase |
 |---------|---------|-------|
+| `/discovery` | Start Phase 0 research | Phase 0 |
 | `/phase` | Show current phase status | Any |
 | `/gate-check` | Check gate requirements | Any |
 | `/phase approve` | Approve phase advancement | End of phase |
-| `/aid end` | Complete phase with feedback | End of phase |
+| `/aid end` | Complete phase with feedback | End of phase (after sub-agent review) |
 | `/aid improve` | Run improvement analysis | Any (3+ feedback) |

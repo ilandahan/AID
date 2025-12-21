@@ -53,18 +53,66 @@ if (isNanoBananaEnabled()) {
 
 | AID Phase | Trigger | Output |
 |-----------|---------|--------|
-| Discovery | "Create stakeholder map" | Stakeholder diagram |
-| PRD | "Create user flow" | Flow diagram |
-| Tech Spec | "Create architecture diagram" | System architecture |
-| Development | "Create screen mockup" | Atomic Design mockup |
+| Phase 0: Discovery | "Create stakeholder map" | Stakeholder power/interest diagram |
+| Phase 0: Discovery | "Create competitive landscape" | Market positioning visual |
+| Phase 0: Discovery | "Create systems map" | System interaction diagram |
+| Phase 1: PRD | "Create user flow" | Flow diagram |
+| Phase 1: PRD | "Create journey map" | User journey visual |
+| Phase 2: Tech Spec | "Create architecture diagram" | System architecture |
+| Phase 2: Tech Spec | "Create ERD" | Entity relationship diagram |
+| Phase 4: Development | "Create screen mockup" | Atomic Design mockup |
 
 ## Phase Integration
 
 ```
-Discovery  → Stakeholder Map, Problem Impact Visual
-PRD        → User Flows, Journey Maps, Wireframes
-Tech Spec  → Architecture, ERD, Sequence Diagrams
-Development → Screen Mockups (with Atomic Design tokens)
+Phase 0 (Discovery)  → Stakeholder Map, Problem Impact, Competitive Landscape
+Phase 1 (PRD)        → User Flows, Journey Maps, Wireframes
+Phase 2 (Tech Spec)  → Architecture, ERD, Sequence Diagrams
+Phase 4 (Development) → Screen Mockups (with Atomic Design tokens)
+```
+
+## Phase 0: Discovery Visuals
+
+Generate visual artifacts during research phase:
+
+### Stakeholder Map
+```typescript
+const result = await client.generateFromText(`
+Create a stakeholder power/interest matrix diagram.
+
+Stakeholders:
+- CEO: High Power, High Interest
+- Engineering Team: Medium Power, High Interest
+- End Users: Low Power, High Interest
+- Legal: High Power, Low Interest
+
+Style: Professional 2x2 matrix with quadrant labels
+- Manage Closely (High/High)
+- Keep Satisfied (High/Low)
+- Keep Informed (Low/High)
+- Monitor (Low/Low)
+`);
+
+// Save to docs/research/YYYY-MM-DD-project/assets/
+fs.writeFileSync('stakeholder-map.png', Buffer.from(result.images[0].base64!, 'base64'));
+```
+
+### Competitive Landscape
+```typescript
+const result = await client.generateFromText(`
+Create a competitive positioning map.
+
+X-axis: Price (Low to High)
+Y-axis: Feature Richness (Low to High)
+
+Competitors:
+- Competitor A: Low price, Low features (bottom-left)
+- Competitor B: High price, High features (top-right)
+- Our Position: Medium price, High features (top-center)
+- Market Gap: High price, Low features (bottom-right, "opportunity")
+
+Style: Clean scatter plot with labeled positions
+`);
 ```
 
 ---
@@ -192,15 +240,20 @@ After generating:
 ## File Organization
 
 ```
-project/docs/visuals/
-├── discovery/
-│   └── stakeholder-map.png
+project/docs/
+├── research/YYYY-MM-DD-[project]/
+│   └── assets/
+│       ├── stakeholder-map.png        # Phase 0
+│       ├── competitive-landscape.png  # Phase 0
+│       └── systems-map.png            # Phase 0
 ├── prd/
-│   └── user-flow-checkout.png
+│   └── visuals/
+│       └── user-flow-checkout.png     # Phase 1
 ├── tech-spec/
-│   └── architecture.png
+│   └── visuals/
+│       └── architecture.png           # Phase 2
 └── design/
-    └── dashboard-mockup.png
+    └── dashboard-mockup.png           # Phase 4
 ```
 
 ---

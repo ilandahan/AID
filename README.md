@@ -162,20 +162,21 @@ See the reasoning behind every major decision:
 
 ## Phase Gate System
 
-AID enforces **5 mandatory phases** with quality gates between each. No phase can be skipped.
+AID enforces **6 mandatory phases** (0-5) with quality gates between each. No phase can be skipped.
 
 ```
-Phase 1 ──► Gate ──► Phase 2 ──► Gate ──► Phase 3 ──► Gate ──► Phase 4 ──► Gate ──► Phase 5
-  PRD        ✓      Tech Spec     ✓      Breakdown     ✓        Dev          ✓      QA & Ship
+Phase 0 ──► Gate ──► Phase 1 ──► Gate ──► Phase 2 ──► Gate ──► Phase 3 ──► Gate ──► Phase 4 ──► Gate ──► Phase 5
+Discovery    ✓        PRD        ✓      Tech Spec     ✓      Impl Plan     ✓        Dev          ✓      QA & Ship
 ```
 
 ### Phase Details
 
 | Phase | Name | What Happens | Output |
 |-------|------|--------------|--------|
-| **1** | PRD | Define requirements, user stories, scope | `docs/prd/*.md` |
+| **0** | Discovery | Research, stakeholder mapping, competitive analysis, Go/No-Go | `docs/research/YYYY-MM-DD-[project]/` |
+| **1** | PRD | Define requirements, user stories, scope (linked to research) | `docs/prd/*.md` |
 | **2** | Tech Spec | Architecture, database design, APIs, security | `docs/tech-spec/*.md` |
-| **3** | Breakdown | Implementation plan, Jira tasks (< 4 hours each) | `docs/implementation-plan/*.md` |
+| **3** | Impl Plan | Implementation plan, Jira tasks (< 4 hours each) | `docs/implementation-plan/*.md` |
 | **4** | Development | TDD implementation, code review | `src/`, `testing/` |
 | **5** | QA & Ship | Validation, testing, deployment | Production release |
 
@@ -183,11 +184,32 @@ Phase 1 ──► Gate ──► Phase 2 ──► Gate ──► Phase 3 ──
 
 | Phase | Allowed | Blocked |
 |-------|---------|---------|
-| 1 PRD | Requirements, scope, user stories | Code, architecture, Jira |
+| 0 Discovery | Research, stakeholders, competitive analysis | PRD, architecture, code |
+| 1 PRD | + Requirements, scope, user stories | Architecture, code, Jira |
 | 2 Tech Spec | + Architecture, schemas, APIs | Code, Jira issues |
-| 3 Breakdown | + Jira epics, stories, tasks | Production code |
+| 3 Impl Plan | + Jira epics, stories, tasks | Production code |
 | 4 Development | + Code, tests, components | Deployment |
 | 5 QA & Ship | Everything | - |
+
+### Phase 0: Discovery (NEW)
+
+Start every project with research:
+
+```bash
+/discovery my-project    # Creates research folder structure
+```
+
+**Key Activities:**
+- Problem Analysis (5 Whys, Problem Severity)
+- Stakeholder Research (Interviews, Power/Interest Matrix)
+- Competitive Analysis (JTBD, Market Research)
+- Root Cause Investigation
+- Go/No-Go Decision
+
+**Exit Criteria:**
+- Research report with problem statement (SCQ format)
+- Traceability matrix linking research to requirements
+- Go/No-Go decision documented
 
 ### Sub-Agent Review (Mandatory)
 
@@ -245,10 +267,10 @@ Generate professional visual artifacts using Google's Nano Banana Pro (Gemini 3 
 
 | AID Phase | Visual Artifact | Example |
 |-----------|-----------------|---------|
-| Discovery | Stakeholder maps | Org chart with influence levels |
-| PRD | User flows, journey maps | Checkout process flow diagram |
-| Tech Spec | Architecture diagrams, ERDs | Microservices system diagram |
-| Development | Screen mockups | Dashboard with design tokens applied |
+| Phase 0: Discovery | Stakeholder maps, competitive landscape | Power/interest matrix, market positioning |
+| Phase 1: PRD | User flows, journey maps | Checkout process flow diagram |
+| Phase 2: Tech Spec | Architecture diagrams, ERDs | Microservices system diagram |
+| Phase 4: Development | Screen mockups | Dashboard with design tokens applied |
 
 ### Setup (Environment Variables)
 

@@ -8,13 +8,21 @@ Before doing ANY work, Claude MUST:
 3. Verify requested work is allowed in current phase
 4. **REFUSE work that belongs to a later phase**
 
+### 6-Phase Lifecycle
+
+```
+Phase 0 ──► Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4 ──► Phase 5
+Discovery     PRD      Tech Spec   Impl Plan     Dev       QA & Ship
+```
+
 ### Phase Permissions
 
 | Phase | Allowed | Blocked |
 |-------|---------|---------|
-| 1 PRD | Requirements, scope, user stories | Code, architecture, Jira |
+| 0 Discovery | Research, stakeholders, competitive analysis | PRD, architecture, code |
+| 1 PRD | + Requirements, scope, user stories | Architecture, code, Jira |
 | 2 Tech Spec | + Architecture, schemas, APIs | Code, Jira issues |
-| 3 Breakdown | + Jira epics, stories, tasks | Production code |
+| 3 Impl Plan | + Jira epics, stories, tasks | Production code |
 | 4 Development | + Code, tests, components | Deployment |
 | 5 QA & Ship | Everything | - |
 
@@ -44,9 +52,10 @@ Before doing ANY work, Claude MUST:
 | Command | Purpose |
 |---------|---------|
 | `/aid-init` | Initialize project with AID phases + memory system |
-| `/aid-start` | Start work session - select role & phase |
+| `/aid-start` | Start work session - select role & phase (0-5) |
 | `/aid-status` | Show current state (phase + session) |
 | `/aid-end` | End phase and provide feedback |
+| `/discovery` | **Start Phase 0** - research and validation |
 | `/phase` | Show current phase status |
 | `/gate-check` | Check if ready to advance |
 | `/phase-approve` | Human sign-off for current phase |
@@ -83,7 +92,10 @@ Claude MUST update `.aid/context.json` when:
 
 | Phase | Load These Skills |
 |-------|-------------------|
+| 0 | `skills/pre-prd-research/`, `skills/aid-discovery/`, `skills/nano-banana-visual/` |
+| 1 | `skills/aid-prd/` |
 | 2 | `skills/system-architect/` |
+| 3 | `skills/aid-tech-spec/` |
 | 4 | `skills/atomic-design/`, `skills/atomic-page-builder/` |
 | 4-5 | `skills/code-review/`, `skills/test-driven/` |
 | All | `skills/phase-enforcement/`, `skills/context-tracking/` |
@@ -93,10 +105,12 @@ Claude MUST update `.aid/context.json` when:
 ## Key Files
 
 ```
-.aid/state.json      - Phase state (which phase we're in)
+.aid/state.json      - Phase state (starts at Phase 0: Discovery)
 .aid/context.json    - Work context (current task, step, progress)
-docs/PRD.md          - Product requirements
-docs/TECH-SPEC.md    - Technical specification
+docs/research/       - Phase 0 outputs (research-report.md, traceability-matrix.md)
+docs/prd/            - Phase 1 outputs (Product requirements)
+docs/tech-spec/      - Phase 2 outputs (Technical specification)
+docs/implementation-plan/ - Phase 3 outputs (Task breakdown)
 ```
 
 ---
