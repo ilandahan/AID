@@ -7,7 +7,7 @@ name = "aid-memory-system"
 version = "1.0.0"
 description = "AID Learning Mode Sub-Agent - Feedback analysis and learning system"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "AID Community License v1.0"}
 requires-python = ">=3.9"
 authors = [
     {name = "AID Team"}
@@ -16,7 +16,7 @@ keywords = ["ai", "learning", "feedback", "analysis", "claude"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",

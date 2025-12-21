@@ -1,0 +1,242 @@
+# AID Methodology License
+
+## The AID Community License v1.0
+
+Copyright (c) 2024-Present Ilan Dahan
+
+---
+
+## Preamble
+
+The AID (AI-Assisted Development) Methodology was created to empower entrepreneurs, developers, product managers, and organizations worldwide. This license ensures the methodology remains **free and accessible to all** while protecting it from commercial exploitation.
+
+**Core Philosophy:** Knowledge shared freely creates more value than knowledge sold.
+
+---
+
+## Definitions
+
+- **"The Methodology"** refers to the AID (AI-Assisted Development) framework, including all documentation, templates, workflows, processes, skills, prompts, and associated materials contained in this repository.
+
+- **"Use"** means to read, study, implement, adapt, execute, and apply The Methodology in any project, product, or organization.
+
+- **"Derivative Works"** means any modification, adaptation, translation, extension, or enhancement of The Methodology.
+
+- **"Commercial Sale"** means offering The Methodology itself, or substantially similar derivatives, as a paid product, course, training program, book, certification, or consulting package where The Methodology is the primary deliverable.
+
+- **"Internal Commercial Use"** means using The Methodology within a for-profit organization to build products, manage projects, or improve processes.
+
+---
+
+## Granted Rights
+
+### You ARE FREE to:
+
+1. **Use Without Restriction**
+   - Apply The Methodology in personal projects
+   - Implement The Methodology in commercial products and services you build
+   - Use The Methodology in startups, enterprises, and organizations of any size
+   - Use The Methodology in open source projects
+
+2. **Adapt and Modify**
+   - Customize The Methodology for your specific needs
+   - Create internal versions tailored to your organization
+   - Extend The Methodology with your own additions
+   - Translate The Methodology to other languages
+
+3. **Share and Distribute**
+   - Share The Methodology with colleagues and communities
+   - Include references to The Methodology in your documentation
+   - Write articles, blog posts, and tutorials about The Methodology
+   - Present The Methodology at conferences, meetups, and workshops
+   - Teach The Methodology in academic and educational settings
+
+4. **Attribute and Reference**
+   - Reference The Methodology in your work
+   - Credit The Methodology in products built using it
+   - Link to this repository from your projects
+
+---
+
+## Restrictions
+
+### You may NOT:
+
+1. **Sell The Methodology**
+   - Offer The Methodology as a paid product or service
+   - Create paid courses, certifications, or training programs that are substantially based on The Methodology
+   - Publish The Methodology as a paid book or ebook
+   - Package The Methodology as paid consulting deliverables where The Methodology itself is the primary value proposition
+
+2. **Claim Ownership**
+   - Remove or alter copyright notices
+   - Claim original authorship of The Methodology
+   - Register trademarks or patents on The Methodology or its core concepts
+   - Sublicense The Methodology under different terms
+
+3. **Restrict Access**
+   - Place The Methodology behind paywalls
+   - Require payment to access The Methodology
+   - Create artificial scarcity around The Methodology
+
+---
+
+## Clarifications & Examples
+
+### This IS Allowed:
+
+| Scenario | Allowed? | Reason |
+|----------|----------|--------|
+| A startup uses AID to build their SaaS product | Yes | Internal commercial use |
+| A consulting firm uses AID internally for client projects | Yes | Tool for delivering services |
+| A company adapts AID for their internal engineering handbook | Yes | Internal adaptation |
+| A blogger writes a paid newsletter mentioning AID | Yes | AID is referenced, not sold |
+| A university includes AID in their curriculum | Yes | Educational use |
+| A conference speaker presents about AID | Yes | Knowledge sharing |
+| A book about AI development mentions and references AID | Yes | Reference and citation |
+| A book about AI product management includes a chapter on AID | Yes | AID is referenced, not the primary content |
+
+### This is NOT Allowed:
+
+| Scenario | Allowed? | Reason |
+|----------|----------|--------|
+| Selling "The Complete AID Course" for $499 | No | Selling the methodology |
+| Publishing "AID: The Book" as a paid ebook | No | Packaging methodology for sale |
+| Offering "AID Certification" for $1,000 | No | Monetizing the methodology |
+| Rebranding AID as "SuperDev Framework" and selling it | No | Selling derivative of methodology |
+| Placing AID documentation behind a paywall | No | Restricting free access |
+| Paid workshop that teaches AID among other topics | No | Commercial teaching of the methodology |
+| Tool/SaaS that automates AID workflows | No | Commercializing the methodology through software |
+| A developer creates a VS Code extension that implements AID workflows | No | Packaging the methodology as a software product |
+
+### Gray Areas - Generally Allowed:
+
+| Scenario | Guidance |
+|----------|----------|
+| Consulting engagement that includes AID implementation | Allowed - you're selling your expertise, not the methodology |
+
+---
+
+## Attribution Requirements
+
+When using The Methodology, you must:
+
+1. **Maintain Copyright Notice**
+   - Keep this LICENSE file intact in any distribution
+   - Include copyright notice in derivative works
+
+2. **Provide Attribution**
+   - When publicly referencing The Methodology, include:
+     - Name: "AID (AI-Assisted Development) Methodology"
+     - Author: "Ilan Dahan"
+     - Website: https://www.theaid.ai/
+     - Repository: https://github.com/ilandahan/AID
+
+3. **Indicate Modifications**
+   - If you modify The Methodology, clearly indicate what changes you made
+   - Do not imply that your modifications are endorsed by the original author
+
+### Attribution Examples:
+
+**In Documentation:**
+```
+This project uses the AID (AI-Assisted Development) Methodology by Ilan Dahan.
+https://www.theaid.ai/
+Licensed under the AID Community License v1.0
+```
+
+**In Presentations:**
+```
+Methodology: AID by Ilan Dahan (theaid.ai)
+```
+
+**In Code Comments:**
+```
+// Workflow based on AID Methodology (https://github.com/ilandahan/AID)
+// Licensed under AID Community License v1.0
+```
+
+---
+
+## Contributions
+
+Contributions to this repository are welcome and will be licensed under the same terms.
+
+By submitting a contribution, you:
+- Grant the maintainer the right to include your contribution under this license
+- Confirm you have the right to make the contribution
+- Understand your contribution will be freely available under these terms
+
+---
+
+## Enforcement
+
+### Violations
+
+If you become aware of a violation of this license:
+1. Contact the copyright holder at ilan.dahn@gmail.com
+2. Provide details of the suspected violation
+3. Allow reasonable time for investigation and response
+
+### Remedies
+
+In case of violation, the copyright holder reserves the right to:
+- Request immediate cessation of the violating activity
+- Request removal of infringing materials
+- Pursue legal remedies if necessary
+- Publicly identify violators to protect the community
+
+### Good Faith
+
+This license is designed to keep The Methodology free and accessible. The copyright holder will interpret edge cases in favor of free use and knowledge sharing, not restriction.
+
+---
+
+## Warranty Disclaimer
+
+THE METHODOLOGY IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE METHODOLOGY OR THE USE OR OTHER DEALINGS IN THE METHODOLOGY.
+
+---
+
+## License Versioning
+
+This is version 1.0 of the AID Community License.
+
+The copyright holder reserves the right to publish updated versions of this license. You may choose to follow the terms of either:
+- The version of the license included with the copy of The Methodology you received, or
+- Any later version published by the copyright holder
+
+---
+
+## Summary (Plain Language)
+
+**In simple terms:**
+
+**FREE:** Use it however you want in your work and projects
+
+**COMMERCIAL OK:** Build products, run businesses, serve clients - all fine
+
+**SHARE:** Teach it, present it, write about it - spread the knowledge
+
+**ADAPT:** Modify it for your needs, make it your own
+
+**CREDIT:** Just mention where it came from
+
+**DON'T SELL IT:** The methodology itself should remain free for everyone
+
+---
+
+## Contact
+
+- **Author:** Ilan Dahan
+- **Website:** https://www.theaid.ai/
+- **Repository:** https://github.com/ilandahan/AID
+- **Questions:** ilan.dahn@gmail.com
+
+---
+
+*This license was created to ensure the AID Methodology remains a gift to the global developer and product community. Knowledge wants to be free.*
+
+**Last Updated:** 2024

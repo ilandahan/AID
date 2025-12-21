@@ -5,7 +5,7 @@
 **Transform raw requirements into production-ready software using Claude Code**
 
 [![Claude Code](https://img.shields.io/badge/Claude-Code-orange)](https://claude.ai)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-AID%20Community%20v1.0-blue.svg)](LICENSE)
 [![MCP Integrations](https://img.shields.io/badge/MCP-6%20Integrations-green)](#mcp-integrations)
 [![Skills](https://img.shields.io/badge/Skills-21%20Specialized-purple)](#skills-system)
 
@@ -624,4 +624,13 @@ Built with [Claude Code](https://claude.ai) by Anthropic.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+**AID Community License v1.0** - Free to use, adapt, and share. Cannot be sold.
+
+See [LICENSE](LICENSE) for full details.
+
+### Quick Summary:
+- **FREE:** Use it in any project (personal, commercial, open source)
+- **ADAPT:** Customize for your needs
+- **SHARE:** Teach, present, write about it
+- **CREDIT:** Attribute to Ilan Dahan / theaid.ai
+- **DON'T SELL:** The methodology itself must remain free

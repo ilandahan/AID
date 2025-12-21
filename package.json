@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "AI Full Stack Development Methodology - Transform requirements into production-ready software using Claude Code",
   "author": "Ilan Dahan",
+  "license": "SEE LICENSE IN LICENSE",
   "private": true,
   "scripts": {
     "dev": "next dev",
