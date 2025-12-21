@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(code-review)",
+      "mcp__filesystem__directory_tree",
+      "Bash(wc:*)",
+      "Bash(setx:*)",
+      "Skill(test-driven)",
+      "Bash(python -m pytest:*)",
+      "mcp__filesystem__list_allowed_directories",
+      "mcp__confluence__conf_get",
+      "mcp__github__search_repositories",
+      "mcp__figma__get_figma_data",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__jira__jira_get",
+      "mcp__filesystem__read_text_file",
+      "Bash(cat:*)",
+      "mcp__filesystem__write_file",
+      "mcp__filesystem__edit_file",
+      "Bash(git add:*)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "filesystem",
+    "chrome-devtools",
+    "jira",
+    "confluence",
+    "figma",
+    "github"
+  ]
+}

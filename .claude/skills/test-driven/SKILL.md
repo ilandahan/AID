@@ -1,6 +1,6 @@
 ---
 name: test-driven
-description: "TDD methodology with document-driven testing. Separates Backend/API tests from GUI tests (DevTools MCP). Always references PRD, Tech Spec, and Implementation Plan."
+description: Comprehensive TDD (Test-Driven Development) methodology for writing production-quality tests. Use this skill when writing tests before implementation, reviewing test quality, ensuring comprehensive coverage, avoiding test anti-patterns, or when asked about testing best practices. Covers minimal mocking strategies, realistic test data, strong assertions, and test independence.
 ---
 
 # Test-Driven Development Skill
@@ -52,8 +52,6 @@ User Request: "Write tests for feature X"
               └─► GUI Tests (DevTools MCP)
 ```
 
----
-
 ## Test Types Separation
 
 ```
@@ -81,7 +79,26 @@ User Request: "Write tests for feature X"
 | **Integration** | `tests/integration/` | Supertest, real DB | Medium | APIs, DB operations |
 | **GUI/E2E** | `tests/e2e/` | DevTools MCP | Slow | User flows, visual |
 
----
+## The TDD Cycle
+
+```
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│    1. RED      →    2. GREEN    →    3. REFACTOR   │
+│    Write test       Make it          Clean up      │
+│    (fails)          pass             (tests pass)  │
+│                                                     │
+│         ↑                                 │        │
+│         └─────────────────────────────────┘        │
+│                     REPEAT                         │
+└─────────────────────────────────────────────────────┘
+```
+
+| Phase | Action | Rule |
+|-------|--------|------|
+| **RED** | Write failing test | Test MUST fail first |
+| **GREEN** | Write minimal code to pass | No extra features |
+| **REFACTOR** | Clean up code | Tests still pass |
 
 ## Part 1: Backend & API Testing
 
@@ -226,8 +243,6 @@ describe('OrderCalculator', () => {
 });
 ```
 
----
-
 ## Part 2: GUI Testing (DevTools MCP)
 
 ### DevTools MCP Integration
@@ -294,26 +309,6 @@ describe('Login Page', () => {
 });
 ```
 
-### GUI Test Checklist (from PRD User Stories)
-
-```typescript
-// For each user story in PRD, create GUI test:
-
-// PRD User Story: "As a user, I can register an account"
-describe('Registration Flow', () => {
-  test('complete registration creates account', async () => { });
-  test('shows validation errors for invalid input', async () => { });
-  test('shows success message after registration', async () => { });
-});
-
-// PRD User Story: "As a user, I can reset my password"
-describe('Password Reset Flow', () => {
-  test('sends reset email', async () => { });
-  test('reset link works', async () => { });
-  test('can set new password', async () => { });
-});
-```
-
 ### Accessibility Testing (DevTools MCP)
 
 ```typescript
@@ -340,8 +335,6 @@ describe('Accessibility', () => {
   });
 });
 ```
-
----
 
 ## Test File Organization
 
@@ -383,31 +376,6 @@ tests/
     └── jest.setup.ts
 ```
 
----
-
-## The TDD Cycle
-
-```
-┌─────────────────────────────────────────────────────┐
-│                                                     │
-│    1. RED      →    2. GREEN    →    3. REFACTOR   │
-│    Write test       Make it          Clean up      │
-│    (fails)          pass             (tests pass)  │
-│                                                     │
-│         ↑                                 │        │
-│         └─────────────────────────────────┘        │
-│                     REPEAT                         │
-└─────────────────────────────────────────────────────┘
-```
-
-| Phase | Action | Rule |
-|-------|--------|------|
-| **RED** | Write failing test | Test MUST fail first |
-| **GREEN** | Write minimal code to pass | No extra features |
-| **REFACTOR** | Clean up code | Tests still pass |
-
----
-
 ## Document-to-Test Mapping
 
 ### From PRD → GUI Tests
@@ -436,8 +404,6 @@ tests/
 | Phase 3 | E2E tests |
 | Phase 4 | Performance/load tests |
 
----
-
 ## Quick Commands
 
 ```bash
@@ -460,8 +426,6 @@ npm test -- --coverage
 npm test -- path/to/test.ts
 ```
 
----
-
 ## Checklist Before Writing Tests
 
 - [ ] Found latest PRD in `docs/prd/`
@@ -473,13 +437,71 @@ npm test -- path/to/test.ts
 - [ ] Extracted error scenarios (→ Error tests)
 - [ ] Identified test phases from plan
 
+## Anti-Patterns to Avoid
+
+| Anti-Pattern | Problem | Fix |
+|--------------|---------|-----|
+| Testing implementation details | Brittle tests | Test behavior/outcomes |
+| Unrealistic mock data | Miss edge cases | Use realistic factories |
+| Only happy path | Miss errors | Test edge cases & errors |
+| Tests depend on order | Flaky tests | Make tests independent |
+| Over-mocking | Miss integration bugs | Use real integrations (<20% mocking) |
+| Weak assertions | False positives | Assert exact values |
+
 ---
 
-## References (Read When Needed)
+## Learning Mode Integration
 
-| File | When to Read |
-|------|--------------|
-| `references/test-patterns.md` | Extended test patterns by framework |
-| `references/integration-testing.md` | Database, API, and service testing |
-| `references/test-data-factories.md` | Building realistic test data |
-| `references/gui-testing-mcp.md` | DevTools MCP detailed guide |
+### Decision Transparency Triggers
+- **Test strategy choices**: Explain why specific test distribution chosen
+- **Coverage decisions**: Show reasoning for coverage targets
+- **Mock vs real**: Document when mocking is appropriate
+
+### Debate Invitations
+- **Test type balance**: When unit vs integration vs E2E trade-offs exist
+- **Coverage targets**: When "good enough" vs "comprehensive" is unclear
+- **Test data approach**: Factories vs fixtures vs inline data
+
+### Feedback Requests
+- After test suite written: Validate coverage completeness
+- After test strategy defined: Confirm approach is appropriate
+- At phase gate: Overall test quality rating (1-5)
+
+### Example Transparency Block for Testing
+```markdown
+<decision-transparency>
+**Decision:** Testing Trophy approach - 40% unit, 40% integration, 20% E2E
+
+**Reasoning:**
+- **CI time**: Full E2E would exceed 10 min target
+- **Coverage balance**: Integration tests catch most real bugs
+- **E2E focus**: Critical checkout path only
+
+**Alternatives Considered:**
+1. Heavy E2E (40%) - Rejected: CI too slow, tests too brittle
+2. Heavy unit (80%) - Rejected: Misses integration issues
+
+**Confidence:** High - Proven pattern for this type of app
+
+**Open to Debate:** Yes - If CI time constraint changes
+</decision-transparency>
+```
+
+### Example Debate Invitation for Testing
+```markdown
+<debate-invitation>
+**Topic:** Test data strategy for user tests
+
+**Option A: Inline Test Data**
+- ✅ Pros: Easy to read, explicit
+- ❌ Cons: Repetitive, hard to maintain
+
+**Option B: Factory Functions**
+- ✅ Pros: DRY, realistic data
+- ❌ Cons: Slight indirection
+
+**My Lean:** Option B - Factories produce realistic data consistently
+
+**Your Input Needed:** Does team have factory pattern experience?
+</debate-invitation>
+```

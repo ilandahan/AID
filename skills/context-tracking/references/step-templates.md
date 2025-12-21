@@ -24,7 +24,7 @@ Predefined step templates for different task types and phases.
 
 ---
 
-## Phase 1: PRD Creation
+## Phase 1: Research & PRD
 
 ```json
 {

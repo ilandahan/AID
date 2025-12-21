@@ -11,14 +11,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import os
-import sys
 
-# Add parent directory for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from analysis.metrics import MetricsCalculator
-from analysis.patterns import PatternDetector
-from feedback.collector import load_pending_feedback, load_feedback_by_date_range
+# Support both relative imports (when used as package) and direct imports (when used standalone)
+try:
+    from ..analysis.metrics import MetricsCalculator
+    from ..analysis.patterns import PatternDetector
+    from ..feedback.collector import load_pending_feedback, load_feedback_by_date_range
+except ImportError:
+    from analysis.metrics import MetricsCalculator
+    from analysis.patterns import PatternDetector
+    from feedback.collector import load_pending_feedback, load_feedback_by_date_range
 
 # Configuration
 RECOMMENDATIONS_DIR = Path(os.path.expanduser("~/.aid/recommendations"))
@@ -523,6 +525,62 @@ def generate_recommendations_from_feedback(
         save_recommendations(recommendations)
 
     return recommendations
+
+
+def save_recommendation(recommendation: Dict[str, Any]) -> Path:
+    """
+    Save a single recommendation to the queue file.
+
+    Args:
+        recommendation: Single recommendation
+
+    Returns:
+        Path to the queue file
+    """
+    return save_recommendations([recommendation])
+
+
+def approve_recommendation(rec_id: str) -> bool:
+    """
+    Approve and apply a recommendation.
+
+    Args:
+        rec_id: ID of the recommendation
+
+    Returns:
+        True if successful
+    """
+    return mark_recommendation_applied(rec_id)
+
+
+def reject_recommendation(rec_id: str) -> bool:
+    """
+    Reject a recommendation (remove from queue without applying).
+
+    Args:
+        rec_id: ID of the recommendation
+
+    Returns:
+        True if successful
+    """
+    ensure_directories()
+
+    # Load queue
+    queue = load_recommendation_queue()
+
+    # Find and remove from queue
+    for i, r in enumerate(queue):
+        if r['id'] == rec_id:
+            queue.pop(i)
+            break
+    else:
+        return False
+
+    # Save updated queue
+    with open(QUEUE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(queue, f, indent=2, ensure_ascii=False)
+
+    return True
 
 
 def format_recommendations_report(recommendations: List[Dict[str, Any]]) -> str:

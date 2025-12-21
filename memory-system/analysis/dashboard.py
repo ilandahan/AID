@@ -10,19 +10,26 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import os
-import sys
 
-# Add parent directory for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from feedback.collector import load_feedback_by_date_range, get_feedback_stats
-from analysis.metrics import MetricsCalculator, generate_metrics_report
-from analysis.patterns import PatternDetector
-from recommendations.generator import (
-    RecommendationGenerator,
-    load_recommendation_queue,
-    format_recommendations_report
-)
+# Support both relative imports (when used as package) and direct imports (when used standalone)
+try:
+    from ..feedback.collector import load_feedback_by_date_range, get_feedback_stats
+    from .metrics import MetricsCalculator, generate_metrics_report
+    from .patterns import PatternDetector
+    from ..recommendations.generator import (
+        RecommendationGenerator,
+        load_recommendation_queue,
+        format_recommendations_report
+    )
+except ImportError:
+    from feedback.collector import load_feedback_by_date_range, get_feedback_stats
+    from analysis.metrics import MetricsCalculator, generate_metrics_report
+    from analysis.patterns import PatternDetector
+    from recommendations.generator import (
+        RecommendationGenerator,
+        load_recommendation_queue,
+        format_recommendations_report
+    )
 
 # Configuration
 REPORTS_DIR = Path(os.path.expanduser("~/.aid/reports"))

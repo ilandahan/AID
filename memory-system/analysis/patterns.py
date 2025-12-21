@@ -9,13 +9,13 @@ from typing import Dict, Any, List, Optional, Tuple
 from collections import defaultdict
 from datetime import datetime, timedelta
 import re
-import sys
 from pathlib import Path
 
-# Add parent directory for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from feedback.collector import load_pending_feedback, load_feedback_by_date_range
+# Support both relative imports (when used as package) and direct imports (when used standalone)
+try:
+    from ..feedback.collector import load_pending_feedback, load_feedback_by_date_range
+except ImportError:
+    from feedback.collector import load_pending_feedback, load_feedback_by_date_range
 
 
 class PatternDetector:
@@ -527,14 +527,17 @@ class PatternDetector:
         """
         all_topics = []
         for entry in self.entries:
-            topic = entry.get('decision', {}).get('topic')
-            category = entry.get('decision', {}).get('topic_category')
+            decision = entry.get('decision') or {}
+            topic = decision.get('topic')
+            category = decision.get('topic_category')
+            feedback = entry.get('feedback') or {}
+            debate = entry.get('debate') or {}
             if topic:
                 all_topics.append({
                     "topic": topic,
                     "category": category,
-                    "rating": entry.get('feedback', {}).get('rating'),
-                    "had_debate": entry.get('debate', {}).get('occurred', False)
+                    "rating": feedback.get('rating'),
+                    "had_debate": debate.get('occurred', False)
                 })
 
         if len(all_topics) < 3:

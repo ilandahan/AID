@@ -108,10 +108,8 @@ lerna-debug.log*
 !templates/.aid/
 
 # Local MCP config (may contain secrets)
+# Keep .mcp.json.example if exists
 .mcp.json
-
-# Keep example
-!.mcp.json.example
 
 # ================== Docker ==================
 # Ignore docker compose override (local customizations)
@@ -150,3 +148,4 @@ service-account.json
 generated/
 .generated/
 *.generated.*
+nul

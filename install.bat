@@ -52,15 +52,31 @@ echo [OK] Commands installed
 
 REM Copy skills to .claude/skills
 echo Copying skills...
+REM Core methodology skills
+xcopy /E /I /Y "skills\aid-development" ".claude\skills\aid-development" >nul 2>nul
+xcopy /E /I /Y "skills\aid-discovery" ".claude\skills\aid-discovery" >nul 2>nul
+xcopy /E /I /Y "skills\aid-prd" ".claude\skills\aid-prd" >nul 2>nul
+xcopy /E /I /Y "skills\aid-qa-ship" ".claude\skills\aid-qa-ship" >nul 2>nul
+xcopy /E /I /Y "skills\aid-tech-spec" ".claude\skills\aid-tech-spec" >nul 2>nul
+REM Design system skills
 xcopy /E /I /Y "skills\atomic-design" ".claude\skills\atomic-design" >nul 2>nul
 xcopy /E /I /Y "skills\atomic-page-builder" ".claude\skills\atomic-page-builder" >nul 2>nul
+REM Development skills
 xcopy /E /I /Y "skills\code-review" ".claude\skills\code-review" >nul 2>nul
 xcopy /E /I /Y "skills\context-tracking" ".claude\skills\context-tracking" >nul 2>nul
 xcopy /E /I /Y "skills\learning-mode" ".claude\skills\learning-mode" >nul 2>nul
 xcopy /E /I /Y "skills\phase-enforcement" ".claude\skills\phase-enforcement" >nul 2>nul
+xcopy /E /I /Y "skills\pre-prd-research" ".claude\skills\pre-prd-research" >nul 2>nul
 xcopy /E /I /Y "skills\system-architect" ".claude\skills\system-architect" >nul 2>nul
 xcopy /E /I /Y "skills\test-driven" ".claude\skills\test-driven" >nul 2>nul
-echo [OK] Skills installed
+REM Role-based skills
+xcopy /E /I /Y "skills\role-developer" ".claude\skills\role-developer" >nul 2>nul
+xcopy /E /I /Y "skills\role-product-manager" ".claude\skills\role-product-manager" >nul 2>nul
+xcopy /E /I /Y "skills\role-qa-engineer" ".claude\skills\role-qa-engineer" >nul 2>nul
+xcopy /E /I /Y "skills\role-tech-lead" ".claude\skills\role-tech-lead" >nul 2>nul
+REM Optional skills
+xcopy /E /I /Y "skills\nano-banana-visual" ".claude\skills\nano-banana-visual" >nul 2>nul
+echo [OK] Skills installed (19 skills)
 
 REM Create .aid directory
 echo.

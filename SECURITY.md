@@ -4,134 +4,125 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.x.x   | :white_check_mark: |
+| 1.0.x   | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in AID, please report it responsibly:
+We take security vulnerabilities seriously. If you discover a security issue, please report it responsibly.
 
 ### How to Report
 
 1. **DO NOT** create a public GitHub issue for security vulnerabilities
-2. Email the security team directly (or use GitHub's private security advisory feature)
-3. Include detailed information about the vulnerability:
-   - Type of vulnerability
+2. Email security concerns to the repository maintainers directly
+3. Include the following in your report:
+   - Description of the vulnerability
    - Steps to reproduce
    - Potential impact
    - Suggested fix (if any)
 
 ### What to Expect
 
-- **Acknowledgment**: Within 48 hours
-- **Initial Assessment**: Within 1 week
+- **Acknowledgment**: Within 48 hours of your report
+- **Initial Assessment**: Within 5 business days
 - **Resolution Timeline**: Depends on severity
   - Critical: 24-72 hours
-  - High: 1 week
-  - Medium: 2 weeks
+  - High: 1-2 weeks
+  - Medium: 2-4 weeks
   - Low: Next release cycle
+
+### Responsible Disclosure
+
+We kindly ask that you:
+- Give us reasonable time to fix the issue before public disclosure
+- Do not access or modify other users' data
+- Do not perform actions that could harm the service or other users
 
 ## Security Best Practices for Contributors
 
-### Code Security
+### Secrets Management
 
-Per the `code-review` and `security.md` rules:
+**NEVER commit secrets to the repository:**
 
-- **Input Validation**: All user inputs must be validated using Zod schemas
-- **SQL Injection**: Use parameterized queries (Prisma handles this)
-- **XSS Prevention**: Never use `dangerouslySetInnerHTML` without sanitization
-- **Authentication**: Store JWT in httpOnly cookies, never localStorage
-- **Secrets**: Use environment variables, never hardcode credentials
+```bash
+# Bad - hardcoded secrets
+ATLASSIAN_API_TOKEN="actual_token_here"
 
-### OWASP Top 10 Compliance
+# Good - use environment variables
+ATLASSIAN_API_TOKEN="${ATLASSIAN_API_TOKEN}"
+```
 
-This project follows OWASP Top 10 security guidelines:
+**Files that should NEVER contain real credentials:**
+- `.mcp.json` - Use `.mcp.json.example` as template
+- `.env` - Use `.env.example` as template
+- Any configuration file in version control
 
-1. **Injection** - Parameterized queries via Prisma
-2. **Broken Authentication** - bcrypt password hashing, JWT with short expiry
-3. **Sensitive Data Exposure** - Encryption at rest and in transit
-4. **XXE** - External entity processing disabled
-5. **Broken Access Control** - Permission checks on all routes
-6. **Security Misconfiguration** - Security headers configured
-7. **XSS** - React auto-escaping, CSP headers
-8. **Insecure Deserialization** - No eval() on user data
-9. **Vulnerable Components** - Regular npm audit
-10. **Insufficient Logging** - Auth events logged, secrets never logged
+### Pre-commit Hooks
 
-### Before Submitting Code
+This repository uses pre-commit hooks to prevent accidental secret commits:
 
-- [ ] Run `npm audit` to check for vulnerable dependencies
-- [ ] Ensure no secrets are committed (check `.env.example` for patterns)
-- [ ] Validate all user inputs with Zod schemas
-- [ ] Check for OWASP Top 10 vulnerabilities
-- [ ] Review authentication and authorization logic
-- [ ] Test error messages don't leak sensitive info
+```bash
+# Install pre-commit hooks
+pip install pre-commit
+pre-commit install
 
-### Environment Variables
+# Run manually
+pre-commit run --all-files
+```
 
-**Never commit:**
-- API keys
-- Database credentials
-- JWT secrets
-- Encryption keys
-- Personal access tokens
+### Security Checklist for PRs
 
-**Use `.env.example` as a template** - it should contain placeholder values only.
+Before submitting a PR, verify:
 
-## Security Features
+- [ ] No hardcoded credentials, API keys, or tokens
+- [ ] No private keys or certificates
+- [ ] No internal URLs or IP addresses
+- [ ] No personally identifiable information (PII)
+- [ ] Dependencies are from trusted sources
+- [ ] No `eval()`, `exec()`, or similar dangerous functions
+- [ ] Input validation on all user inputs
+- [ ] Proper error handling (no stack traces in production)
 
-### Headers (Configured in next.config.js)
+## Known Security Considerations
 
-- `X-Frame-Options: DENY` - Prevents clickjacking
-- `X-Content-Type-Options: nosniff` - Prevents MIME sniffing
-- `Strict-Transport-Security` - Enforces HTTPS
-- `Content-Security-Policy` - Prevents XSS and injection
-- `Permissions-Policy` - Restricts browser features
-- `Referrer-Policy` - Controls referrer information
-- `X-XSS-Protection` - Additional XSS protection
+### MCP Configuration
 
-### Authentication
+The `.mcp.json` file configures external service integrations. This file:
+- Is listed in `.gitignore` to prevent accidental commits
+- Should be created locally from `.mcp.json.example`
+- Contains API tokens that grant access to:
+  - Atlassian Jira/Confluence
+  - Figma
+  - GitHub
+  - Local filesystem
 
-- Passwords hashed with bcrypt (cost factor 12+)
-- JWT tokens with short expiration (15 min access, refresh rotation)
-- Rate limiting on auth endpoints
-- Secure session management
+**If you accidentally commit credentials:**
+1. Immediately rotate all exposed tokens
+2. Remove the file from git history using BFG Repo-Cleaner or `git filter-branch`
+3. Force push to all branches
+4. Check for any unauthorized access using the exposed tokens
 
-### Data Protection
+### Data Storage
 
-- Sensitive data encrypted at rest
-- TLS for data in transit
-- PII handling compliant with GDPR
-- Audit logging for security events
+The AID system stores data locally in `~/.aid/`:
+- `state.json` - Session state
+- `feedback/` - User feedback data
+- `memory/` - Claude Memory sync data
 
-### Development Security
+This data may contain:
+- Project names and descriptions
+- User interactions and feedback
+- Learning patterns
 
-- Pre-commit hooks for security checks
-- Automated dependency scanning
-- Code review requirements for security-sensitive changes
+**Recommendation**: Ensure `~/.aid/` is backed up securely and not shared publicly.
 
-## Compliance
+## Security Updates
 
-This project follows:
-- **ISO 27001** security controls (see `system-architect` skill)
-- **OWASP** secure coding guidelines (see `code-review` skill)
-- **GDPR** data protection requirements (where applicable)
+Security patches are released as soon as possible after a vulnerability is confirmed. To stay updated:
 
-## Security Skills & Documentation
+1. Watch this repository for releases
+2. Enable GitHub security alerts
+3. Run `npm audit` and `pip-audit` regularly
 
-For detailed security guidance, see:
-- `.claude/skills/code-review/` - Security review patterns
-- `.claude/skills/system-architect/` - Security architecture
-- `.claude/rules/security.md` - Security coding rules
-- `skills/code-review/references/iso27001-guidelines.md`
-- `skills/code-review/references/security-patterns.md`
-- `skills/system-architect/references/security-architecture.md`
+## Contact
 
-## Security Contacts
-
-For security-related inquiries:
-- Create a private security advisory on GitHub
-- Or contact the maintainers directly
-
----
-
-*This security policy is reviewed and updated regularly as part of the AID methodology.*
+For security-related questions, contact the repository maintainers.

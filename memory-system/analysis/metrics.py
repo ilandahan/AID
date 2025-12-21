@@ -10,12 +10,12 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
-import sys
 
-# Add parent directory for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from feedback.collector import load_pending_feedback, load_feedback_by_date_range
+# Support both relative imports (when used as package) and direct imports (when used standalone)
+try:
+    from ..feedback.collector import load_pending_feedback, load_feedback_by_date_range
+except ImportError:
+    from feedback.collector import load_pending_feedback, load_feedback_by_date_range
 
 
 class MetricsCalculator:
@@ -61,7 +61,7 @@ class MetricsCalculator:
                 "start": min(dates),
                 "end": max(dates)
             },
-            "unique_sessions": len(set(e['session_id'] for e in self.entries))
+            "unique_sessions": len(set(e.get('session_id', '') for e in self.entries))
         }
 
     def calculate_decision_acceptance_rate(self) -> Dict[str, Any]:

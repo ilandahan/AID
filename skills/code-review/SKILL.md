@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: "Code review for commits and PRs. Use when reviewing changes, auditing code quality, checking for security issues, or validating TDD practices."
+description: Comprehensive code review for commits and pull requests. Use when asked to review code changes, audit commits, verify code quality, check for shortcuts or workarounds, validate architectural patterns, or assess production-readiness. Covers pre-implementation workflow, code quality, security, testing, and Claude Code best practices.
 ---
 
 # Code Review Skill
@@ -34,8 +34,6 @@ Code Changes Received
      └─► 5. VERDICT
               • Ready ✓ | Needs Review ⚠️ | Needs Rework ✗
 ```
-
----
 
 ## Security Checklist (CRITICAL)
 
@@ -93,8 +91,6 @@ const apiKey = process.env.API_KEY;
 - [ ] Are error messages safe (no stack traces to users)?
 - [ ] Is sensitive data encrypted at rest and in transit?
 - [ ] Are dependencies up to date (no known CVEs)?
-
----
 
 ## TDD Checklist (PRIORITY)
 
@@ -159,8 +155,6 @@ test('handles unicode names', () => { /* ... */ });
 - [ ] Do tests run independently (no shared state)?
 - [ ] Were tests NOT modified just to make them pass?
 
----
-
 ## ISO 27001 Compliance Checklist
 
 Quick checks aligned with ISO 27001 security controls:
@@ -193,8 +187,6 @@ Must NOT be in repo:
 ✗ Database dumps
 ✗ Log files with sensitive data
 ```
-
----
 
 ## Code Quality Checklists
 
@@ -235,7 +227,46 @@ Must NOT be in repo:
 - [ ] No overly broad exception handling
 - [ ] Error messages aid debugging
 
-### 5. Architecture & Patterns
+### 5. MANDATORY Documentation Standards
+
+**EVERY file MUST have documentation at THREE levels:**
+
+| Level | Required | Red Flag |
+|-------|----------|----------|
+| **File** | @file, @description, @related, @created | No file header comment |
+| **Component/Class** | Purpose, responsibilities | Class without doc comment |
+| **Function** | @param, @returns, @throws, @related | Undocumented functions |
+
+```typescript
+// ❌ MISSING: No documentation
+export function createUser(data) {
+  return db.create(data);
+}
+
+// ✅ CORRECT: Full documentation
+/**
+ * Creates a new user account with validation.
+ *
+ * @param data - User creation input
+ * @returns Created user object
+ * @throws {ValidationError} If email invalid
+ *
+ * @related
+ *   - ./UserRepository.ts - Database persistence
+ *   - ../validators/email.ts - Email validation
+ */
+export async function createUser(data: CreateUserInput): Promise<User> {
+```
+
+### Documentation Review Questions
+
+- [ ] Does file have @file, @description, @related, @created header?
+- [ ] Does every class/component have a purpose comment?
+- [ ] Does every function have @param, @returns, @throws?
+- [ ] Are cross-file dependencies documented with @related?
+- [ ] Do inline comments explain non-obvious logic?
+
+### 6. Architecture & Patterns
 
 - [ ] Follows existing project patterns
 - [ ] Proper separation of concerns
@@ -243,22 +274,21 @@ Must NOT be in repo:
 - [ ] Thread-safe where required
 - [ ] No business logic in controllers/routes
 
----
-
 ## Red Flags (Instant Attention)
 
 | Flag | Severity | Action |
 |------|----------|--------|
-| SQL/Command injection | 🔴 CRITICAL | Block merge |
-| Hardcoded secrets | 🔴 CRITICAL | Block merge |
-| XSS vulnerability | 🔴 CRITICAL | Block merge |
-| No tests for new code | 🟠 MAJOR | Request tests |
-| Tests modified to pass | 🟠 MAJOR | Investigate |
-| Silent exception catch | 🟠 MAJOR | Require logging |
-| TODO/FIXME comments | 🟡 MINOR | Track in backlog |
-| Magic numbers | 🟡 MINOR | Extract constants |
-
----
+| SQL/Command injection | CRITICAL | Block merge |
+| Hardcoded secrets | CRITICAL | Block merge |
+| XSS vulnerability | CRITICAL | Block merge |
+| No tests for new code | MAJOR | Request tests |
+| Tests modified to pass | MAJOR | Investigate |
+| Silent exception catch | MAJOR | Require logging |
+| **Missing file header** | MAJOR | Add @file, @description, @related |
+| **Undocumented functions** | MAJOR | Add @param, @returns, @related |
+| **No @related for cross-file** | MAJOR | Document file dependencies |
+| TODO/FIXME comments | MINOR | Track in backlog |
+| Magic numbers | MINOR | Extract constants |
 
 ## Output Format
 
@@ -274,26 +304,26 @@ Must NOT be in repo:
 | Code quality | ✓/⚠️/✗ |
 | **Verdict** | Ready ✓ / Review ⚠️ / Rework ✗ |
 
-## Security Issues 🔒
-### Critical 🔴
+## Security Issues
+### Critical
 1. **[Vulnerability Type]** - `file:line`
    - Problem: [description]
    - Impact: [potential damage]
    - Fix: [specific code fix]
 
-### Warning 🟠
+### Warning
 [same format]
 
-## TDD Issues 🧪
+## TDD Issues
 1. **[Issue]** - `file:line`
    - Problem: [description]
    - Fix: [what tests to add/change]
 
-## Code Quality Issues 📝
-### Major 🟠
+## Code Quality Issues
+### Major
 [issues]
 
-### Minor 🟡
+### Minor
 [issues]
 
 ## Verdict
@@ -303,8 +333,6 @@ Must NOT be in repo:
 - [ ] [specific action item]
 - [ ] [specific action item]
 ```
-
----
 
 ## Review Workflow
 
@@ -344,11 +372,77 @@ npm test -- --coverage
 
 ---
 
-## References (Read When Needed)
+## Learning Mode Integration
 
-| File | When to Read |
-|------|--------------|
-| `references/review-templates.md` | Need copy-paste review template |
-| `references/security-patterns.md` | Deep-dive on vulnerability patterns |
-| `references/tdd-patterns.md` | Extended TDD examples and anti-patterns |
-| `references/iso27001-guidelines.md` | Compliance and project organization standards |
+### Decision Transparency Triggers
+- **Verdict decisions**: Explain why specific verdict given
+- **Issue severity**: Show reasoning for critical vs major vs minor
+- **Exception handling**: Document when issues are acceptable
+
+### Debate Invitations
+- **Architectural concerns**: When patterns deviate from standards
+- **Security trade-offs**: When perfect security conflicts with usability
+- **Technical debt acceptance**: When shortcuts are being considered
+
+### Feedback Requests
+- After review complete: Validate findings are clear
+- After significant findings: Confirm severity assessment
+- Request feedback on review thoroughness
+
+### Example Transparency Block for Code Review
+```markdown
+<decision-transparency>
+**Decision:** Approve with minor suggestions (Ready ✓)
+
+**Reasoning:**
+- **Security**: No vulnerabilities found
+- **Testing**: All new code has tests
+- **Quality**: Minor naming suggestions only
+
+**Issues Found:**
+1. Minor: Variable name `d` could be `data` (line 42)
+2. Minor: Consider extracting magic number 5 to constant
+
+**Confidence:** High - Standard approval scenario
+
+**Open to Debate:** No - Clear pass with minor improvements
+</decision-transparency>
+```
+
+### Example Debate Invitation for Code Review
+```markdown
+<debate-invitation>
+**Topic:** Handling of deprecated API usage
+
+**Option A: Block Until Fixed**
+- ✅ Pros: No technical debt
+- ❌ Cons: Delays release
+
+**Option B: Approve with Follow-up Task**
+- ✅ Pros: Pragmatic, allows progress
+- ❌ Cons: Debt may linger
+
+**My Lean:** Option B - Create ticket, set deadline
+
+**Your Input Needed:** Is there a release deadline? How critical is this code path?
+</debate-invitation>
+```
+
+### Learning Capture Example
+```markdown
+<learning-captured>
+**What I Learned:**
+This team prefers blocking on any security warnings, even low severity.
+
+**Source:**
+- User feedback on: Code review verdict
+- Context: Asked to escalate low-severity CORS warning
+
+**Applied To:**
+- Future reviews will flag all security warnings as requiring attention
+- Will not auto-approve with security findings
+
+**Verification:**
+- Next review with security findings will flag for review
+</learning-captured>
+```

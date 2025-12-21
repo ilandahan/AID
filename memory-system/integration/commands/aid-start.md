@@ -8,14 +8,10 @@ Begin a tracked work session. Selects role and phase, loads relevant skills.
 
 ## Flow
 
-1. **Check MCP Servers**: Read `.mcp.json` and verify MCP servers are configured
-   - Show status of configured servers
-   - Warn if required servers are not connected
-
-2. **Check State**: Load `.aid/state.json` (project directory)
+1. **Check State**: Load `~/.aid/state.json`
    - If active session exists, ask to continue or start new
 
-3. **Select Role**:
+2. **Select Role**: 
    ```
    Select your role:
    1. PM (Product Manager)
@@ -24,7 +20,7 @@ Begin a tracked work session. Selects role and phase, loads relevant skills.
    4. Lead
    ```
 
-4. **Select Phase**:
+3. **Select Phase**:
    ```
    Select current phase:
    1. Discovery
@@ -34,32 +30,22 @@ Begin a tracked work session. Selects role and phase, loads relevant skills.
    5. QA & Ship
    ```
 
-5. **Load Skills** (from `.claude/skills/`):
+4. **Load Skills**:
+   - Read `memory-system/skills/roles/{role}/SKILL.md`
+   - Read `memory-system/skills/phases/{phase}/SKILL.md`
+   - Apply guidelines from both
 
-   Based on role and phase, load relevant skills:
-
-   | Phase | Skills to Load |
-   |-------|----------------|
-   | PRD | phase-enforcement, context-tracking |
-   | Tech Spec | system-architect, phase-enforcement, context-tracking |
-   | Development | atomic-design, atomic-page-builder, code-review, test-driven, context-tracking |
-   | QA & Ship | code-review, test-driven, context-tracking |
-
-   Always load: `.claude/skills/phase-enforcement/SKILL.md`, `.claude/skills/context-tracking/SKILL.md`
-
-6. **Update State** (in `.aid/state.json`):
+5. **Update State**:
    ```json
    {
-     "current_session": {
-       "active": true,
-       "role": "Developer",
-       "phase": 4,
-       "started_at": "2024-01-15T09:00:00Z"
-     }
+     "role": "developer",
+     "phase": "development",
+     "session_start": "2024-01-15T09:00:00Z",
+     "status": "active"
    }
    ```
 
-7. **Greet User**:
+6. **Greet User**:
    ```
    ✅ Session started
    

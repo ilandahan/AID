@@ -45,7 +45,7 @@ def create_feedback_entry(
 
     Args:
         session_id: ID of the current session
-        phase: AID phase (0-discovery, 1-prd, etc.)
+        phase: AID phase (1-prd, 2-tech-spec, etc.)
         role: User's role (developer, pm, qa, tech-lead)
         interaction_type: Type of interaction
         decision: Decision details (topic, chosen, alternatives, rationale)
@@ -246,6 +246,210 @@ def get_feedback_stats() -> Dict[str, Any]:
         "pending_dir": str(PENDING_DIR),
         "processed_dir": str(PROCESSED_DIR)
     }
+
+
+def get_pending_feedback() -> List[Dict[str, Any]]:
+    """
+    Alias for load_pending_feedback for backwards compatibility.
+
+    Returns:
+        List of pending feedback entries
+    """
+    return load_pending_feedback()
+
+
+def save_feedback(entry: Dict[str, Any]) -> Path:
+    """
+    Alias for save_feedback_entry for backwards compatibility.
+
+    Args:
+        entry: The feedback entry to save
+
+    Returns:
+        Path to the saved file
+    """
+    return save_feedback_entry(entry)
+
+
+class FeedbackCollector:
+    """
+    Class-based interface for collecting feedback.
+
+    Provides an object-oriented approach to feedback collection
+    with session management and convenience methods.
+    """
+
+    def __init__(self, session_id: Optional[str] = None, phase: str = "unknown", role: str = "unknown"):
+        """
+        Initialize feedback collector.
+
+        Args:
+            session_id: Session ID (auto-generated if not provided)
+            phase: Current AID phase
+            role: User's role
+        """
+        self.session_id = session_id or str(uuid.uuid4())
+        self.phase = phase
+        self.role = role
+        ensure_directories()
+
+    def collect(
+        self,
+        interaction_type: str,
+        decision: Optional[Dict[str, Any]] = None,
+        debate: Optional[Dict[str, Any]] = None,
+        feedback: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Collect and save a feedback entry.
+
+        Args:
+            interaction_type: Type of interaction
+            decision: Decision details
+            debate: Debate details
+            feedback: User feedback
+            metadata: Additional metadata
+
+        Returns:
+            The saved feedback entry
+        """
+        entry = create_feedback_entry(
+            session_id=self.session_id,
+            phase=self.phase,
+            role=self.role,
+            interaction_type=interaction_type,
+            decision=decision,
+            debate=debate,
+            feedback=feedback,
+            metadata=metadata
+        )
+        save_feedback_entry(entry)
+        return entry
+
+    def collect_decision(
+        self,
+        topic: str,
+        chosen: str,
+        topic_category: str = "other",
+        alternatives: Optional[List[str]] = None,
+        rationale: str = "",
+        confidence: str = "medium",
+        rating: Optional[int] = None,
+        verbal: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Collect feedback for a decision.
+
+        Args:
+            topic: Decision topic
+            chosen: Chosen option
+            topic_category: Category of the topic
+            alternatives: Alternative options considered
+            rationale: Rationale for the decision
+            confidence: Confidence level
+            rating: User rating (1-5)
+            verbal: Verbal feedback
+
+        Returns:
+            The saved feedback entry
+        """
+        return self.collect(
+            interaction_type="decision",
+            decision={
+                "topic": topic,
+                "topic_category": topic_category,
+                "chosen": chosen,
+                "alternatives": alternatives or [],
+                "rationale": rationale,
+                "confidence": confidence
+            },
+            feedback={
+                "rating": rating,
+                "verbal": verbal,
+                "skipped": rating is None and verbal is None
+            }
+        )
+
+    def collect_debate(
+        self,
+        topic: str,
+        user_challenge: str,
+        original_recommendation: str,
+        final_decision: str,
+        outcome: str,
+        learning: str,
+        rating: Optional[int] = None,
+        verbal: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Collect feedback for a debate.
+
+        Args:
+            topic: Debate topic
+            user_challenge: User's challenge
+            original_recommendation: Original recommendation
+            final_decision: Final decision after debate
+            outcome: Debate outcome (confirmed/changed/partially_changed)
+            learning: Learning from the debate
+            rating: User rating (1-5)
+            verbal: Verbal feedback
+
+        Returns:
+            The saved feedback entry
+        """
+        return self.collect(
+            interaction_type="decision",
+            decision={
+                "topic": topic,
+                "topic_category": "other",
+                "chosen": final_decision,
+                "alternatives": [original_recommendation] if original_recommendation != final_decision else [],
+                "rationale": learning
+            },
+            debate={
+                "occurred": True,
+                "user_challenge": user_challenge,
+                "original_recommendation": original_recommendation,
+                "final_decision": final_decision,
+                "outcome": outcome,
+                "learning": learning
+            },
+            feedback={
+                "rating": rating,
+                "verbal": verbal,
+                "skipped": rating is None and verbal is None
+            }
+        )
+
+    def get_session_feedback(self) -> List[Dict[str, Any]]:
+        """
+        Get all feedback entries for this session.
+
+        Returns:
+            List of feedback entries
+        """
+        return load_feedback_by_session(self.session_id)
+
+    @staticmethod
+    def get_stats() -> Dict[str, Any]:
+        """
+        Get feedback statistics.
+
+        Returns:
+            Dictionary with feedback statistics
+        """
+        return get_feedback_stats()
+
+    @staticmethod
+    def get_pending() -> List[Dict[str, Any]]:
+        """
+        Get all pending feedback.
+
+        Returns:
+            List of pending feedback entries
+        """
+        return load_pending_feedback()
 
 
 # Convenience functions for common feedback scenarios

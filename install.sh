@@ -68,17 +68,33 @@ setup_claude_commands_and_skills() {
     cp -f skills/commands/*.md .claude/commands/ 2>/dev/null || true
     log_success "Commands installed"
 
-    # Copy skills to .claude/skills (project level, like Windows)
+    # Copy skills to .claude/skills (project level)
     echo "Copying skills..."
+    # Core methodology skills
+    cp -r skills/aid-development .claude/skills/ 2>/dev/null || true
+    cp -r skills/aid-discovery .claude/skills/ 2>/dev/null || true
+    cp -r skills/aid-prd .claude/skills/ 2>/dev/null || true
+    cp -r skills/aid-qa-ship .claude/skills/ 2>/dev/null || true
+    cp -r skills/aid-tech-spec .claude/skills/ 2>/dev/null || true
+    # Design system skills
     cp -r skills/atomic-design .claude/skills/ 2>/dev/null || true
     cp -r skills/atomic-page-builder .claude/skills/ 2>/dev/null || true
+    # Development skills
     cp -r skills/code-review .claude/skills/ 2>/dev/null || true
     cp -r skills/context-tracking .claude/skills/ 2>/dev/null || true
     cp -r skills/learning-mode .claude/skills/ 2>/dev/null || true
     cp -r skills/phase-enforcement .claude/skills/ 2>/dev/null || true
+    cp -r skills/pre-prd-research .claude/skills/ 2>/dev/null || true
     cp -r skills/system-architect .claude/skills/ 2>/dev/null || true
     cp -r skills/test-driven .claude/skills/ 2>/dev/null || true
-    log_success "Skills installed"
+    # Role-based skills
+    cp -r skills/role-developer .claude/skills/ 2>/dev/null || true
+    cp -r skills/role-product-manager .claude/skills/ 2>/dev/null || true
+    cp -r skills/role-qa-engineer .claude/skills/ 2>/dev/null || true
+    cp -r skills/role-tech-lead .claude/skills/ 2>/dev/null || true
+    # Optional skills
+    cp -r skills/nano-banana-visual .claude/skills/ 2>/dev/null || true
+    log_success "Skills installed (19 skills)"
 }
 
 # Step 3: Create project state directory
