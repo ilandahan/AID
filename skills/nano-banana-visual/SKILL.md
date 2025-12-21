@@ -1,41 +1,52 @@
 ---
 name: nano-banana-visual
-description: "[OPTIONAL] AI-powered visual artifact generation using Google Nano Banana Pro. For creating professional user flows, architecture diagrams, screen mockups with Atomic Design. Requires Vertex AI access."
+description: "[OPTIONAL] AI-powered visual artifact generation using Google Nano Banana Pro. For creating professional user flows, architecture diagrams, screen mockups with Atomic Design."
 optional: true
-requires: "Vertex AI API enabled on GCP project"
+requires: "API key configured in .env file"
 ---
 
 # Nano Banana Pro Visual Integration
 
-> **OPTIONAL SKILL** - Requires Vertex AI access. AID works fully without this.
+> **OPTIONAL SKILL** - AID works fully without this. Enable only if you need AI-generated visuals.
 
 Generate professional visual artifacts for AID phases using Google's Nano Banana Pro (Gemini 3 Pro Image).
 
-## Prerequisites
+## Setup (Environment Variables)
 
-**Required:**
-- GCP Project: `theaid-ai-website`
-- Vertex AI API: Enabled
-- Generative Language API: Enabled
-- gcloud CLI authenticated
+Configure in your `.env` file (copy from `.env.example`):
 
-**Check status:**
-```bash
-gcloud services list --enabled | grep -E "aiplatform|generativelanguage"
+### Option 1: Google AI Studio (Easiest)
+```env
+ENABLE_NANO_BANANA=true
+NANO_BANANA_PROVIDER=google
+GOOGLE_AI_API_KEY=your-key-from-aistudio.google.com
 ```
 
-## Configuration
+### Option 2: AI/ML API
+```env
+ENABLE_NANO_BANANA=true
+NANO_BANANA_PROVIDER=aimlapi
+AIML_API_KEY=your-key-from-aimlapi.com
+```
+
+### Option 3: Google Vertex AI (Enterprise)
+```env
+ENABLE_NANO_BANANA=true
+NANO_BANANA_PROVIDER=vertex
+VERTEX_PROJECT_ID=your-gcp-project-id
+VERTEX_LOCATION=us-central1
+```
+
+## Usage
 
 ```typescript
-import { NanoBananaProClient } from '@/lib/nano-banana-pro';
+import { createNanoBananaClient, isNanoBananaEnabled } from '@/lib/nano-banana-pro';
 
-const client = new NanoBananaProClient({
-  provider: 'vertex',
-  vertex: {
-    projectId: 'theaid-ai-website',
-    location: 'us-central1',
-  },
-});
+// Always check if enabled first
+if (isNanoBananaEnabled()) {
+  const client = createNanoBananaClient();
+  // Use client...
+}
 ```
 
 ## When to Use
