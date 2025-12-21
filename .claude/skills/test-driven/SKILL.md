@@ -447,3 +447,61 @@ npm test -- path/to/test.ts
 | Tests depend on order | Flaky tests | Make tests independent |
 | Over-mocking | Miss integration bugs | Use real integrations (<20% mocking) |
 | Weak assertions | False positives | Assert exact values |
+
+---
+
+## Learning Mode Integration
+
+### Decision Transparency Triggers
+- **Test strategy choices**: Explain why specific test distribution chosen
+- **Coverage decisions**: Show reasoning for coverage targets
+- **Mock vs real**: Document when mocking is appropriate
+
+### Debate Invitations
+- **Test type balance**: When unit vs integration vs E2E trade-offs exist
+- **Coverage targets**: When "good enough" vs "comprehensive" is unclear
+- **Test data approach**: Factories vs fixtures vs inline data
+
+### Feedback Requests
+- After test suite written: Validate coverage completeness
+- After test strategy defined: Confirm approach is appropriate
+- At phase gate: Overall test quality rating (1-5)
+
+### Example Transparency Block for Testing
+```markdown
+<decision-transparency>
+**Decision:** Testing Trophy approach - 40% unit, 40% integration, 20% E2E
+
+**Reasoning:**
+- **CI time**: Full E2E would exceed 10 min target
+- **Coverage balance**: Integration tests catch most real bugs
+- **E2E focus**: Critical checkout path only
+
+**Alternatives Considered:**
+1. Heavy E2E (40%) - Rejected: CI too slow, tests too brittle
+2. Heavy unit (80%) - Rejected: Misses integration issues
+
+**Confidence:** High - Proven pattern for this type of app
+
+**Open to Debate:** Yes - If CI time constraint changes
+</decision-transparency>
+```
+
+### Example Debate Invitation for Testing
+```markdown
+<debate-invitation>
+**Topic:** Test data strategy for user tests
+
+**Option A: Inline Test Data**
+- ✅ Pros: Easy to read, explicit
+- ❌ Cons: Repetitive, hard to maintain
+
+**Option B: Factory Functions**
+- ✅ Pros: DRY, realistic data
+- ❌ Cons: Slight indirection
+
+**My Lean:** Option B - Factories produce realistic data consistently
+
+**Your Input Needed:** Does team have factory pattern experience?
+</debate-invitation>
+```

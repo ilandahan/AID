@@ -1,10 +1,11 @@
+---
+name: context-tracking
+description: Real-time work context tracking for seamless session continuity. Use this skill to maintain task/step state across sessions, track progress on current work, manage session logs, and integrate with phase enforcement. Essential for multi-session projects and team handoffs.
+---
+
 # Context Tracking Skill
 
-## Purpose
-
 Maintain real-time work context in `.aid/context.json` for seamless session continuity, integrated with phase enforcement and quality feedback systems.
-
----
 
 ## PRIORITY 1: Context State Management
 
@@ -22,8 +23,6 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 └─────────────────────────────────────────────────────────────────┘
 ```
 
----
-
 ## Context Update Triggers
 
 | Moment | Action | Updates |
@@ -36,8 +35,6 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 | Progress milestone | Update % | Notes, timestamp |
 | Phase change | Sync state | Update phase in context |
 | End of conversation | Final save | All pending changes |
-
----
 
 ## Context Structure
 
@@ -52,6 +49,12 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
     "current": 4,
     "name": "development",
     "started_at": "2024-12-10T09:00:00Z"
+  },
+
+  "development_tracking": {
+    "interaction_count": 7,
+    "last_quality_check": "2024-12-11T14:00:00Z",
+    "quality_check_threshold": 10
   },
 
   "project": {
@@ -114,11 +117,6 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
       "timestamp": "2024-12-11T15:00:00Z",
       "action": "step_completed",
       "details": "Unit tests complete: 8 tests passing"
-    },
-    {
-      "timestamp": "2024-12-11T15:30:00Z",
-      "action": "progress_update",
-      "details": "Implementation at 60%"
     }
   ],
 
@@ -129,8 +127,6 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
   }
 }
 ```
-
----
 
 ## PRIORITY 2: Phase Integration
 
@@ -158,213 +154,6 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 | 3 - Impl Plan | Planning | Task breakdown, estimates |
 | 4 - Development | Coding | TDD cycle, implementation, review |
 | 5 - QA & Ship | QA | Testing, coverage, deployment |
-
-### Document Tracking
-
-Context tracks all phase documents:
-
-```javascript
-const documentPaths = {
-  1: "docs/prd/YYYY-MM-DD-[feature].md",
-  2: "docs/tech-spec/YYYY-MM-DD-[feature].md",
-  3: "docs/implementation-plan/YYYY-MM-DD-[feature].md",
-};
-```
-
----
-
-## PRIORITY 3: Feedback Integration
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  CONTEXT-FEEDBACK FLOW                                          │
-│                                                                 │
-│  Task Complete?                                                 │
-│       │                                                         │
-│       ▼                                                         │
-│  Update Context (task → done)                                   │
-│       │                                                         │
-│       ▼                                                         │
-│  Check: Is this phase ending?                                   │
-│       │                                                         │
-│       ├── Yes ──▶ Prompt: "/aid end for phase feedback"         │
-│       │                                                         │
-│       ▼                                                         │
-│  Check: Sessions since feedback >= 3?                           │
-│       │                                                         │
-│       ├── Yes ──▶ Remind: "Consider /aid end for feedback"      │
-│       │                                                         │
-│       ▼                                                         │
-│  Continue to next task                                          │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Feedback Tracking in Context
-
-```json
-{
-  "feedback": {
-    "pending_for_phase": true,
-    "last_feedback_at": "2024-12-10T18:00:00Z",
-    "sessions_since_feedback": 3,
-    "tasks_completed_since_feedback": 5,
-    "reminder_shown": false
-  }
-}
-```
-
-### Feedback Reminders
-
-| Condition | Reminder |
-|-----------|----------|
-| Phase ending | "Run /aid end before advancing to next phase" |
-| 3+ sessions without feedback | "Consider /aid end to share what worked" |
-| 5+ tasks completed | "Good time for /aid end checkpoint" |
-
----
-
-## Update Operations
-
-### 1. Start Session (Read Context)
-
-```python
-def start_session():
-    context = read_context(".aid/context.json")
-    state = read_state(".aid/state.json")
-
-    # Sync phase
-    if context.phase.current != state.current_phase:
-        context.phase.current = state.current_phase
-        context.phase.name = PHASE_NAMES[state.current_phase]
-
-    # Check staleness
-    if hours_since(context.last_updated) > 24:
-        show_warning("Context is stale (>24h). Please verify.")
-
-    # Check feedback status
-    if context.feedback.sessions_since_feedback >= 3:
-        show_reminder("Consider running /aid end for feedback")
-
-    log("session_started", f"Loaded context for {context.tasks.current.key}")
-    return context
-```
-
-### 2. Start New Task
-
-```python
-def start_new_task(new_task):
-    # Shift task chain
-    context.tasks.previous = context.tasks.current
-    context.tasks.current = new_task
-    context.tasks.current.status = "in_progress"
-    context.tasks.current.started_at = now()
-    context.tasks.next = get_next_from_sprint()
-
-    # Reset steps for new task
-    context.current_task_steps = get_steps_template(
-        task_type=new_task.type,
-        phase=context.phase.current
-    )
-
-    # Update feedback counter
-    context.feedback.tasks_completed_since_feedback += 1
-
-    log("task_started", f"Started {new_task.key}: {new_task.title}")
-    save_context()
-```
-
-### 3. Complete Step
-
-```python
-def complete_step(notes=""):
-    # Update previous step
-    context.current_task_steps.previous = context.current_task_steps.current
-    context.current_task_steps.previous.status = "done"
-    context.current_task_steps.previous.completed_at = now()
-    context.current_task_steps.previous.notes = notes
-
-    # Shift to next step
-    context.current_task_steps.current = context.current_task_steps.next
-    if context.current_task_steps.current:
-        context.current_task_steps.current.status = "in_progress"
-        context.current_task_steps.current.started_at = now()
-
-    # Determine next step
-    context.current_task_steps.next = determine_next_step()
-
-    log("step_completed", notes)
-    save_context()
-```
-
-### 4. Complete Task
-
-```python
-def complete_task():
-    # Mark task done
-    context.tasks.previous = context.tasks.current
-    context.tasks.previous.status = "done"
-    context.tasks.previous.completed_at = now()
-
-    # Shift to next task
-    context.tasks.current = context.tasks.next
-    context.tasks.next = get_next_from_sprint()
-
-    # Reset steps
-    context.current_task_steps = {
-        "previous": None,
-        "current": None,
-        "next": None
-    }
-
-    # Update feedback tracking
-    context.feedback.tasks_completed_since_feedback += 1
-
-    # Check if feedback reminder needed
-    if context.feedback.tasks_completed_since_feedback >= 5:
-        show_reminder("5 tasks completed - good time for /aid end")
-
-    log("task_completed", f"Completed {context.tasks.previous.key}")
-    save_context()
-```
-
-### 5. Update Progress
-
-```python
-def update_progress(progress, notes=""):
-    context.current_task_steps.current.progress = progress
-    if notes:
-        context.current_task_steps.current.notes = notes
-    context.last_updated = now()
-
-    log("progress_update", f"{progress} - {notes}")
-    save_context()
-```
-
-### 6. Phase Transition
-
-```python
-def handle_phase_transition(new_phase):
-    # Sync with state.json
-    state = read_state()
-    state.current_phase = new_phase
-    save_state(state)
-
-    # Update context
-    context.phase.current = new_phase
-    context.phase.name = PHASE_NAMES[new_phase]
-    context.phase.started_at = now()
-
-    # Mark feedback as required for phase
-    context.feedback.pending_for_phase = True
-
-    log("phase_changed", f"Transitioned to Phase {new_phase}")
-
-    # Prompt for feedback
-    show_prompt("Run /aid end to provide feedback before continuing")
-    save_context()
-```
-
----
 
 ## Standard Step Templates by Phase
 
@@ -418,7 +207,7 @@ def handle_phase_transition(new_phase):
 }
 ```
 
-### Phase 1-3: Document Creation
+### Phase 1-3: Research, PRD & Document Creation
 
 ```json
 {
@@ -432,8 +221,6 @@ def handle_phase_transition(new_phase):
   ]
 }
 ```
-
----
 
 ## Session Log Actions
 
@@ -451,7 +238,39 @@ def handle_phase_transition(new_phase):
 | `context_saved` | Manual context save | Reason |
 | `session_ended` | End of work session | Summary |
 
----
+## PRIORITY 3: Feedback Integration
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  CONTEXT-FEEDBACK FLOW                                          │
+│                                                                 │
+│  Task Complete?                                                 │
+│       │                                                         │
+│       ▼                                                         │
+│  Update Context (task → done)                                   │
+│       │                                                         │
+│       ▼                                                         │
+│  Check: Is this phase ending?                                   │
+│       │                                                         │
+│       ├── Yes ──▶ Prompt: "/aid end for phase feedback"         │
+│       │                                                         │
+│       ▼                                                         │
+│  Check: Sessions since feedback >= 3?                           │
+│       │                                                         │
+│       ├── Yes ──▶ Remind: "Consider /aid end for feedback"      │
+│       │                                                         │
+│       ▼                                                         │
+│  Continue to next task                                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Feedback Reminders
+
+| Condition | Reminder |
+|-----------|----------|
+| Phase ending | "Run /aid end before advancing to next phase" |
+| 3+ sessions without feedback | "Consider /aid end to share what worked" |
+| 5+ tasks completed | "Good time for /aid end checkpoint" |
 
 ## Integration with Commands
 
@@ -463,34 +282,6 @@ def handle_phase_transition(new_phase):
 | `/phase` | Sync phase between context and state |
 | `/aid end` | Update feedback tracking, save context |
 | `/aid improve` | Reset feedback counters |
-
----
-
-## Jira MCP Integration
-
-When Jira MCP is connected, context syncs automatically:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  JIRA-CONTEXT SYNC                                              │
-│                                                                 │
-│  On task_started:                                               │
-│    - Fetch task details from Jira                               │
-│    - Update context.tasks.current with Jira data                │
-│    - Fetch next task from sprint backlog                        │
-│                                                                 │
-│  On task_completed:                                             │
-│    - Update Jira status to "Done"                               │
-│    - Log time if duration tracked                               │
-│    - Fetch next task for context.tasks.next                     │
-│                                                                 │
-│  On session_started:                                            │
-│    - Verify context.tasks.current matches Jira status           │
-│    - Sync any offline changes                                   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
 
 ## Error Handling
 
@@ -536,19 +327,6 @@ Syncing to Phase 4...
 Note: You may need to update your current task steps.
 ```
 
-### Next task is null
-
-```
-⚠️ No next task defined
-
-Options:
-  [1] Fetch from Jira sprint backlog
-  [2] Enter task key manually
-  [3] Skip (will prompt when needed)
-```
-
----
-
 ## File Locations
 
 ```
@@ -566,21 +344,94 @@ Options:
     └── trends.json   # Aggregated metrics
 ```
 
----
+## PRIORITY 4: Development Interaction Tracking
 
-## Skill Integration
+During Phase 4 (Development), track significant interactions to trigger periodic quality checks.
 
-Context tracking coordinates with other skills:
+### What Counts as an Interaction
 
-| Skill | Integration |
-|-------|-------------|
-| `phase-enforcement` | Sync phase, enforce gates |
-| `system-architect` | Track Tech Spec document path |
-| `atomic-design` | Track component implementation steps |
-| `code-review` | Log review step completion |
-| `test-driven` | Track TDD cycle steps |
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  INTERACTION COUNTER INCREMENTS WHEN:                           │
+│                                                                 │
+│  ✓ Component/function implementation completed                  │
+│  ✓ Test file written and saved                                  │
+│  ✓ git commit executed                                          │
+│  ✓ Code review checklist completed                              │
+│  ✓ Bug fix verified                                             │
+│                                                                 │
+│  DOES NOT INCREMENT FOR:                                        │
+│  ✗ Questions and discussions                                    │
+│  ✗ File reads without changes                                   │
+│  ✗ Context lookups                                              │
+│  ✗ Planning/thinking                                            │
+└─────────────────────────────────────────────────────────────────┘
+```
 
----
+### Quality Check Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  DEVELOPMENT QUALITY CHECK FLOW                                 │
+│                                                                 │
+│  Interaction happens                                            │
+│       │                                                         │
+│       ▼                                                         │
+│  Is Phase 4 (Development)?                                      │
+│       │                                                         │
+│       ├── No ──▶ Skip                                           │
+│       │                                                         │
+│       ▼                                                         │
+│  Increment development_tracking.interaction_count               │
+│       │                                                         │
+│       ▼                                                         │
+│  interaction_count >= quality_check_threshold?                  │
+│       │                                                         │
+│       ├── No ──▶ Continue working                               │
+│       │                                                         │
+│       ▼                                                         │
+│  Trigger Quality Check Prompt                                   │
+│       │                                                         │
+│       ▼                                                         │
+│  User rates (1-5) or skips                                      │
+│       │                                                         │
+│       ▼                                                         │
+│  If rated: Save to feedback/pending/                            │
+│  Reset interaction_count to 0                                   │
+│  Update last_quality_check timestamp                            │
+│  Continue working                                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Quality Check Prompt
+
+When threshold reached, Claude displays:
+
+```
+═══════════════════════════════════════════════════════════════════
+📊 QUICK QUALITY CHECK
+
+You've completed ~{count} significant interactions. Quick checkpoint:
+
+How's the session going? (1-5 or 'skip')
+  1 = Struggling   2 = Below avg   3 = On track   4 = Good   5 = Great
+
+Your rating (or 'skip'): ___
+
+Brief note (optional): ___
+═══════════════════════════════════════════════════════════════════
+```
+
+### Configuration
+
+Default threshold: 10 interactions
+Can be overridden in `~/.aid/config.yaml`:
+
+```yaml
+development:
+  quality_check_interval: 10
+  quality_check_enabled: true
+```
 
 ## Commands Reference
 
@@ -592,12 +443,3 @@ Context tracking coordinates with other skills:
 | `/context log` | Show session log |
 | `/context update` | Manual context update |
 | `/good-morning` | Full startup routine with context |
-
----
-
-## References
-
-See `references/` folder:
-- `context-schema.md` - Full JSON schema with validation
-- `step-templates.md` - Step templates for all task types
-- `session-management.md` - Session tracking and recovery

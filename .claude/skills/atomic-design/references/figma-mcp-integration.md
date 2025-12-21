@@ -2,6 +2,26 @@
 
 Integration with Figma's official Dev Mode MCP Server for extracting design tokens and component specs.
 
+## ⚠️ CRITICAL: This Is Not Optional
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  🚨 EXTRACTION FROM FIGMA IS MANDATORY BEFORE ANY CODING            │
+│                                                                      │
+│  This guide shows HOW to extract from Figma.                        │
+│  The extraction itself is NOT optional - it's REQUIRED.             │
+│                                                                      │
+│  ❌ "אני אשתמש בערכים שנראים לי נכונים" = FORBIDDEN                  │
+│  ✅ "אני חייב לחלץ את הערכים מ-Figma קודם" = CORRECT                 │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Related documents:**
+- `figma-design-fidelity.md` - Complete extraction workflow
+- `design-deviation-rules.md` - Zero deviation policy
+
+---
+
 ## Prerequisites
 
 - Figma Desktop app (latest version)
@@ -22,6 +42,8 @@ The official Figma MCP runs locally from Figma Desktop at:
 4. In the inspect panel, click **Enable desktop MCP server**
 5. Server runs at `http://127.0.0.1:3845/mcp`
 
+---
+
 ## Two Ways to Work
 
 ### Method 1: Selection-Based (Recommended for Design Systems)
@@ -35,12 +57,14 @@ The official Figma MCP runs locally from Figma Desktop at:
 
 ### Method 2: Link-Based
 
-1. Copy Figma link (Right-click â†’ Copy link)
+1. Copy Figma link (Right-click → Copy link)
 2. Paste in Claude Code:
 ```
 "Extract the color tokens from this style guide: [figma-link]"
 "Convert this component to React: [figma-link]"
 ```
+
+---
 
 ## Extracting Design Tokens Workflow
 
@@ -51,14 +75,14 @@ Open your style guide file and go to the tokens/foundations page.
 ### Step 2: Select Token Groups
 
 Select the relevant frames:
-- Colors section â†’ Extract color tokens
-- Typography section â†’ Extract text styles
-- Spacing section â†’ Extract spacing scale
+- Colors section → Extract color tokens
+- Typography section → Extract text styles
+- Spacing section → Extract spacing scale
 
 ### Step 3: Request Extraction
 
 ```
-"From my current Figma selection, extract all color tokens 
+"From my current Figma selection, extract all color tokens
 and generate CSS custom properties"
 ```
 
@@ -66,74 +90,92 @@ and generate CSS custom properties"
 
 ```
 Figma Style Guide Structure:
-â”œâ”€â”€ ðŸŽ¨ Colors
-â”‚   â”œâ”€â”€ Primitives (raw color values)
-â”‚   â””â”€â”€ Semantic (purpose-driven aliases)
-â”œâ”€â”€ ðŸ“ Typography
-â”‚   â”œâ”€â”€ Font families
-â”‚   â”œâ”€â”€ Type scale
-â”‚   â””â”€â”€ Text styles
-â”œâ”€â”€ ðŸ“ Spacing
-â”‚   â”œâ”€â”€ Base unit
-â”‚   â””â”€â”€ Scale
-â”œâ”€â”€ ðŸ”² Effects
-â”‚   â”œâ”€â”€ Shadows
-â”‚   â””â”€â”€ Blurs
-â”œâ”€â”€ ðŸ“ Borders
-â”‚   â”œâ”€â”€ Radii
-â”‚   â””â”€â”€ Widths
-â””â”€â”€ ðŸ“± Breakpoints
-    â””â”€â”€ Device widths
+├── 🎨 Colors
+│   ├── Primitives (raw color values)
+│   └── Semantic (purpose-driven aliases)
+├── 📝 Typography
+│   ├── Font families
+│   ├── Type scale
+│   └── Text styles
+├── 📐 Spacing
+│   ├── Base unit
+│   └── Scale
+├── 📲 Effects
+│   ├── Shadows
+│   └── Blurs
+├── 🔲 Borders
+│   ├── Radii
+│   └── Widths
+└── 📱 Breakpoints
+    └── Device widths
 ```
+
+---
 
 ## Token Transformation Patterns
 
+### ⚠️ IMPORTANT: Extract EXACT Values
+
+```
+When extracting from Figma:
+
+✅ CORRECT: Copy the exact value
+   Figma shows: #3B82F6 → Code: #3B82F6
+   Figma shows: 13px → Code: 13px
+   Figma shows: 450 weight → Code: font-weight: 450
+
+❌ WRONG: Round or "improve" values
+   Figma shows: #3B82F6 → Code: #3F85F7 (changed!)
+   Figma shows: 13px → Code: 12px (rounded!)
+   Figma shows: 450 weight → Code: font-weight: 500 (standardized!)
+```
+
 ### From Figma Colors to Code
 
-**Transform to token structure:**
+**Transform to token structure (EXACT values only):**
 ```typescript
 // From Figma: "Blue/500" -> #3b82f6
-// To tokens:
+// To tokens (use EXACT Figma value):
 const colors = {
   primitives: {
     blue: {
-      50: '#eff6ff',
-      100: '#dbeafe',
-      200: '#bfdbfe',
-      300: '#93c5fd',
-      400: '#60a5fa',
-      500: '#3b82f6',  // Primary
-      600: '#2563eb',
-      700: '#1d4ed8',
-      800: '#1e40af',
-      900: '#1e3a8a',
+      50: '#eff6ff',   // EXACT from Figma
+      100: '#dbeafe',  // EXACT from Figma
+      200: '#bfdbfe',  // EXACT from Figma
+      300: '#93c5fd',  // EXACT from Figma
+      400: '#60a5fa',  // EXACT from Figma
+      500: '#3b82f6',  // EXACT from Figma - Primary
+      600: '#2563eb',  // EXACT from Figma
+      700: '#1d4ed8',  // EXACT from Figma
+      800: '#1e40af',  // EXACT from Figma
+      900: '#1e3a8a',  // EXACT from Figma
     },
     // ... other color palettes
   },
   semantic: {
-    // Map to purposes
+    // Map to purposes (aliases to primitives)
     primary: 'var(--color-blue-500)',
     primaryHover: 'var(--color-blue-600)',
     primaryActive: 'var(--color-blue-700)',
-    
+
     background: {
       default: 'var(--color-white)',
       subtle: 'var(--color-gray-50)',
       muted: 'var(--color-gray-100)',
     },
-    
+
     text: {
       primary: 'var(--color-gray-900)',
       secondary: 'var(--color-gray-600)',
       muted: 'var(--color-gray-400)',
       inverse: 'var(--color-white)',
     },
-    
+
     border: {
       default: 'var(--color-gray-200)',
       strong: 'var(--color-gray-300)',
     },
-    
+
     status: {
       success: 'var(--color-green-500)',
       warning: 'var(--color-yellow-500)',
@@ -144,58 +186,65 @@ const colors = {
 };
 ```
 
-### Step 3: Extract Typography Tokens
+### Extract Typography Tokens
 
 **MCP Command:**
 ```
 figma.get_styles(file_key, style_type="TEXT")
 ```
 
-**Transform to token structure:**
+**Transform to token structure (EXACT values only):**
 ```typescript
+/**
+ * Typography Tokens
+ * Source: Figma Style Guide
+ * Extracted: [DATE]
+ *
+ * ⚠️ ALL values are EXACT from Figma - DO NOT MODIFY
+ */
 const typography = {
   fonts: {
-    heading: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
-    body: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
-    mono: '"JetBrains Mono", "Fira Code", monospace',
+    heading: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',  // EXACT from Figma
+    body: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',     // EXACT from Figma
+    mono: '"JetBrains Mono", "Fira Code", monospace',                   // EXACT from Figma
   },
-  
+
   fontSizes: {
-    xs: '0.75rem',    // 12px
-    sm: '0.875rem',   // 14px
-    base: '1rem',     // 16px
-    lg: '1.125rem',   // 18px
-    xl: '1.25rem',    // 20px
-    '2xl': '1.5rem',  // 24px
-    '3xl': '1.875rem',// 30px
-    '4xl': '2.25rem', // 36px
-    '5xl': '3rem',    // 48px
+    xs: '0.75rem',    // 12px - EXACT from Figma
+    sm: '0.875rem',   // 14px - EXACT from Figma
+    base: '1rem',     // 16px - EXACT from Figma
+    lg: '1.125rem',   // 18px - EXACT from Figma
+    xl: '1.25rem',    // 20px - EXACT from Figma
+    '2xl': '1.5rem',  // 24px - EXACT from Figma
+    '3xl': '1.875rem',// 30px - EXACT from Figma
+    '4xl': '2.25rem', // 36px - EXACT from Figma
+    '5xl': '3rem',    // 48px - EXACT from Figma
   },
-  
+
   fontWeights: {
-    normal: 400,
-    medium: 500,
-    semibold: 600,
-    bold: 700,
+    normal: 400,   // EXACT from Figma
+    medium: 500,   // EXACT from Figma
+    semibold: 600, // EXACT from Figma
+    bold: 700,     // EXACT from Figma
   },
-  
+
   lineHeights: {
-    none: 1,
-    tight: 1.25,
-    snug: 1.375,
-    normal: 1.5,
-    relaxed: 1.625,
-    loose: 2,
+    none: 1,       // EXACT from Figma
+    tight: 1.25,   // EXACT from Figma
+    snug: 1.375,   // EXACT from Figma
+    normal: 1.5,   // EXACT from Figma
+    relaxed: 1.625,// EXACT from Figma
+    loose: 2,      // EXACT from Figma
   },
-  
+
   letterSpacing: {
-    tighter: '-0.05em',
-    tight: '-0.025em',
-    normal: '0',
-    wide: '0.025em',
-    wider: '0.05em',
+    tighter: '-0.05em', // EXACT from Figma
+    tight: '-0.025em',  // EXACT from Figma
+    normal: '0',        // EXACT from Figma
+    wide: '0.025em',    // EXACT from Figma
+    wider: '0.05em',    // EXACT from Figma
   },
-  
+
   // Composed text styles (from Figma text styles)
   textStyles: {
     h1: {
@@ -211,7 +260,7 @@ const typography = {
       fontWeight: 'var(--font-weight-bold)',
       lineHeight: 'var(--line-height-tight)',
     },
-    // ... other text styles
+    // ... other text styles - ALL from Figma
     body: {
       fontFamily: 'var(--font-body)',
       fontSize: 'var(--font-size-base)',
@@ -228,106 +277,127 @@ const typography = {
 };
 ```
 
-### Step 4: Extract Spacing Tokens
+### Extract Spacing Tokens
 
-**From Figma auto-layout values:**
+**From Figma auto-layout values (EXACT):**
 ```typescript
+/**
+ * Spacing Tokens
+ * Source: Figma Style Guide
+ * Extracted: [DATE]
+ *
+ * ⚠️ ALL values are EXACT from Figma - DO NOT MODIFY
+ */
 const spacing = {
-  // Base unit: 4px
+  // Base unit: 4px (from Figma)
   0: '0',
   px: '1px',
-  0.5: '0.125rem',  // 2px
-  1: '0.25rem',     // 4px
-  1.5: '0.375rem',  // 6px
-  2: '0.5rem',      // 8px
-  2.5: '0.625rem',  // 10px
-  3: '0.75rem',     // 12px
-  4: '1rem',        // 16px
-  5: '1.25rem',     // 20px
-  6: '1.5rem',      // 24px
-  8: '2rem',        // 32px
-  10: '2.5rem',     // 40px
-  12: '3rem',       // 48px
-  16: '4rem',       // 64px
-  20: '5rem',       // 80px
-  24: '6rem',       // 96px
+  0.5: '0.125rem',  // 2px - EXACT from Figma
+  1: '0.25rem',     // 4px - EXACT from Figma
+  1.5: '0.375rem',  // 6px - EXACT from Figma
+  2: '0.5rem',      // 8px - EXACT from Figma
+  2.5: '0.625rem',  // 10px - EXACT from Figma
+  3: '0.75rem',     // 12px - EXACT from Figma
+  4: '1rem',        // 16px - EXACT from Figma
+  5: '1.25rem',     // 20px - EXACT from Figma
+  6: '1.5rem',      // 24px - EXACT from Figma
+  8: '2rem',        // 32px - EXACT from Figma
+  10: '2.5rem',     // 40px - EXACT from Figma
+  12: '3rem',       // 48px - EXACT from Figma
+  16: '4rem',       // 64px - EXACT from Figma
+  20: '5rem',       // 80px - EXACT from Figma
+  24: '6rem',       // 96px - EXACT from Figma
 };
 
-// Semantic spacing
+// Semantic spacing (aliases)
 const semanticSpacing = {
   component: {
-    paddingXs: 'var(--spacing-2)',      // 8px - compact elements
-    paddingSm: 'var(--spacing-3)',      // 12px - small buttons
-    paddingMd: 'var(--spacing-4)',      // 16px - default buttons
-    paddingLg: 'var(--spacing-5)',      // 20px - large buttons
+    paddingXs: 'var(--spacing-2)',      // 8px - from Figma compact elements
+    paddingSm: 'var(--spacing-3)',      // 12px - from Figma small buttons
+    paddingMd: 'var(--spacing-4)',      // 16px - from Figma default buttons
+    paddingLg: 'var(--spacing-5)',      // 20px - from Figma large buttons
   },
   layout: {
-    gapSm: 'var(--spacing-2)',          // 8px
-    gapMd: 'var(--spacing-4)',          // 16px
-    gapLg: 'var(--spacing-6)',          // 24px
-    gapXl: 'var(--spacing-8)',          // 32px
-    sectionGap: 'var(--spacing-16)',    // 64px
+    gapSm: 'var(--spacing-2)',          // 8px - from Figma
+    gapMd: 'var(--spacing-4)',          // 16px - from Figma
+    gapLg: 'var(--spacing-6)',          // 24px - from Figma
+    gapXl: 'var(--spacing-8)',          // 32px - from Figma
+    sectionGap: 'var(--spacing-16)',    // 64px - from Figma
   },
   container: {
-    paddingMobile: 'var(--spacing-4)',  // 16px
-    paddingTablet: 'var(--spacing-6)',  // 24px
-    paddingDesktop: 'var(--spacing-8)', // 32px
+    paddingMobile: 'var(--spacing-4)',  // 16px - from Figma Mobile frame
+    paddingTablet: 'var(--spacing-6)',  // 24px - from Figma Tablet frame
+    paddingDesktop: 'var(--spacing-8)', // 32px - from Figma Desktop frame
   },
 };
 ```
 
-### Step 5: Extract Effects & Borders
+### Extract Effects & Borders
 
 ```typescript
+/**
+ * Effects Tokens
+ * Source: Figma Style Guide
+ * Extracted: [DATE]
+ *
+ * ⚠️ ALL values are EXACT from Figma - DO NOT MODIFY
+ */
 const effects = {
   shadows: {
     none: 'none',
-    sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
-    base: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-    md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-    lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-    xl: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-    inner: 'inset 0 2px 4px 0 rgb(0 0 0 / 0.05)',
+    sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',                                      // EXACT from Figma
+    base: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',    // EXACT from Figma
+    md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',   // EXACT from Figma
+    lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)', // EXACT from Figma
+    xl: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',// EXACT from Figma
+    inner: 'inset 0 2px 4px 0 rgb(0 0 0 / 0.05)',                              // EXACT from Figma
   },
-  
+
   borderRadius: {
     none: '0',
-    sm: '0.125rem',   // 2px
-    base: '0.25rem',  // 4px
-    md: '0.375rem',   // 6px
-    lg: '0.5rem',     // 8px
-    xl: '0.75rem',    // 12px
-    '2xl': '1rem',    // 16px
+    sm: '0.125rem',   // 2px - EXACT from Figma
+    base: '0.25rem',  // 4px - EXACT from Figma
+    md: '0.375rem',   // 6px - EXACT from Figma
+    lg: '0.5rem',     // 8px - EXACT from Figma
+    xl: '0.75rem',    // 12px - EXACT from Figma
+    '2xl': '1rem',    // 16px - EXACT from Figma
     full: '9999px',
   },
-  
+
   borderWidth: {
     0: '0',
-    1: '1px',
-    2: '2px',
-    4: '4px',
+    1: '1px',  // EXACT from Figma
+    2: '2px',  // EXACT from Figma
+    4: '4px',  // EXACT from Figma
   },
-  
+
   transitions: {
-    fast: '150ms ease',
-    base: '200ms ease',
-    slow: '300ms ease',
-    slower: '500ms ease',
+    fast: '150ms ease',   // EXACT from Figma
+    base: '200ms ease',   // EXACT from Figma
+    slow: '300ms ease',   // EXACT from Figma
+    slower: '500ms ease', // EXACT from Figma
   },
 };
 ```
 
-### Step 6: Extract Breakpoints
+### Extract Breakpoints
 
 ```typescript
+/**
+ * Breakpoints
+ * Source: Figma Style Guide / Frame sizes
+ * Extracted: [DATE]
+ *
+ * ⚠️ Check Figma for which breakpoints have dedicated frames
+ */
 const breakpoints = {
-  xs: '320px',   // Small mobile (iPhone SE)
-  sm: '480px',   // Mobile landscape
-  md: '768px',   // Tablet portrait (iPad)
-  lg: '1024px',  // Tablet landscape / Small laptop
-  xl: '1280px',  // Desktop
-  '2xl': '1440px', // Large desktop
-  '3xl': '1920px', // Full HD / Wide screens
+  xs: '320px',   // Small mobile (iPhone SE) - check Figma
+  sm: '480px',   // Mobile landscape - check Figma
+  md: '768px',   // Tablet portrait (iPad) - check Figma
+  lg: '1024px',  // Tablet landscape / Small laptop - check Figma
+  xl: '1280px',  // Desktop - check Figma
+  '2xl': '1440px', // Large desktop - check Figma
+  '3xl': '1920px', // Full HD / Wide screens - check Figma
 };
 
 // Media query helpers
@@ -342,6 +412,8 @@ const media = {
 };
 ```
 
+---
+
 ## Component Spec Extraction
 
 ### Reading Component Details from Figma
@@ -351,7 +423,7 @@ const media = {
 figma.get_node(file_key, node_id)
 ```
 
-**Extract from component:**
+**Extract from component (ALL values EXACT):**
 - Dimensions (width, height)
 - Padding (from auto-layout)
 - Gap (from auto-layout)
@@ -367,13 +439,13 @@ Map Figma variants to code variants:
 
 ```
 Figma Component: "Button"
-â”œâ”€â”€ State=Default, Size=Small, Type=Primary
-â”œâ”€â”€ State=Hover, Size=Small, Type=Primary
-â”œâ”€â”€ State=Default, Size=Medium, Type=Primary
-â”œâ”€â”€ State=Default, Size=Small, Type=Secondary
-â””â”€â”€ ...
+├── State=Default, Size=Small, Type=Primary
+├── State=Hover, Size=Small, Type=Primary
+├── State=Default, Size=Medium, Type=Primary
+├── State=Default, Size=Small, Type=Secondary
+└── ...
 
-â†“ Maps to â†“
+↓ Maps to ↓
 
 ButtonProps:
 - variant: 'primary' | 'secondary' | 'ghost'
@@ -381,60 +453,92 @@ ButtonProps:
 - state handled by CSS :hover, :active, :disabled
 ```
 
+### Documentation Template for Extracted Component
+
+```typescript
+/**
+ * Button Component
+ *
+ * @figma https://figma.com/file/xxx/Design-System?node-id=123
+ * @extracted 2024-01-15
+ * @designer [Designer Name]
+ *
+ * Extracted Specs (DO NOT MODIFY without Figma update):
+ * ├── Dimensions
+ * │   ├── height: 48px (md size)
+ * │   └── min-width: auto (hug contents)
+ * │
+ * ├── Padding
+ * │   ├── vertical: 12px
+ * │   └── horizontal: 24px
+ * │
+ * ├── Visual
+ * │   ├── background: #3B82F6 (--color-primary)
+ * │   ├── border-radius: 8px (--radius-lg)
+ * │   └── shadow: none
+ * │
+ * ├── Typography
+ * │   ├── font: Inter
+ * │   ├── size: 16px
+ * │   ├── weight: 500
+ * │   └── color: #FFFFFF
+ * │
+ * └── States
+ *     ├── hover: bg #2563EB
+ *     ├── active: bg #1D4ED8
+ *     └── disabled: bg #E5E7EB, color #9CA3AF
+ */
+```
+
+---
+
 ## Output Formats
 
 ### CSS Custom Properties
 
 ```css
+/**
+ * Design Tokens - CSS Variables
+ * Source: Figma Style Guide
+ * Extracted: [DATE]
+ *
+ * ⚠️ ALL values EXACT from Figma - DO NOT MODIFY manually
+ * To update: Extract new values from Figma first
+ */
+
 :root {
-  /* Colors - Primitives */
+  /* Colors - Primitives (EXACT from Figma) */
   --color-blue-500: #3b82f6;
   --color-blue-600: #2563eb;
-  
-  /* Colors - Semantic */
+
+  /* Colors - Semantic (aliases) */
   --color-primary: var(--color-blue-500);
   --color-primary-hover: var(--color-blue-600);
-  
-  /* Typography */
+
+  /* Typography (EXACT from Figma) */
   --font-heading: 'Inter', sans-serif;
   --font-size-base: 1rem;
-  
-  /* Spacing */
+
+  /* Spacing (EXACT from Figma) */
   --spacing-4: 1rem;
-  
-  /* Effects */
+
+  /* Effects (EXACT from Figma) */
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
   --radius-lg: 0.5rem;
 }
 ```
 
-### Tailwind Config
-
-```javascript
-// tailwind.config.js
-module.exports = {
-  theme: {
-    extend: {
-      colors: {
-        primary: {
-          DEFAULT: '#3b82f6',
-          hover: '#2563eb',
-        },
-      },
-      fontFamily: {
-        heading: ['Inter', 'sans-serif'],
-      },
-      spacing: {
-        // Custom spacing if needed
-      },
-    },
-  },
-};
-```
-
 ### TypeScript Theme Object
 
 ```typescript
+/**
+ * Theme Configuration
+ * Source: Figma Style Guide
+ * Extracted: [DATE]
+ *
+ * ⚠️ ALL values EXACT from Figma
+ */
+
 export const theme = {
   colors: { /* ... */ },
   typography: { /* ... */ },
@@ -446,43 +550,7 @@ export const theme = {
 export type Theme = typeof theme;
 ```
 
-## Project Configuration (Optional)
-
-For teams managing multiple projects, create a config file to standardize output:
-
-```typescript
-// design-system.config.ts
-export interface DesignSystemConfig {
-  // Project info
-  projectName: string;
-  
-  // Output configuration  
-  output: {
-    format: 'css' | 'tailwind' | 'styled-components' | 'scss';
-    path: string;
-    prefix?: string;  // e.g., 'ds-' for --ds-color-primary
-  };
-  
-  // Token naming convention mapping (Figma name â†’ output name)
-  tokenMapping?: {
-    colors?: Record<string, string>;
-    typography?: Record<string, string>;
-    spacing?: Record<string, string>;
-  };
-}
-
-// Example
-const config: DesignSystemConfig = {
-  projectName: 'my-app',
-  output: {
-    format: 'css',
-    path: './src/design-system/tokens',
-    prefix: '',
-  },
-};
-
-export default config;
-```
+---
 
 ## Workflow for New Projects
 
@@ -494,16 +562,18 @@ export default config;
    - Enable Dev Mode (Shift+D)
    - Enable MCP server in inspect panel
 
-2. **Extract Tokens**
-   - Select Colors frame â†’ "Extract color tokens as CSS variables"
-   - Select Typography frame â†’ "Extract text styles"
-   - Select Spacing frame â†’ "Extract spacing scale"
+2. **Extract Tokens (MANDATORY)**
+   - Select Colors frame → "Extract color tokens as CSS variables"
+   - Select Typography frame → "Extract text styles"
+   - Select Spacing frame → "Extract spacing scale"
+   - ⚠️ Use EXACT values - no rounding or "improving"
 
 3. **Generate Token Files**
    Ask Claude: "Generate a tokens.css file from the extracted values"
 
 4. **Create Components**
-   - Select Button component â†’ "Create React Button atom using my tokens"
+   - Select Button component → "Create React Button atom using my tokens"
+   - ⚠️ All values must come from Figma extraction
    - Continue for each component type
 ```
 
@@ -512,9 +582,9 @@ export default config;
 Transform Figma names to code-friendly names:
 
 ```typescript
-// "Colors/Blue/500" â†’ "--color-blue-500"
-// "Typography/Heading/H1" â†’ "--font-h1"
-// "Spacing/Large" â†’ "--spacing-lg"
+// "Colors/Blue/500" → "--color-blue-500"
+// "Typography/Heading/H1" → "--font-h1"
+// "Spacing/Large" → "--spacing-lg"
 
 function normalizeTokenName(figmaName: string): string {
   return figmaName
@@ -523,6 +593,35 @@ function normalizeTokenName(figmaName: string): string {
     .replace(/\s+/g, '-');
 }
 ```
+
+---
+
+## Handling Figma Updates
+
+### When Style Guide Changes in Figma
+
+```
+1. Detect change (via Figma MCP or manual check)
+2. Extract NEW values from Figma (EXACT)
+3. Compare with existing tokens
+4. Update tokens/*.json with new EXACT values
+5. Regenerate CSS variables
+6. Run visual regression tests
+7. Commit: "sync: Update tokens from Figma [date]"
+```
+
+### When Component Changes in Figma
+
+```
+1. Extract NEW component specs via MCP
+2. Compare with current implementation
+3. Update component CSS with EXACT new values
+4. Update component props if variants changed
+5. Verify visual match with Figma
+6. Commit: "sync: Update [Component] from Figma [date]"
+```
+
+---
 
 ## Tips for Efficient Extraction
 
@@ -545,12 +644,25 @@ For comprehensive extraction:
 then generate a complete tokens.css file"
 ```
 
+---
+
 ## Summary
 
 | Action | Approach |
 |--------|----------|
-| Extract colors | Select Colors frame â†’ Ask Claude |
-| Extract typography | Select Typography frame â†’ Ask Claude |
-| Extract component | Select component â†’ Ask Claude |
+| Extract colors | Select Colors frame → Ask Claude → Use EXACT values |
+| Extract typography | Select Typography frame → Ask Claude → Use EXACT values |
+| Extract component | Select component → Ask Claude → Use EXACT values |
 | Generate tokens file | Request specific format (CSS/Tailwind/SCSS) |
-| Create components | Select design â†’ "Create React/Vue component" |
+| Create components | Select design → "Create React/Vue component" → EXACT specs |
+
+### ⚠️ Remember
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  EVERY value in your code must come from Figma extraction.      │
+│  NO guessing. NO rounding. NO "improving".                      │
+│  If Figma shows 13px → Code is 13px (not 12px).                │
+│  If Figma shows #3B82F6 → Code is #3B82F6 (not #3F85F7).       │
+└─────────────────────────────────────────────────────────────────┘
+```

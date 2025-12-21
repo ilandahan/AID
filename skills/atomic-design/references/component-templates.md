@@ -2,9 +2,40 @@
 
 Production-ready templates for common design system components.
 
+## ⚠️ CRITICAL: These Are Templates, Not Final Values
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  🚨 BEFORE USING THESE TEMPLATES:                                    │
+│                                                                      │
+│  1. Extract specs from Figma using MCP                              │
+│  2. Replace ALL placeholder values with EXACT Figma values          │
+│  3. Add @figma JSDoc tag with actual Figma link                     │
+│  4. Document extraction date                                         │
+│                                                                      │
+│  These templates show STRUCTURE and PATTERNS.                       │
+│  The actual VALUES must come from YOUR Figma design system.         │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Related documents:**
+- `figma-design-fidelity.md` - Complete extraction workflow
+- `design-deviation-rules.md` - Zero deviation policy
+- `figma-mcp-integration.md` - MCP commands for extraction
+
 ## Complete Atom: Button
 
 ```typescript
+/**
+ * Button Atom
+ *
+ * @figma [REPLACE: https://figma.com/file/xxx/Design-System?node-id=button]
+ * @extracted [REPLACE: YYYY-MM-DD]
+ * @designer [REPLACE: Designer Name]
+ *
+ * ⚠️ Replace ALL values below with EXACT values from Figma extraction
+ */
+
 // atoms/Button/Button.tsx
 import { forwardRef, ButtonHTMLAttributes, ReactNode } from 'react';
 import clsx from 'clsx';
@@ -91,6 +122,17 @@ export default Button;
 ```
 
 ```css
+/**
+ * Button Styles
+ *
+ * Source: Figma Design System
+ * Frame: Components/Button
+ * Extracted: [REPLACE: YYYY-MM-DD]
+ *
+ * ⚠️ ALL values must be EXACT from Figma - DO NOT MODIFY
+ * Replace placeholder values with your Figma values
+ */
+
 /* atoms/Button/Button.module.css */
 .button {
   display: inline-flex;
@@ -155,34 +197,36 @@ export default Button;
 }
 
 /* Sizes - Mobile first */
+/* ⚠️ ALL values from Figma - check each size variant in Figma */
 .sm {
-  min-height: 36px;
-  padding: var(--spacing-2) var(--spacing-3);
-  font-size: var(--font-size-sm);
+  min-height: 36px;                          /* From Figma: Button/Small */
+  padding: var(--spacing-2) var(--spacing-3); /* From Figma */
+  font-size: var(--font-size-sm);             /* From Figma */
 }
 
 .md {
-  min-height: 44px;
-  padding: var(--spacing-2) var(--spacing-4);
-  font-size: var(--font-size-sm);
+  min-height: 44px;                          /* From Figma: Button/Medium */
+  padding: var(--spacing-2) var(--spacing-4); /* From Figma */
+  font-size: var(--font-size-sm);             /* From Figma */
 }
 
 .lg {
-  min-height: 52px;
-  padding: var(--spacing-3) var(--spacing-5);
-  font-size: var(--font-size-base);
+  min-height: 52px;                          /* From Figma: Button/Large */
+  padding: var(--spacing-3) var(--spacing-5); /* From Figma */
+  font-size: var(--font-size-base);           /* From Figma */
 }
 
+/* Responsive: Check Figma Desktop frame for these values */
 @media (min-width: 768px) {
   .sm {
-    min-height: 32px;
+    min-height: 32px;  /* From Figma Desktop: Button/Small */
   }
   .md {
-    min-height: 40px;
+    min-height: 40px;  /* From Figma Desktop: Button/Medium */
     font-size: var(--font-size-base);
   }
   .lg {
-    min-height: 48px;
+    min-height: 48px;  /* From Figma Desktop: Button/Large */
   }
 }
 
@@ -229,6 +273,15 @@ export default Button;
 ## Complete Atom: Input
 
 ```typescript
+/**
+ * Input Atom
+ *
+ * @figma [REPLACE: https://figma.com/file/xxx/Design-System?node-id=input]
+ * @extracted [REPLACE: YYYY-MM-DD]
+ *
+ * ⚠️ Replace ALL values below with EXACT values from Figma extraction
+ */
+
 // atoms/Input/Input.tsx
 import { forwardRef, InputHTMLAttributes, ReactNode } from 'react';
 import clsx from 'clsx';
@@ -295,6 +348,16 @@ export default Input;
 ```
 
 ```css
+/**
+ * Input Styles
+ *
+ * Source: Figma Design System
+ * Frame: Components/Input
+ * Extracted: [REPLACE: YYYY-MM-DD]
+ *
+ * ⚠️ ALL values must be EXACT from Figma - DO NOT MODIFY
+ */
+
 /* atoms/Input/Input.module.css */
 .wrapper {
   display: flex;
@@ -387,6 +450,16 @@ export default Input;
 ## Complete Molecule: FormField
 
 ```typescript
+/**
+ * FormField Molecule
+ *
+ * @figma [REPLACE: https://figma.com/file/xxx/Design-System?node-id=formfield]
+ * @extracted [REPLACE: YYYY-MM-DD]
+ *
+ * Composes: Typography (label) + Input + Typography (error/hint)
+ * ⚠️ Replace ALL spacing values with EXACT values from Figma
+ */
+
 // molecules/FormField/FormField.tsx
 import { ReactNode, useId } from 'react';
 import clsx from 'clsx';
@@ -467,25 +540,35 @@ export default FormField;
 ```
 
 ```css
+/**
+ * FormField Styles
+ *
+ * Source: Figma Design System
+ * Frame: Components/FormField
+ * Extracted: [REPLACE: YYYY-MM-DD]
+ *
+ * ⚠️ ALL gap/margin values from Figma - DO NOT MODIFY
+ */
+
 /* molecules/FormField/FormField.module.css */
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-1);
+  gap: var(--spacing-1);  /* From Figma: gap between label and input */
 }
 
 .label {
   display: flex;
   align-items: center;
-  gap: var(--spacing-1);
+  gap: var(--spacing-1);  /* From Figma: gap between label text and asterisk */
 }
 
 .required {
-  color: var(--color-error);
+  color: var(--color-error);  /* From Figma: required indicator color */
 }
 
 .message {
-  margin-top: var(--spacing-1);
+  margin-top: var(--spacing-1);  /* From Figma: gap between input and message */
 }
 ```
 
@@ -494,6 +577,17 @@ export default FormField;
 ## Complete Organism: Header
 
 ```typescript
+/**
+ * Header Organism
+ *
+ * @figma [REPLACE: https://figma.com/file/xxx/Design-System?node-id=header]
+ * @extracted [REPLACE: YYYY-MM-DD]
+ *
+ * Composes: Logo + NavItems + Actions + MobileMenu
+ * ⚠️ Check Figma for Desktop, Tablet, Mobile variations
+ * ⚠️ Replace ALL height, padding, breakpoint values with EXACT Figma values
+ */
+
 // organisms/Header/Header.tsx
 import { useState, ReactNode } from 'react';
 import clsx from 'clsx';
@@ -617,13 +711,23 @@ export default Header;
 ```
 
 ```css
+/**
+ * Header Styles
+ *
+ * Source: Figma Design System
+ * Frame: Components/Header
+ * Extracted: [REPLACE: YYYY-MM-DD]
+ *
+ * ⚠️ ALL values from Figma - check Desktop, Tablet, Mobile frames
+ */
+
 /* organisms/Header/Header.module.css */
 .header {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);        /* From Figma */
+  border-bottom: 1px solid var(--color-border); /* From Figma */
 }
 
 .container {
@@ -759,6 +863,21 @@ export default Header;
 ## CSS Variables Template
 
 ```css
+/**
+ * Design Tokens - CSS Variables
+ *
+ * Source: Figma Style Guide
+ * Extracted: [REPLACE: YYYY-MM-DD]
+ *
+ * ⚠️ CRITICAL: ALL values MUST be extracted from Figma
+ * DO NOT use these placeholder values - replace with your Figma values
+ *
+ * To extract:
+ * 1. Open Figma Style Guide
+ * 2. Use MCP: figma.get_local_variables(file_key)
+ * 3. Replace all values below with EXACT Figma values
+ */
+
 /* tokens/variables.css */
 :root {
   /* ==================== COLORS ==================== */

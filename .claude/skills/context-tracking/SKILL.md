@@ -51,6 +51,12 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
     "started_at": "2024-12-10T09:00:00Z"
   },
 
+  "development_tracking": {
+    "interaction_count": 7,
+    "last_quality_check": "2024-12-11T14:00:00Z",
+    "quality_check_threshold": 10
+  },
+
   "project": {
     "name": "user-authentication",
     "documents": {
@@ -201,7 +207,7 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 }
 ```
 
-### Phase 1-3: Document Creation
+### Phase 1-3: Research, PRD & Document Creation
 
 ```json
 {
@@ -336,6 +342,95 @@ Note: You may need to update your current task steps.
 │   └── processed/    # Archived feedback
 └── metrics/
     └── trends.json   # Aggregated metrics
+```
+
+## PRIORITY 4: Development Interaction Tracking
+
+During Phase 4 (Development), track significant interactions to trigger periodic quality checks.
+
+### What Counts as an Interaction
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  INTERACTION COUNTER INCREMENTS WHEN:                           │
+│                                                                 │
+│  ✓ Component/function implementation completed                  │
+│  ✓ Test file written and saved                                  │
+│  ✓ git commit executed                                          │
+│  ✓ Code review checklist completed                              │
+│  ✓ Bug fix verified                                             │
+│                                                                 │
+│  DOES NOT INCREMENT FOR:                                        │
+│  ✗ Questions and discussions                                    │
+│  ✗ File reads without changes                                   │
+│  ✗ Context lookups                                              │
+│  ✗ Planning/thinking                                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Quality Check Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  DEVELOPMENT QUALITY CHECK FLOW                                 │
+│                                                                 │
+│  Interaction happens                                            │
+│       │                                                         │
+│       ▼                                                         │
+│  Is Phase 4 (Development)?                                      │
+│       │                                                         │
+│       ├── No ──▶ Skip                                           │
+│       │                                                         │
+│       ▼                                                         │
+│  Increment development_tracking.interaction_count               │
+│       │                                                         │
+│       ▼                                                         │
+│  interaction_count >= quality_check_threshold?                  │
+│       │                                                         │
+│       ├── No ──▶ Continue working                               │
+│       │                                                         │
+│       ▼                                                         │
+│  Trigger Quality Check Prompt                                   │
+│       │                                                         │
+│       ▼                                                         │
+│  User rates (1-5) or skips                                      │
+│       │                                                         │
+│       ▼                                                         │
+│  If rated: Save to feedback/pending/                            │
+│  Reset interaction_count to 0                                   │
+│  Update last_quality_check timestamp                            │
+│  Continue working                                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Quality Check Prompt
+
+When threshold reached, Claude displays:
+
+```
+═══════════════════════════════════════════════════════════════════
+📊 QUICK QUALITY CHECK
+
+You've completed ~{count} significant interactions. Quick checkpoint:
+
+How's the session going? (1-5 or 'skip')
+  1 = Struggling   2 = Below avg   3 = On track   4 = Good   5 = Great
+
+Your rating (or 'skip'): ___
+
+Brief note (optional): ___
+═══════════════════════════════════════════════════════════════════
+```
+
+### Configuration
+
+Default threshold: 10 interactions
+Can be overridden in `~/.aid/config.yaml`:
+
+```yaml
+development:
+  quality_check_interval: 10
+  quality_check_enabled: true
 ```
 
 ## Commands Reference

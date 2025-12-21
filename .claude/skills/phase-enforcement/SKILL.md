@@ -17,8 +17,230 @@ Enforces AID phase gates with mandatory quality feedback collection. Claude MUST
 │  2. Classify the requested work                                 │
 │  3. Check if work is allowed in current phase                   │
 │  4. REFUSE if not allowed (show violation template)             │
-│  5. At phase completion: collect feedback via /aid end          │
+│  5. At phase completion: MANDATORY SUB-AGENT REVIEW             │
+│  6. After review passes: collect feedback via /aid end          │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+## MANDATORY: Sub-Agent Review at Phase Transitions
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ⚠️  NO PHASE TRANSITION WITHOUT SUB-AGENT REVIEW               │
+│                                                                 │
+│  Before moving from Phase N to Phase N+1:                       │
+│                                                                 │
+│  1. Claude MUST spawn a review sub-agent using Task tool        │
+│  2. Sub-agent reviews ALL deliverables for current phase        │
+│  3. Sub-agent returns PASS/FAIL with detailed findings          │
+│  4. If FAIL: Claude must address issues before retry            │
+│  5. If PASS: Claude can proceed to collect feedback             │
+│                                                                 │
+│  THIS IS NOT OPTIONAL - CANNOT BE SKIPPED                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Sub-Agent Review Flow
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   Phase N    │────▶│  Sub-Agent   │────▶│   Review     │
+│  Complete    │     │   Review     │     │   Result     │
+└──────────────┘     └──────────────┘     └──────┬───────┘
+                                                 │
+                          ┌──────────────────────┼──────────────────────┐
+                          │                      │                      │
+                          ▼                      ▼                      ▼
+                    ┌──────────┐           ┌──────────┐          ┌──────────┐
+                    │   PASS   │           │  PARTIAL │          │   FAIL   │
+                    │          │           │          │          │          │
+                    └────┬─────┘           └────┬─────┘          └────┬─────┘
+                         │                      │                     │
+                         ▼                      ▼                     ▼
+                   ┌──────────┐          ┌──────────┐          ┌──────────┐
+                   │ /aid end │          │  Fix &   │          │  Fix &   │
+                   │ Feedback │          │  Re-run  │          │  Re-run  │
+                   └──────────┘          └──────────┘          └──────────┘
+```
+
+### Sub-Agent Review Prompts by Phase
+
+#### Phase 1 (PRD) → Phase 2 (Tech Spec) Review
+
+```markdown
+**SUB-AGENT TASK: PRD Review**
+
+Review the PRD document at: [docs/prd/YYYY-MM-DD-feature.md]
+
+**Checklist - ALL must pass:**
+1. [ ] Problem statement is clear and specific
+2. [ ] All user stories follow "As a... I want... So that..." format
+3. [ ] Each user story has acceptance criteria
+4. [ ] Non-functional requirements defined (performance, security, scalability)
+5. [ ] Success metrics are measurable
+6. [ ] Scope boundaries are explicit (what's in/out)
+7. [ ] Stakeholders identified
+8. [ ] No implementation details (that belongs in Tech Spec)
+
+**Return Format:**
+- PASS: All 8 items checked, ready for Tech Spec
+- PARTIAL: [List items that need minor fixes]
+- FAIL: [List critical missing items]
+
+**Provide specific line references for any issues found.**
+```
+
+#### Phase 2 (Tech Spec) → Phase 3 (Implementation Plan) Review
+
+```markdown
+**SUB-AGENT TASK: Tech Spec Review**
+
+Review the Tech Spec at: [docs/tech-spec/YYYY-MM-DD-feature.md]
+
+**Checklist - ALL must pass:**
+1. [ ] Architecture diagram exists (Mermaid or image)
+2. [ ] All components and their responsibilities defined
+3. [ ] Data models with TypeScript interfaces
+4. [ ] API contracts (endpoints, request/response schemas)
+5. [ ] Database schema with migrations
+6. [ ] Security assessment complete:
+   - Data classification (PUBLIC/INTERNAL/CONFIDENTIAL)
+   - Authentication method specified
+   - Authorization model documented
+   - Encryption requirements defined
+7. [ ] Error handling strategy documented
+8. [ ] References PRD requirements (traceability)
+
+**Return Format:**
+- PASS: All 8 items checked, ready for Implementation Plan
+- PARTIAL: [List items that need minor fixes]
+- FAIL: [List critical missing items]
+
+**Provide specific line references for any issues found.**
+```
+
+#### Phase 3 (Implementation Plan) → Phase 4 (Development) Review
+
+```markdown
+**SUB-AGENT TASK: Implementation Plan Review**
+
+Review the Implementation Plan at: [docs/implementation-plan/YYYY-MM-DD-feature.md]
+
+**Checklist - ALL must pass:**
+1. [ ] Tasks broken down into actionable items (< 4 hours each)
+2. [ ] Each task has clear acceptance criteria
+3. [ ] Dependencies between tasks identified
+4. [ ] Tasks ordered by dependency (critical path visible)
+5. [ ] Test strategy defined:
+   - Unit test scope
+   - Integration test scope
+   - E2E test scenarios (from user stories)
+   - Coverage target (minimum 70%)
+6. [ ] Risk assessment with mitigations
+7. [ ] Each task maps back to Tech Spec components
+8. [ ] Step-by-step implementation order is explicit
+
+**CRITICAL: Implementation Plan must be step-by-step**
+- Each step must be independently verifiable
+- Steps must be in dependency order
+- No step should require guessing previous work
+
+**Return Format:**
+- PASS: All 8 items checked, ready for Development
+- PARTIAL: [List items that need minor fixes]
+- FAIL: [List critical missing items]
+
+**Provide specific task references for any issues found.**
+```
+
+#### Phase 4 (Development) → Phase 5 (QA & Ship) Review
+
+```markdown
+**SUB-AGENT TASK: Development Review**
+
+Review the implementation against the Implementation Plan.
+
+**Checklist - ALL must pass:**
+1. [ ] All tasks in Implementation Plan marked complete
+2. [ ] All tests written and passing
+3. [ ] Test coverage >= 70%
+4. [ ] No test-specific logic in production code
+5. [ ] Code follows project standards (lint passes)
+6. [ ] Build succeeds without errors
+7. [ ] No critical security vulnerabilities (npm audit)
+8. [ ] Documentation updated (README, API docs)
+9. [ ] Code reviewed (PR approved or self-review documented)
+
+**Run these commands and report results:**
+- `npm test` or equivalent
+- `npm run build` or equivalent
+- `npm run lint` or equivalent
+- Coverage report
+
+**Return Format:**
+- PASS: All 9 items checked, ready for QA & Ship
+- PARTIAL: [List items that need minor fixes]
+- FAIL: [List critical missing items]
+
+**Provide specific file:line references for any issues found.**
+```
+
+### How to Invoke Sub-Agent Review
+
+Claude MUST use the Task tool to spawn the review sub-agent:
+
+```
+Task tool invocation:
+- subagent_type: "general-purpose"
+- prompt: [Use appropriate review prompt from above]
+- description: "Phase [N] gate review"
+```
+
+### Review Result Handling
+
+**On PASS:**
+```
+✅ SUB-AGENT REVIEW PASSED
+
+Phase: [N] [Phase Name]
+Reviewed: [document/code path]
+Result: PASS
+
+All gate requirements verified. Proceeding to feedback collection.
+
+Run: /aid end
+```
+
+**On PARTIAL:**
+```
+⚠️ SUB-AGENT REVIEW: PARTIAL PASS
+
+Phase: [N] [Phase Name]
+Reviewed: [document/code path]
+Result: PARTIAL
+
+Minor issues found:
+1. [Issue 1 with location]
+2. [Issue 2 with location]
+
+Fix these issues and re-run review, or override with:
+"override: [reason]"
+```
+
+**On FAIL:**
+```
+❌ SUB-AGENT REVIEW FAILED
+
+Phase: [N] [Phase Name]
+Reviewed: [document/code path]
+Result: FAIL
+
+Critical issues found:
+1. [Critical issue 1 with location]
+2. [Critical issue 2 with location]
+
+These MUST be fixed before phase transition.
+Cannot override critical failures.
 ```
 
 ## Phase Structure
@@ -149,6 +371,7 @@ const PHASE_OUTPUT_FOLDERS = {
 - [ ] PRD exists in `docs/prd/YYYY-MM-DD-[feature].md`
 - [ ] All user stories defined
 - [ ] Acceptance criteria complete
+- [ ] **⚠️ SUB-AGENT REVIEW PASSED** (mandatory)
 - [ ] **Feedback collected** via `/aid end`
 
 ### Phase 2 → Phase 3 Gate
@@ -156,6 +379,7 @@ const PHASE_OUTPUT_FOLDERS = {
 - [ ] Architecture diagram included
 - [ ] API contracts defined
 - [ ] Security assessment complete
+- [ ] **⚠️ SUB-AGENT REVIEW PASSED** (mandatory)
 - [ ] **Feedback collected** via `/aid end`
 
 ### Phase 3 → Phase 4 Gate
@@ -163,6 +387,8 @@ const PHASE_OUTPUT_FOLDERS = {
 - [ ] Tasks broken down with effort estimates
 - [ ] Dependencies identified
 - [ ] Test strategy defined
+- [ ] **Step-by-step implementation order explicit**
+- [ ] **⚠️ SUB-AGENT REVIEW PASSED** (mandatory)
 - [ ] **Feedback collected** via `/aid end`
 
 ### Phase 4 → Phase 5 Gate
@@ -170,6 +396,7 @@ const PHASE_OUTPUT_FOLDERS = {
 - [ ] Tests passing
 - [ ] Coverage meets threshold
 - [ ] Code reviewed
+- [ ] **⚠️ SUB-AGENT REVIEW PASSED** (mandatory)
 - [ ] **Feedback collected** via `/aid end`
 
 ## Violation Template

@@ -9,9 +9,23 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,scss}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,scss}\"",
+    "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:ci": "jest --coverage --ci --watchAll=false",
+    "test:python": "cd memory-system && python -m pytest",
+    "test:python:coverage": "cd memory-system && python -m pytest --cov=. --cov-report=html",
+    "test:all": "npm run test:ci && npm run test:python:coverage",
+    "test:sanity": "python -m pytest testing/e2e/ -v --tb=short -m \"not integration\"",
+    "test:sanity:full": "python -m pytest testing/e2e/ -v --tb=short",
+    "test:e2e": "python -m pytest testing/e2e/ -v",
+    "test:e2e:install": "python -m pytest testing/e2e/test_installation.py -v",
+    "test:e2e:mcp": "python -m pytest testing/e2e/test_mcp_sanity.py -v",
+    "test:e2e:memory": "python -m pytest testing/e2e/test_memory_system_sanity.py -v",
     "db:migrate": "node scripts/migrate.js",
     "db:migrate:create": "node scripts/create-migration.js",
     "db:push": "prisma db push",
@@ -26,7 +40,10 @@
     "install:mcp:jira": "npx -y @modelcontextprotocol/server-atlassian --help || true",
     "install:mcp:github": "npx -y @modelcontextprotocol/server-github --help || true",
     "install:mcp:postgres": "npx -y @modelcontextprotocol/server-postgres --help || true",
-    "install:mcp:chrome": "npx -y chrome-devtools-mcp@latest --help || true"
+    "install:mcp:chrome": "npx -y chrome-devtools-mcp@latest --help || true",
+    "prepare": "node -e \"try { require('husky').install() } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') throw e }\"",
+    "precommit": "lint-staged",
+    "security:audit": "npm audit && cd memory-system && pip-audit || true"
   },
   "dependencies": {
     "next": "^16.0.7",
@@ -77,5 +94,22 @@
     "postgresql",
     "e2e",
     "full-stack"
-  ]
+  ],
+  "overrides": {
+    "jsdom": "^26.1.0",
+    "glob": "^11.0.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css,scss,md}": [
+      "prettier --write"
+    ],
+    "*.py": [
+      "ruff check --fix",
+      "ruff format"
+    ]
+  }
 }
