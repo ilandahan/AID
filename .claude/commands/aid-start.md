@@ -20,16 +20,26 @@ Begin a tracked work session. Selects role and phase, loads relevant skills.
    4. Lead
    ```
 
-3. **Select Phase**:
+3. **Select Phase** (MUST be presented in order 0→5):
    ```
    Select current phase:
-   0. Discovery (Research & Validation)
-   1. PRD (Requirements)
-   2. Tech Spec (Architecture)
-   3. Implementation Plan (Task Breakdown)
-   4. Development (Code & Tests)
-   5. QA & Ship (Deploy & Release)
+
+   Phase 0: Discovery (Research & Validation)
+   Phase 1: PRD (Requirements)
+   Phase 2: Tech Spec (Architecture)
+   Phase 3: Implementation Plan (Task Breakdown)
+   Phase 4: Development (Code & Tests)
+   Phase 5: QA & Ship (Deploy & Release)
    ```
+
+   **IMPORTANT**: Always display phases in sequential order starting from 0.
+   Use AskUserQuestion with options in this EXACT order:
+   - Option 1: "Phase 0: Discovery"
+   - Option 2: "Phase 1: PRD"
+   - Option 3: "Phase 2: Tech Spec"
+   - Option 4: "Phase 3: Implementation Plan"
+   - Option 5: "Phase 4: Development"
+   - Option 6: "Phase 5: QA & Ship"
 
 4. **Load Skills**:
    - Read `memory-system/skills/roles/{role}/SKILL.md`
