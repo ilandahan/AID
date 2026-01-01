@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atomic Design Extractor</title>
+  <style>
+    /* ============================================
+       Design Tokens
+    ============================================ */
+    :root {
+      --color-bg: #ffffff;
+      --color-bg-secondary: #f5f5f5;
+      --color-bg-tertiary: #e8e8e8;
+      --color-text: #333333;
+      --color-text-secondary: #666666;
+      --color-text-muted: #999999;
+      --color-primary: #18a0fb;
+      --color-primary-hover: #0d8de8;
+      --color-success: #1bc47d;
+      --color-warning: #f5a623;
+      --color-error: #f24822;
+      --color-border: #e0e0e0;
+      
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      
+      --spacing-xs: 4px;
+      --spacing-sm: 8px;
+      --spacing-md: 12px;
+      --spacing-lg: 16px;
+      --spacing-xl: 24px;
+      
+      --font-size-xs: 11px;
+      --font-size-sm: 12px;
+      --font-size-md: 13px;
+      --font-size-lg: 14px;
+      
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.1);
+      --shadow-md: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    
+    /* ============================================
+       Base Styles
+    ============================================ */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: var(--font-size-md);
+      color: var(--color-text);
+      background: var(--color-bg);
+      line-height: 1.5;
+    }
+    
+    /* ============================================
+       Layout
+    ============================================ */
+    .plugin-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--spacing-md) var(--spacing-lg);
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-bg);
+    }
+    
+    .header-title {
+      font-size: var(--font-size-lg);
+      font-weight: 600;
+    }
+    
+    .connection-status {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      font-size: var(--font-size-sm);
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-error);
+    }
+    
+    .status-dot.connected {
+      background: var(--color-success);
+    }
+    
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-bg-secondary);
+    }
+    
+    .tab {
+      padding: var(--spacing-sm) var(--spacing-lg);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    
+    .tab:hover {
+      color: var(--color-text);
+    }
+    
+    .tab.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+      background: var(--color-bg);
+    }
+    
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--spacing-lg);
+    }
+    
+    .footer {
+      padding: var(--spacing-md) var(--spacing-lg);
+      border-top: 1px solid var(--color-border);
+      background: var(--color-bg-secondary);
+    }
+    
+    /* ============================================
+       Components
+    ============================================ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-xs);
+      padding: var(--spacing-sm) var(--spacing-md);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      border-radius: var(--radius-md);
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-primary {
+      background: var(--color-primary);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: var(--color-primary-hover);
+    }
+    
+    .btn-secondary {
+      background: var(--color-bg-tertiary);
+      color: var(--color-text);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--color-border);
+    }
+    
+    .btn-ghost {
+      background: transparent;
+      color: var(--color-text-secondary);
+    }
+    
+    .btn-ghost:hover {
+      background: var(--color-bg-secondary);
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .btn-full {
+      width: 100%;
+    }
+    
+    .input {
+      width: 100%;
+      padding: var(--spacing-sm) var(--spacing-md);
+      font-size: var(--font-size-sm);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      transition: border-color 0.2s;
+    }
+    
+    .input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+    
+    .card {
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+      margin-bottom: var(--spacing-md);
+    }
+    
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .card-title {
+      font-weight: 600;
+      font-size: var(--font-size-md);
+    }
+    
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px var(--spacing-sm);
+      font-size: var(--font-size-xs);
+      font-weight: 500;
+      border-radius: var(--radius-sm);
+      background: var(--color-bg-tertiary);
+      color: var(--color-text-secondary);
+    }
+    
+    .badge.atom { background: #e3f2fd; color: #1976d2; }
+    .badge.molecule { background: #f3e5f5; color: #7b1fa2; }
+    .badge.organism { background: #e8f5e9; color: #388e3c; }
+    .badge.template { background: #fff3e0; color: #f57c00; }
+    .badge.page { background: #fce4ec; color: #c2185b; }
+    
+    .badge.pending { background: var(--color-bg-tertiary); }
+    .badge.analyzing { background: #e3f2fd; color: #1976d2; }
+    .badge.approved { background: #e8f5e9; color: #388e3c; }
+    .badge.converting { background: #fff3e0; color: #f57c00; }
+    .badge.completed { background: #e8f5e9; color: #388e3c; }
+    .badge.failed { background: #ffebee; color: #c62828; }
+    
+    /* ============================================
+       Selection Panel
+    ============================================ */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--spacing-xl);
+      color: var(--color-text-muted);
+      text-align: center;
+    }
+    
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: var(--spacing-md);
+      opacity: 0.5;
+    }
+    
+    .node-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+    
+    .node-item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+      padding: var(--spacing-md);
+      background: var(--color-bg-secondary);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    .node-item:hover {
+      background: var(--color-bg-tertiary);
+    }
+    
+    .node-item.selected {
+      background: #e3f2fd;
+      border: 1px solid var(--color-primary);
+    }
+    
+    .node-icon {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--color-bg);
+      border-radius: var(--radius-sm);
+      font-size: 16px;
+    }
+    
+    .node-info {
+      flex: 1;
+    }
+    
+    .node-name {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    
+    .node-meta {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-secondary);
+    }
+    
+    .node-checkbox {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--color-primary);
+    }
+    
+    /* ============================================
+       Work Plan Panel
+    ============================================ */
+    .work-plan {
+      background: var(--color-bg-secondary);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+    }
+    
+    .work-plan-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--spacing-md);
+      padding-bottom: var(--spacing-sm);
+      border-bottom: 1px solid var(--color-border);
+    }
+    
+    .work-plan-title {
+      font-weight: 600;
+    }
+    
+    .step-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+    
+    .step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--spacing-md);
+      padding: var(--spacing-sm);
+      background: var(--color-bg);
+      border-radius: var(--radius-sm);
+    }
+    
+    .step-number {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--color-bg-tertiary);
+      border-radius: 50%;
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+    }
+    
+    .step-number.completed {
+      background: var(--color-success);
+      color: white;
+    }
+    
+    .step-content {
+      flex: 1;
+    }
+    
+    .step-action {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    
+    .step-description {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-secondary);
+    }
+    
+    .step-tokens {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+    }
+    
+    .work-plan-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-md);
+    }
+    
+    /* ============================================
+       Queue Panel
+    ============================================ */
+    .queue-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--spacing-md);
+    }
+    
+    .queue-stats {
+      display: flex;
+      gap: var(--spacing-lg);
+      font-size: var(--font-size-sm);
+    }
+    
+    .queue-stat {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .queue-stat-value {
+      font-weight: 600;
+      font-size: var(--font-size-lg);
+    }
+    
+    .queue-stat-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+    }
+    
+    .queue-controls {
+      display: flex;
+      gap: var(--spacing-sm);
+    }
+    
+    .queue-item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+      padding: var(--spacing-md);
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .queue-item-drag {
+      cursor: grab;
+      color: var(--color-text-muted);
+    }
+    
+    .queue-item-info {
+      flex: 1;
+    }
+    
+    .queue-item-name {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    
+    .queue-item-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      font-size: var(--font-size-xs);
+      color: var(--color-text-secondary);
+    }
+    
+    .queue-item-actions {
+      display: flex;
+      gap: var(--spacing-xs);
+    }
+    
+    .progress-bar {
+      height: 4px;
+      background: var(--color-bg-tertiary);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: var(--spacing-xs);
+    }
+    
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--color-primary);
+      transition: width 0.3s;
+    }
+    
+    /* ============================================
+       Settings Panel
+    ============================================ */
+    .settings-group {
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .settings-group-title {
+      font-weight: 600;
+      margin-bottom: var(--spacing-md);
+      padding-bottom: var(--spacing-xs);
+      border-bottom: 1px solid var(--color-border);
+    }
+    
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--spacing-sm) 0;
+    }
+    
+    .settings-label {
+      font-size: var(--font-size-sm);
+    }
+    
+    .settings-description {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+      margin-top: 2px;
+    }
+    
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      background: var(--color-bg-tertiary);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    .toggle.active {
+      background: var(--color-primary);
+    }
+    
+    .toggle-knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      background: white;
+      border-radius: 50%;
+      transition: left 0.2s;
+      box-shadow: var(--shadow-sm);
+    }
+    
+    .toggle.active .toggle-knob {
+      left: 18px;
+    }
+    
+    /* ============================================
+       Animations
+    ============================================ */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .loading {
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    .spinner {
+      animation: spin 1s linear infinite;
+    }
+    
+    /* ============================================
+       Utilities
+    ============================================ */
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+    .flex-1 { flex: 1; }
+    .gap-sm { gap: var(--spacing-sm); }
+    .gap-md { gap: var(--spacing-md); }
+    .mt-md { margin-top: var(--spacing-md); }
+    .mb-md { margin-bottom: var(--spacing-md); }
+    .text-center { text-align: center; }
+    .text-muted { color: var(--color-text-muted); }
+  </style>
+</head>
+<body>
+  <div class="plugin-container" id="app">
+    <!-- Header -->
+    <header class="header">
+      <h1 class="header-title">Atomic Design Extractor</h1>
+      <div class="connection-status">
+        <div class="status-dot" id="connectionDot"></div>
+        <span id="connectionText">Not Connected</span>
+      </div>
+    </header>
+    
+    <!-- Tabs -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="selection">Selection</button>
+      <button class="tab" data-tab="queue">Queue</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </nav>
+    
+    <!-- Content -->
+    <main class="content">
+      <!-- Selection Tab -->
+      <section id="selection-tab" class="tab-content">
+        <div id="empty-selection" class="empty-state">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M9 9h6v6H9z"/>
+          </svg>
+          <p>Select components in Figma<br>to analyze and extract</p>
+        </div>
+        
+        <div id="selection-content" class="hidden">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Selected Components</span>
+              <span class="badge" id="selection-count">0</span>
+            </div>
+            <div class="node-list" id="node-list"></div>
+          </div>
+          
+          <div id="work-plan-container" class="hidden">
+            <div class="work-plan">
+              <div class="work-plan-header">
+                <span class="work-plan-title" id="plan-title">Work Plan</span>
+                <span class="badge" id="plan-level">atom</span>
+              </div>
+              <div class="step-list" id="step-list"></div>
+              <div class="work-plan-actions">
+                <button class="btn btn-primary flex-1" id="approve-plan-btn">
+                  ✓ Approve Plan
+                </button>
+                <button class="btn btn-secondary" id="reject-plan-btn">
+                  ✕ Reject
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mt-md">
+            <button class="btn btn-primary btn-full" id="add-to-queue-btn">
+              Add to Queue
+            </button>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Queue Tab -->
+      <section id="queue-tab" class="tab-content hidden">
+        <div class="queue-header">
+          <div class="queue-stats">
+            <div class="queue-stat">
+              <span class="queue-stat-value" id="stat-total">0</span>
+              <span class="queue-stat-label">Total</span>
+            </div>
+            <div class="queue-stat">
+              <span class="queue-stat-value" id="stat-pending">0</span>
+              <span class="queue-stat-label">Pending</span>
+            </div>
+            <div class="queue-stat">
+              <span class="queue-stat-value" id="stat-completed">0</span>
+              <span class="queue-stat-label">Completed</span>
+            </div>
+          </div>
+          <div class="queue-controls">
+            <button class="btn btn-primary" id="process-queue-btn" disabled>
+              ▶ Process
+            </button>
+            <button class="btn btn-secondary hidden" id="pause-queue-btn">
+              ⏸ Pause
+            </button>
+          </div>
+        </div>
+        
+        <div id="queue-empty" class="empty-state">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 12h-6l-2 3h-4l-2-3H2"/>
+            <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+          </svg>
+          <p>Queue is empty<br>Add components from the Selection tab</p>
+        </div>
+        
+        <div id="queue-list" class="hidden"></div>
+      </section>
+      
+      <!-- Settings Tab -->
+      <section id="settings-tab" class="tab-content hidden">
+        <!-- Authentication Section -->
+        <div class="settings-group" id="auth-section">
+          <h3 class="settings-group-title">🔐 Authentication</h3>
+          
+          <!-- Not logged in state -->
+          <div id="auth-login-form">
+            <div class="mb-md">
+              <label class="settings-label">Tenant ID</label>
+              <input 
+                type="text" 
+                class="input" 
+                id="tenant-id" 
+                placeholder="org_abc123"
+              >
+            </div>
+            <div class="mb-md">
+              <label class="settings-label">API Key</label>
+              <input 
+                type="password" 
+                class="input" 
+                id="api-key" 
+                placeholder="ak_live_xxxxxxxxxxxx"
+              >
+              <div class="settings-description">Get your API key from your dashboard</div>
+            </div>
+            <button class="btn btn-primary btn-full" id="login-btn">
+              🔑 Login
+            </button>
+          </div>
+          
+          <!-- Logged in state -->
+          <div id="auth-logged-in" class="hidden">
+            <div class="card">
+              <div class="flex" style="align-items: center; gap: var(--spacing-md);">
+                <div class="node-icon" style="background: var(--color-success); color: white;">✓</div>
+                <div class="node-info">
+                  <div class="node-name" id="user-name">John Doe</div>
+                  <div class="node-meta" id="user-email">user@company.com</div>
+                  <div class="node-meta">
+                    Tenant: <span id="user-tenant">org_abc123</span>
+                  </div>
+                </div>
+                <button class="btn btn-ghost" id="logout-btn">Logout</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="settings-group">
+          <h3 class="settings-group-title">MCP Connection</h3>
+          <div class="mb-md">
+            <input 
+              type="text" 
+              class="input" 
+              id="mcp-endpoint" 
+              placeholder="http://localhost:3845/mcp"
+              value="http://localhost:3845/mcp"
+            >
+          </div>
+          <button class="btn btn-primary" id="connect-btn" disabled>Connect</button>
+          <button class="btn btn-secondary hidden" id="disconnect-btn">Disconnect</button>
+          <div class="settings-description mt-md" id="auth-required-msg">
+            ⚠️ Login required before connecting
+          </div>
+        </div>
+        
+        <div class="settings-group">
+          <h3 class="settings-group-title">Behavior</h3>
+          <div class="settings-row">
+            <div>
+              <div class="settings-label">Auto-classify on select</div>
+              <div class="settings-description">Automatically analyze components when selected</div>
+            </div>
+            <div class="toggle active" id="toggle-auto-classify">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-label">Include Storybook</div>
+              <div class="settings-description">Generate Storybook stories for components</div>
+            </div>
+            <div class="toggle active" id="toggle-storybook">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="settings-group">
+          <h3 class="settings-group-title">Output Format</h3>
+          <div class="settings-row">
+            <div class="settings-label">Framework</div>
+            <select class="input" id="output-format" style="width: auto;">
+              <option value="react">React</option>
+              <option value="vue">Vue</option>
+              <option value="html">HTML</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">Token Naming</div>
+            <select class="input" id="token-naming" style="width: auto;">
+              <option value="kebab-case">kebab-case</option>
+              <option value="camelCase">camelCase</option>
+              <option value="snake_case">snake_case</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="settings-group">
+          <h3 class="settings-group-title">Export Tokens</h3>
+          <div class="flex gap-sm">
+            <button class="btn btn-secondary" id="export-css">CSS</button>
+            <button class="btn btn-secondary" id="export-json">JSON</button>
+            <button class="btn btn-secondary" id="export-tailwind">Tailwind</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  
+  <script>
+    // ============================================
+    // State Management
+    // ============================================
+    
+    const state = {
+      isConnected: false,
+      isAuthenticated: false,
+      user: null,
+      selectedNodes: [],
+      classifications: [],
+      currentWorkPlan: null,
+      queue: { items: [], isProcessing: false, isPaused: false },
+      settings: {
+        mcpEndpoint: 'http://localhost:3845/mcp',
+        autoClassify: true,
+        includeStorybook: true,
+        outputFormat: 'react',
+        tokenNaming: 'kebab-case',
+      },
+    };
+    
+    // ============================================
+    // DOM Elements
+    // ============================================
+    
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => document.querySelectorAll(selector);
+    
+    const elements = {
+      connectionDot: $('#connectionDot'),
+      connectionText: $('#connectionText'),
+      tabs: $$('.tab'),
+      tabContents: $$('.tab-content'),
+      emptySelection: $('#empty-selection'),
+      selectionContent: $('#selection-content'),
+      selectionCount: $('#selection-count'),
+      nodeList: $('#node-list'),
+      workPlanContainer: $('#work-plan-container'),
+      planTitle: $('#plan-title'),
+      planLevel: $('#plan-level'),
+      stepList: $('#step-list'),
+      approvePlanBtn: $('#approve-plan-btn'),
+      rejectPlanBtn: $('#reject-plan-btn'),
+      addToQueueBtn: $('#add-to-queue-btn'),
+      queueEmpty: $('#queue-empty'),
+      queueList: $('#queue-list'),
+      statTotal: $('#stat-total'),
+      statPending: $('#stat-pending'),
+      statCompleted: $('#stat-completed'),
+      processQueueBtn: $('#process-queue-btn'),
+      pauseQueueBtn: $('#pause-queue-btn'),
+      mcpEndpoint: $('#mcp-endpoint'),
+      connectBtn: $('#connect-btn'),
+      disconnectBtn: $('#disconnect-btn'),
+      // Auth elements
+      tenantIdInput: $('#tenant-id'),
+      apiKeyInput: $('#api-key'),
+      loginBtn: $('#login-btn'),
+      logoutBtn: $('#logout-btn'),
+      authLoginForm: $('#auth-login-form'),
+      authLoggedIn: $('#auth-logged-in'),
+      userName: $('#user-name'),
+      userEmail: $('#user-email'),
+      userTenant: $('#user-tenant'),
+      authRequiredMsg: $('#auth-required-msg'),
+    };
+    
+    // ============================================
+    // Message Handling
+    // ============================================
+    
+    function postMessage(message) {
+      parent.postMessage({ pluginMessage: message }, '*');
+    }
+    
+    window.onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+      
+      switch (msg.type) {
+        case 'SELECTION_CHANGED':
+          handleSelectionChanged(msg.nodes);
+          break;
+        case 'ANALYSIS_COMPLETE':
+          handleAnalysisComplete(msg.classifications);
+          break;
+        case 'WORK_PLAN_CREATED':
+          handleWorkPlanCreated(msg.plan);
+          break;
+        case 'QUEUE_UPDATED':
+          handleQueueUpdated(msg.queue);
+          break;
+        case 'MCP_CONNECTED':
+          handleMCPConnected(msg.endpoint);
+          break;
+        case 'MCP_DISCONNECTED':
+          handleMCPDisconnected(msg.reason);
+          break;
+        case 'AUTH_SUCCESS':
+          handleAuthSuccess(msg.user);
+          break;
+        case 'AUTH_LOGOUT':
+          handleAuthLogout();
+          break;
+        case 'AUTH_RESTORED':
+          handleAuthRestored(msg.user);
+          break;
+        case 'ERROR':
+          handleError(msg.message, msg.details);
+          break;
+        case 'TOKENS_EXTRACTED':
+          console.log('Tokens extracted:', msg.tokens.length);
+          break;
+        case 'COMPONENT_SENT':
+          console.log('Component sent:', msg.componentId, msg.success);
+          break;
+      }
+    };
+    
+    // ============================================
+    // Event Handlers
+    // ============================================
+    
+    function handleSelectionChanged(nodes) {
+      state.selectedNodes = nodes;
+      
+      if (nodes.length === 0) {
+        elements.emptySelection.classList.remove('hidden');
+        elements.selectionContent.classList.add('hidden');
+        return;
+      }
+      
+      elements.emptySelection.classList.add('hidden');
+      elements.selectionContent.classList.remove('hidden');
+      elements.selectionCount.textContent = nodes.length;
+      
+      renderNodeList(nodes);
+    }
+    
+    function handleAnalysisComplete(classifications) {
+      state.classifications = classifications;
+      
+      // Update badges on node items
+      state.selectedNodes.forEach((node, index) => {
+        const item = $(`[data-node-id="${node.id}"]`);
+        if (item && classifications[index]) {
+          const badge = item.querySelector('.badge');
+          if (badge) {
+            badge.textContent = classifications[index].level;
+            badge.className = `badge ${classifications[index].level}`;
+          }
+        }
+      });
+    }
+    
+    function handleWorkPlanCreated(plan) {
+      state.currentWorkPlan = plan;
+      elements.workPlanContainer.classList.remove('hidden');
+      renderWorkPlan(plan);
+    }
+    
+    function handleQueueUpdated(queue) {
+      state.queue = queue;
+      renderQueue(queue);
+    }
+    
+    function handleMCPConnected(endpoint) {
+      state.isConnected = true;
+      state.settings.mcpEndpoint = endpoint;
+      
+      elements.connectionDot.classList.add('connected');
+      elements.connectionText.textContent = 'Connected';
+      elements.connectBtn.classList.add('hidden');
+      elements.disconnectBtn.classList.remove('hidden');
+      elements.processQueueBtn.disabled = state.queue.items.length === 0;
+    }
+    
+    function handleMCPDisconnected(reason) {
+      state.isConnected = false;
+      
+      elements.connectionDot.classList.remove('connected');
+      elements.connectionText.textContent = reason ? `Disconnected: ${reason}` : 'Not Connected';
+      elements.connectBtn.classList.remove('hidden');
+      elements.disconnectBtn.classList.add('hidden');
+      elements.processQueueBtn.disabled = true;
+    }
+    
+    function handleError(message, details) {
+      console.error('Plugin error:', message, details);
+      // TODO: Show toast notification
+      alert(message);
+    }
+    
+    // ============================================
+    // Auth Event Handlers
+    // ============================================
+    
+    function handleAuthSuccess(user) {
+      state.isAuthenticated = true;
+      state.user = user;
+      updateAuthUI();
+    }
+    
+    function handleAuthLogout() {
+      state.isAuthenticated = false;
+      state.user = null;
+      state.isConnected = false;
+      updateAuthUI();
+      handleMCPDisconnected('Logged out');
+    }
+    
+    function handleAuthRestored(user) {
+      if (user) {
+        state.isAuthenticated = true;
+        state.user = user;
+      }
+      updateAuthUI();
+    }
+    
+    function updateAuthUI() {
+      if (state.isAuthenticated && state.user) {
+        // Show logged in state
+        elements.authLoginForm.classList.add('hidden');
+        elements.authLoggedIn.classList.remove('hidden');
+        
+        // Update user info
+        elements.userName.textContent = state.user.name || 'User';
+        elements.userEmail.textContent = state.user.email || '';
+        elements.userTenant.textContent = state.user.tenantId || '';
+        
+        // Enable connect button
+        elements.connectBtn.disabled = false;
+        elements.authRequiredMsg.classList.add('hidden');
+      } else {
+        // Show login form
+        elements.authLoginForm.classList.remove('hidden');
+        elements.authLoggedIn.classList.add('hidden');
+        
+        // Disable connect button
+        elements.connectBtn.disabled = true;
+        elements.authRequiredMsg.classList.remove('hidden');
+      }
+    }
+    
+    // ============================================
+    // Rendering
+    // ============================================
+    
+    function renderNodeList(nodes) {
+      elements.nodeList.innerHTML = nodes.map((node, index) => {
+        const classification = state.classifications[index];
+        const level = classification?.level || 'unknown';
+        const icon = getNodeIcon(node.type);
+        
+        return `
+          <div class="node-item" data-node-id="${node.id}">
+            <input type="checkbox" class="node-checkbox" checked>
+            <div class="node-icon">${icon}</div>
+            <div class="node-info">
+              <div class="node-name">${node.name}</div>
+              <div class="node-meta">
+                ${node.type} • ${countChildren(node)} children
+              </div>
+            </div>
+            <span class="badge ${level}">${level}</span>
+          </div>
+        `;
+      }).join('');
+      
+      // Add click handlers
+      elements.nodeList.querySelectorAll('.node-item').forEach((item, index) => {
+        item.addEventListener('click', () => {
+          if (state.selectedNodes[index]) {
+            postMessage({ 
+              type: 'ADD_TO_QUEUE', 
+              nodeIds: [state.selectedNodes[index].id] 
+            });
+          }
+        });
+      });
+    }
+    
+    function renderWorkPlan(plan) {
+      elements.planTitle.textContent = plan.componentName;
+      elements.planLevel.textContent = plan.classification.level;
+      elements.planLevel.className = `badge ${plan.classification.level}`;
+      
+      elements.stepList.innerHTML = plan.steps.map((step, index) => `
+        <div class="step-item">
+          <div class="step-number ${step.status === 'completed' ? 'completed' : ''}">
+            ${step.status === 'completed' ? '✓' : index + 1}
+          </div>
+          <div class="step-content">
+            <div class="step-action">${formatAction(step.action)}</div>
+            <div class="step-description">${step.description}</div>
+            <div class="step-tokens">~${step.estimatedTokens} tokens</div>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    function renderQueue(queue) {
+      // Update stats
+      const stats = calculateStats(queue);
+      elements.statTotal.textContent = stats.total;
+      elements.statPending.textContent = stats.pending;
+      elements.statCompleted.textContent = stats.completed;
+      
+      // Update buttons
+      elements.processQueueBtn.disabled = !state.isConnected || stats.pending === 0;
+      
+      if (queue.isProcessing) {
+        elements.processQueueBtn.classList.add('hidden');
+        elements.pauseQueueBtn.classList.remove('hidden');
+      } else {
+        elements.processQueueBtn.classList.remove('hidden');
+        elements.pauseQueueBtn.classList.add('hidden');
+      }
+      
+      // Render items
+      if (queue.items.length === 0) {
+        elements.queueEmpty.classList.remove('hidden');
+        elements.queueList.classList.add('hidden');
+        return;
+      }
+      
+      elements.queueEmpty.classList.add('hidden');
+      elements.queueList.classList.remove('hidden');
+      
+      elements.queueList.innerHTML = queue.items.map((item) => `
+        <div class="queue-item" data-item-id="${item.id}">
+          <div class="queue-item-drag">⋮⋮</div>
+          <div class="queue-item-info">
+            <div class="queue-item-name">${item.nodeName}</div>
+            <div class="queue-item-meta">
+              <span class="badge ${item.workPlan?.classification?.level || 'unknown'}">
+                ${item.workPlan?.classification?.level || 'unknown'}
+              </span>
+              <span class="badge ${item.status}">${item.status}</span>
+            </div>
+            ${item.status === 'converting' ? `
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 50%"></div>
+              </div>
+            ` : ''}
+          </div>
+          <div class="queue-item-actions">
+            <button class="btn btn-ghost btn-remove" data-item-id="${item.id}">✕</button>
+          </div>
+        </div>
+      `).join('');
+      
+      // Add remove handlers
+      elements.queueList.querySelectorAll('.btn-remove').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const itemId = btn.dataset.itemId;
+          postMessage({ type: 'REMOVE_FROM_QUEUE', itemId });
+        });
+      });
+    }
+    
+    // ============================================
+    // Helper Functions
+    // ============================================
+    
+    function getNodeIcon(type) {
+      const icons = {
+        'COMPONENT': '◇',
+        'COMPONENT_SET': '◆',
+        'FRAME': '▢',
+        'INSTANCE': '◈',
+      };
+      return icons[type] || '○';
+    }
+    
+    function countChildren(node) {
+      if (!node.children) return 0;
+      return node.children.reduce((acc, child) => {
+        return acc + 1 + countChildren(child);
+      }, 0);
+    }
+    
+    function formatAction(action) {
+      const names = {
+        'extract_tokens': 'Extract Tokens',
+        'analyze_variants': 'Analyze Variants',
+        'map_props': 'Map Props',
+        'generate_code': 'Generate Code',
+        'create_stories': 'Create Stories',
+      };
+      return names[action] || action;
+    }
+    
+    function calculateStats(queue) {
+      const items = queue.items;
+      return {
+        total: items.length,
+        pending: items.filter(i => ['pending', 'approved'].includes(i.status)).length,
+        processing: items.filter(i => ['analyzing', 'enriching', 'converting', 'sending'].includes(i.status)).length,
+        completed: items.filter(i => i.status === 'completed').length,
+        failed: items.filter(i => i.status === 'failed').length,
+      };
+    }
+    
+    // ============================================
+    // Tab Navigation
+    // ============================================
+    
+    elements.tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.dataset.tab;
+        
+        elements.tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        elements.tabContents.forEach(content => {
+          content.classList.toggle('hidden', content.id !== `${tabName}-tab`);
+        });
+      });
+    });
+    
+    // ============================================
+    // Button Handlers
+    // ============================================
+    
+    elements.addToQueueBtn.addEventListener('click', () => {
+      const checkedNodes = Array.from(elements.nodeList.querySelectorAll('.node-checkbox:checked'))
+        .map(cb => cb.closest('.node-item').dataset.nodeId);
+      
+      if (checkedNodes.length > 0) {
+        postMessage({ type: 'ADD_TO_QUEUE', nodeIds: checkedNodes });
+        // Switch to queue tab
+        elements.tabs.forEach(t => t.classList.remove('active'));
+        $$('[data-tab="queue"]').forEach(t => t.classList.add('active'));
+        elements.tabContents.forEach(c => c.classList.add('hidden'));
+        $('#queue-tab').classList.remove('hidden');
+      }
+    });
+    
+    elements.approvePlanBtn.addEventListener('click', () => {
+      if (state.currentWorkPlan) {
+        postMessage({ type: 'APPROVE_PLAN', planId: state.currentWorkPlan.componentId });
+      }
+    });
+    
+    elements.rejectPlanBtn.addEventListener('click', () => {
+      if (state.currentWorkPlan) {
+        const reason = prompt('Reason for rejection:');
+        if (reason) {
+          postMessage({ type: 'REJECT_PLAN', planId: state.currentWorkPlan.componentId, reason });
+        }
+      }
+    });
+    
+    elements.processQueueBtn.addEventListener('click', () => {
+      postMessage({ type: 'PROCESS_QUEUE' });
+    });
+    
+    elements.pauseQueueBtn.addEventListener('click', () => {
+      postMessage({ type: 'PAUSE_QUEUE' });
+    });
+    
+    elements.connectBtn.addEventListener('click', () => {
+      const endpoint = elements.mcpEndpoint.value.trim();
+      if (endpoint) {
+        postMessage({ type: 'CONNECT_MCP', endpoint });
+      }
+    });
+    
+    elements.disconnectBtn.addEventListener('click', () => {
+      postMessage({ type: 'DISCONNECT_MCP' });
+    });
+    
+    // Auth handlers
+    elements.loginBtn.addEventListener('click', () => {
+      const tenantId = elements.tenantIdInput.value.trim();
+      const apiKey = elements.apiKeyInput.value.trim();
+      const endpoint = elements.mcpEndpoint.value.trim();
+      
+      if (!tenantId || !apiKey) {
+        alert('Please enter both Tenant ID and API Key');
+        return;
+      }
+      
+      postMessage({ 
+        type: 'LOGIN', 
+        tenantId, 
+        apiKey,
+        backendUrl: endpoint.replace('/mcp', '')
+      });
+    });
+    
+    elements.logoutBtn.addEventListener('click', () => {
+      postMessage({ type: 'LOGOUT' });
+    });
+    
+    // Toggle handlers
+    $$('.toggle').forEach((toggle) => {
+      toggle.addEventListener('click', () => {
+        toggle.classList.toggle('active');
+        const settingId = toggle.id.replace('toggle-', '');
+        const value = toggle.classList.contains('active');
+        
+        const settingsMap = {
+          'auto-classify': 'autoClassify',
+          'storybook': 'includeStorybook',
+        };
+        
+        if (settingsMap[settingId]) {
+          state.settings[settingsMap[settingId]] = value;
+          postMessage({ 
+            type: 'UPDATE_SETTINGS', 
+            settings: { [settingsMap[settingId]]: value } 
+          });
+        }
+      });
+    });
+    
+    // Export handlers
+    $('#export-css').addEventListener('click', () => {
+      postMessage({ type: 'EXPORT_TOKENS', format: 'css' });
+    });
+    
+    $('#export-json').addEventListener('click', () => {
+      postMessage({ type: 'EXPORT_TOKENS', format: 'json' });
+    });
+    
+    $('#export-tailwind').addEventListener('click', () => {
+      postMessage({ type: 'EXPORT_TOKENS', format: 'tailwind' });
+    });
+    
+    // ============================================
+    // Initialization
+    // ============================================
+    
+    postMessage({ type: 'INIT' });
+  </script>
+</body>
+</html>

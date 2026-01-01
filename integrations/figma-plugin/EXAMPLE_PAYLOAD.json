@@ -1,0 +1,269 @@
+{
+  "component": {
+    "componentId": "1:234",
+    "componentName": "Button / Primary / Large",
+    "displayName": "Button",
+    "description": "Primary action button used for main CTAs throughout the application. Should be used sparingly - maximum 2 per page.",
+    
+    "level": "atom",
+    "category": "button",
+    
+    "props": [
+      {
+        "name": "label",
+        "type": "string",
+        "required": true,
+        "defaultValue": "Click me",
+        "description": "Button text content",
+        "mappedFrom": "1:235"
+      },
+      {
+        "name": "icon",
+        "type": "node",
+        "required": false,
+        "description": "Optional icon element displayed before label",
+        "mappedFrom": "1:236"
+      },
+      {
+        "name": "iconPosition",
+        "type": "enum",
+        "required": false,
+        "enumValues": ["left", "right"],
+        "defaultValue": "left",
+        "description": "Position of the icon relative to label"
+      },
+      {
+        "name": "onClick",
+        "type": "function",
+        "required": false,
+        "description": "Click event handler"
+      },
+      {
+        "name": "disabled",
+        "type": "boolean",
+        "required": false,
+        "defaultValue": false,
+        "description": "When true, prevents interaction and shows disabled style"
+      },
+      {
+        "name": "loading",
+        "type": "boolean",
+        "required": false,
+        "defaultValue": false,
+        "description": "When true, shows loading spinner and prevents interaction"
+      },
+      {
+        "name": "fullWidth",
+        "type": "boolean",
+        "required": false,
+        "defaultValue": false,
+        "description": "When true, button takes full width of container"
+      }
+    ],
+    
+    "variants": [
+      {
+        "name": "variant",
+        "options": ["primary", "secondary", "ghost", "danger"],
+        "defaultOption": "primary",
+        "description": "Visual style variant of the button"
+      },
+      {
+        "name": "size",
+        "options": ["sm", "md", "lg"],
+        "defaultOption": "md",
+        "description": "Size of the button"
+      }
+    ],
+    
+    "states": ["default", "hover", "active", "focus", "disabled", "loading"],
+    
+    "breakpoints": ["default"],
+    
+    "dependencies": {
+      "internal": ["spinner", "icon"],
+      "external": []
+    },
+    
+    "accessibility": {
+      "role": "button",
+      "ariaLabel": null,
+      "keyboardInteraction": ["Enter", "Space"]
+    },
+    
+    "figmaUrl": "https://www.figma.com/file/ABC123XYZ?node-id=1:234",
+    "createdAt": "2024-01-15T10:30:00Z",
+    "version": "1.0.0",
+    "tags": ["button", "cta", "primary", "interactive", "action"],
+    "notes": "Use primary variant for main actions. Limit to 2 primary buttons per page. For destructive actions, use the danger variant."
+  },
+  
+  "tokens": [
+    {
+      "name": "button-primary-bg",
+      "value": "#3b82f6",
+      "category": "color",
+      "rawValue": { "r": 0.231, "g": 0.51, "b": 0.965 },
+      "cssVariable": "--color-button-primary-bg",
+      "tailwindClass": "bg-blue-500",
+      "semanticName": "primary"
+    },
+    {
+      "name": "button-primary-bg-hover",
+      "value": "#2563eb",
+      "category": "color",
+      "rawValue": { "r": 0.145, "g": 0.388, "b": 0.922 },
+      "cssVariable": "--color-button-primary-bg-hover",
+      "tailwindClass": "hover:bg-blue-600"
+    },
+    {
+      "name": "button-primary-text",
+      "value": "#ffffff",
+      "category": "color",
+      "rawValue": { "r": 1, "g": 1, "b": 1 },
+      "cssVariable": "--color-button-primary-text",
+      "tailwindClass": "text-white"
+    },
+    {
+      "name": "button-secondary-bg",
+      "value": "#f3f4f6",
+      "category": "color",
+      "cssVariable": "--color-button-secondary-bg",
+      "tailwindClass": "bg-gray-100"
+    },
+    {
+      "name": "button-secondary-text",
+      "value": "#374151",
+      "category": "color",
+      "cssVariable": "--color-button-secondary-text",
+      "tailwindClass": "text-gray-700"
+    },
+    {
+      "name": "button-ghost-text",
+      "value": "#3b82f6",
+      "category": "color",
+      "cssVariable": "--color-button-ghost-text",
+      "tailwindClass": "text-blue-500"
+    },
+    {
+      "name": "button-danger-bg",
+      "value": "#ef4444",
+      "category": "color",
+      "cssVariable": "--color-button-danger-bg",
+      "tailwindClass": "bg-red-500"
+    },
+    {
+      "name": "button-padding-sm",
+      "value": "8px 12px",
+      "category": "spacing",
+      "rawValue": { "top": 8, "right": 12, "bottom": 8, "left": 12 },
+      "cssVariable": "--spacing-button-padding-sm"
+    },
+    {
+      "name": "button-padding-md",
+      "value": "12px 24px",
+      "category": "spacing",
+      "rawValue": { "top": 12, "right": 24, "bottom": 12, "left": 24 },
+      "cssVariable": "--spacing-button-padding-md"
+    },
+    {
+      "name": "button-padding-lg",
+      "value": "16px 32px",
+      "category": "spacing",
+      "rawValue": { "top": 16, "right": 32, "bottom": 16, "left": 32 },
+      "cssVariable": "--spacing-button-padding-lg"
+    },
+    {
+      "name": "button-gap",
+      "value": "8px",
+      "category": "spacing",
+      "rawValue": 8,
+      "cssVariable": "--spacing-button-gap",
+      "tailwindClass": "gap-2"
+    },
+    {
+      "name": "button-radius",
+      "value": "8px",
+      "category": "borderRadius",
+      "rawValue": 8,
+      "cssVariable": "--radius-button",
+      "tailwindClass": "rounded-lg"
+    },
+    {
+      "name": "button-font-size-sm",
+      "value": "12px",
+      "category": "typography",
+      "rawValue": 12,
+      "cssVariable": "--font-size-button-sm",
+      "tailwindClass": "text-xs"
+    },
+    {
+      "name": "button-font-size-md",
+      "value": "14px",
+      "category": "typography",
+      "rawValue": 14,
+      "cssVariable": "--font-size-button-md",
+      "tailwindClass": "text-sm"
+    },
+    {
+      "name": "button-font-size-lg",
+      "value": "16px",
+      "category": "typography",
+      "rawValue": 16,
+      "cssVariable": "--font-size-button-lg",
+      "tailwindClass": "text-base"
+    },
+    {
+      "name": "button-font-weight",
+      "value": "600",
+      "category": "typography",
+      "rawValue": 600,
+      "cssVariable": "--font-weight-button",
+      "tailwindClass": "font-semibold"
+    },
+    {
+      "name": "button-font-family",
+      "value": "Inter",
+      "category": "typography",
+      "rawValue": { "family": "Inter", "style": "Semi Bold" },
+      "cssVariable": "--font-family-button"
+    },
+    {
+      "name": "button-shadow",
+      "value": "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+      "category": "shadow",
+      "rawValue": {
+        "type": "DROP_SHADOW",
+        "color": { "r": 0, "g": 0, "b": 0, "a": 0.05 },
+        "offset": { "x": 0, "y": 1 },
+        "radius": 2,
+        "spread": 0
+      },
+      "cssVariable": "--shadow-button",
+      "tailwindClass": "shadow-sm"
+    },
+    {
+      "name": "button-shadow-hover",
+      "value": "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+      "category": "shadow",
+      "cssVariable": "--shadow-button-hover",
+      "tailwindClass": "hover:shadow-md"
+    },
+    {
+      "name": "button-transition",
+      "value": "all 150ms ease",
+      "category": "animation",
+      "cssVariable": "--transition-button"
+    }
+  ],
+  
+  "figmaMetadata": {
+    "fileKey": "ABC123XYZ789",
+    "nodeId": "1:234",
+    "exportedAt": "2024-01-15T10:30:00Z",
+    "pluginVersion": "1.0.0",
+    "figmaUrl": "https://www.figma.com/file/ABC123XYZ789?node-id=1:234",
+    "fileName": "Design System",
+    "pageName": "Components / Atoms"
+  }
+}

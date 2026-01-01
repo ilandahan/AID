@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__filesystem__list_allowed_directories",
+      "mcp__filesystem__directory_tree",
+      "mcp__filesystem__read_multiple_files",
+      "mcp__filesystem__create_directory",
+      "mcp__filesystem__list_directory",
+      "Skill(code-review)",
+      "Skill(test-driven)",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__new_page",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__fill",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__wait_for",
+      "mcp__chrome-devtools__list_console_messages",
+      "mcp__chrome-devtools__get_console_message",
+      "Bash(curl:*)",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__handle_dialog",
+      "mcp__chrome-devtools__fill_form",
+      "Bash(powershell -Command \"Copy-Item ''C:\\ilans'''' local files\\ai full stack\\fig-plugin\\ui.html'' -Destination ''C:\\ilans'''' local files\\ai full stack\\fig-plugin\\dist\\ui.html'' -Force\")",
+      "Bash(dir \"C:\\ilans'' local files\\demo\\last-one\")",
+      "Bash(robocopy:*)",
+      "Bash(powershell -Command \"Copy-Item -Path ''C:\\ilans'''' local files\\ai full stack\\fig-plugin\\*'' -Destination ''C:\\ilans'''' local files\\demo\\last-one\\integrations\\figma-plugin\\'' -Recurse -Exclude ''node_modules'',''.git'' -Force\")",
+      "Bash(dir \"C:\\ilans'' local files\\demo\\last-one\\.claude\\commands\")",
+      "Bash(taskkill:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(cd *server*:*)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "filesystem",
+    "chrome-devtools",
+    "jira",
+    "confluence",
+    "figma",
+    "github"
+  ]
+}

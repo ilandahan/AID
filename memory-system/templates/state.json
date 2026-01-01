@@ -1,0 +1,37 @@
+{
+  "$schema": "aid-state-v1",
+  "version": "1.1",
+  "initialized_at": null,
+  "last_updated": null,
+
+  "current_phase": 0,
+  "phase_name": "Discovery",
+  "phase_approved": false,
+
+  "current_session": {
+    "active": false,
+    "role": null,
+    "phase": null,
+    "started_at": null,
+    "revision_count": 0
+  },
+  
+  "last_session": {
+    "role": null,
+    "phase": null,
+    "completed_at": null
+  },
+  
+  "statistics": {
+    "total_sessions": 0,
+    "total_feedback_collected": 0,
+    "pending_feedback_count": 0,
+    "last_improvement_run": null,
+    "sessions_since_last_improvement": 0
+  },
+  
+  "notifications": {
+    "improvement_suggested": false,
+    "reason": null
+  }
+}

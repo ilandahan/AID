@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atomic Design Extractor</title>
+  <style>
+    :root {
+      --primary: #0c8ce9;
+      --primary-dark: #0a6fba;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-500: #6b7280;
+      --gray-700: #374151;
+      --gray-900: #111827;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      color: var(--gray-900);
+      background: #fff;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--gray-50);
+    }
+
+    .header h1 { font-size: 14px; font-weight: 600; flex: 1; }
+
+
+    .connection-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--gray-300);
+      transition: all 0.3s ease;
+    }
+    .connection-dot.connected { background: var(--success); }
+    .connection-dot.connecting {
+      background: var(--warning);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .connection-dot.reconnecting {
+      background: var(--warning);
+      animation: pulse 0.8s ease-in-out infinite;
+    }
+    .connection-dot.error {
+      background: var(--error);
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+    }
+
+    /* Connection controls wrapper */
+    .connection-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .disconnect-btn {
+      display: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--gray-200);
+      border: none;
+      cursor: pointer;
+      font-size: 8px;
+      line-height: 1;
+      color: var(--gray-600);
+      transition: all 0.2s ease;
+      padding: 0;
+    }
+    .disconnect-btn:hover {
+      background: var(--error);
+      color: white;
+    }
+    .disconnect-btn.show {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Connection status banner */
+    .connection-banner {
+      display: none;
+      padding: 8px 12px;
+      font-size: 11px;
+      text-align: center;
+      font-weight: 500;
+    }
+    .connection-banner.show { display: block; }
+    .connection-banner.reconnecting {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .connection-banner.expiring {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    /* MCP Connection Status Card */
+    .mcp-status-card {
+      display: none;
+      background: linear-gradient(135deg, #fcd34d 0%, #f59e0b 100%);
+      border: 1px solid #d97706;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      text-align: center;
+    }
+    .mcp-status-card.show { display: block; }
+    .mcp-status-card.connected {
+      background: linear-gradient(135deg, #86efac 0%, #4ade80 100%);
+      border-color: #16a34a;
+    }
+    .mcp-status-card.error {
+      background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%);
+      border-color: #dc2626;
+    }
+    .mcp-status-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    .mcp-status-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 4px;
+    }
+    .mcp-status-message {
+      font-size: 12px;
+      color: var(--gray-700);
+    }
+    .mcp-status-spinner {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      border: 3px solid rgba(245, 158, 11, 0.3);
+      border-top-color: #f59e0b;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 8px;
+    }
+
+    /* Disabled buttons when MCP not connected */
+    .btn.mcp-required:disabled {
+      background: var(--gray-200);
+      color: var(--gray-500);
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .tab {
+      flex: 1;
+      padding: 10px 8px;
+      text-align: center;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--gray-500);
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .tab:hover { background: var(--gray-50); color: var(--gray-700); }
+    .tab.active { color: var(--primary); font-weight: 600; }
+    .tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--primary);
+    }
+    .tab.disabled { opacity: 0.5; cursor: not-allowed; }
+    .tab-icon { display: block; font-size: 16px; margin-bottom: 2px; }
+
+    .tab-content {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    .tab-content.active { display: block; }
+
+    .selection-panel {
+      padding: 12px;
+      background: var(--gray-200);
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+    .selection-panel.empty { text-align: center; color: var(--gray-500); padding: 24px; }
+    .selection-panel .empty { text-align: center; color: var(--gray-500); padding: 12px; font-size: 13px; }
+    .selection-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .selection-meta { font-size: 11px; color: var(--gray-500); }
+
+    .score-card {
+      background: linear-gradient(135deg, var(--gray-900) 0%, var(--gray-700) 100%);
+      color: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .score-value { font-size: 48px; font-weight: 700; line-height: 1; }
+    .score-label { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+    .score-bar {
+      height: 8px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 4px;
+      margin-top: 16px;
+      overflow: hidden;
+    }
+    .score-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+    .score-bar-fill.low { background: var(--error); }
+    .score-bar-fill.medium { background: var(--warning); }
+    .score-bar-fill.high { background: var(--success); }
+
+    .score-status {
+      margin-top: 12px;
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      display: inline-block;
+    }
+    .score-status.ready { background: var(--success); }
+    .score-status.not-ready { background: var(--warning); }
+
+    .issues-section { margin-bottom: 16px; }
+    .issues-header {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .issues-header .count {
+      background: var(--gray-200);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 10px;
+    }
+
+    /* Component Group - container for issues from one component/variant */
+    .component-group {
+      margin-bottom: 16px;
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .component-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      background: var(--gray-100);
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .component-header .component-name {
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--gray-800);
+    }
+    .component-header .count {
+      background: var(--gray-300);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 10px;
+      color: var(--gray-700);
+    }
+    .component-issues {
+      padding: 12px;
+    }
+
+    /* Severity Group - groups issues by error/warning/info */
+    .severity-group {
+      margin-bottom: 12px;
+    }
+    .severity-group:last-child {
+      margin-bottom: 0;
+    }
+    .severity-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 11px;
+      margin-bottom: 8px;
+      color: var(--gray-600);
+    }
+    .severity-header .count {
+      background: var(--gray-200);
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-size: 9px;
+    }
+
+    /* Individual Issue Items */
+    .issue-item {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      background: var(--gray-50);
+      border-radius: 6px;
+      border-left: 3px solid var(--gray-300);
+    }
+    .issue-item:last-child {
+      margin-bottom: 0;
+    }
+    .issue-item.error {
+      background: #fef2f2;
+      border-left-color: var(--error);
+    }
+    .issue-item.warning {
+      background: #fffbeb;
+      border-left-color: var(--warning);
+    }
+    .issue-item.info {
+      background: #eff6ff;
+      border-left-color: var(--primary);
+    }
+    .issue-content {
+      flex: 1;
+      min-width: 0;
+    }
+    .issue-message {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--gray-800);
+      word-wrap: break-word;
+    }
+    .issue-location {
+      font-size: 10px;
+      color: var(--gray-500);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .issue-suggestion {
+      font-size: 11px;
+      color: var(--gray-600);
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed var(--gray-300);
+    }
+
+    /* Go to button for issues */
+    .goto-btn {
+      flex-shrink: 0;
+      padding: 4px 8px;
+      font-size: 10px;
+      background: white;
+      border: 1px solid var(--gray-300);
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+    .goto-btn:hover {
+      background: var(--gray-100);
+      border-color: var(--gray-400);
+    }
+    .goto-btn.small {
+      padding: 3px 6px;
+      font-size: 9px;
+    }
+
+    /* Developer Handoff Styles */
+    .dev-handoff { padding: 12px 0; }
+    .dev-handoff-section {
+      background: var(--gray-50);
+      border-radius: 10px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .dev-handoff-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--gray-100);
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .dev-handoff-header:hover { background: var(--gray-200); }
+    .dev-handoff-content {
+      padding: 12px 14px;
+      font-family: 'SF Mono', 'Consolas', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    .dev-handoff-section.collapsed .dev-handoff-content { display: none; }
+    .dev-handoff-section.collapsed .dev-handoff-header::after { content: '▸'; margin-left: auto; }
+    .dev-handoff-section:not(.collapsed) .dev-handoff-header::after { content: '▾'; margin-left: auto; }
+    .dev-prop-row {
+      display: flex;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .dev-prop-row:last-child { border-bottom: none; }
+    .dev-prop-name { color: #8b5cf6; min-width: 120px; }
+    .dev-prop-type { color: #059669; }
+    .dev-prop-optional { color: var(--gray-400); font-style: italic; }
+    .dev-code-block {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .dev-code-comment { color: #6c7086; }
+    .dev-code-keyword { color: #cba6f7; }
+    .dev-code-string { color: #a6e3a1; }
+    .dev-code-type { color: #89b4fa; }
+    .dev-copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: var(--gray-700);
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .dev-copy-btn:hover { background: var(--gray-600); }
+
+    /* Collapsible metadata sections */
+    .metadata-section {
+      margin-bottom: 12px;
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .metadata-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: var(--gray-50);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      user-select: none;
+    }
+    .metadata-section-header:hover {
+      background: var(--gray-100);
+    }
+    .metadata-section-header .section-icon {
+      margin-right: 8px;
+    }
+    .metadata-section-header .section-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--gray-600);
+    }
+    .metadata-section-header .section-status.complete { color: var(--success); }
+    .metadata-section-header .section-status.incomplete { color: var(--warning); }
+    .metadata-section-header .section-status.missing { color: var(--error); }
+    .metadata-section-header .chevron {
+      transition: transform 0.2s;
+    }
+    .metadata-section.collapsed .chevron {
+      transform: rotate(-90deg);
+    }
+    .metadata-section-content {
+      padding: 12px;
+      background: white;
+      display: block;
+    }
+    .metadata-section.collapsed .metadata-section-content {
+      display: none;
+    }
+    .metadata-field {
+      display: flex;
+      align-items: flex-start;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .metadata-field:last-child {
+      border-bottom: none;
+    }
+    .metadata-field-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
+    .metadata-field-icon.present { color: var(--success); }
+    .metadata-field-icon.missing { color: var(--error); }
+    .metadata-field-icon.incomplete { color: var(--warning); }
+    .metadata-field-content {
+      flex: 1;
+      min-width: 0;
+    }
+    .metadata-field-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--gray-800);
+      margin-bottom: 2px;
+    }
+    .metadata-field-value {
+      font-size: 11px;
+      color: var(--gray-600);
+      word-break: break-word;
+    }
+    .metadata-field-value.empty {
+      font-style: italic;
+      color: var(--gray-400);
+    }
+    .variant-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .variant-item {
+      display: flex;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--gray-100);
+      font-size: 11px;
+    }
+    .variant-item:last-child { border-bottom: none; }
+    .variant-item .variant-name {
+      flex: 1;
+      font-weight: 500;
+    }
+    .variant-item .variant-status {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .variant-item .variant-status.has-desc {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .variant-item .variant-status.no-desc {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+    /* Generated metadata badge */
+    .variant-item .variant-status.generated,
+    .metadata-field .generated-badge {
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      color: #92400e;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .metadata-field-value.generated {
+      color: #92400e;
+      font-style: italic;
+    }
+    .metadata-field-value .generated-value {
+      display: block;
+      margin-top: 4px;
+      padding: 6px 8px;
+      background: linear-gradient(135deg, #fffbeb, #fef3c7);
+      border-radius: 4px;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #78350f;
+      border-left: 3px solid #f59e0b;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      width: 100%;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-primary:disabled { background: var(--gray-300); cursor: not-allowed; }
+    .btn.loading { pointer-events: none; opacity: 0.8; }
+    .btn.loading .btn-text { display: none; }
+    .btn.loading .btn-spinner { display: inline-block; }
+    .btn-spinner {
+      display: none;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Pipeline Progress Styles */
+    .pipeline-steps {
+      background: var(--gray-50);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .pipeline-step {
+      display: flex;
+      gap: 12px;
+      position: relative;
+    }
+    .step-indicator {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 32px;
+    }
+    .step-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--gray-200);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      position: relative;
+      z-index: 1;
+    }
+    .step-line {
+      width: 2px;
+      flex: 1;
+      min-height: 20px;
+      background: var(--gray-200);
+      transition: background 0.3s ease;
+    }
+    .step-line.last { display: none; }
+    .step-content {
+      flex: 1;
+      padding-bottom: 16px;
+    }
+    .step-name {
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--gray-700);
+      margin-bottom: 2px;
+    }
+    .step-status {
+      font-size: 11px;
+      color: var(--gray-500);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .step-status .mini-spinner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--gray-300);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* Step States */
+    .pipeline-step.idle .step-icon { background: var(--gray-200); }
+    .pipeline-step.idle .step-status { color: var(--gray-400); }
+
+    .pipeline-step.waiting .step-icon { background: #e0f2fe; }
+    .pipeline-step.waiting .step-status { color: var(--primary); }
+
+    .pipeline-step.running .step-icon {
+      background: var(--primary);
+      box-shadow: 0 0 0 4px rgba(12, 140, 233, 0.2);
+    }
+    .pipeline-step.running .step-name { color: var(--primary); }
+    .pipeline-step.running .step-status { color: var(--primary); font-weight: 500; }
+    .pipeline-step.running .step-line { background: var(--primary); }
+
+    .pipeline-step.done .step-icon { background: var(--success); }
+    .pipeline-step.done .step-line { background: var(--success); }
+    .pipeline-step.done .step-status { color: var(--success); }
+
+    .pipeline-step.error .step-icon { background: var(--error); }
+    .pipeline-step.error .step-status { color: var(--error); }
+
+    .btn-secondary { background: white; color: var(--gray-700); border: 1px solid var(--gray-300); }
+    .btn-secondary:hover { background: var(--gray-50); }
+    .btn-success { background: var(--success); color: white; }
+
+    /* Button groups - responsive for 2-3 buttons */
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .btn-group .btn {
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* When 3 buttons, make them stack nicely on narrow width */
+    .btn-group .btn:only-child {
+      flex: 1 1 100%;
+    }
+    /* Compact buttons for narrow plugin */
+    .btn-group.compact .btn {
+      padding: 8px 10px;
+      font-size: 11px;
+    }
+    .btn-group.compact .btn span:first-child {
+      margin-right: 4px;
+    }
+
+    /* No issues empty state */
+    .no-issues {
+      padding: 16px;
+      text-align: center;
+      color: var(--gray-500);
+      font-size: 12px;
+      background: var(--gray-50);
+      border-radius: 8px;
+    }
+
+    .metadata-preview {
+      background: var(--gray-900);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 16px;
+      max-height: 300px;
+      overflow: auto;
+    }
+    .metadata-code {
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 11px;
+      color: #d4d4d4;
+      white-space: pre-wrap;
+    }
+
+    .checklist { margin-top: 16px; }
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .checklist-icon {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+    .checklist-icon.pass { background: var(--success); color: white; }
+    .checklist-icon.fail { background: var(--error); color: white; }
+    .checklist-text { flex: 1; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--gray-500);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--gray-900);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 12px;
+      display: none;
+      z-index: 100;
+    }
+    .toast.show { display: block; animation: slideUp 0.3s ease; }
+    @keyframes slideUp {
+      from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+      to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+
+    /* Review tab styles */
+    .review-intro {
+      text-align: center;
+      padding: 20px;
+      background: linear-gradient(135deg, #bfdbfe 0%, #bbf7d0 100%);
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+    .review-intro h2 { font-size: 16px; margin-bottom: 8px; color: var(--gray-900); }
+    .review-intro p { font-size: 12px; color: var(--gray-500); }
+
+    /* AI.D Pairing styles */
+    .aid-pairing {
+      padding: 20px;
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+    }
+    .pairing-input-group {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin: 16px 0;
+    }
+    .otp-input {
+      width: 50px;
+      height: 50px;
+      font-size: 24px;
+      font-weight: 700;
+      text-align: center;
+      border: 2px solid var(--gray-200);
+      border-radius: 8px;
+      background: var(--gray-50);
+    }
+    .otp-input:focus {
+      border-color: var(--primary);
+      outline: none;
+    }
+    .aid-status {
+      padding: 12px;
+      border-radius: 8px;
+      margin: 16px 0;
+      font-size: 12px;
+    }
+    .aid-status.unpaired {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .aid-status.paired {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .aid-status.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .pairing-timer {
+      font-size: 11px;
+      color: var(--gray-500);
+      margin-top: 8px;
+    }
+    .aid-instructions {
+      font-size: 11px;
+      color: var(--gray-900);
+      margin-top: 16px;
+      padding: 12px;
+      background: var(--gray-200);
+      border-radius: 8px;
+    }
+    .aid-instructions code {
+      background: var(--gray-900);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+
+    /* Locked state overlay */
+    .locked-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #ffffff;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    .locked-overlay.hidden { display: none; }
+
+    /* Modal overlay */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <!-- AI.D Pairing Overlay (shown until paired) -->
+  <div class="locked-overlay" id="aidLockOverlay">
+    <div class="aid-pairing">
+      <!-- AID Logo -->
+      <div style="margin-bottom: 16px; text-align: center;">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGIAAABiCAYAAACrpQYOAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAATpSURBVHgB7dtBUhtHFAbg91pEVhW4olSl4vIqygmCT2D5BMGrGLEwOgEmThZZgdfBgZxAULaEszI5QcQJopyASVWqKLJBLpyKENK8dEsQTKzpHs30gOT6vwUCpjUwvOnXb7obIgAAAAAAAAAAAAAAAAAAAAAAAAAAAACYPkwZu71xtCBMX7raCXPw9zef7djazP741wqLFF3vffFit6wU3adEuK3P+CYMpW0+7/U6rWq12qaMZRqIQRCIXsd+A9P626d3no081/PDZRFVc723VntdzOc7x+QRMwUi0mLO7VUqX+9QBhRlifmrsdoLPYk+qKx3uAiVzGuh0CmSZ8Nz84JIuN1o7B40Gj8/Js+yDQRJmcZTnPvhsEwTzATFBKRe310njzILhPmDXtylY1G58XrRzVl7+bLxhDzJLBCscom6r4SyQFNCjx1rtVrNSyrMMDWNnZYG9MWVJj09XWJdGBRWyIMZyoArLbHoKoQtaUsNBuYmZUZa+odsM4f/laUiXBq+mvKY5/UNUY55LpOenlFKmQTCpCV9QZHHz3rhg4/y6teoYElIy+Th4qJ0u/ywWn0U2NrUarulW7d4RV+HYxzgYr1en19aWmpRChmlpui0pP/4Qef7u4EQ70W1yTo9VauLQZw2lcqjVWbeIqdcwofHS94D4ayWeJhymPq/k41SqS/Oh9PTWzF6psxTSv57hLP85Kb5mFOFPWszSTbY+1atPmwzu8YrSV05eQ8Ek7387J/1981re/UTc4GB5Uzlwsbx5zQR2JH/ebJ6xOzmn/PWtCTUMuPD5Zds7RUz3F2mCWDGNcqY10BwmLc+xOmS9cqdpWdS98n6hslIT7ofv7Efn7TUJPbaW0nuSg/I5fJNsuJycfPA+ySefzw5gShuHpZc1UNu5uRKDzDjxMXgHaUnc861jKyFoQooY94CcdZ3VUvSbK9+8f4CC9sDMQmUCkuUMW+B0CtMy/YGamTlwRLanyemgqRewfMSiDhpKWrgFZ6MBze73Mf245w6EF7mmvphrAmy+dnnRwe6Ugouv6UHOQlT1+BZM1Mulqkz8tEjvARCxKw9iLMdD5ccSzR17L1dz9zefGo6T0tl+kCZzQgirh4vqWZejdSBiJmWplY+33EuhzKnL29Tp6a4aem6LC4uBo3Gq60wHJ1O9LT2HsVk9kfplzVXO73AlLpHpAqESUu9/uSlJbOOQAmYxaB8PtRPycqs0D12pyRD2pVKZZ9SShWIeGlpMJA57xhdTZWsy6cxFTePi73w7IAkcv6n9fbbO/fq9Ve/jR6Eh9laYnfy+D3MJlUgXGnJzFr2e/0H78642sxtHJldgSl3cXR0SayKlt/p/Fj6iTqDWbbJg8SDtbnznNWSXlCJG4QBCX+i6bLtIy0ZiQPRDzvOO/f/s60uMzOFlo+n1GsSdLudRGPRKIkDIaRcO/LaJ999+guNYbhqJ15ybpZ0emvqINzzuUs8+RghrlwuTUok1F1dLb//4wbb5ekmmQAoJetLS37S0buSB4J5K2p9WvR8Uu9MEnXbk6d3t29vHN3X44vZDdLunfb+GJyzTzusqKzLypGDbK8bnu+2KOiAdVtR7S6egs3zhP49I24mbutj5m4Phuvq3Op2/9m/jv+TAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAb/4FyS7XrpEjL+oAAAAASUVORK5CYII=" alt="AID Logo" width="98" height="98" style="display: inline-block;">
+      </div>
+      <h2 data-i18n="aid.title" style="font-size: 18px; margin-bottom: 3px;">Connect to AI.D</h2>
+      <p data-i18n="aid.subtitle">Enter the pairing code from Claude Code</p>
+
+      <div class="pairing-input-group">
+        <input type="text" class="otp-input" maxlength="1" data-otp="0" inputmode="numeric">
+        <input type="text" class="otp-input" maxlength="1" data-otp="1" inputmode="numeric">
+        <input type="text" class="otp-input" maxlength="1" data-otp="2" inputmode="numeric">
+        <input type="text" class="otp-input" maxlength="1" data-otp="3" inputmode="numeric">
+        <input type="text" class="otp-input" maxlength="1" data-otp="4" inputmode="numeric">
+        <input type="text" class="otp-input" maxlength="1" data-otp="5" inputmode="numeric">
+      </div>
+
+      <div class="aid-status unpaired" id="aidStatus" data-i18n="aid.notPaired">Not paired with AI.D</div>
+
+      <button class="btn btn-primary" id="pairBtn" style="max-width: 200px; margin: 0 auto;">
+        <span data-i18n="aid.pairButton">Pair with AI.D</span>
+      </button>
+
+      <div class="aid-instructions" style="line-height: 22px;">
+        <strong data-i18n="aid.howToPair">How to pair:</strong><br>
+        1. <span data-i18n="aid.step1">Open your AI.D</span><br>
+        2. Run <code>/aid-pair</code><br>
+        3. <span data-i18n="aid.step3">Enter the 6-digit code above</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="header">
+    <h1 id="appTitle"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGIAAABiCAYAAACrpQYOAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAATpSURBVHgB7dtBUhtHFAbg91pEVhW4olSl4vIqygmCT2D5BMGrGLEwOgEmThZZgdfBgZxAULaEszI5QcQJopyASVWqKLJBLpyKENK8dEsQTKzpHs30gOT6vwUCpjUwvOnXb7obIgAAAAAAAAAAAAAAAAAAAAAAAAAAAACYPkwZu71xtCBMX7raCXPw9zef7djazP741wqLFF3vffFit6wU3adEuK3P+CYMpW0+7/U6rWq12qaMZRqIQRCIXsd+A9P626d3no081/PDZRFVc723VntdzOc7x+QRMwUi0mLO7VUqX+9QBhRlifmrsdoLPYk+qKx3uAiVzGuh0CmSZ8Nz84JIuN1o7B40Gj8/Js+yDQRJmcZTnPvhsEwTzATFBKRe310njzILhPmDXtylY1G58XrRzVl7+bLxhDzJLBCscom6r4SyQFNCjx1rtVrNSyrMMDWNnZYG9MWVJj09XWJdGBRWyIMZyoArLbHoKoQtaUsNBuYmZUZa+odsM4f/laUiXBq+mvKY5/UNUY55LpOenlFKmQTCpCV9QZHHz3rhg4/y6teoYElIy+Th4qJ0u/ywWn0U2NrUarulW7d4RV+HYxzgYr1en19aWmpRChmlpui0pP/4Qef7u4EQ70W1yTo9VauLQZw2lcqjVWbeIqdcwofHS94D4ayWeJhymPq/k41SqS/Oh9PTWzF6psxTSv57hLP85Kb5mFOFPWszSTbY+1atPmwzu8YrSV05eQ8Ek7387J/1981re/UTc4GB5Uzlwsbx5zQR2JH/ebJ6xOzmn/PWtCTUMuPD5Zds7RUz3F2mCWDGNcqY10BwmLc+xOmS9cqdpWdS98n6hslIT7ofv7Efn7TUJPbaW0nuSg/I5fJNsuJycfPA+ySefzw5gShuHpZc1UNu5uRKDzDjxMXgHaUnc861jKyFoQooY94CcdZ3VUvSbK9+8f4CC9sDMQmUCkuUMW+B0CtMy/YGamTlwRLanyemgqRewfMSiDhpKWrgFZ6MBze73Mf245w6EF7mmvphrAmy+dnnRwe6Ugouv6UHOQlT1+BZM1Mulqkz8tEjvARCxKw9iLMdD5ccSzR17L1dz9zefGo6T0tl+kCZzQgirh4vqWZejdSBiJmWplY+33EuhzKnL29Tp6a4aem6LC4uBo3Gq60wHJ1O9LT2HsVk9kfplzVXO73AlLpHpAqESUu9/uSlJbOOQAmYxaB8PtRPycqs0D12pyRD2pVKZZ9SShWIeGlpMJA57xhdTZWsy6cxFTePi73w7IAkcv6n9fbbO/fq9Ve/jR6Eh9laYnfy+D3MJlUgXGnJzFr2e/0H78642sxtHJldgSl3cXR0SayKlt/p/Fj6iTqDWbbJg8SDtbnznNWSXlCJG4QBCX+i6bLtIy0ZiQPRDzvOO/f/s60uMzOFlo+n1GsSdLudRGPRKIkDIaRcO/LaJ999+guNYbhqJ15ybpZ0emvqINzzuUs8+RghrlwuTUok1F1dLb//4wbb5ekmmQAoJetLS37S0buSB4J5K2p9WvR8Uu9MEnXbk6d3t29vHN3X44vZDdLunfb+GJyzTzusqKzLypGDbK8bnu+2KOiAdVtR7S6egs3zhP49I24mbutj5m4Phuvq3Op2/9m/jv+TAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAb/4FyS7XrpEjL+oAAAAASUVORK5CYII=" alt="AID" width="24" height="24" style="vertical-align: middle; margin-right: 6px;">Atomic Design Extractor</h1>
+    <div class="connection-controls">
+      <span class="connection-dot" id="connectionDot" title="MCP Connection"></span>
+      <button class="disconnect-btn" id="disconnectBtn" title="Disconnect">✕</button>
+    </div>
+  </div>
+  <div class="connection-banner" id="connectionBanner"></div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="review"><span class="tab-icon">✨</span><span data-i18n="tab.review">Review</span></button>
+    <button class="tab" data-tab="audit"><span class="tab-icon">🔍</span><span data-i18n="tab.audit">Audit</span></button>
+    <button class="tab" data-tab="metadata"><span class="tab-icon">📋</span><span data-i18n="tab.metadata">Metadata</span></button>
+    <button class="tab" data-tab="report"><span class="tab-icon">👨‍💻</span><span data-i18n="tab.report">Dev Info</span></button>
+    <button class="tab disabled" data-tab="export" id="exportTab"><span class="tab-icon">📤</span><span data-i18n="tab.export">Export</span></button>
+  </div>
+
+  <!-- NEW: Review Tab (Claude AI Design Review) - DEFAULT TAB -->
+  <div class="tab-content active" id="review-tab">
+    <div class="review-intro">
+      <h2 data-i18n="review.title">Design Review Before Export</h2>
+      <p data-i18n="review.subtitle">AI.D will review your design system and will suggest improvement before developments</p>
+    </div>
+
+    <!-- MCP Connection Status Card -->
+    <div class="mcp-status-card show" id="mcpStatusCard">
+      <div class="mcp-status-spinner"></div>
+      <div class="mcp-status-title" id="mcpStatusTitle" data-i18n="mcp.connecting">Connecting to AI.D Server...</div>
+      <div class="mcp-status-message" id="mcpStatusMessage" data-i18n="mcp.pleaseWait">Please wait while we establish connection</div>
+    </div>
+
+    <div class="selection-panel" id="reviewSelectionPanel">
+      <div class="empty" data-i18n="selection.empty">Select a component in Figma to begin</div>
+    </div>
+
+    <div id="reviewContent" style="display: none;">
+      <div class="score-breakdown" style="background: var(--gray-200); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+        <div style="font-weight: 600; font-size: 12px; margin-bottom: 8px;" data-i18n="review.scoreBreakdown">Score Breakdown</div>
+        <div style="display: flex; gap: 16px; font-size: 11px; color: var(--gray-700);">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 14px;">🔍</span>
+            <span><span data-i18n="review.auditWeight">Audit</span>: <strong>70%</strong></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 14px;">📋</span>
+            <span><span data-i18n="review.metadataWeight">Metadata Analysis</span>: <strong>30%</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Component Info (shown when component selected, stays in same position after review) -->
+      <div id="componentInfoPanel" style="display: none; background: linear-gradient(135deg, #bfdbfe 0%, #bbf7d0 100%); border-radius: 8px; padding: 12px; margin-bottom: 16px; text-align: center;">
+        <div id="componentInfoName" style="font-size: 14px; color: var(--gray-900); font-weight: 600;">📦 Component Name</div>
+        <div id="componentInfoMeta" style="font-size: 11px; color: var(--gray-700); margin-top: 4px;"></div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary mcp-required" id="runPipelineBtn" disabled>
+          <span class="btn-spinner"></span>
+          <span class="btn-text">✨</span>
+          <span class="btn-text" data-i18n="action.runPipeline">Run Full Review</span>
+        </button>
+      </div>
+
+      <!-- Pipeline Progress Steps -->
+      <div id="pipelineProgress" style="display: none; margin-top: 16px;">
+        <div class="pipeline-header" style="font-weight: 600; font-size: 12px; margin-bottom: 12px;" data-i18n="pipeline.title">Review Progress</div>
+        <div class="pipeline-steps">
+          <div class="pipeline-step" id="step-audit" data-step="audit">
+            <div class="step-indicator">
+              <div class="step-icon">🔍</div>
+              <div class="step-line"></div>
+            </div>
+            <div class="step-content">
+              <div class="step-name" data-i18n="pipeline.audit">Quality Audit</div>
+              <div class="step-status" data-i18n="pipeline.status.idle">Waiting...</div>
+            </div>
+          </div>
+          <div class="pipeline-step" id="step-metadata" data-step="metadata">
+            <div class="step-indicator">
+              <div class="step-icon">📋</div>
+              <div class="step-line"></div>
+            </div>
+            <div class="step-content">
+              <div class="step-name" data-i18n="pipeline.metadata">Metadata Check</div>
+              <div class="step-status" data-i18n="pipeline.status.idle">Waiting...</div>
+            </div>
+          </div>
+          <div class="pipeline-step" id="step-generate" data-step="generate">
+            <div class="step-indicator">
+              <div class="step-icon">✨</div>
+              <div class="step-line"></div>
+            </div>
+            <div class="step-content">
+              <div class="step-name" data-i18n="pipeline.generate">Smart Suggestions</div>
+              <div class="step-status" data-i18n="pipeline.status.idle">Waiting...</div>
+            </div>
+          </div>
+          <div class="pipeline-step" id="step-report" data-step="report">
+            <div class="step-indicator">
+              <div class="step-icon">📊</div>
+              <div class="step-line last"></div>
+            </div>
+            <div class="step-content">
+              <div class="step-name" data-i18n="pipeline.report">Final Report</div>
+              <div class="step-status" data-i18n="pipeline.status.idle">Waiting...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="reviewResults" style="margin-top: 16px;"></div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="audit-tab">
+    <!-- Unified Component Info Panel (same style as Review tab) -->
+    <div id="auditComponentInfoPanel" class="component-info-unified" style="display: none; background: linear-gradient(135deg, #bfdbfe 0%, #bbf7d0 100%); border-radius: 8px; padding: 12px; margin-bottom: 16px; text-align: center;">
+      <div id="auditComponentInfoName" style="font-size: 14px; color: var(--gray-900); font-weight: 600;">📦 Component Name</div>
+      <div id="auditComponentInfoMeta" style="font-size: 11px; color: var(--gray-700); margin-top: 4px;"></div>
+    </div>
+
+    <div id="auditContent" style="display: none;">
+      <div class="score-card">
+        <div class="score-value" id="auditScore">--</div>
+        <div class="score-label" data-i18n="score.overall">Audit Score</div>
+        <div class="score-bar"><div class="score-bar-fill" id="scoreBarFill" style="width: 0%"></div></div>
+        <div class="score-status not-ready" id="scoreStatus" data-i18n="status.loading">Loading...</div>
+      </div>
+
+      <div class="issues-section">
+        <div class="issues-header">
+          <span>🔴</span>
+          <span data-i18n="issues.title">Issues</span>
+          <span class="count" id="issueCount">0</span>
+        </div>
+        <div id="issuesList"></div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary mcp-required" id="runAuditBtn" disabled>
+          <span>🔍</span>
+          <span data-i18n="action.runAudit">Run Audit</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="metadata-tab">
+    <!-- Unified Component Info Panel (same style as Review tab) -->
+    <div id="metadataComponentInfoPanel" class="component-info-unified" style="display: none; background: linear-gradient(135deg, #bfdbfe 0%, #bbf7d0 100%); border-radius: 8px; padding: 12px; margin-bottom: 16px; text-align: center;">
+      <div id="metadataComponentInfoName" style="font-size: 14px; color: var(--gray-900); font-weight: 600;">📦 Component Name</div>
+      <div id="metadataComponentInfoMeta" style="font-size: 11px; color: var(--gray-700); margin-top: 4px;"></div>
+    </div>
+
+    <!-- Metadata Score Summary -->
+    <div class="score-card" style="margin-bottom: 16px;">
+      <div class="score-value" id="metadataScore">--</div>
+      <div class="score-label">Metadata Completeness</div>
+      <div class="score-bar"><div class="score-bar-fill" id="metadataBar" style="width: 0%"></div></div>
+      <div class="score-status not-ready" id="metadataStatus">Run analysis to check metadata</div>
+    </div>
+
+    <!-- Component Metadata (collapsible) -->
+    <div id="metadataDetails">
+      <div class="empty" style="padding: 12px; color: var(--gray-500); text-align: center;">
+        Select a component and click "Analyze Metadata" to view details
+      </div>
+    </div>
+
+    <div class="btn-group compact" id="metadataButtons">
+      <button class="btn btn-primary mcp-required" id="analyzeBtn" disabled>
+        <span>📋</span>
+        <span data-i18n="action.analyzeMetadata">Analyze</span>
+      </button>
+      <button class="btn btn-secondary mcp-required" id="generateBtn" disabled>
+        <span>✨</span>
+        <span data-i18n="action.generateAuto">Generate</span>
+      </button>
+      <button class="btn btn-success" id="applyMetaBtnMeta" style="display: none;">
+        <span>✅</span>
+        <span data-i18n="action.applyToFigma">Apply</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="tab-content" id="report-tab">
+    <!-- Empty state when no analysis -->
+    <div class="empty-state" id="devHandoffEmpty">
+      <div class="icon">👨‍💻</div>
+      <p>Developer Handoff</p>
+      <p style="margin-top: 8px; font-size: 11px; color: var(--gray-500);">Analyze a component to generate developer specs</p>
+    </div>
+
+    <!-- Developer Handoff Content -->
+    <div class="dev-handoff" id="devHandoffContent" style="display: none;">
+      <!-- Unified Component Info Panel (same style as Review tab) -->
+      <div id="devComponentInfoPanel" class="component-info-unified" style="background: linear-gradient(135deg, #bfdbfe 0%, #bbf7d0 100%); border-radius: 8px; padding: 12px; margin-bottom: 16px; text-align: center;">
+        <div id="devComponentInfoName" style="font-size: 14px; color: var(--gray-900); font-weight: 600;">📦 Component Name</div>
+        <div id="devComponentInfoMeta" style="font-size: 11px; color: var(--gray-700); margin-top: 4px;"></div>
+      </div>
+
+      <!-- Component Stats Section -->
+      <div class="dev-handoff-section" id="devStatsSection">
+        <div class="dev-handoff-header">
+          <span>📊</span> Component Stats
+        </div>
+        <div class="dev-handoff-content" id="devStatsContent">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Props Section -->
+      <div class="dev-handoff-section" id="devPropsSection">
+        <div class="dev-handoff-header">
+          <span>📦</span> Props Interface <span style="font-size: 9px; color: var(--gray-500); font-weight: normal;">(Component Set only)</span>
+        </div>
+        <div class="dev-handoff-content" id="devPropsContent">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- States Section -->
+      <div class="dev-handoff-section" id="devStatesSection">
+        <div class="dev-handoff-header">
+          <span>🎭</span> Component States <span style="font-size: 9px; color: var(--gray-500); font-weight: normal;">(Component Set only)</span>
+        </div>
+        <div class="dev-handoff-content" id="devStatesContent">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Accessibility Section -->
+      <div class="dev-handoff-section" id="devA11ySection">
+        <div class="dev-handoff-header">
+          <span>♿</span> Accessibility
+        </div>
+        <div class="dev-handoff-content" id="devA11yContent">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Tokens Section - NOT collapsed so tokens are visible -->
+      <div class="dev-handoff-section" id="devTokensSection">
+        <div class="dev-handoff-header">
+          <span>🎨</span> Design Tokens
+        </div>
+        <div class="dev-handoff-content" id="devTokensContent">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Testing Section -->
+      <div class="dev-handoff-section collapsed" id="devTestSection">
+        <div class="dev-handoff-header">
+          <span>🧪</span> Testing & Analytics
+        </div>
+        <div class="dev-handoff-content" id="devTestContent">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Copy Button -->
+    <div class="btn-group" id="devHandoffButtons" style="display: none;">
+      <button class="btn btn-primary" id="copyDevHandoffBtn">
+        <span>📋</span>
+        <span>Copy as Markdown</span>
+      </button>
+      <button class="btn btn-secondary" id="copyDevCodeBtn">
+        <span>💻</span>
+        <span>Copy TypeScript</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Metadata Approval Modal -->
+  <div class="modal-overlay" id="metadataApprovalModal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px; max-height: 80vh; overflow: auto;">
+      <h3 style="margin-bottom: 16px;" data-i18n="modal.approveMetadata">Approve Metadata</h3>
+      <p style="font-size: 12px; color: var(--gray-700); margin-bottom: 12px;" data-i18n="modal.reviewBeforeApply">Review the generated metadata before applying to Figma:</p>
+      <div class="metadata-preview" style="max-height: 300px; overflow: auto; margin-bottom: 16px;">
+        <pre class="metadata-code" id="modalMetaPreview" style="font-size: 11px;"></pre>
+      </div>
+      <div class="btn-group" style="justify-content: flex-end;">
+        <button class="btn btn-secondary" id="cancelApplyBtn">
+          <span data-i18n="action.cancel">Cancel</span>
+        </button>
+        <button class="btn btn-success" id="confirmApplyBtn" style="background: var(--success);">
+          <span>✅</span>
+          <span data-i18n="action.confirmApply">Confirm & Apply</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Component Switch Confirmation Modal -->
+  <div class="modal-overlay" id="componentSwitchModal" style="display: none;">
+    <div class="modal-content" style="max-width: 400px;">
+      <div style="text-align: center; margin-bottom: 16px;">
+        <span style="font-size: 32px;">⚠️</span>
+      </div>
+      <h3 style="margin-bottom: 12px; text-align: center;" data-i18n="modal.switchComponent">Switch Component?</h3>
+      <p style="font-size: 12px; color: var(--gray-700); margin-bottom: 8px; text-align: center;">
+        <span data-i18n="modal.currentComponent">You have analysis data for:</span>
+      </p>
+      <p style="font-size: 14px; font-weight: 600; color: var(--gray-900); margin-bottom: 16px; text-align: center; padding: 8px; background: var(--gray-100); border-radius: 6px;" id="currentComponentName"></p>
+      <p style="font-size: 12px; color: var(--gray-700); margin-bottom: 20px; text-align: center;" data-i18n="modal.discardWarning">Switching to a new component will discard this data.</p>
+      <div class="btn-group" style="justify-content: center; gap: 12px;">
+        <button class="btn btn-secondary" id="cancelSwitchBtn" style="min-width: 100px;">
+          <span data-i18n="action.keepCurrent">Keep Current</span>
+        </button>
+        <button class="btn btn-primary" id="confirmSwitchBtn" style="min-width: 100px; background: var(--error);">
+          <span data-i18n="action.switchComponent">Switch</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="export-tab">
+    <!-- Blocked State (Score < 70) -->
+    <div class="empty-state" id="blockedState">
+      <div class="icon">🚫</div>
+      <p data-i18n="export.blocked">Export blocked</p>
+      <p style="margin-top: 8px; font-size: 11px;" data-i18n="export.minScore">Minimum score: 70</p>
+      <p style="margin-top: 4px; font-size: 11px; color: var(--error);" id="pointsNeeded"></p>
+      <div id="blockersList" style="margin-top: 12px; text-align: left; font-size: 11px;"></div>
+    </div>
+
+    <!-- Ready State (Score >= 70) -->
+    <div id="readyState" style="display: none;">
+      <!-- Component Info Card -->
+      <div class="export-info-card" style="background: var(--gray-50); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+        <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px;" id="exportComponentName">Component Name</div>
+
+        <!-- Auto-detected Level -->
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <span id="levelBadge" class="level-badge" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #dbeafe; color: #1e40af;">
+            <span id="levelIcon">🔵</span>
+            <span id="levelText">Atom</span>
+          </span>
+          <span style="font-size: 10px; color: var(--gray-500);" data-i18n="export.autoDetected">(auto-detected)</span>
+        </div>
+
+        <!-- Score Display -->
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <span style="font-size: 12px; color: var(--gray-700);" data-i18n="export.score">Score:</span>
+          <span id="exportScore" style="font-weight: 700; font-size: 14px;">--</span>
+          <span id="exportScoreStatus" style="font-size: 10px; padding: 2px 6px; border-radius: 10px;"></span>
+        </div>
+
+        <!-- Destination Path -->
+        <div style="background: var(--gray-200); border-radius: 6px; padding: 8px 12px; font-family: monospace; font-size: 11px; color: var(--gray-700);">
+          <span style="color: var(--gray-500);" data-i18n="export.destination">Destination:</span>
+          <span id="exportDestination">src/design-system/atoms/</span>
+        </div>
+      </div>
+
+      <!-- Single Export Button -->
+      <button class="btn btn-success" id="exportAIDBtn" style="background: linear-gradient(135deg, var(--success) 0%, #16a34a 100%); font-size: 14px; padding: 14px 20px;">
+        <span style="font-size: 18px;">📤</span>
+        <span data-i18n="action.exportToAID">Export to AID Design System</span>
+      </button>
+
+      <!-- Files to be created -->
+      <div style="margin-top: 16px; background: var(--gray-900); border-radius: 8px; padding: 12px; color: #d4d4d4; font-family: monospace; font-size: 10px;">
+        <div style="color: var(--gray-500); margin-bottom: 6px;" data-i18n="export.filesCreated">Files to be created:</div>
+        <div id="exportFilesList">
+          <div>├── ComponentName.tsx</div>
+          <div>├── ComponentName.module.css</div>
+          <div>├── ComponentName.types.ts</div>
+          <div>├── ComponentName.test.tsx</div>
+          <div>├── ComponentName.stories.tsx</div>
+          <div>└── index.ts</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    /* BUILD_PLACEHOLDER: This script section will be replaced with bundled JS during build */
+    console.error('[UI] ERROR: Running source ui.html directly. Please run "npm run build" first.');
+    document.body.innerHTML = '<div style="padding: 40px; text-align: center; color: #ef4444;"><h2>⚠️ Build Required</h2><p>Please run <code>npm run build</code> to bundle the UI.</p></div>';
+  </script>
+</body>
+</html>

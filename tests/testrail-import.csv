@@ -1,0 +1,97 @@
+ID,Title,Section,Priority,Type,Preconditions,Steps,Expected Result,Tags
+TC-ACT-001,Create Activity with all required fields,Activity Creation,Critical,E2E,"User logged in as Editor, on Activities page","1. Click 'Create Activity'
+2. Select CEFR Level 'Level 2 Beginner'
+3. Verify Unit dropdown populates
+4. Select Unit 'Unit 3 Travel and Transportation'
+5. Verify Topic dropdown populates
+6. Select Topic 'Getting There'
+7. Hover over Topic info icon
+8. Select Activity Type 'Grammar'
+9. Select Lesson Type 'Grammar'
+10. Enter Title 'Present Tense Practice'
+11. Enter Number of Questions '5'
+12. Verify Time per Question defaults to 30
+13. Click 'Create'","Activity created with status 'Draft', user redirected to question creation screen",smoke,activity,creation
+TC-ACT-002,Cannot create activity without required Title,Activity Creation,Critical,Negative,User logged in as Editor,"1. Click 'Create Activity'
+2. Fill all fields EXCEPT Title
+3. Click 'Create'","Form does not submit, validation error on Title field",negative,validation
+TC-ACT-003,Activity title enforces 30 character maximum,Activity Creation,Critical,Validation,Create Activity form open,"1. Type exactly 30 characters in Title
+2. Attempt to type 31st character","Input stops at 30 characters, character counter shows '30/30'",character-limit,P0
+TC-ACT-004,Activity types with 60 character title limit,Activity Creation,Critical,Validation,Create Activity form open,"1. Select Activity Type (Text-to-Image/Speaking/Spelling/Vocabulary/Listening)
+2. Type 60 characters in Title
+3. Attempt to type 61st character",Input stops at 60 characters,character-limit,P0
+TC-ACT-010,Grammar Activity - Grammar rules screen,Activity Creation - Grammar,High,E2E,"Grammar activity created, on Grammar Rules screen","1. Enter Short Grammar Rule
+2. Enter Long Grammar Rule
+3. Enter Example Sentence 1
+4. Enter Example Sentence 2
+5. Click 'Next'","User proceeds to Questions screen, grammar rules saved",grammar,activity
+TC-ACT-011,Memory Game requires exactly 6 pairs,Activity Creation - Memory Game,Critical,E2E,Memory Game activity created,"1. Fill Word/Phrase for only 5 pairs
+2. Upload images for 5 pairs
+3. Enter Image Source for 5 pairs
+4. Attempt to click 'Approve for Translation'","Button disabled or error shown, message indicates 6 pairs required",memory-game,P0
+TC-ACT-012,Memory Game can be saved with words only,Activity Creation - Memory Game,High,E2E,Memory Game activity created,"1. Enter Word/Phrase for all 6 pairs
+2. Do NOT upload any images
+3. Click 'Save and Continue'","Activity saves successfully, can return later to add images",memory-game
+TC-ACT-013,Natural Conversations has dual instruction fields,Activity Creation - Natural Conversations,High,E2E,Natural Conversations activity created,"1. Verify two instruction fields exist
+2. Enter Instructions for Listen
+3. Enter Instructions for Speak
+4. Verify separate native language toggles
+5. Save question","Both instruction sets saved with independent settings",natural-conversations
+TC-ACT-016,Spelling Activity has 10 character answer limit,Activity Creation - Spelling,Critical,Validation,Spelling activity created,"1. Type 'automobile' (10 chars) in Word/Phrase
+2. Attempt to type 11th character","Input stops at 10 characters, different from other types",spelling,character-limit,P0
+TC-ACT-017,Open Writing has 98 character question limit,Activity Creation - Open Writing,Critical,Validation,Open Writing activity created,"1. Type exactly 98 characters in Question
+2. Attempt to type 99th character","Input stops at 98 characters, different from standard 80",open-writing,character-limit,P0
+TC-ACT-019,Audio-to-Image requires audio upload,Activity Creation - Audio-to-Image,Critical,E2E,Audio-to-Image activity created,"1. Enter Instructions and Audio Transcript
+2. Do NOT upload audio
+3. Upload answer images
+4. Click 'Save and Continue'","Save blocked, error 'Audio file required'",audio-to-image,P0
+TC-CHR-006,Instructions field 80 char limit - all types,Character Limits,Critical,Validation,Any activity created,"1. Type 80 characters in Instructions
+2. Attempt to type 81st character","Input stops at 80 characters for ALL activity types",character-limit,P0,smoke
+TC-CHR-010,Answer field 38 character limit,Character Limits,Critical,Validation,Activity with text answer created,"1. Type 38 characters in Correct Answer
+2. Attempt to type 39th character","Input stops at 38 characters",character-limit,P0
+TC-CHR-011,Spelling Answer 10 character limit,Character Limits,Critical,Validation,Spelling activity created,"1. Type 10 characters in Word/Phrase
+2. Attempt to type 11th character","Input stops at 10 characters - UNIQUE to Spelling",character-limit,spelling,P0
+TC-CHR-022,Paste behavior when exceeding limit,Character Limits,Critical,Validation,Activity question screen open,"1. Copy 100 characters to clipboard
+2. Paste into Instructions (80 char limit)","Only first 80 characters pasted OR paste blocked with warning",character-limit,P0
+TC-STS-001,New activity starts with Draft status,Status Workflow,Critical,Functional,User logged in as Editor,"1. Create new Grammar activity
+2. Save with all required fields
+3. Check activity status",Activity status is 'Draft',status,smoke,P0
+TC-STS-002,Draft to In Translation transition,Status Workflow,Critical,E2E,"Activity in Draft, all questions saved","1. Open activity with all questions
+2. Click 'Approve for Translation'
+3. Verify popup appears
+4. Check status","Status changes to 'In Translation', popup shows confirmation",status,workflow,P0
+TC-STS-003,Cannot approve with incomplete questions,Status Workflow,Critical,Negative,"Activity in Draft, questions incomplete","1. Create activity with 5 questions
+2. Save only 3 questions
+3. Attempt to approve","Button disabled or error, message about completing questions",status,negative,P0
+TC-STS-006,Edit resets status to Draft,Status Workflow,Critical,Functional,Activity in 'Ready' status,"1. Open activity for editing
+2. Change any question field
+3. Save changes",Status RESETS to 'Draft',status,regression,P0
+TC-TPB-001,Access Topic Builder and select topic,Topic Builder,High,E2E,User logged in as Editor,"1. Click 'Topic Builder' from menu
+2. Select Level
+3. Select Unit
+4. Select Topic
+5. Click 'Next'","Topic Builder screen displayed with Activities picker",topic-builder
+TC-TPB-004,Reorder activities with drag and drop,Topic Builder,High,UI,"Topic Builder screen, 3 activities added","1. Drag activity #3 to position #1
+2. Release","Order updates to [3,1,2], visual feedback during drag",topic-builder,drag-drop
+TC-TRN-001,View pending translations,Translation Flow,High,E2E,User logged in as Translator,"1. Access Translator interface
+2. Set Status filter to 'Waiting for Translation'","Table shows columns: Activity Name, Type, Level, Unit, Topic, Lesson",translation
+TC-TRN-010,Complete translation status change,Translation Flow,Critical,E2E,"Translator, all translations complete","1. Complete all required translations
+2. Mark as 'Ready to Use'","Status changes from 'Waiting' to 'Ready to Use'",translation,P0
+TC-MED-001,Upload valid image formats,Media Upload,High,Functional,Question screen with image field,"1. Click 'Upload Image'
+2. Select valid JPEG image","Image uploads, thumbnail preview displayed",media,image
+TC-MED-005,Upload valid MP3 audio,Media Upload,High,Functional,Natural Conversations question screen,"1. Click 'Upload Audio'
+2. Select valid .mp3 file","Audio uploads, playback control available",media,audio
+TC-MED-003,Reject invalid image format,Media Upload,High,Negative,Question screen with image field,"1. Attempt to upload .txt file as image","Upload rejected, error 'Invalid file format'",media,negative
+TC-CAS-001,Level to Unit cascade,Cascading Dropdowns,Critical,Functional,Create Activity form open,"1. Select Level 'Level 2 Beginner'
+2. Observe Unit dropdown","Unit dropdown populates with Level 2 units only",cascade,P0
+TC-CAS-002,Unit to Topic cascade,Cascading Dropdowns,Critical,Functional,Level selected in form,"1. Select Unit 'Unit 3'
+2. Observe Topic dropdown",Topic dropdown populates with Unit 3 topics only,cascade,P0
+TC-NEG-001,Submit without required distractor,Edge Cases,Critical,Negative,Text-to-Text question screen,"1. Fill Question and Correct Answer
+2. Leave ALL distractors empty
+3. Click 'Save and Continue'","Save blocked, error 'At least one distractor required'",negative,validation,P0
+TC-NEG-002,Memory Game fewer than 6 pairs,Edge Cases,Critical,Negative,Memory Game activity,"1. Fill only 4 pairs with words and images
+2. Click 'Approve for Translation'","Cannot approve, error 'requires exactly 6 pairs'",negative,memory-game,P0
+TC-NEG-005,Special characters in text fields,Edge Cases,Medium,Functional,Any question screen,"1. Enter 'Héllo! ¿Cómo estás? 你好' in Instructions
+2. Save and reload",Special characters preserved without encoding issues,unicode,i18n
+TC-NEG-006,Fill-in-blank underscore insertion,Edge Cases,High,UI,Question with fill-in-blank support,"1. Type 'He ___ a car'
+2. Use blank insert tool (if available)","Blank (___) inserted correctly, displays in preview",fill-in-blank

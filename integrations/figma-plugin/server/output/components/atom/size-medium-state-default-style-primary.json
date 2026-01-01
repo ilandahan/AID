@@ -1,0 +1,98 @@
+{
+  "$schema": "aid-component-v1",
+  "version": "1.0",
+  "id": "size-medium-state-default-style-primary",
+  "name": "Size=Medium, State=Default, Style=Primary",
+  "type": "COMPONENT",
+  "metadata": {
+    "description": "Size=Medium, State=Default, Style=Primary component for use in the design system.",
+    "formattedDescription": "Size=Medium, State=Default, Style=Primary component for use in the design system.\n\n---\ntags: size=medium,, state=default,, style=primary, data-display, atom, component, figma\nnotes: Use appropriately in data-display contexts\ncategory: data-display\nlevel: atom\npriority: medium\nariaLabel: Size= Medium,  State= Default,  Style= Primary\na11y:\n  - Ensure 4.5:1 contrast ratio for text\n\nstates:\n  default: Base appearance when not interacting\n  hover: Appearance when cursor hovers over element\n  focus: Visible focus indicator for keyboard navigation\n  active: Appearance during click/tap interaction\n  disabled: Appearance when element is not interactive\n\nspecs:\n  contrast: Ensure 4.5:1 minimum contrast ratio for text\n  touchTarget: Minimum 44x44px touch target for interactive elements\n  spacing: Follow design system spacing tokens\n\ntokens:\n  colors: #0c8ce9, #ffffff\n  spacing: sizemediumstatedefaultstyleprimary-padding: 16px 32px 16px 32px, sizemediumstatedefaultstyleprimary-gap: 0px\n  typography: 16px, Quicksand\n",
+    "tags": "size=medium,, state=default,, style=primary, data-display, atom, component, figma",
+    "notes": "Use this atom for data-display purposes.",
+    "ariaLabel": "Size= Medium,  State= Default,  Style= Primary",
+    "category": "data-display",
+    "level": "atom",
+    "priority": "medium"
+  },
+  "tokens": [
+    {
+      "name": "sizemediumstatedefaultstyleprimary-bg",
+      "value": "#0c8ce9",
+      "category": "color",
+      "rawValue": {
+        "r": 0.0470588244497776,
+        "g": 0.5490196347236633,
+        "b": 0.9137254953384399
+      },
+      "cssVariable": "--color-sizemediumstatedefaultstyleprimary-bg"
+    },
+    {
+      "name": "sizemediumstatedefaultstyleprimary-padding",
+      "value": "16px 32px 16px 32px",
+      "category": "spacing",
+      "rawValue": {
+        "top": 16,
+        "right": 32,
+        "bottom": 16,
+        "left": 32
+      },
+      "cssVariable": "--spacing-sizemediumstatedefaultstyleprimary-padding"
+    },
+    {
+      "name": "sizemediumstatedefaultstyleprimary-gap",
+      "value": "0px",
+      "category": "spacing",
+      "rawValue": 0,
+      "cssVariable": "--spacing-sizemediumstatedefaultstyleprimary-gap"
+    },
+    {
+      "name": "sizemediumstatedefaultstyleprimary-radius",
+      "value": "6px",
+      "category": "borderRadius",
+      "rawValue": 6,
+      "cssVariable": "--radius-sizemediumstatedefaultstyleprimary"
+    },
+    {
+      "name": "label-bg",
+      "value": "#ffffff",
+      "category": "color",
+      "rawValue": {
+        "r": 1,
+        "g": 1,
+        "b": 1
+      },
+      "cssVariable": "--color-label-bg"
+    },
+    {
+      "name": "label-font-size",
+      "value": "16px",
+      "category": "typography",
+      "rawValue": 16,
+      "cssVariable": "--font-size-label"
+    },
+    {
+      "name": "label-font-family",
+      "value": "Quicksand",
+      "category": "typography",
+      "rawValue": {
+        "family": "Quicksand",
+        "style": "SemiBold"
+      },
+      "cssVariable": "--font-family-label"
+    }
+  ],
+  "variants": [],
+  "content": {
+    "Label": "Send Message"
+  },
+  "certification": {
+    "score": 91,
+    "exportedAt": "2025-12-29T20:43:10.524Z",
+    "auditPassed": false,
+    "metadataComplete": false
+  },
+  "figma": {
+    "fileKey": null,
+    "exportedFrom": "aid-figma-plugin"
+  }
+}

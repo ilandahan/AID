@@ -1,0 +1,34 @@
+# ============================================
+# Figma Plugin .gitignore
+# ============================================
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Test coverage (Istanbul/NYC)
+coverage/
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local

@@ -1,0 +1,231 @@
+{
+  "$schema": "aid-memory-tracking-v1",
+  "version": "1.0",
+  
+  "initialized_at": null,
+  "last_sync": null,
+  
+  "slot_allocation": {
+    "universal": {
+      "max_slots": 5,
+      "description": "Apply to all roles and phases",
+      "prefix": "AID:ALL:ALL:",
+      "entries": [
+        {
+          "line_number": null,
+          "entry": "AID:ALL:ALL:DO Confirm understanding before producing deliverable",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:ALL:ALL:CHECK Verify scope hasn't crept since last checkpoint",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:ALL:ALL:DO Break large outputs into reviewable chunks",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:ALL:ALL:DONT Never skip phase gate human approval",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:ALL:ALL:ASK \"What does success look like?\" before starting",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        }
+      ]
+    },
+    
+    "product_manager": {
+      "max_slots": 5,
+      "description": "Product Manager specific insights",
+      "prefix": "AID:PM:",
+      "entries": [
+        {
+          "line_number": null,
+          "entry": "AID:PM:DISC:ASK \"Who else touches this data?\" for stakeholders",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:PM:DISC:DO Use SCQ format for problem statements",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:PM:PRD:DO User stories: As [who] I want [what] so that [why]",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:PM:PRD:DONT No implementation details in requirements",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:PM:PRD:CHECK All acceptance criteria are testable",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        }
+      ]
+    },
+    
+    "developer": {
+      "max_slots": 5,
+      "description": "Developer specific insights",
+      "prefix": "AID:DEV:",
+      "entries": [
+        {
+          "line_number": null,
+          "entry": "AID:DEV:SPEC:DO Include error handling for every endpoint",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:DEV:SPEC:DO Define API contracts before implementation",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:DEV:DEV:DO Write test first, then implement (TDD)",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:DEV:DEV:DONT No test-specific logic in implementation",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:DEV:DEV:CHECK Run all tests before marking complete",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        }
+      ]
+    },
+    
+    "qa_engineer": {
+      "max_slots": 5,
+      "description": "QA Engineer specific insights",
+      "prefix": "AID:QA:",
+      "entries": [
+        {
+          "line_number": null,
+          "entry": "AID:QA:QA:DO Test with realistic data (unicode, long strings)",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:QA:QA:DO Cover happy path, edge cases, AND error conditions",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:QA:QA:DONT Don't weaken tests to make them pass",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:QA:QA:CHECK Integration tests exist for critical paths",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        },
+        {
+          "line_number": null,
+          "entry": "AID:QA:QA:DO Use real DB/Redis in tests, minimize mocking",
+          "added_date": null,
+          "source": "starter",
+          "times_used": 0,
+          "avg_rating_when_relevant": null
+        }
+      ]
+    },
+    
+    "tech_lead": {
+      "max_slots": 3,
+      "description": "Tech Lead specific insights",
+      "prefix": "AID:LEAD:",
+      "entries": []
+    },
+    
+    "phase_specific": {
+      "max_slots": 5,
+      "description": "Cross-role phase-specific insights",
+      "prefix": "AID:*:{phase}:",
+      "entries": []
+    },
+    
+    "learned": {
+      "max_slots": 10,
+      "description": "Patterns promoted from improvement cycles",
+      "prefix": "AID:",
+      "entries": []
+    }
+  },
+  
+  "promotion_history": [],
+  
+  "retirement_history": [],
+  
+  "usage_tracking": {
+    "total_sessions_tracked": 0,
+    "entries_by_usage": {}
+  }
+}

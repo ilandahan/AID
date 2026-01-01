@@ -1,0 +1,20 @@
+{
+  "name": "Atomic Design Extractor",
+  "id": "atomic-design-extractor-mcp-v6",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": [
+    "figma",
+    "dev"
+  ],
+  "networkAccess": {
+    "allowedDomains": [
+      "https://figma-plugin-server-983606191500.us-central1.run.app",
+      "https://pair.theaid.ai"
+    ],
+    "reasoning": "Required to communicate with AID server for component quality analysis, metadata generation, and design system export. All communication uses HTTPS."
+  },
+  "capabilities": ["inspect"],
+  "enableProposedApi": false
+}
