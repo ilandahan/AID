@@ -142,18 +142,17 @@ else
     echo "[SKIP] context.json already exists"
 fi
 
-# Copy .mcp.json (Mac format)
+# Copy .mcp.json (Mac template ONLY - no fallback)
 echo ""
-echo "Copying MCP configuration (Mac)..."
+echo "Copying MCP configuration (macOS/Linux)..."
 if [ ! -f "$TARGET_PATH/.mcp.json" ]; then
     if [ -f "$AID_PATH/.mcp.json.mac" ]; then
         cp "$AID_PATH/.mcp.json.mac" "$TARGET_PATH/.mcp.json"
-        echo "[OK] .mcp.json copied (Mac format - edit with your API tokens)"
-    elif [ -f "$AID_PATH/.mcp.json" ]; then
-        cp "$AID_PATH/.mcp.json" "$TARGET_PATH/.mcp.json"
-        echo "[OK] .mcp.json copied (edit with your API tokens)"
+        echo "[OK] .mcp.json copied from Mac template"
+        echo "    Edit with your API tokens: ATLASSIAN_API_TOKEN, FIGMA_API_KEY, GITHUB_TOKEN"
     else
-        echo "[WARNING] .mcp.json not found"
+        echo "[ERROR] .mcp.json.mac template not found in AID folder!"
+        echo "        Please ensure .mcp.json.mac exists at: $AID_PATH"
     fi
 else
     echo "[SKIP] .mcp.json already exists"

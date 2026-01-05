@@ -1,251 +1,100 @@
 # Learning Mode - Quick Reference
 
-Fast lookup for Learning Mode triggers and formats.
-
----
-
 ## When to Use What
 
-### 🔍 Decision Transparency
+### Decision Transparency
+USE: Architecture, Technology, Trade-offs, Scope, Pattern selection
+SKIP: Obvious choices, No alternatives, Standard patterns
 
-**USE WHEN:**
-- ✅ Architecture decisions
-- ✅ Technology choices
-- ✅ Trade-off selections
-- ✅ Scope decisions
-- ✅ Pattern selection (with alternatives)
+### Debate Invitation
+USE: Multiple viable options, No clear winner, User vs best practice, Ambiguous scope
+SKIP: Single best answer, User decided, Trivial
 
-**SKIP WHEN:**
-- ❌ Obvious/simple choices
-- ❌ No alternatives exist
-- ❌ Standard patterns
+### Feedback Request
+USE: Phase gate, Major deliverable, Uncertainty, Session ending
+SKIP: Minor task, Obvious next step, Just gave feedback
 
-### 💬 Debate Invitation
-
-**USE WHEN:**
-- ✅ Multiple viable options
-- ✅ Trade-offs have no clear winner
-- ✅ User preference vs best practice
-- ✅ Scope is ambiguous
-
-**SKIP WHEN:**
-- ❌ Single clear best answer
-- ❌ User already decided
-- ❌ Trivial decisions
-
-### 📊 Feedback Request
-
-**USE WHEN:**
-- ✅ Phase gate reached
-- ✅ Major deliverable complete
-- ✅ Uncertainty about direction
-- ✅ Session ending
-
-**SKIP WHEN:**
-- ❌ Minor task completion
-- ❌ Obvious next step
-- ❌ User just gave feedback
-
-### 📚 Learning Capture
-
-**USE WHEN:**
-- ✅ User provides correction
-- ✅ User states preference
-- ✅ Feedback indicates change needed
-- ✅ User chooses unexpected option
-
----
+### Learning Capture
+USE: User correction, User preference, Feedback indicates change, Unexpected choice
 
 ## Block Formats
 
 ### Decision Transparency
-
-```markdown
+```
 <decision-transparency>
 **Decision:** [What]
-
-**Reasoning:**
-- [Factor]: [Impact]
-
-**Alternatives Considered:**
-1. [Alt] - Rejected: [why]
-
+**Reasoning:** [Factor]: [Impact]
+**Alternatives:** [Alt] - Rejected: [why]
 **Confidence:** [High/Medium/Low]
-
 **Open to Debate:** [Yes/No]
 </decision-transparency>
 ```
 
 ### Debate Invitation
-
-```markdown
+```
 <debate-invitation>
-**Topic:** [What we're deciding]
-
-**Option A: [Name]**
-- ✅ Pros: [list]
-- ❌ Cons: [list]
-
-**Option B: [Name]**
-- ✅ Pros: [list]
-- ❌ Cons: [list]
-
+**Topic:** [Decision]
+**Option A:** Pros/Cons
+**Option B:** Pros/Cons
 **My Lean:** [Which + why]
-
-**But Consider:** [Counter-argument]
-
-**Your Input Needed:** [Question]
+**But Consider:** [Counter]
+**Your Input:** [Question]
 </debate-invitation>
 ```
 
 ### Feedback Request
-
-```markdown
+```
 <feedback-request>
-**Context:** [What was done]
-
-**Seeking Feedback On:**
-1. [Aspect 1]
-2. [Aspect 2]
-
-**Questions:**
-- [Specific question]
-
-**Rating Request:** 1-5
-
-**Improvement Ideas Welcome**
+**Context:** [Done]
+**Seeking Feedback:** [Aspects]
+**Questions:** [Specific]
+**Rating:** 1-5
 </feedback-request>
 ```
 
 ### Learning Capture
-
-```markdown
+```
 <learning-captured>
-**What I Learned:**
-[Description]
-
-**Source:**
-- Context: [what]
-- Date: [when]
-
-**Applied To:**
-- [How behavior changes]
-
-**Verification:**
-- [Next application]
+**Learned:** [What]
+**Applied:** [How]
 </learning-captured>
 ```
 
----
-
-## Phase-Specific Triggers
+## Phase Triggers
 
 | Phase | Transparency | Debate | Feedback |
 |-------|--------------|--------|----------|
-| 1 PRD | Prioritization, Scope | Scope boundaries | Story completeness |
-| 2 Tech Spec | Architecture, Tech stack | DB choice, Patterns | Spec readiness |
-| 3 Breakdown | Task sizing, Dependencies | Granularity | Estimate accuracy |
-| 4 Development | Pattern selection | Approach options | Code quality |
-| 5 QA & Ship | Coverage decisions | Test strategy | Release readiness |
-
----
-
-## Role-Specific Focus
-
-| Role | Primary Transparency | Primary Debates | Primary Feedback |
-|------|---------------------|-----------------|------------------|
-| PM | Prioritization | Scope | Requirements |
-| Dev | Pattern choices | Technical approach | Code quality |
-| Lead | Architecture | Technology | Direction |
-| QA | Coverage | Test strategy | Quality |
-
----
+| 1 PRD | Prioritization | Scope | Stories |
+| 2 Spec | Arch, Tech | DB, Patterns | Readiness |
+| 3 Plan | Task sizing | Granularity | Estimates |
+| 4 Dev | Patterns | Approach | Code |
+| 5 QA | Coverage | Test strategy | Release |
 
 ## Confidence Levels
 
-| Level | When to Use | Action |
-|-------|-------------|--------|
-| **High** | Clear requirements, proven pattern | Execute |
-| **Medium** | Some uncertainty, reasonable assumptions | Execute + note concern |
-| **Low** | Multiple unknowns, risky assumptions | Invite debate or ask |
-| **Uncertain** | Can't make informed decision | Ask clarifying question |
+| Level | Action |
+|-------|--------|
+| High | Execute |
+| Medium | Execute + note |
+| Low | Debate |
+| Uncertain | Ask |
 
----
+## Rating Scale
 
-## Rating Scale (Feedback)
-
-| Rating | Meaning | Response |
-|--------|---------|----------|
-| **5** | Excellent | Continue, capture what worked |
-| **4** | Good | Minor tweaks, continue |
-| **3** | Acceptable | Ask for improvement ideas |
-| **2** | Needs work | Request specific changes |
-| **1** | Off track | Full realignment needed |
-
----
+| Rating | Response |
+|--------|----------|
+| 5 | Continue |
+| 4 | Minor tweaks |
+| 3 | Ask improvements |
+| 2 | Request changes |
+| 1 | Realign |
 
 ## Anti-Patterns
 
-| ❌ Don't | ✅ Do Instead |
-|----------|---------------|
-| Debate trivial choices | Just decide and move on |
-| Request feedback constantly | Only at milestones |
-| Ignore user corrections | Capture as learning |
-| Fake debates (obvious answer) | Use transparency |
-| Over-explain simple things | Brief explanation only |
-| Skip transparency on big decisions | Always show reasoning |
-
----
-
-## Integration Checklist
-
-Before completing significant work:
-
-- [ ] Did I explain significant decisions?
-- [ ] Did I invite debate where options exist?
-- [ ] Did I request feedback at milestone?
-- [ ] Did I capture user preferences as learnings?
-- [ ] Did I avoid over-ceremony on simple tasks?
-
----
-
-## Copy-Paste Templates
-
-### Quick Decision Transparency
-```markdown
-<decision-transparency>
-**Decision:**
-**Reasoning:**
-**Confidence:**
-</decision-transparency>
-```
-
-### Quick Debate
-```markdown
-<debate-invitation>
-**Topic:**
-
-**Option A:** ✅ ... ❌ ...
-**Option B:** ✅ ... ❌ ...
-
-**My Lean:**
-**Your Input:**
-</debate-invitation>
-```
-
-### Quick Feedback
-```markdown
-<feedback-request>
-**Context:**
-**Rating Request:** 1-5
-**Questions:**
-</feedback-request>
-```
-
-### Quick Learning
-```markdown
-<learning-captured>
-**Learned:**
-**Applied:**
-</learning-captured>
-```
+| Dont | Do |
+|------|-----|
+| Debate trivial | Just decide |
+| Constant feedback | Only milestones |
+| Ignore corrections | Capture learning |
+| Fake debates | Use transparency |
+| Over-explain simple | Brief only |

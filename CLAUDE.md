@@ -1,8 +1,72 @@
 # AID - AI Development Methodology
 
+## ⚠️ FOUNDATIONAL LAYER: WHY-First Thinking
+
+> "People don't buy what you do; they buy why you do it." — Simon Sinek
+
+**BEFORE any command, any phase, any action — understand WHY.**
+
+### Prompt Analysis Protocol (Runs First, Always)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  EVERY PROMPT → WHY ANALYSIS → PHASE CHECK → THEN PROCEED  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+1. **Extract Explicit WHY** — What did the user state as their goal?
+2. **Infer Implicit WHY** — What underlying need might they not have articulated?
+3. **Validate or Ask** — Is the WHY clear enough? If not, ASK before proceeding.
+4. **Anchor to WHY** — Every output must trace back to the established WHY.
+
+### Golden Rules (Always Do)
+
+| Rule | Description |
+|------|-------------|
+| Ask WHY before acting | Even simple requests have underlying motivations |
+| Dig deeper with 5 Whys | First answer is rarely the root cause |
+| State the WHY explicitly | Make motivation visible in all outputs |
+| Validate understanding | Reflect back the WHY before proceeding |
+| Connect to purpose | Every choice traces to the WHY |
+
+### Iron Rules (Never Break)
+
+| Rule | Description |
+|------|-------------|
+| Never implement without purpose | "Just do it" is not acceptable |
+| Never copy without understanding | "Competitor has it" needs WHY validation |
+| Never skip WHY in reviews | Every PR shows intent, not just changes |
+| Never let urgency bypass purpose | "It's urgent" requires WHY more, not less |
+| Never assume shared understanding | Implicit WHY leads to misalignment |
+
+### 3-Second WHY Check
+
+Before ANY action:
+
+| ✓ | Question |
+|---|----------|
+| □ | WHY am I doing this? |
+| □ | WHAT value does it create? |
+| □ | WHO benefits? |
+
+Can't answer in 3 seconds → **STOP and clarify.**
+
+### Red Flags — Stop and Ask
+
+| Signal | Ask |
+|--------|-----|
+| "Just do it" | "What problem does this solve?" |
+| "Everyone wants it" | "Why specifically?" |
+| "Competitor has it" | "Does our purpose require it?" |
+| "It's urgent" | "What's the cost of not doing it?" |
+| "Make it better" | "What does 'better' mean here?" |
+| "Trust me" | "Help me understand the reasoning" |
+
+---
+
 ## ⚠️ CRITICAL: Phase Gate Enforcement
 
-Before doing ANY work, Claude MUST:
+After WHY is established, Claude MUST:
 1. Read `.aid/state.json` to determine current phase
 2. Read `.aid/context.json` to understand current task/step
 3. Verify requested work is allowed in current phase
@@ -15,6 +79,19 @@ Phase 0 ──► Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4 
 Discovery     PRD      Tech Spec   Impl Plan     Dev       QA & Ship
 ```
 
+### Phase-Specific WHY Questions
+
+| Phase | Core WHY Question |
+|-------|-------------------|
+| 0 Discovery | "WHY is this problem worth solving?" |
+| 1 PRD | "WHY does the user need this?" |
+| 2 Tech Spec | "WHY this architecture?" |
+| 3a Consolidation | "WHY does this contradiction exist? WHY this resolution?" |
+| 3b Breakdown | "WHY this task size? WHY these dependencies?" |
+| 3c Jira Population | "WHY is this information complete? WHY can dev work from this alone?" |
+| 4 Development | "WHY this code? WHY these connections?" |
+| 5 QA & Ship | "WHY is this test? WHY is this ready?" |
+
 ### Phase Permissions
 
 | Phase | Allowed | Blocked |
@@ -22,9 +99,198 @@ Discovery     PRD      Tech Spec   Impl Plan     Dev       QA & Ship
 | 0 Discovery | Research, stakeholders, competitive analysis | PRD, architecture, code |
 | 1 PRD | + Requirements, scope, user stories | Architecture, code, Jira |
 | 2 Tech Spec | + Architecture, schemas, APIs | Code, Jira issues |
-| 3 Impl Plan | + Jira epics, stories, tasks | Production code |
+| 3a Consolidation | + Contradiction resolution, consolidate specs | Jira issues, code |
+| 3b Breakdown | + Task decomposition, sprint planning | Jira creation, code |
+| 3c Jira Population | + Jira epics, stories, tasks with full info | Production code |
 | 4 Development | + Code, tests, components | Deployment |
 | 5 QA & Ship | Everything | - |
+
+---
+
+## 🔍 Transparent Quality Check (AUTOMATIC)
+
+Every significant output MUST go through self-reflection before being shown to the user.
+The Quality Check box is ALWAYS displayed to build trust and ensure consistent quality.
+
+### Core Flow
+
+```
+┌─────────────┐      ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+│   Prompt    │ ───► │   Draft     │ ───► │  Reflect    │ ───► │   Output    │
+└─────────────┘      └─────────────┘      └─────────────┘      └─────────────┘
+                      (internal)          (score & revise)    (with QC box)
+```
+
+### When to Apply
+
+| Apply Quality Check | Skip Quality Check |
+|---------------------|-------------------|
+| ✅ Code generation | ❌ Simple questions |
+| ✅ Architecture decisions | ❌ Status checks |
+| ✅ PRD/requirements | ❌ File reading |
+| ✅ Technical specs | ❌ Clarifying questions |
+| ✅ Test writing | ❌ Command help |
+
+### Quality Check Display Format
+
+**ALWAYS show this box before significant outputs:**
+
+```
+╭─────────────────────────────────────────────────────────────╮
+│ 🔍 Quality Check                                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  [✅|⚠️|❌] WHY Alignment     X/10   [brief note]           │
+│  [✅|⚠️|❌] Phase Compliance  X/10   [brief note]           │
+│  [✅|⚠️|❌] Correctness       X/10   [brief note]           │
+│  [✅|⚠️|❌] Security          X/10   [brief note]           │
+│  [✅|⚠️|❌] Completeness      X/10   [brief note]           │
+│                                                             │
+│  ══════════════════════════════════════════════════════    │
+│  📊 Overall: X.X/10                                         │
+│  [STATUS: ✅ PASSED | 🔄 PASSED after N revision(s) | ⚠️]   │
+│                                                             │
+│  [If revised: 📝 Improvements made: ...]                    │
+│                                                             │
+╰─────────────────────────────────────────────────────────────╯
+```
+
+### Score Icons
+
+| Score | Icon | Action |
+|-------|------|--------|
+| 8-10 | ✅ | Excellent - show output |
+| 6-7.9 | ⚠️ | Acceptable - show with notes |
+| 0-5.9 | ❌ | Revise internally (up to 3 times) |
+
+### Criteria (Weight)
+
+1. **WHY Alignment (3)** - Does output serve user's actual need?
+2. **Phase Compliance (2)** - Appropriate for current phase?
+3. **Correctness (3)** - Accurate, functional, no errors?
+4. **Security (2)** - No vulnerabilities or exposed secrets?
+5. **Completeness (2)** - All requirements addressed?
+
+### Revision Display
+
+When a score improved due to revision, show:
+```
+│  ⚠️  Security         5→8/10 Fixed: Added input validation  │
+```
+
+### Quality Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/reflect` | Show detailed breakdown of last quality check |
+| `/reflect --history` | Show all quality checks from session |
+| `/reflect --strict` | Re-evaluate with threshold 8 |
+| `/reflect --explain <criterion>` | Deep dive into specific score |
+
+### Phase-Specific Criteria
+
+Detailed criteria for each phase in:
+`.claude/skills/reflection/criteria/phase-{N}-{name}.yaml`
+
+---
+
+## Code Generation Standards (Phase 4+)
+
+### Every Function Must Include WHY:
+
+```python
+# ─────────────────────────────────────────────────
+# WHY: [Problem this function solves]
+# WHAT: [What it does]
+# CONNECTION: [What calls it, what it calls]
+# ─────────────────────────────────────────────────
+def function_name(params):
+    """
+    Brief description.
+    
+    WHY param_x: [Why this parameter exists]
+    WHY return_type: [Why caller needs this]
+    """
+```
+
+### Every Component Must Document Connections:
+
+```python
+"""
+ComponentName
+
+WHY THIS EXISTS:
+[Core purpose and problem it solves]
+
+CONNECTIONS:
+- CALLED BY: [List callers and WHY they call this]
+- CALLS: [List dependencies and WHY we need them]
+
+DESIGN DECISIONS:
+- WHY [decision]: [Reasoning]
+"""
+```
+
+### Component Relationship Pattern:
+
+```
+┌─────────────────┐     WHY: Decouple UI from data fetching
+│   UserProfile   │────────────────────────────────────────┐
+└────────┬────────┘                                        │
+         │ WHY: Single source of truth for user state      │
+         ▼                                                 │
+┌─────────────────┐     WHY: Cache reduces API calls       │
+│   UserStore     │◄───────────────────────────────────────┤
+└────────┬────────┘                                        │
+         │ WHY: Normalize data once at entry point         │
+         ▼                                                 │
+┌─────────────────┐     WHY: Abstract API versioning
+│   UserAPI       │
+└─────────────────┘
+```
+
+---
+
+## Testing Standards (Phase 4-5) — BDD/TDD Integration
+
+### Every Test Must State WHY:
+
+```python
+def test_specific_behavior():
+    """
+    WHY THIS TEST:
+    - PROBLEM: [What failure this prevents]
+    - COST OF FAILURE: [Business/user impact]
+    - SUCCESS: [What passing means]
+    """
+```
+
+### BDD - Gherkin with WHY:
+
+```gherkin
+Feature: Feature Name
+  """
+  WHY: [Business value and user need]
+  IMPACT: [What happens if this fails]
+  """
+  
+  Scenario: Scenario Name
+    """
+    WHY: [Why this specific scenario matters]
+    """
+    Given [context]
+    When [action]
+    Then [outcome]
+```
+
+### Test Organization by WHY (Cost of Failure):
+
+```
+tests/
+├── critical_failures/      # High cost - test first
+├── user_experience/        # Medium cost
+└── edge_cases/            # Low frequency
+```
 
 ---
 
@@ -42,11 +308,15 @@ Discovery     PRD      Tech Spec   Impl Plan     Dev       QA & Ship
 | `/good-morning` | Morning startup - check systems, load context, continue |
 | `/context` | Show current work context (tasks + steps) |
 | `/context-update` | Update context manually |
+| `/reflect` | Show detailed breakdown of last quality check |
 
 ### Testing
 | Command | Purpose |
 |---------|---------|
-| `/aid-test` | Run full methodology test suite with simulated approvals |
+| `/aid-test` | Run full AID test (Phases 0-2) with reflection validation |
+| `/aid-test --phase 0` | Test only Phase 0 |
+| `/aid-test --quick` | Abbreviated test (1 output per phase) |
+| `/aid-test --verbose` | Show all reflection details |
 
 ### Phase Management ⭐
 | Command | Purpose |
@@ -92,10 +362,12 @@ Claude MUST update `.aid/context.json` when:
 
 | Phase | Load These Skills |
 |-------|-------------------|
+| ALL | `skills/why-driven-decision/` **(FOUNDATIONAL - Load First)** |
+| ALL | `skills/reflection/` **(Quality Check - Always Active)** |
 | 0 | `skills/pre-prd-research/`, `skills/aid-discovery/`, `skills/nano-banana-visual/` |
 | 1 | `skills/aid-prd/` |
-| 2 | `skills/system-architect/` |
-| 3 | `skills/aid-tech-spec/` |
+| 2 | `skills/system-architect/`, `skills/aid-tech-spec/` |
+| 3 | `skills/aid-impl-plan/` **(Consolidation → Breakdown → Jira)** |
 | 4 | `skills/atomic-design/`, `skills/atomic-page-builder/` |
 | 4-5 | `skills/code-review/`, `skills/test-driven/` |
 | All | `skills/phase-enforcement/`, `skills/context-tracking/` |
@@ -149,6 +421,7 @@ cd my-app
 - Daily workflow: `docs/MORNING-STARTUP.md`
 - Components: `skills/atomic-design/references/`
 - Testing: `skills/test-driven/references/`
+- **WHY Framework: `skills/why-driven-decision/`**
 
 ---
 
@@ -187,9 +460,10 @@ python -m memory_system --status
 
 1. **Init**: `/aid-init` → Creates project state + memory system
 2. **Start**: `/aid-start` → Select role FIRST → Then select phase with role-specific terminology → Skills loaded
-3. **Work**: Claude applies loaded skills automatically
-4. **End**: `/aid-end` → Rate session (1-5) → Describe what worked/didn't
-5. **Learn**: `/aid-improve` → Analyze feedback → Update skills
+3. **WHY Check**: Before any work, establish WHY (automatic)
+4. **Work**: Claude applies loaded skills automatically
+5. **End**: `/aid-end` → Rate session (1-5) → Describe what worked/didn't
+6. **Learn**: `/aid-improve` → Analyze feedback → Update skills
 
 ### Role-Based Phase Terminology
 
@@ -210,6 +484,7 @@ Terminology mapping defined in: `.claude/references/role-phase-terminology.json`
 
 **Primary Skills** (Source of truth):
 - `.claude/skills/` - All skill definitions and prompts
+- `.claude/skills/why-driven-decision/` - **Foundational WHY skill (loads first)**
 
 **Memory System** (References + learnings):
 - `memory-system/skills/roles/{role}/` - Quick reference + cumulative learnings
@@ -226,3 +501,39 @@ Claude loads skills from `.claude/skills/` based on role and phase.
 ### Memory System Documentation
 
 Full documentation: `memory-system/docs/`
+
+---
+
+## Appendix: The 5 Whys Technique
+
+When WHY isn't clear, dig deeper:
+
+```
+Statement: "We need a dashboard"
+  Why? → "To see metrics"
+  Why? → "To track performance"
+  Why? → "To make better decisions"
+  Why? → "Because they're overwhelmed by data"
+  ROOT WHY: Reduce overwhelm, create clarity
+
+→ The real solution may not be a dashboard at all.
+```
+
+---
+
+## Appendix: WHY Statement Template
+
+After discovery, articulate clearly:
+
+```
+We believe that [CORE BELIEF].
+Therefore, we [HOW WE ACT ON IT].
+Which results in [WHAT WE CREATE].
+```
+
+**AID's WHY:**
+```
+We believe that great software comes from understanding purpose before writing code.
+Therefore, we enforce phase gates and WHY analysis at every step.
+Which results in products that solve real problems, not just implement features.
+```

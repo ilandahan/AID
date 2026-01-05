@@ -193,74 +193,26 @@ if exist "memory-system\templates\state.json" (
 )
 echo [OK] Global learning system initialized at %AID_HOME%
 
-REM Create .mcp.json if not exists (WINDOWS FORMAT)
+REM Create .mcp.json from Windows template (no inline defaults)
 echo.
 echo [STEP 7/7] Creating MCP configuration (Windows)...
 if not exist ".mcp.json" (
     if exist ".mcp.json.windows" (
         copy ".mcp.json.windows" ".mcp.json" >nul
         echo [OK] MCP configuration created from Windows template
+        echo.
+        echo   NOTE: Edit .mcp.json to add your API tokens:
+        echo     - ATLASSIAN_API_TOKEN (for Jira/Confluence^)
+        echo     - FIGMA_API_KEY (for Figma^)
+        echo     - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub^)
     ) else (
-        echo Creating .mcp.json with default configuration...
-        (
-echo {
-echo   "mcpServers": {
-echo     "filesystem": {
-echo       "type": "stdio",
-echo       "command": "cmd",
-echo       "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-filesystem", "."]
-echo     },
-echo     "chrome-devtools": {
-echo       "type": "stdio",
-echo       "command": "cmd",
-echo       "args": ["/c", "npx", "-y", "chrome-devtools-mcp@latest"]
-echo     },
-echo     "jira": {
-echo       "type": "stdio",
-echo       "command": "cmd",
-echo       "args": ["/c", "npx", "-y", "@aashari/mcp-server-atlassian-jira"],
-echo       "env": {
-echo         "ATLASSIAN_SITE_URL": "https://YOUR_SITE.atlassian.net",
-echo         "ATLASSIAN_USER_EMAIL": "your@email.com",
-echo         "ATLASSIAN_API_TOKEN": "YOUR_ATLASSIAN_API_TOKEN"
-echo       }
-echo     },
-echo     "confluence": {
-echo       "type": "stdio",
-echo       "command": "cmd",
-echo       "args": ["/c", "npx", "-y", "@aashari/mcp-server-atlassian-confluence"],
-echo       "env": {
-echo         "ATLASSIAN_SITE_URL": "https://YOUR_SITE.atlassian.net",
-echo         "ATLASSIAN_USER_EMAIL": "your@email.com",
-echo         "ATLASSIAN_API_TOKEN": "YOUR_ATLASSIAN_API_TOKEN"
-echo       }
-echo     },
-echo     "figma": {
-echo       "type": "stdio",
-echo       "command": "cmd",
-echo       "args": ["/c", "npx", "-y", "figma-developer-mcp", "--stdio"],
-echo       "env": {
-echo         "FIGMA_API_KEY": "YOUR_FIGMA_API_KEY"
-echo       }
-echo     },
-echo     "github": {
-echo       "type": "stdio",
-echo       "command": "cmd",
-echo       "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-github"],
-echo       "env": {
-echo         "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_GITHUB_TOKEN"
-echo       }
-echo     }
-echo   }
-echo }
-        ) > ".mcp.json"
-        echo [OK] MCP configuration created with defaults
+        echo [ERROR] .mcp.json.windows template not found!
+        echo.
+        echo   The Windows MCP template is required for installation.
+        echo   Please ensure .mcp.json.windows exists in the AID folder.
+        echo.
+        echo   You can create it manually or download from the AID repository.
     )
-    echo.
-    echo   NOTE: Edit .mcp.json to add your API tokens:
-    echo     - ATLASSIAN_API_TOKEN (for Jira/Confluence)
-    echo     - FIGMA_API_KEY (for Figma)
-    echo     - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)
 ) else (
     echo [OK] MCP configuration already exists
 )

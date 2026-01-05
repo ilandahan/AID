@@ -48,14 +48,8 @@ htmlcov/
 .env.production.local
 .env*.local
 
-# Catch ALL .env files in subdirectories
-**/.env
-**/.env.local
-**/.env.*.local
-
-# Keep examples
+# Keep example
 !.env.example
-!**/.env.example
 
 # ================== IDE & Editors ==================
 .idea/
@@ -109,6 +103,8 @@ lerna-debug.log*
 # State files (contain session-specific data)
 .aid/state.json
 .aid/context.json
+.aid/feedback/
+.aid/test-outputs/
 
 # Keep templates
 !templates/.aid/
@@ -155,4 +151,29 @@ service-account.json
 generated/
 .generated/
 *.generated.*
+
+# ================== Windows Specific ==================
+# Windows null device file
 nul
+
+# ================== AID Test Outputs ==================
+# Test harness output directories - generated during testing
+.aidtest-*/
+.aidtest-outputs*/
+
+# ================== LLM Context Files ==================
+# These can be regenerated and are often large
+llm.txt
+llms.txt
+llms-full.txt
+
+# ================== Claude Settings ==================
+# Local Claude settings (machine-specific)
+.claude/settings.local.json
+**/settings.local.json
+skills/.claude/
+
+# ================== Extended/Generated Documentation ==================
+# Auto-generated extended skill files
+*.extended.md
+.claude/test-agent/

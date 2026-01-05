@@ -1,214 +1,143 @@
 # Learning Mode - Simulation Examples
 
-Real interaction examples showing Learning Mode in action across phases and roles.
-
----
+Real interaction examples showing Learning Mode in action.
 
 ## Simulation 1: Architecture Decision with Debate
 
-### Context
-- **Phase:** 2 - Tech Spec
-- **Role:** Developer
-- **Task:** Choose database for new project
-
-### Interaction
+**Context:** Phase 2 Tech Spec, Developer, Database choice
 
 **User:** We need to decide on a database for the new e-commerce platform.
 
 **Claude:**
 
-Let me analyze the options based on your project requirements.
-
+```markdown
 <debate-invitation>
 **Topic:** Database selection for e-commerce platform
 
 **Option A: PostgreSQL**
-- ✅ Pros:
-  - Strong ACID compliance for financial transactions
-  - Excellent relational query support
-  - Rich ecosystem, battle-tested
-  - JSON support for flexible product attributes
-- ❌ Cons:
-  - Horizontal scaling requires more effort
-  - Can be complex for simple read-heavy workloads
+- Pros: Strong ACID compliance, excellent relational queries, battle-tested, JSON support
+- Cons: Horizontal scaling requires more effort
 - Best when: Complex queries, financial data, relationships matter
 
 **Option B: MongoDB**
-- ✅ Pros:
-  - Flexible schema for varied product types
-  - Easy horizontal scaling
-  - Fast reads for catalog browsing
-- ❌ Cons:
-  - Weaker transaction support (improved in recent versions)
-  - Can lead to data inconsistency if not careful
-  - Joins are expensive
+- Pros: Flexible schema, easy horizontal scaling, fast reads
+- Cons: Weaker transaction support, joins are expensive
 - Best when: Catalog-heavy, varied product schemas, scale-out needed
 
 **Option C: PostgreSQL + Redis Cache**
-- ✅ Pros:
-  - Best of both: ACID for orders + fast reads for catalog
-  - Proven pattern for e-commerce
-- ❌ Cons:
-  - Two systems to maintain
-  - Cache invalidation complexity
+- Pros: Best of both: ACID for orders + fast reads for catalog
+- Cons: Two systems to maintain, cache invalidation complexity
 - Best when: High traffic, need both reliability and speed
 
-**My Lean:** Option C (PostgreSQL + Redis) - E-commerce needs transaction safety for orders AND fast catalog reads. This is the proven pattern used by most successful platforms.
+**My Lean:** Option C - E-commerce needs transaction safety for orders AND fast catalog reads.
 
-**But Consider:** If team has limited DevOps capacity, managing two data stores adds complexity. Pure PostgreSQL with proper indexing might be simpler to start.
+**But Consider:** If team has limited DevOps capacity, managing two data stores adds complexity.
 
-**Your Input Needed:**
-- What's the expected traffic level?
-- Does the team have Redis experience?
-- How varied are the product types (standard vs. completely different attributes)?
+**Your Input Needed:** Expected traffic? Team Redis experience? How varied are product types?
 </debate-invitation>
+```
 
-**User:** We expect moderate traffic initially, team knows PostgreSQL well but not Redis. Products are fairly standard with some custom attributes.
+**User:** Moderate traffic, team knows PostgreSQL but not Redis. Products fairly standard.
 
 **Claude:**
 
+```markdown
 <decision-transparency>
-**Decision:** PostgreSQL only (Option A) with JSON columns for custom attributes
+**Decision:** PostgreSQL only with JSON columns for custom attributes
 
 **Reasoning:**
 - **Traffic level**: Moderate traffic doesn't require cache layer initially
 - **Team expertise**: Team knows PostgreSQL, no Redis experience = faster development
-- **Product structure**: Fairly standard products means relational model works well
-- **Custom attributes**: PostgreSQL's JSONB handles flexible attributes efficiently
+- **Product structure**: Standard products suit relational model well
 - **Future path**: Can add Redis later if traffic demands it
 
 **Alternatives Considered:**
 1. PostgreSQL + Redis - Deferred: Adds complexity team isn't ready for
-2. MongoDB - Rejected: Team expertise is in PostgreSQL, standard products suit relational model
+2. MongoDB - Rejected: Team expertise is in PostgreSQL
 
 **Confidence:** High - Clear match between requirements and solution
 
 **Open to Debate:** Yes - If you anticipate rapid traffic growth, we could discuss Redis from day 1
 </decision-transparency>
 
-I'll proceed with PostgreSQL in the tech spec. We'll use JSONB columns for custom product attributes, which gives you flexibility without sacrificing query performance.
-
 <learning-captured>
 **What I Learned:**
-This team values simplicity and leveraging existing expertise over optimal architecture when trade-offs are acceptable.
-
-**Source:**
-- User feedback on: Database selection debate
-- Decision context: Chose simpler option due to team familiarity
+This team values simplicity and leveraging existing expertise over optimal architecture.
 
 **Applied To:**
 - Future architecture decisions will weight team expertise more heavily
 - Will present "start simple, add complexity later" as valid pattern
-
-**Verification:**
-- Will apply this preference in infrastructure decisions
 </learning-captured>
+```
 
 ---
 
 ## Simulation 2: PRD Phase Feedback
 
-### Context
-- **Phase:** 1 - PRD
-- **Role:** Product Manager
-- **Task:** Complete user authentication PRD
-
-### Interaction
+**Context:** Phase 1 PRD, PM, Authentication
 
 **Claude:**
 
-I've completed the draft PRD for the User Authentication feature. Here's a summary:
-
-**Scope:**
+PRD draft completed for User Authentication:
 - Email/password registration and login
 - Password reset flow
 - Session management
 - OAuth (Google, GitHub) - Phase 2
 
-**User Stories:** 12 stories covering registration, login, logout, password management
-
-**Acceptance Criteria:** Defined for each story with specific, testable conditions
-
+```markdown
 <feedback-request>
 **Context:** PRD draft completed for User Authentication feature
 
 **Seeking Feedback On:**
-1. **Completeness**: Did I capture all authentication scenarios?
-2. **Scope boundaries**: Is OAuth correctly deferred to Phase 2?
-3. **Acceptance criteria**: Are they specific and testable enough?
-4. **Security considerations**: Did I address the key security requirements?
+1. Completeness: Did I capture all authentication scenarios?
+2. Scope boundaries: Is OAuth correctly deferred to Phase 2?
+3. Acceptance criteria: Are they specific and testable enough?
 
 **Questions:**
 - Should "Remember me" functionality be in Phase 1 or deferred?
-- Are there specific compliance requirements (SOC2, GDPR) I should address?
-- Is the session timeout (24 hours) appropriate for your use case?
+- Are there specific compliance requirements (SOC2, GDPR)?
+- Is the session timeout (24 hours) appropriate?
 
-**Rating Request:** On a scale of 1-5, how well does this PRD capture your requirements?
-- 1 = Missing major requirements
-- 3 = Good start but needs work
-- 5 = Ready for Tech Spec phase
-
-**Improvement Ideas Welcome:** What would make this PRD better?
+**Rating Request:** 1-5, how well does this PRD capture your requirements?
 </feedback-request>
+```
 
-**User:** Rating: 4. Good work. Add "Remember me" to Phase 1, session timeout should be 7 days for remembered sessions. Also need to add rate limiting for login attempts - security requirement.
+**User:** Rating: 4. Add "Remember me" to Phase 1, session timeout 7 days for remembered. Also need rate limiting for login attempts.
 
 **Claude:**
 
-Thank you for the feedback. I'll update the PRD with these additions:
-
+```markdown
 <learning-captured>
 **What I Learned:**
-1. "Remember me" is a baseline expectation, not a nice-to-have
-2. This team has specific security requirements (rate limiting) that should be proactively addressed
-3. 7-day session for remembered users is the preferred default
-
-**Source:**
-- User feedback on: PRD Authentication phase
-- Rating: 4/5 with specific improvements
+1. "Remember me" is baseline expectation, not nice-to-have
+2. This team has specific security requirements (rate limiting) to proactively address
+3. 7-day session for remembered users is preferred default
 
 **Applied To:**
-- Future authentication PRDs will include "Remember me" by default
-- Will proactively include rate limiting in any login-related feature
-- Will ask about session duration preferences early
-
-**Verification:**
-- Will check for these patterns in next security-related PRD
+- Future auth PRDs will include "Remember me" by default
+- Will proactively include rate limiting in login-related features
 </learning-captured>
+```
 
-**Updates made:**
-1. ✅ Added "Remember me" checkbox to login flow (Phase 1)
-2. ✅ Updated session management:
-   - Standard session: 24 hours
-   - Remembered session: 7 days
-3. ✅ Added new user story: "Rate Limiting for Login Attempts"
-   - Max 5 failed attempts per 15 minutes
-   - Lockout notification email
-   - Admin unlock capability
-
-Shall I proceed with the Tech Spec phase, or are there other PRD adjustments needed?
+Updates made:
+1. Added "Remember me" to login flow (Phase 1)
+2. Updated sessions: Standard 24h, Remembered 7 days
+3. Added rate limiting: Max 5 failed attempts/15 min, lockout notification
 
 ---
 
 ## Simulation 3: Code Review with Learning
 
-### Context
-- **Phase:** 4 - Development
-- **Role:** Developer
-- **Task:** Review submitted code
+**Context:** Phase 4 Development, Developer, Code review
 
-### Interaction
-
-**User:** Please review my authentication middleware code.
+**User:** Please review my authentication middleware:
 
 ```typescript
 const authMiddleware = async (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
-
   if (!token) {
     return res.status(401).json({ error: 'No token provided' });
   }
-
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
@@ -221,401 +150,223 @@ const authMiddleware = async (req, res, next) => {
 
 **Claude:**
 
+```markdown
 <decision-transparency>
 **Decision:** Approve with minor suggestions
 
 **Reasoning:**
-- **Core logic**: Correct - token extraction, verification, and error handling are proper
-- **Security**: Good - doesn't expose internal error details
-- **Pattern**: Standard JWT middleware pattern
-
-**Issues Found:**
-1. Minor: No TypeScript types (if using TS)
-2. Minor: Could benefit from token expiration check (though jwt.verify handles this)
+- Core logic correct - token extraction, verification, error handling proper
+- Security good - doesn't expose internal error details
+- Pattern: Standard JWT middleware
 
 **Confidence:** High - This is standard, secure middleware
-
-**Open to Debate:** No - This is straightforward approval
 </decision-transparency>
+```
 
-**Review Result: ✅ Approved**
+Review Result: Approved
 
-The code is solid. A few optional improvements:
-
+Optional improvement if using TypeScript:
 ```typescript
-// Optional: Add explicit typing if using TypeScript
 interface JWTPayload {
   userId: string;
   email: string;
-  iat: number;
-  exp: number;
 }
-
 const authMiddleware = async (
   req: Request & { user?: JWTPayload },
   res: Response,
   next: NextFunction
-) => {
-  // ... same logic
-};
+) => { /* same logic */ };
 ```
 
-The current implementation correctly:
-- Extracts Bearer token
-- Handles missing token case
-- Verifies JWT (including expiration)
-- Doesn't leak error details
-
-**User:** Actually, we don't use TypeScript in this project. Also, I prefer keeping middleware simple - no need for the explicit typing suggestion.
+**User:** We don't use TypeScript. Prefer keeping middleware simple.
 
 **Claude:**
 
+```markdown
 <learning-captured>
 **What I Learned:**
 1. This project uses JavaScript, not TypeScript
-2. Team prefers simple, minimal middleware over defensive typing
-3. Should check project language before suggesting TypeScript patterns
-
-**Source:**
-- User feedback on: Code review suggestions
-- Context: TypeScript suggestions were not applicable
+2. Team prefers simple, minimal middleware
+3. Should check project language before suggesting typed patterns
 
 **Applied To:**
 - Will check package.json/project config before suggesting typed patterns
-- Will keep middleware suggestions minimal unless complexity warrants it
 - JavaScript projects get JavaScript suggestions
-
-**Verification:**
-- Next code review will check project language first
 </learning-captured>
+```
 
-Understood! Your middleware is good as-is. Clean, simple, and handles the essential cases correctly.
-
-For this JavaScript project, I'll keep future suggestions focused on logic and security rather than typing patterns.
+Understood! Your middleware is good as-is - clean, simple, handles essential cases.
 
 ---
 
 ## Simulation 4: Tech Spec Phase Gate
 
-### Context
-- **Phase:** 2 - Tech Spec (completing)
-- **Role:** Tech Lead
-- **Task:** Phase gate review
-
-### Interaction
+**Context:** Phase 2 Tech Spec completing, Tech Lead
 
 **Claude:**
 
-Phase 2 (Tech Spec) is complete. Here's the summary:
+```markdown
+<feedback-request>
+**Context:** Phase 2 Technical Specification completed
 
 **Deliverables:**
-- System architecture diagram
-- Database schema (PostgreSQL)
-- API contracts (OpenAPI spec)
-- Security architecture
-- Infrastructure requirements
-
-<feedback-request>
-**Context:** Phase 2 - Technical Specification completed
-
-**Phase Deliverables:**
-- ✅ System Architecture: Microservices with API Gateway
-- ✅ Database Schema: 15 tables, normalized with proper indexes
-- ✅ API Contracts: 42 endpoints documented in OpenAPI
-- ✅ Security: JWT auth, rate limiting, input validation
-- ✅ Infrastructure: AWS ECS, RDS, ElastiCache
+- System Architecture: Microservices with API Gateway
+- Database Schema: 15 tables, normalized
+- API Contracts: 42 endpoints in OpenAPI
+- Security: JWT auth, rate limiting
+- Infrastructure: AWS ECS, RDS, ElastiCache
 
 **Seeking Feedback On:**
-1. Is the architecture appropriate for the scale we discussed?
-2. Are the API contracts complete enough for frontend development?
-3. Any security concerns I should address before implementation?
+1. Is architecture appropriate for discussed scale?
+2. Are API contracts complete for frontend development?
+3. Any security concerns before implementation?
 
-**Questions:**
-- Should we add WebSocket specs for real-time features?
-- Is the proposed caching strategy sufficient?
-- Any infrastructure preferences I should know about?
-
-**Rating Request:** On a scale of 1-5, how ready are we for Implementation Planning?
-- 1 = Major gaps, need significant rework
-- 3 = Some concerns but can proceed
-- 5 = Excellent, ready for Phase 3
-
-**Improvement Ideas Welcome:** What would strengthen this spec?
+**Rating:** 1-5, how ready for Implementation Planning?
 </feedback-request>
+```
 
-**User:** Rating: 3. The spec is good but I have concerns about the microservices approach for our small team. Also, we need WebSocket specs for the notification system. Let's discuss the architecture.
+**User:** Rating: 3. Concerns about microservices for our small team. Need WebSocket specs for notifications.
 
 **Claude:**
 
+```markdown
 <debate-invitation>
 **Topic:** Architecture approach - Microservices vs Monolith for small team
 
-**Option A: Keep Microservices (Current)**
-- ✅ Pros:
-  - Independent scaling per service
-  - Technology flexibility
-  - Clear service boundaries
-- ❌ Cons:
-  - Operational overhead for small team
-  - Network complexity
-  - Distributed debugging challenges
+**Option A: Keep Microservices**
+- Pros: Independent scaling, technology flexibility, clear boundaries
+- Cons: Operational overhead, network complexity, distributed debugging
 - Best when: Large team, need independent deployments
 
 **Option B: Modular Monolith**
-- ✅ Pros:
-  - Simpler operations (one deployment)
-  - Easier debugging
-  - Lower infrastructure cost
-  - Can extract to microservices later
-- ❌ Cons:
-  - All-or-nothing deployments
-  - Potential for tight coupling if not careful
+- Pros: Simpler ops (one deployment), easier debugging, lower cost, can extract later
+- Cons: All-or-nothing deployments, potential coupling
 - Best when: Small team, rapid iteration, unclear scaling needs
 
-**Option C: Hybrid (API Gateway + Monolith Core)**
-- ✅ Pros:
-  - Simple core with flexibility for extraction
-  - API Gateway handles cross-cutting concerns
-  - Best path for "start simple, scale later"
-- ❌ Cons:
-  - Still need API Gateway ops
-- Best when: Want to keep options open
+**Option C: Hybrid (Monolith + Notification Service)**
+- Pros: Simple core with flexibility, best "start simple, scale later" path
+- Cons: Still need some distributed ops
+- Best when: Want options open
 
-**My Lean:** Option B (Modular Monolith) given the small team context you mentioned. We can design with clear module boundaries so extraction is possible later.
+**My Lean:** Option B given small team. Design with module boundaries for later extraction.
 
-**But Consider:** If one specific service (like notifications) has very different scaling needs, we could do Option C - monolith core with notifications as separate service.
-
-**Your Input Needed:**
-- How small is the team?
-- Do you anticipate any specific service needing independent scaling?
+**Your Input Needed:** How small is team? Any service needing independent scaling?
 </debate-invitation>
+```
 
-**User:** Team is 3 developers. Go with modular monolith. Notifications can be a separate service since it might have different load patterns.
+**User:** Team is 3 developers. Go modular monolith. Notifications separate since different load patterns.
 
 **Claude:**
 
+```markdown
 <decision-transparency>
-**Decision:** Hybrid architecture - Modular Monolith + Notification Microservice
+**Decision:** Hybrid - Modular Monolith + Notification Microservice
 
 **Reasoning:**
-- **Team size (3)**: Too small for full microservices operational overhead
-- **Core services**: Auth, Users, Products, Orders → Monolith with clear modules
-- **Notifications**: Separate service due to different scaling patterns (spiky during events)
-- **Future flexibility**: Module boundaries allow extraction if/when team grows
-
-**Alternatives Considered:**
-1. Full microservices - Rejected: Too much ops overhead for 3 devs
-2. Pure monolith - Modified: Notifications genuinely benefits from separation
+- **Team size (3)**: Too small for full microservices overhead
+- **Core services**: Auth, Users, Products, Orders -> Monolith with modules
+- **Notifications**: Separate due to spiky scaling patterns
+- **Future**: Module boundaries allow extraction when team grows
 
 **Confidence:** High - Clear team size and scaling constraints
-
-**Open to Debate:** No - User decision is clear
 </decision-transparency>
 
 <learning-captured>
 **What I Learned:**
 1. Team size is critical context for architecture decisions
-2. For small teams (≤5), default to monolith unless specific service needs differ
+2. For small teams (<=5), default to monolith unless specific needs differ
 3. This team prefers practical over theoretical optimal
-
-**Source:**
-- User feedback on: Architecture debate
-- Context: 3-person team, chose modular monolith
 
 **Applied To:**
 - Will ask about team size early in Tech Spec phase
 - Will default to simpler architectures for small teams
-- Will only suggest microservices for specific, justified services
-
-**Verification:**
-- Next project architecture will start with team size question
 </learning-captured>
-
-I'll update the Tech Spec with:
-
-1. **Core Architecture:** Modular Monolith
-   - Auth module
-   - Users module
-   - Products module
-   - Orders module
-
-2. **Separate Service:** Notifications
-   - WebSocket support for real-time
-   - Independent scaling
-   - Message queue integration with core
-
-3. **Infrastructure:** Simplified
-   - Single ECS service for core (vs 5 separate)
-   - Separate ECS service for notifications
-   - Shared RDS
-
-Shall I proceed with these updates and add the WebSocket specifications?
+```
 
 ---
 
 ## Simulation 5: Test Strategy Debate
 
-### Context
-- **Phase:** 4 - Development
-- **Role:** QA Engineer
-- **Task:** Define test strategy
+**Context:** Phase 4 Development, QA, Test strategy
 
-### Interaction
-
-**User:** We need to define the testing approach for the checkout flow.
+**User:** Need to define testing approach for checkout flow.
 
 **Claude:**
 
+```markdown
 <debate-invitation>
 **Topic:** Test strategy for checkout flow
 
 **Option A: Heavy Unit Testing**
-- ✅ Pros: Fast feedback, isolated, easy to maintain
-- ❌ Cons: Doesn't catch integration issues, can miss real-world failures
-- Coverage target: 90% unit, 10% integration, few E2E
+- Pros: Fast feedback, isolated, easy to maintain
+- Cons: Doesn't catch integration issues
+- Target: 90% unit, 10% integration, few E2E
 
 **Option B: Integration-Focused**
-- ✅ Pros: Tests real interactions, catches more bugs
-- ❌ Cons: Slower, harder to debug failures, flakier
-- Coverage target: 50% unit, 40% integration, 10% E2E
+- Pros: Tests real interactions, catches more bugs
+- Cons: Slower, harder to debug, flakier
+- Target: 50% unit, 40% integration, 10% E2E
 
-**Option C: E2E-Heavy with Critical Path Coverage**
-- ✅ Pros: Tests what users actually do, highest confidence
-- ❌ Cons: Slowest, most brittle, expensive to maintain
-- Coverage target: 30% unit, 30% integration, 40% E2E
+**Option C: E2E-Heavy**
+- Pros: Tests what users do, highest confidence
+- Cons: Slowest, most brittle, expensive
+- Target: 30% unit, 30% integration, 40% E2E
 
 **Option D: Testing Trophy (Recommended)**
-- ✅ Pros: Balanced - unit for logic, integration for flows, E2E for critical paths
-- ❌ Cons: Requires discipline to maintain balance
-- Coverage target: 40% unit, 40% integration, 20% E2E
+- Pros: Balanced - unit for logic, integration for flows, E2E for critical
+- Cons: Requires discipline
+- Target: 40% unit, 40% integration, 20% E2E
 
-**My Lean:** Option D (Testing Trophy) - Checkout is critical and complex:
-- Unit tests for price calculations, validation logic
-- Integration tests for payment gateway, inventory checks
-- E2E tests for complete happy path + key failure scenarios
+**My Lean:** Option D - Checkout is critical and complex
 
-**But Consider:** If CI pipeline time is a constraint, we might lean more toward Option A with strategic E2E.
-
-**Your Input Needed:**
-- What's the acceptable CI pipeline time?
-- How critical is checkout (is it the core revenue path)?
-- Does the team have E2E testing experience (Playwright/Cypress)?
+**Your Input Needed:** Acceptable CI time? How critical is checkout? Team E2E experience?
 </debate-invitation>
+```
 
-**User:** Checkout is critical - it's 100% of revenue. Team knows Playwright. CI time should stay under 10 minutes for PRs.
+**User:** Checkout is critical - 100% of revenue. Team knows Playwright. CI under 10 min.
 
 **Claude:**
 
+```markdown
 <decision-transparency>
 **Decision:** Testing Trophy with optimized E2E for CI
 
 **Reasoning:**
-- **Revenue criticality**: 100% of revenue = maximum coverage needed
+- **Revenue criticality**: 100% = maximum coverage needed
 - **Team capability**: Playwright experience enables E2E
 - **CI constraint**: 10 min limit requires smart test selection
 
 **Strategy:**
-1. **Unit tests (40%)**: Price calc, discounts, validation - runs in < 1 min
-2. **Integration tests (40%)**: Payment mock, inventory service - runs in < 3 min
-3. **E2E tests (20%)**: Critical paths only, parallelized - runs in < 5 min
-4. **Full E2E suite**: Runs on merge to main (not PRs)
-
-**Test Distribution for Checkout:**
-- Unit: ~25 tests (calculation logic)
-- Integration: ~15 tests (service interactions)
-- E2E: ~5 tests (critical happy/error paths)
-
-**Confidence:** High - Matches constraints and criticality
-
-**Open to Debate:** Yes - E2E test selection could be discussed
-</decision-transparency>
-
-Here's the detailed test plan:
+1. Unit (40%): Price calc, discounts, validation - < 1 min
+2. Integration (40%): Payment mock, inventory - < 3 min
+3. E2E (20%): Critical paths, parallelized - < 5 min
+4. Full E2E: On merge to main only
 
 **PR Pipeline (< 10 min):**
+- Unit: Cart calculations, discount validation, address validation
+- Integration: Payment gateway (mocked), inventory check, order creation
+- E2E critical paths: Happy path, payment failure, out of stock, discount code, guest checkout
+
+**Confidence:** High - Matches constraints and criticality
+</decision-transparency>
 ```
-Unit tests: ~1 min
-├── Cart calculations
-├── Discount validation
-├── Address validation
-└── Order total logic
-
-Integration tests: ~3 min
-├── Payment gateway (mocked)
-├── Inventory check
-├── Order creation
-└── Email trigger
-
-E2E critical paths: ~5 min (parallelized)
-├── Happy path: Add → Cart → Checkout → Payment → Confirmation
-├── Payment failure + retry
-├── Out of stock handling
-├── Discount code application
-└── Guest vs logged-in checkout
-```
-
-**Main branch (full suite):**
-- All above + edge cases
-- Multiple payment methods
-- International addresses
-- Various product combinations
-
-<feedback-request>
-**Context:** Test strategy defined for checkout
-
-**Seeking Feedback On:**
-1. Is the test distribution appropriate?
-2. Are the E2E critical paths correct?
-3. Any scenarios I'm missing?
-
-**Rating:** 1-5 for this test strategy?
-</feedback-request>
 
 ---
 
-## Key Patterns Demonstrated
+## Key Patterns
 
-| Pattern | Shown In |
-|---------|----------|
-| Decision Transparency | Simulations 1, 3, 4, 5 |
-| Debate Invitation | Simulations 1, 4, 5 |
-| Feedback Request | Simulations 2, 4, 5 |
-| Learning Capture | All simulations |
-| User Preference Integration | Simulations 1, 3, 4 |
-| Phase Gate Review | Simulation 4 |
+| Pattern | Used In |
+|---------|---------|
+| Decision Transparency | 1, 3, 4, 5 |
+| Debate Invitation | 1, 4, 5 |
+| Feedback Request | 2, 4 |
+| Learning Capture | All |
 
----
+## Anti-Patterns
 
-## Anti-Patterns to Avoid
-
-### ❌ Over-ceremony for Simple Decisions
-
-**Bad:**
-```
-<debate-invitation>
-**Topic:** Variable naming
-
-**Option A:** `userData`
-**Option B:** `userInfo`
-...
-```
-
-**Good:** Just use consistent naming and move on.
-
-### ❌ Ignoring User Signals
-
-**Bad:** Continuing to suggest TypeScript after user said they use JavaScript.
-
-**Good:** Capture learning and adapt immediately.
-
-### ❌ Fake Debates (When Answer is Obvious)
-
-**Bad:** Creating a debate when there's clearly one right answer.
-
-**Good:** Use Decision Transparency to explain the obvious choice.
-
-### ❌ Too Many Feedback Requests
-
-**Bad:** Asking for rating after every small task.
-
-**Good:** Request feedback at meaningful milestones and phase gates.
+| Dont | Example |
+|------|---------|
+| Over-ceremony for simple | Debate on variable naming |
+| Ignore user signals | Suggest TS after user said JS |
+| Fake debates | When answer is obvious |
+| Too many feedback requests | After every small task |

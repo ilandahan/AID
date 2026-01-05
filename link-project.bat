@@ -136,18 +136,17 @@ echo }
     echo [SKIP] context.json already exists
 )
 
-REM Copy .mcp.json (Windows format)
+REM Copy .mcp.json (Windows template ONLY - no fallback)
 echo.
 echo Copying MCP configuration (Windows)...
 if not exist "%TARGET_PATH%\.mcp.json" (
     if exist "%AID_PATH%\.mcp.json.windows" (
         copy "%AID_PATH%\.mcp.json.windows" "%TARGET_PATH%\.mcp.json" >nul
-        echo [OK] .mcp.json copied (Windows format - edit with your API tokens)
-    ) else if exist "%AID_PATH%\.mcp.json" (
-        copy "%AID_PATH%\.mcp.json" "%TARGET_PATH%\.mcp.json" >nul
-        echo [OK] .mcp.json copied (edit with your API tokens)
+        echo [OK] .mcp.json copied from Windows template
+        echo     Edit with your API tokens: ATLASSIAN_API_TOKEN, FIGMA_API_KEY, GITHUB_TOKEN
     ) else (
-        echo [WARNING] .mcp.json not found
+        echo [ERROR] .mcp.json.windows template not found in AID folder!
+        echo         Please ensure .mcp.json.windows exists at: %AID_PATH%
     )
 ) else (
     echo [SKIP] .mcp.json already exists

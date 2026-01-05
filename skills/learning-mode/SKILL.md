@@ -1,45 +1,18 @@
 ---
 name: learning-mode
-description: Decision transparency, feedback collection, and debate invitations for AID methodology. Use this skill to explain reasoning, invite user feedback, and continuously improve through learning. Active in ALL phases for ALL roles.
+description: Decision transparency, feedback collection, and debate invitations for AID methodology. Active in ALL phases for ALL roles.
 ---
 
 # Learning Mode Skill
 
 Enables transparent decision-making, feedback collection, and continuous improvement.
 
-## ⚠️ CRITICAL: Always Active
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│  🎓 LEARNING MODE IS ALWAYS ON                                          │
-│                                                                         │
-│  This skill is NOT optional. Claude MUST:                               │
-│  1. Show decision transparency for significant choices                  │
-│  2. Request feedback at phase gates                                     │
-│  3. Invite debate when alternatives exist                               │
-│  4. Learn from user corrections                                         │
-│                                                                         │
-│  Goal: Build trust through transparency and improve over time           │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
 ## Core Principles
 
-### 1. Decision Transparency
-Show the reasoning behind significant decisions, not just the output.
-
-### 2. Feedback Integration
-Actively request and incorporate user feedback.
-
-### 3. Debate Invitation
-When multiple valid approaches exist, present them and invite discussion.
-
-### 4. Continuous Learning
-Use feedback to improve future recommendations.
-
----
+1. Decision Transparency - Show reasoning behind significant decisions
+2. Feedback Integration - Actively request and incorporate user feedback
+3. Debate Invitation - Present multiple valid approaches for discussion
+4. Continuous Learning - Use feedback to improve future recommendations
 
 ## Decision Transparency
 
@@ -47,14 +20,14 @@ Use feedback to improve future recommendations.
 
 | Situation | Show Reasoning? |
 |-----------|-----------------|
-| Architecture decisions | ✅ Always |
-| Technology choices | ✅ Always |
-| Trade-off selections | ✅ Always |
-| Pattern selection | ✅ When alternatives exist |
-| Scope decisions | ✅ Always |
-| Simple/obvious choices | ❌ Skip (reduces noise) |
+| Architecture decisions | Yes |
+| Technology choices | Yes |
+| Trade-off selections | Yes |
+| Pattern selection | When alternatives exist |
+| Scope decisions | Yes |
+| Simple/obvious choices | Skip |
 
-### Transparency Block Format
+### Format
 
 ```markdown
 <decision-transparency>
@@ -63,7 +36,6 @@ Use feedback to improve future recommendations.
 **Reasoning:**
 - [Factor 1]: [How it influenced the decision]
 - [Factor 2]: [How it influenced the decision]
-- [Factor 3]: [How it influenced the decision]
 
 **Alternatives Considered:**
 1. [Alternative 1] - Rejected because: [reason]
@@ -98,11 +70,9 @@ Use feedback to improve future recommendations.
 </decision-transparency>
 ```
 
----
-
 ## Feedback Requests
 
-### When to Request Feedback
+### When to Request
 
 | Trigger | Feedback Type |
 |---------|---------------|
@@ -112,7 +82,7 @@ Use feedback to improve future recommendations.
 | Multiple paths available | Direction preference |
 | Work session ending | Progress check |
 
-### Feedback Request Format
+### Format
 
 ```markdown
 <feedback-request>
@@ -121,15 +91,11 @@ Use feedback to improve future recommendations.
 **Seeking Feedback On:**
 1. [Specific aspect 1]
 2. [Specific aspect 2]
-3. [Specific aspect 3]
 
 **Questions:**
 - [Specific question about quality/direction/completeness]
 
 **Rating Request:** On a scale of 1-5, how well did this meet your expectations?
-- 1 = Significantly off track
-- 3 = Acceptable but could improve
-- 5 = Excellent, exactly what was needed
 
 **Improvement Ideas Welcome:** What would make this better?
 </feedback-request>
@@ -157,35 +123,33 @@ Use feedback to improve future recommendations.
 </feedback-request>
 ```
 
----
-
 ## Debate Invitations
 
-### When to Invite Debate
+### When to Invite
 
-| Situation | Invite Debate? |
-|-----------|----------------|
-| Multiple viable architectures | ✅ Yes |
-| Trade-offs with no clear winner | ✅ Yes |
-| User's stated preference conflicts with best practice | ✅ Yes (respectfully) |
-| Scope ambiguity | ✅ Yes |
-| Single obvious correct answer | ❌ No |
-| User explicitly decided already | ❌ No |
+| Situation | Invite? |
+|-----------|---------|
+| Multiple viable architectures | Yes |
+| Trade-offs with no clear winner | Yes |
+| User preference vs best practice | Yes |
+| Scope ambiguity | Yes |
+| Single obvious correct answer | No |
+| User explicitly decided | No |
 
-### Debate Invitation Format
+### Format
 
 ```markdown
 <debate-invitation>
 **Topic:** [What we're deciding]
 
 **Option A: [Name]**
-- ✅ Pros: [list]
-- ❌ Cons: [list]
+- Pros: [list]
+- Cons: [list]
 - Best when: [conditions]
 
 **Option B: [Name]**
-- ✅ Pros: [list]
-- ❌ Cons: [list]
+- Pros: [list]
+- Cons: [list]
 - Best when: [conditions]
 
 **My Lean:** [Which option and why]
@@ -203,13 +167,13 @@ Use feedback to improve future recommendations.
 **Topic:** API design approach for the notification service
 
 **Option A: REST API**
-- ✅ Pros: Simple, well-understood, great tooling, cacheable
-- ❌ Cons: Multiple requests for related data, over-fetching
+- Pros: Simple, well-understood, great tooling, cacheable
+- Cons: Multiple requests for related data, over-fetching
 - Best when: Simple CRUD operations, caching important
 
 **Option B: GraphQL**
-- ✅ Pros: Single request for complex data, client-driven queries
-- ❌ Cons: More complex setup, learning curve, harder caching
+- Pros: Single request for complex data, client-driven queries
+- Cons: More complex setup, learning curve, harder caching
 - Best when: Complex data relationships, mobile clients
 
 **My Lean:** REST API - Notifications are simple CRUD, team knows REST
@@ -220,13 +184,9 @@ Use feedback to improve future recommendations.
 </debate-invitation>
 ```
 
----
-
 ## Learning Integration
 
-### Capturing Learnings
-
-When user provides feedback or correction:
+### Format
 
 ```markdown
 <learning-captured>
@@ -265,124 +225,50 @@ This team prefers detailed inline comments over separate documentation files for
 </learning-captured>
 ```
 
----
+## Phase-Specific Behaviors
 
-## Phase-Specific Learning Behaviors
+| Phase | Transparency | Debate | Feedback |
+|-------|--------------|--------|----------|
+| 1 PRD | Prioritization, Scope | Scope boundaries | Story completeness |
+| 2 Tech Spec | Architecture, Tech | DB, Patterns | Spec readiness |
+| 3 Breakdown | Task sizing | Granularity | Estimate accuracy |
+| 4 Development | Pattern selection | Approach | Code quality |
+| 5 QA & Ship | Coverage decisions | Test strategy | Release readiness |
 
-### Phase 1: PRD
-- Invite debate on scope boundaries
-- Request feedback on user story completeness
-- Show transparency on prioritization decisions
+## Role-Specific Behaviors
 
-### Phase 2: Tech Spec
-- Invite debate on architecture choices
-- Request feedback on technology selections
-- Show transparency on trade-off decisions
+| Role | Transparency Focus | Debate Focus | Feedback Focus |
+|------|-------------------|--------------|----------------|
+| PM | Prioritization | Scope | Requirements |
+| Dev | Pattern choices | Technical approach | Code quality |
+| Lead | Architecture | Technology | Direction |
+| QA | Coverage | Test strategy | Quality |
 
-### Phase 3: Implementation Planning
-- Invite debate on task breakdown granularity
-- Request feedback on effort estimates
-- Show transparency on dependency decisions
+## Confidence Levels
 
-### Phase 4: Development
-- Request feedback on code review findings
-- Show transparency on pattern selections
-- Invite debate on optimization approaches
+| Level | When | Action |
+|-------|------|--------|
+| High | Clear requirements | Execute |
+| Medium | Some uncertainty | Execute + note concern |
+| Low | Multiple unknowns | Invite debate |
+| Uncertain | Can't decide | Ask clarifying question |
 
-### Phase 5: QA & Ship
-- Request feedback on test coverage
-- Show transparency on release decisions
-- Invite debate on deployment strategies
+## Rating Scale
 
----
+| Rating | Meaning | Response |
+|--------|---------|----------|
+| 5 | Excellent | Continue |
+| 4 | Good | Minor tweaks |
+| 3 | Acceptable | Ask for improvements |
+| 2 | Needs work | Request changes |
+| 1 | Off track | Full realignment |
 
-## Role-Specific Learning Behaviors
+## Anti-Patterns
 
-### Product Manager Role
-- Focus on: Scope debates, requirement clarity
-- Request feedback on: User story quality, acceptance criteria
-- Show transparency on: Prioritization decisions
-
-### Developer Role
-- Focus on: Technical approach debates
-- Request feedback on: Code quality, pattern choices
-- Show transparency on: Architecture decisions
-
-### Tech Lead Role
-- Focus on: Architecture debates, trade-offs
-- Request feedback on: Technical direction
-- Show transparency on: Technology selections
-
-### QA Engineer Role
-- Focus on: Test strategy debates
-- Request feedback on: Coverage completeness
-- Show transparency on: Risk assessments
-
----
-
-## Integration with Other Skills
-
-### With phase-enforcement
-- Request feedback at every phase gate
-- Show transparency on gate readiness assessment
-
-### With code-review
-- Invite debate on significant review findings
-- Request feedback on review thoroughness
-
-### With test-driven
-- Show transparency on test strategy decisions
-- Invite debate on coverage trade-offs
-
-### With system-architect
-- Show transparency on all architecture decisions
-- Invite debate on technology choices
-
-### With atomic-design
-- Show transparency on component categorization
-- Request feedback on design token accuracy
-
----
-
-## Quick Reference Triggers
-
-### Automatically Show Transparency When:
-- [ ] Choosing between technologies
-- [ ] Selecting architecture patterns
-- [ ] Making scope decisions
-- [ ] Prioritizing features
-- [ ] Selecting testing strategies
-
-### Automatically Request Feedback When:
-- [ ] Phase gate reached
-- [ ] Major deliverable completed
-- [ ] Uncertainty about direction
-- [ ] Work session ending
-
-### Automatically Invite Debate When:
-- [ ] Multiple viable options exist
-- [ ] Trade-offs have no clear winner
-- [ ] User preference may conflict with best practice
-- [ ] Scope is ambiguous
-
----
-
-## Output Checklist
-
-Before completing any significant work:
-
-- [ ] Were significant decisions explained with transparency blocks?
-- [ ] Were alternatives considered and documented?
-- [ ] Was feedback requested on key deliverables?
-- [ ] Were debates invited where appropriate?
-- [ ] Were user corrections captured as learnings?
-
----
-
-## References
-
-| File | Purpose |
-|------|---------|
-| `learning-mode/USER-FLOW.md` | Detailed flow diagrams |
-| `learning-mode/SIMULATION.md` | Example interactions |
-| `learning-mode/QUICK-REFERENCE.md` | Quick trigger reference |
+| Dont | Do |
+|------|-----|
+| Debate trivial (variable naming) | Just decide |
+| Constant feedback | Only milestones |
+| Ignore corrections | Capture learning |
+| Fake debates | Use transparency |
+| Over-explain simple | Brief only |

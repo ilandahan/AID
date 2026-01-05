@@ -1,33 +1,22 @@
-/**
- * @file jest.config.js
- * @description Jest configuration for Figma plugin server tests
- *
- * Coverage Targets:
- * - Services (componentAuditor, scoringEngine, etc.): 95%+ achieved
- * - claudeClient: Lower coverage expected (requires API mocking)
- * - index.js: Covered by integration tests (requires running server)
- */
-
 module.exports = {
+  preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: [
-    '**/tests/**/*.test.js',
-    '**/tests/**/*.spec.js'
-  ],
+  roots: ['<rootDir>/src'],
+  testMatch: ['**/*.test.ts'],
+  transform: {
+    '^.+\\.tsx?$': 'ts-jest'
+  },
   collectCoverageFrom: [
-    'src/services/*.js',
-    '!src/resources/**'
+    'src/**/*.ts',
+    '!src/**/*.test.ts',
+    '!src/index.ts'
   ],
-  coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
   coverageThreshold: {
     global: {
-      branches: 70,
-      functions: 90,
+      branches: 80,
+      functions: 80,
       lines: 80,
       statements: 80
     }
-  },
-  testTimeout: 10000,
-  verbose: true
+  }
 };

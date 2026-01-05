@@ -294,77 +294,29 @@ setup_global_aid() {
     log_success "Global learning system initialized at $AID_HOME"
 }
 
-# Step 7: Create MCP configuration (CROSS-PLATFORM)
+# Step 7: Create MCP configuration (Mac template only - no inline defaults)
 setup_mcp_and_env() {
     echo ""
-    echo "[STEP 7/7] Creating MCP configuration..."
+    echo "[STEP 7/7] Creating MCP configuration (macOS/Linux)..."
 
-    # Create .mcp.json from Mac template if not exists
+    # Create .mcp.json from Mac template ONLY - no inline defaults
     if [ ! -f ".mcp.json" ]; then
         if [ -f ".mcp.json.mac" ]; then
             cp ".mcp.json.mac" ".mcp.json"
             log_success "MCP configuration created from Mac template"
+            echo ""
+            echo "  NOTE: Edit .mcp.json to add your API tokens:"
+            echo "    - ATLASSIAN_API_TOKEN (for Jira/Confluence)"
+            echo "    - FIGMA_API_KEY (for Figma)"
+            echo "    - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)"
         else
-            echo "Creating .mcp.json with default configuration..."
-            cat > ".mcp.json" << 'MCPEOF'
-{
-  "mcpServers": {
-    "filesystem": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
-    },
-    "chrome-devtools": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"]
-    },
-    "jira": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@aashari/mcp-server-atlassian-jira"],
-      "env": {
-        "ATLASSIAN_SITE_URL": "https://YOUR_SITE.atlassian.net",
-        "ATLASSIAN_USER_EMAIL": "your@email.com",
-        "ATLASSIAN_API_TOKEN": "YOUR_ATLASSIAN_API_TOKEN"
-      }
-    },
-    "confluence": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@aashari/mcp-server-atlassian-confluence"],
-      "env": {
-        "ATLASSIAN_SITE_URL": "https://YOUR_SITE.atlassian.net",
-        "ATLASSIAN_USER_EMAIL": "your@email.com",
-        "ATLASSIAN_API_TOKEN": "YOUR_ATLASSIAN_API_TOKEN"
-      }
-    },
-    "figma": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "figma-developer-mcp", "--stdio"],
-      "env": {
-        "FIGMA_API_KEY": "YOUR_FIGMA_API_KEY"
-      }
-    },
-    "github": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_GITHUB_TOKEN"
-      }
-    }
-  }
-}
-MCPEOF
-            log_success "MCP configuration created with defaults"
+            log_error ".mcp.json.mac template not found!"
+            echo ""
+            echo "  The Mac MCP template is required for installation."
+            echo "  Please ensure .mcp.json.mac exists in the AID folder."
+            echo ""
+            echo "  You can create it manually or download from the AID repository."
         fi
-        echo ""
-        echo "  NOTE: Edit .mcp.json to add your API tokens:"
-        echo "    - ATLASSIAN_API_TOKEN (for Jira/Confluence)"
-        echo "    - FIGMA_API_KEY (for Figma)"
-        echo "    - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)"
     else
         log_success "MCP configuration already exists"
     fi
