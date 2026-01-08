@@ -140,6 +140,7 @@ setup_claude_commands_and_skills() {
     cp -r skills/atomic-page-builder .claude/skills/ 2>/dev/null || true
 
     # Development skills
+    cp -r skills/aid-impl-plan .claude/skills/ 2>/dev/null || true
     cp -r skills/code-review .claude/skills/ 2>/dev/null || true
     cp -r skills/context-tracking .claude/skills/ 2>/dev/null || true
     cp -r skills/learning-mode .claude/skills/ 2>/dev/null || true
@@ -160,7 +161,7 @@ setup_claude_commands_and_skills() {
     # Figma design review skill
     cp -r skills/figma-design-review .claude/skills/ 2>/dev/null || true
 
-    log_success "Skills installed (20 skills)"
+    log_success "Skills installed (21 skills)"
 }
 
 # Step 3: Create project state directory
@@ -361,6 +362,36 @@ verify_mcp_config() {
     fi
 }
 
+# Step 8: Setup Storybook preview server
+setup_storybook() {
+    echo ""
+    echo "[STEP 8/8] Setting up Storybook preview server..."
+
+    if [ -d "storybook-preview" ]; then
+        log_info "Installing Storybook dependencies..."
+        cd storybook-preview
+
+        # Install npm dependencies
+        if npm install 2>/dev/null; then
+            log_success "Storybook dependencies installed"
+        else
+            log_warning "Storybook install had issues - try manually: cd storybook-preview && npm install"
+        fi
+
+        # Create atomic design component directories
+        mkdir -p src/components/atoms
+        mkdir -p src/components/molecules
+        mkdir -p src/components/organisms
+        mkdir -p src/components/templates
+        mkdir -p src/components/pages
+
+        cd ..
+        log_success "Storybook ready - use /storybook command to preview components"
+    else
+        log_warning "storybook-preview folder not found, skipping"
+    fi
+}
+
 # Bonus: Pre-install MCP servers (optional - for faster startup)
 preinstall_mcp_servers() {
     echo ""
@@ -419,6 +450,12 @@ print_next_steps() {
     echo ""
     echo "4. Run /aid-start to begin working!"
     echo ""
+    echo "5. (OPTIONAL) Preview Figma components in Storybook:"
+    echo "   - Extract component from Figma plugin"
+    echo "   - Tell Claude: 'Add ComponentName to Storybook'"
+    echo "   - Or use: /storybook add ./path/to/Component"
+    echo "   - View at http://localhost:6006"
+    echo ""
     echo "NOTE: MCP servers are PROJECT-SCOPED."
     echo "      They only work when running Claude from this folder."
     echo ""
@@ -438,6 +475,7 @@ main() {
     setup_global_aid
     setup_mcp_and_env
     verify_mcp_config
+    setup_storybook
     preinstall_mcp_servers
     print_next_steps
 }

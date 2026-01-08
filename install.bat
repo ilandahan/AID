@@ -66,6 +66,7 @@ REM Design system skills
 xcopy /E /I /Y "skills\atomic-design" ".claude\skills\atomic-design" >nul 2>nul
 xcopy /E /I /Y "skills\atomic-page-builder" ".claude\skills\atomic-page-builder" >nul 2>nul
 REM Development skills
+xcopy /E /I /Y "skills\aid-impl-plan" ".claude\skills\aid-impl-plan" >nul 2>nul
 xcopy /E /I /Y "skills\code-review" ".claude\skills\code-review" >nul 2>nul
 xcopy /E /I /Y "skills\context-tracking" ".claude\skills\context-tracking" >nul 2>nul
 xcopy /E /I /Y "skills\learning-mode" ".claude\skills\learning-mode" >nul 2>nul
@@ -81,7 +82,7 @@ xcopy /E /I /Y "skills\role-tech-lead" ".claude\skills\role-tech-lead" >nul 2>nu
 REM Optional skills
 xcopy /E /I /Y "skills\nano-banana-visual" ".claude\skills\nano-banana-visual" >nul 2>nul
 xcopy /E /I /Y "skills\figma-design-review" ".claude\skills\figma-design-review" >nul 2>nul
-echo [OK] Skills installed (20 skills)
+echo [OK] Skills installed (21 skills)
 
 REM Create .aid directory
 echo.
@@ -252,6 +253,32 @@ if exist ".mcp.json" (
     echo   Run: copy .mcp.json.example .mcp.json
 )
 
+REM Step 8: Setup Storybook preview server
+echo.
+echo [STEP 8/8] Setting up Storybook preview server...
+if exist "storybook-preview" (
+    echo Installing Storybook dependencies...
+    cd storybook-preview
+    call npm install >nul 2>nul
+    if !ERRORLEVEL! EQU 0 (
+        echo [OK] Storybook dependencies installed
+    ) else (
+        echo [WARNING] Storybook install had issues - try manually: cd storybook-preview ^&^& npm install
+    )
+
+    REM Create atomic design component directories
+    if not exist "src\components\atoms" mkdir "src\components\atoms"
+    if not exist "src\components\molecules" mkdir "src\components\molecules"
+    if not exist "src\components\organisms" mkdir "src\components\organisms"
+    if not exist "src\components\templates" mkdir "src\components\templates"
+    if not exist "src\components\pages" mkdir "src\components\pages"
+
+    cd ..
+    echo [OK] Storybook ready - use /storybook command to preview components
+) else (
+    echo [WARNING] storybook-preview folder not found, skipping
+)
+
 REM Pre-install MCP servers for faster startup (optional - skippable)
 echo.
 echo [BONUS] Pre-caching MCP server packages (optional)...
@@ -297,6 +324,12 @@ echo.
 echo 3. Inside Claude Code, verify MCP with: /mcp
 echo.
 echo 4. Run /aid-start to begin working!
+echo.
+echo 5. (OPTIONAL^) Preview Figma components in Storybook:
+echo    - Extract component from Figma plugin
+echo    - Tell Claude: "Add ComponentName to Storybook"
+echo    - Or use: /storybook add .\path\to\Component
+echo    - View at http://localhost:6006
 echo.
 echo NOTE: MCP servers are PROJECT-SCOPED.
 echo       They only work when running Claude from this folder.
