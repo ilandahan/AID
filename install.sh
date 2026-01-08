@@ -157,11 +157,16 @@ setup_claude_commands_and_skills() {
 
     # Optional skills
     cp -r skills/nano-banana-visual .claude/skills/ 2>/dev/null || true
-    
+
     # Figma design review skill
     cp -r skills/figma-design-review .claude/skills/ 2>/dev/null || true
 
-    log_success "Skills installed (21 skills)"
+    # Foundational skills
+    cp -r skills/why-driven-decision .claude/skills/ 2>/dev/null || true
+    cp -r skills/reflection .claude/skills/ 2>/dev/null || true
+    cp -r skills/aid-test-agent .claude/skills/ 2>/dev/null || true
+
+    log_success "Skills installed (24 skills)"
 }
 
 # Step 3: Create project state directory

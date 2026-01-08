@@ -82,7 +82,11 @@ xcopy /E /I /Y "skills\role-tech-lead" ".claude\skills\role-tech-lead" >nul 2>nu
 REM Optional skills
 xcopy /E /I /Y "skills\nano-banana-visual" ".claude\skills\nano-banana-visual" >nul 2>nul
 xcopy /E /I /Y "skills\figma-design-review" ".claude\skills\figma-design-review" >nul 2>nul
-echo [OK] Skills installed (21 skills)
+REM Foundational skills
+xcopy /E /I /Y "skills\why-driven-decision" ".claude\skills\why-driven-decision" >nul 2>nul
+xcopy /E /I /Y "skills\reflection" ".claude\skills\reflection" >nul 2>nul
+xcopy /E /I /Y "skills\aid-test-agent" ".claude\skills\aid-test-agent" >nul 2>nul
+echo [OK] Skills installed (24 skills)
 
 REM Create .aid directory
 echo.
