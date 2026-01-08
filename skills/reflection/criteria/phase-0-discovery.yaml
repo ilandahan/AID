@@ -1,0 +1,78 @@
+# Phase 0: Discovery - Reflection Criteria
+# Research & validation phase
+
+phase: 0
+name: "Discovery"
+description: "Research, stakeholder identification, competitive analysis"
+
+criteria:
+  - id: why_alignment
+    name: "WHY Alignment"
+    weight: 3
+    checks:
+      - "Is the research answering the fundamental WHY question?"
+      - "Are we validating the right problem, not jumping to solutions?"
+      - "Does this help decide if we should proceed?"
+    scoring:
+      excellent: "Research directly addresses core business/user need"
+      acceptable: "Research is relevant but slightly tangential"
+      poor: "Research doesn't connect to the stated problem"
+
+  - id: phase_compliance
+    name: "Phase Compliance"
+    weight: 2
+    checks:
+      - "Staying in research mode, not proposing solutions?"
+      - "Not writing PRD content yet?"
+      - "Not making architecture decisions?"
+    scoring:
+      excellent: "Pure research and validation"
+      acceptable: "Mostly research with minor solution hints"
+      poor: "Already proposing features or technical solutions"
+
+  - id: correctness
+    name: "Research Quality"
+    weight: 3
+    checks:
+      - "Are facts verified from reliable sources?"
+      - "Is competitive analysis accurate and current?"
+      - "Are stakeholder needs correctly captured?"
+    scoring:
+      excellent: "Well-sourced, verified, comprehensive research"
+      acceptable: "Good research with minor gaps"
+      poor: "Unverified claims, outdated info, missing key data"
+
+  - id: security
+    name: "Confidentiality"
+    weight: 2
+    checks:
+      - "No sensitive business data exposed inappropriately?"
+      - "Competitive intel handled appropriately?"
+      - "Stakeholder information protected?"
+    scoring:
+      excellent: "All sensitive information properly handled"
+      acceptable: "Minor confidentiality considerations needed"
+      poor: "Sensitive data exposed or mishandled"
+
+  - id: completeness
+    name: "Coverage"
+    weight: 2
+    checks:
+      - "All relevant stakeholders identified?"
+      - "Key competitors analyzed?"
+      - "Market context understood?"
+      - "Success metrics proposed?"
+    scoring:
+      excellent: "Comprehensive coverage of all discovery areas"
+      acceptable: "Main areas covered, some gaps"
+      poor: "Major stakeholders or competitors missing"
+
+threshold: 7
+max_iterations: 3
+
+notes:
+  borderline: "Consider deeper stakeholder interviews or market research"
+  improvement_focus:
+    - "Validate assumptions with data"
+    - "Ensure all stakeholder perspectives captured"
+    - "Check for cognitive biases in analysis"

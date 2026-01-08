@@ -1,0 +1,80 @@
+# Phase 2: Technical Specification - Reflection Criteria
+# System architecture and design phase
+
+phase: 2
+name: "Tech Spec"
+description: "System architecture, API design, data models, security architecture"
+
+criteria:
+  - id: why_alignment
+    name: "WHY Alignment"
+    weight: 3
+    checks:
+      - "Does architecture serve the business requirements from PRD?"
+      - "Are design decisions justified with clear reasoning?"
+      - "Trade-offs explained with WHY for chosen approach?"
+    scoring:
+      excellent: "Every design decision has clear WHY linked to requirements"
+      acceptable: "Most decisions justified, some assumptions"
+      poor: "Architecture without clear connection to requirements"
+
+  - id: phase_compliance
+    name: "Phase Compliance"
+    weight: 2
+    checks:
+      - "Designing system, not implementing it?"
+      - "Not writing production code?"
+      - "Staying at architecture level, not task breakdown?"
+    scoring:
+      excellent: "Pure architecture and design"
+      acceptable: "Mostly design with minor implementation hints"
+      poor: "Contains implementation code or task lists"
+
+  - id: correctness
+    name: "Technical Soundness"
+    weight: 3
+    checks:
+      - "Architecture is technically feasible?"
+      - "Patterns are appropriate for the problem?"
+      - "Scalability considered correctly?"
+      - "No obvious technical flaws?"
+    scoring:
+      excellent: "Sound architecture with proven patterns"
+      acceptable: "Good design with minor concerns"
+      poor: "Technical flaws or inappropriate patterns"
+
+  - id: security
+    name: "Security Architecture"
+    weight: 3
+    checks:
+      - "Security architecture defined?"
+      - "Authentication/authorization design complete?"
+      - "Data protection strategy clear?"
+      - "Threat model considered?"
+    scoring:
+      excellent: "Comprehensive security architecture"
+      acceptable: "Basic security considerations present"
+      poor: "Security not adequately addressed"
+
+  - id: completeness
+    name: "Design Coverage"
+    weight: 2
+    checks:
+      - "All components from PRD have design?"
+      - "Integration points defined?"
+      - "Error handling strategy clear?"
+      - "Non-functional requirements addressed?"
+    scoring:
+      excellent: "Complete design covering all requirements"
+      acceptable: "Main components designed, some gaps"
+      poor: "Major components or integrations missing"
+
+threshold: 7
+max_iterations: 3
+
+notes:
+  borderline: "Review trade-off documentation and integration points"
+  improvement_focus:
+    - "Document WHY for each major decision"
+    - "Add security threat considerations"
+    - "Clarify component interactions"
