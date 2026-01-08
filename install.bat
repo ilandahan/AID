@@ -49,9 +49,10 @@ if not exist ".claude\commands" mkdir ".claude\commands"
 if not exist ".claude\skills" mkdir ".claude\skills"
 if not exist ".claude\references" mkdir ".claude\references"
 
-REM Copy command files
+REM Copy command files from memory-system (if exists)
 copy /Y "memory-system\integration\commands\*.md" ".claude\commands\" >nul 2>nul
-copy /Y "skills\commands\*.md" ".claude\commands\" >nul 2>nul
+REM Note: Commands are stored in .claude\commands\ (already in git)
+REM Do NOT use skills\commands\ - that's not a valid Claude Code pattern
 echo [OK] Commands installed
 
 REM Copy skills to .claude/skills

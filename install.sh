@@ -116,13 +116,12 @@ setup_claude_commands_and_skills() {
     mkdir -p ".claude/skills"
     mkdir -p ".claude/references"
 
-    # Copy command files
+    # Copy command files from memory-system (if exists)
     if [ -d "memory-system/integration/commands" ]; then
         cp -f memory-system/integration/commands/*.md .claude/commands/ 2>/dev/null || true
     fi
-    if [ -d "skills/commands" ]; then
-        cp -f skills/commands/*.md .claude/commands/ 2>/dev/null || true
-    fi
+    # Note: Commands are stored in .claude/commands/ (already in git)
+    # Do NOT use skills/commands/ - that's not a valid Claude Code pattern
     log_success "Commands installed"
 
     # Copy skills to .claude/skills (project level)
