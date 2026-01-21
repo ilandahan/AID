@@ -1,0 +1,28 @@
+{
+  "breakpoints": {
+    "xs": "320px",
+    "sm": "480px",
+    "md": "768px",
+    "lg": "1024px",
+    "xl": "1280px",
+    "2xl": "1440px",
+    "3xl": "1920px"
+  },
+  "containers": {
+    "sm": "640px",
+    "md": "768px",
+    "lg": "1024px",
+    "xl": "1280px"
+  },
+  "queries": {
+    "mobile": "(max-width: 479px)",
+    "tablet": "(min-width: 480px) and (max-width: 1023px)",
+    "desktop": "(min-width: 1024px)",
+    "touch": "(hover: none)",
+    "mouse": "(hover: hover)"
+  },
+  "usage": {
+    "mobile-first": "Start with mobile styles, add @media (min-width) for larger",
+    "example": "@media (min-width: {breakpoints.md}) { /* tablet+ styles */ }"
+  }
+}

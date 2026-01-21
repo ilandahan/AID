@@ -1,0 +1,79 @@
+# Phase 1: PRD - Reflection Criteria
+# Product Requirements Document phase
+
+phase: 1
+name: "PRD"
+description: "Requirements, user stories, acceptance criteria, scope definition"
+
+criteria:
+  - id: why_alignment
+    name: "WHY Alignment"
+    weight: 3
+    checks:
+      - "Does every requirement trace back to user/business need?"
+      - "Is the WHY explicitly stated for each feature?"
+      - "Are we solving the validated problem from Discovery?"
+    scoring:
+      excellent: "Clear WHY traceability for all requirements"
+      acceptable: "Most requirements have clear WHY"
+      poor: "Features without clear purpose or need"
+
+  - id: phase_compliance
+    name: "Phase Compliance"
+    weight: 2
+    checks:
+      - "Defining WHAT, not HOW?"
+      - "Not making technical/architecture decisions?"
+      - "Not writing code or pseudocode?"
+    scoring:
+      excellent: "Pure requirements, no implementation details"
+      acceptable: "Mostly requirements with minor tech hints"
+      poor: "Contains architecture decisions or code"
+
+  - id: correctness
+    name: "Requirements Quality"
+    weight: 3
+    checks:
+      - "User stories follow who/what/why format?"
+      - "Acceptance criteria are testable and measurable?"
+      - "Requirements are unambiguous?"
+      - "No conflicting requirements?"
+    scoring:
+      excellent: "Clear, testable, unambiguous requirements"
+      acceptable: "Good requirements with minor clarity issues"
+      poor: "Vague, untestable, or conflicting requirements"
+
+  - id: security
+    name: "Security Requirements"
+    weight: 2
+    checks:
+      - "Security requirements explicitly defined?"
+      - "Data privacy considerations included?"
+      - "Authentication/authorization needs specified?"
+    scoring:
+      excellent: "Comprehensive security requirements"
+      acceptable: "Basic security requirements present"
+      poor: "Security requirements missing or incomplete"
+
+  - id: completeness
+    name: "Scope Coverage"
+    weight: 2
+    checks:
+      - "All user personas covered?"
+      - "Happy path and error scenarios defined?"
+      - "Edge cases identified?"
+      - "Out of scope clearly stated?"
+    scoring:
+      excellent: "Complete coverage with clear boundaries"
+      acceptable: "Main scenarios covered, some gaps"
+      poor: "Major scenarios or personas missing"
+
+threshold: 7
+max_iterations: 3
+
+notes:
+  borderline: "Review acceptance criteria for testability"
+  improvement_focus:
+    - "Add explicit WHY to each requirement"
+    - "Make acceptance criteria measurable"
+    - "Clarify scope boundaries"

@@ -1,0 +1,174 @@
+{
+  "version": "1.0.0",
+  "description": "Role-based phase terminology mapping for AID methodology",
+  
+  "roles": {
+    "pm": {
+      "id": "pm",
+      "name": "Product Manager",
+      "shortName": "PM",
+      "description": "Focuses on user value, requirements, and business outcomes"
+    },
+    "lead": {
+      "id": "lead",
+      "name": "Tech Lead",
+      "shortName": "Lead",
+      "description": "Focuses on architecture, technical decisions, and team guidance"
+    },
+    "developer": {
+      "id": "developer",
+      "name": "Developer",
+      "shortName": "Dev",
+      "description": "Focuses on implementation, code quality, and TDD"
+    },
+    "qa": {
+      "id": "qa",
+      "name": "QA Engineer",
+      "shortName": "QA",
+      "description": "Focuses on testing, validation, and quality assurance"
+    }
+  },
+
+  "phases": {
+    "pm": {
+      "0": {
+        "name": "Market & Competitive Research",
+        "description": "Research competitors, market trends, and validate the problem space with stakeholders",
+        "skills": ["pre-prd-research", "aid-discovery", "nano-banana-visual"]
+      },
+      "1": {
+        "name": "Product Requirements (PRD)",
+        "description": "Define what we're building, user stories, acceptance criteria, and scope boundaries",
+        "skills": ["aid-prd"]
+      },
+      "2": {
+        "name": "Solution Review",
+        "description": "Review technical approach, ensure it aligns with product vision and user needs",
+        "skills": ["aid-tech-spec", "system-architect"]
+      },
+      "3": {
+        "name": "Roadmap & Prioritization",
+        "description": "Prioritize features, define milestones, coordinate with stakeholders on timeline",
+        "skills": []
+      },
+      "4": {
+        "name": "Feature Validation & UAT",
+        "description": "Validate implemented features against requirements, conduct user acceptance testing",
+        "skills": ["aid-development", "atomic-design", "atomic-page-builder"]
+      },
+      "5": {
+        "name": "Launch & Go-to-Market",
+        "description": "Prepare release communications, coordinate launch, gather initial user feedback",
+        "skills": ["aid-qa-ship"]
+      }
+    },
+
+    "lead": {
+      "0": {
+        "name": "Technology & Architecture Research",
+        "description": "Evaluate technologies, assess technical feasibility, research architectural patterns",
+        "skills": ["pre-prd-research", "aid-discovery", "nano-banana-visual"]
+      },
+      "1": {
+        "name": "Technical Requirements Report",
+        "description": "Translate business needs into technical requirements, identify constraints and risks",
+        "skills": ["aid-prd"]
+      },
+      "2": {
+        "name": "System Architecture Design",
+        "description": "Design system architecture, define APIs, data models, and integration patterns",
+        "skills": ["aid-tech-spec", "system-architect"]
+      },
+      "3": {
+        "name": "Sprint Planning & Task Breakdown",
+        "description": "Break down work into epics/stories/tasks, estimate effort, assign to team members",
+        "skills": []
+      },
+      "4": {
+        "name": "Code Review & Architecture Oversight",
+        "description": "Review code quality, ensure architectural compliance, mentor developers",
+        "skills": ["aid-development", "code-review", "test-driven"]
+      },
+      "5": {
+        "name": "Release Engineering & Deployment",
+        "description": "Oversee deployment process, ensure operational readiness, manage release risks",
+        "skills": ["aid-qa-ship", "code-review"]
+      }
+    },
+
+    "developer": {
+      "0": {
+        "name": "Technical Spike & Research",
+        "description": "Prototype solutions, research libraries/frameworks, validate technical approaches",
+        "skills": ["pre-prd-research", "aid-discovery"]
+      },
+      "1": {
+        "name": "Feature Specification",
+        "description": "Understand requirements deeply, clarify edge cases, document technical assumptions",
+        "skills": ["aid-prd"]
+      },
+      "2": {
+        "name": "Technical Design",
+        "description": "Design component structure, plan implementation approach, identify dependencies",
+        "skills": ["aid-tech-spec", "system-architect"]
+      },
+      "3": {
+        "name": "Task Breakdown & Estimation",
+        "description": "Break features into coding tasks, estimate complexity, identify blockers",
+        "skills": []
+      },
+      "4": {
+        "name": "Implementation & Coding",
+        "description": "Write production code with TDD, implement features, write unit/integration tests",
+        "skills": ["aid-development", "atomic-design", "atomic-page-builder", "test-driven", "code-review"]
+      },
+      "5": {
+        "name": "Bug Fixes & Polish",
+        "description": "Fix bugs from QA, optimize performance, clean up code, update documentation",
+        "skills": ["aid-qa-ship", "test-driven", "code-review"]
+      }
+    },
+
+    "qa": {
+      "0": {
+        "name": "Test Strategy Research",
+        "description": "Research testing approaches, evaluate tools, understand system testability",
+        "skills": ["pre-prd-research", "aid-discovery"]
+      },
+      "1": {
+        "name": "Test Requirements & Coverage Plan",
+        "description": "Derive test requirements from PRD, plan coverage, identify risk areas",
+        "skills": ["aid-prd"]
+      },
+      "2": {
+        "name": "Test Architecture & Framework",
+        "description": "Design test framework, set up automation infrastructure, define test patterns",
+        "skills": ["aid-tech-spec", "test-driven"]
+      },
+      "3": {
+        "name": "Test Plan & Case Design",
+        "description": "Write detailed test cases, design test data, plan regression suite",
+        "skills": ["test-driven"]
+      },
+      "4": {
+        "name": "Test Execution & Automation",
+        "description": "Execute tests, automate test cases, report bugs, verify fixes",
+        "skills": ["aid-development", "test-driven"]
+      },
+      "5": {
+        "name": "Release Certification & Sign-off",
+        "description": "Final regression, performance testing, sign off on release quality",
+        "skills": ["aid-qa-ship", "test-driven"]
+      }
+    }
+  },
+
+  "commonSkills": ["phase-enforcement", "context-tracking", "learning-mode"],
+
+  "roleSkillMapping": {
+    "pm": "role-product-manager",
+    "lead": "role-tech-lead",
+    "developer": "role-developer",
+    "qa": "role-qa-engineer"
+  }
+}

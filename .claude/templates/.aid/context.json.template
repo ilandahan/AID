@@ -1,0 +1,18 @@
+{
+  "last_updated": "",
+  "session_id": "",
+  
+  "tasks": {
+    "previous": null,
+    "current": null,
+    "next": null
+  },
+  
+  "current_task_steps": {
+    "previous": null,
+    "current": null,
+    "next": null
+  },
+  
+  "session_log": []
+}

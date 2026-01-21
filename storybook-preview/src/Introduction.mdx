@@ -1,0 +1,38 @@
+# AI.D Component Library
+
+Welcome to the AI.D Storybook preview server.
+
+This is where you can preview and develop components extracted from Figma using the atomic design methodology.
+
+## Atomic Design Hierarchy
+
+```
+Pages        → Complete screens
+Templates    → Page layouts without real content
+Organisms    → Complex UI sections (Header, Footer, Card)
+Molecules    → Simple groups of atoms (SearchBar, NavItem)
+Atoms        → Basic building blocks (Button, Input, Label)
+```
+
+## How to Use
+
+1. **Extract from Figma** - Use the Figma plugin to extract component specs
+2. **Generate Component** - Tell Claude: "Create a Button component from this Figma spec"
+3. **Add to Storybook** - Tell Claude: "Add Button to Storybook"
+4. **Preview** - Components appear here at http://localhost:6006
+
+## Folder Structure
+
+```
+src/components/
+├── atoms/        # Basic elements
+├── molecules/    # Simple combinations
+├── organisms/    # Complex sections
+├── templates/    # Page layouts
+└── pages/        # Full screens
+```
+
+## Commands
+
+- `npm run storybook` - Start dev server on port 6006
+- `npm run build-storybook` - Build static version

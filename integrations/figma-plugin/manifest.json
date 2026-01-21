@@ -1,0 +1,19 @@
+{
+  "name": "Atomic Design Extractor",
+  "id": "atomic-design-extractor-mcp-v6",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": [
+    "figma",
+    "dev"
+  ],
+  "networkAccess": {
+    "allowedDomains": [
+      "https://figma-plugin-server-983606191500.us-central1.run.app"
+    ],
+    "reasoning": "Required to communicate with AID server for component quality analysis, metadata generation, and design system export. Pairing is done via /aid-pair command in Claude Code."
+  },
+  "capabilities": ["inspect"],
+  "enableProposedApi": false
+}

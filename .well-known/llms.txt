@@ -1,0 +1,68 @@
+# AID - AI Development Methodology
+# Web Discovery File (.well-known/llms.txt)
+# https://llmstxt.org specification
+
+# Name
+> AID (AI Development Methodology)
+
+# Description
+> A comprehensive, end-to-end framework for AI-assisted software development that transforms raw requirements into production-ready software using Claude Code with integrated MCP services.
+
+# Author
+> Ilan Dahan
+
+# Repository
+> https://github.com/ilandahan/AID
+
+# Documentation Files
+> llm.txt - Standard LLM context file
+> llms.txt - Short summary
+> llms-full.txt - Comprehensive documentation
+> CLAUDE.md - Claude Code instructions
+> README.md - Main documentation
+
+# Core Concept
+> 5-phase gated methodology with human approval between phases:
+> 1. PRD - Product Requirements
+> 2. Tech Spec - Architecture Design
+> 3. Breakdown - Jira Task Creation
+> 4. Development - TDD Implementation
+> 5. QA & Ship - Review and Deploy
+
+# Key Features
+> - Phase gate enforcement (prevents premature coding)
+> - Context tracking (session continuity)
+> - MCP integrations (Jira, Figma, GitHub, Chrome)
+> - Specialized skills (atomic-design, TDD, code-review)
+> - 21 slash commands
+
+# Technology Stack
+> Next.js 16, React 19, TypeScript, PostgreSQL, Prisma, Jest
+
+# Essential Commands
+> /good-morning - Daily startup
+> /phase - Show current phase
+> /phase-approve - Human sign-off
+> /phase-advance - Move to next phase
+
+# State Files
+> .aid/state.json - Phase state
+> .aid/context.json - Work context
+
+# Optional
+## Skills
+- phase-enforcement: Blocks future phase work
+- context-tracking: Work continuity
+- system-architect: Architecture design
+- atomic-design: Figma to components
+- atomic-page-builder: Page composition
+- code-review: Quality review
+- test-driven: TDD methodology
+
+## MCP Servers
+- Atlassian (Jira/Confluence)
+- GitHub
+- Figma
+- Chrome DevTools
+- PostgreSQL
+- Filesystem

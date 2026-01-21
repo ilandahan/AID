@@ -1,0 +1,60 @@
+{
+  "$schema": "feedback-input-v1",
+  "description": "Template for feedback data passed to the analysis agent",
+
+  "feedback_items": [
+    {
+      "id": "FB-001",
+      "timestamp": "2025-01-15T14:30:00Z",
+      "context": {
+        "role": "product-manager | developer | qa-engineer | tech-lead",
+        "phase": "discovery | prd | tech-spec | breakdown | development | qa-ship"
+      },
+      "metrics": {
+        "rating": 4,
+        "revisions": 2
+      },
+      "qualitative": {
+        "what_worked": "Free text - what went well (anonymized)",
+        "what_didnt": "Free text - what could be improved (anonymized)",
+        "notes": "Additional notes (anonymized)"
+      }
+    }
+  ],
+
+  "current_memory_entries": [
+    "AID:PM:DISC:ASK \"Who else touches this data?\" for stakeholders",
+    "AID:DEV:DEV:DO Write test first (TDD)"
+  ],
+
+  "previous_trends": {
+    "period": "2025-01-01 to 2025-01-14",
+    "overall_avg_rating": 3.5,
+    "overall_avg_revisions": 2.8,
+    "by_role_phase": [
+      {
+        "role": "developer",
+        "phase": "development",
+        "avg_rating": 3.8,
+        "avg_revisions": 2.2
+      }
+    ]
+  },
+
+  "skill_sections": {
+    "roles": {
+      "product-manager": ["High-Confidence Patterns", "Anti-Patterns"],
+      "developer": ["High-Confidence Patterns", "Anti-Patterns"],
+      "qa-engineer": ["High-Confidence Patterns", "Anti-Patterns"],
+      "tech-lead": ["High-Confidence Patterns", "Anti-Patterns"]
+    },
+    "phases": {
+      "discovery": ["High-Confidence Patterns", "Anti-Patterns"],
+      "prd": ["High-Confidence Patterns", "Anti-Patterns"],
+      "tech-spec": ["High-Confidence Patterns", "Anti-Patterns"],
+      "breakdown": ["High-Confidence Patterns", "Anti-Patterns"],
+      "development": ["High-Confidence Patterns", "Anti-Patterns"],
+      "qa-ship": ["High-Confidence Patterns", "Anti-Patterns"]
+    }
+  }
+}

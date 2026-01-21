@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "enriched-component-payload",
+  "title": "Enriched Component Payload",
+  "description": "Schema for component data sent to backend for code generation",
+  
+  "type": "object",
+  "required": ["component", "tokens", "figmaMetadata"],
+  
+  "properties": {
+    "component": {
+      "type": "object",
+      "required": ["componentId", "componentName", "displayName", "level", "category", "props"],
+      "properties": {
+        "componentId": {
+          "type": "string",
+          "description": "Figma node ID",
+          "example": "1:234"
+        },
+        "componentName": {
+          "type": "string",
+          "description": "Original Figma component name",
+          "example": "Button / Primary / Large"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "PascalCase name for code",
+          "example": "ButtonPrimary"
+        },
+        "description": {
+          "type": "string",
+          "description": "Component description for docs"
+        },
+        "level": {
+          "type": "string",
+          "enum": ["atom", "molecule", "organism", "template", "page"]
+        },
+        "category": {
+          "type": "string",
+          "enum": ["button", "input", "select", "checkbox", "radio", "icon", "text", "link", "card", "modal", "navigation", "form", "table", "media", "layout", "other"]
+        },
+        "props": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type", "required"],
+            "properties": {
+              "name": { "type": "string" },
+              "type": { 
+                "type": "string",
+                "enum": ["string", "number", "boolean", "enum", "node", "function"]
+              },
+              "required": { "type": "boolean" },
+              "defaultValue": {},
+              "enumValues": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "description": { "type": "string" },
+              "mappedFrom": { 
+                "type": "string",
+                "description": "Figma property/node this maps from"
+              }
+            }
+          }
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "options", "defaultOption"],
+            "properties": {
+              "name": { "type": "string" },
+              "options": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "defaultOption": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "states": {
+          "type": "array",
+          "items": { "type": "string" },
+          "example": ["default", "hover", "active", "focus", "disabled"]
+        },
+        "breakpoints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "example": ["default", "mobile", "tablet"]
+        },
+        "dependencies": {
+          "type": "object",
+          "properties": {
+            "internal": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Component IDs from same design system"
+            },
+            "external": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "External library dependencies"
+            }
+          }
+        },
+        "accessibility": {
+          "type": "object",
+          "properties": {
+            "role": { "type": "string" },
+            "ariaLabel": { "type": "string" },
+            "keyboardInteraction": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "version": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    
+    "tokens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "value", "category"],
+        "properties": {
+          "name": { "type": "string" },
+          "value": { "type": ["string", "number"] },
+          "category": {
+            "type": "string",
+            "enum": ["color", "typography", "spacing", "borderRadius", "shadow", "animation", "size"]
+          },
+          "rawValue": {
+            "description": "Original Figma value"
+          },
+          "cssVariable": { "type": "string" },
+          "tailwindClass": { "type": "string" },
+          "semanticName": { "type": "string" }
+        }
+      }
+    },
+    
+    "figmaMetadata": {
+      "type": "object",
+      "required": ["fileKey", "nodeId", "exportedAt", "pluginVersion"],
+      "properties": {
+        "fileKey": { "type": "string" },
+        "nodeId": { "type": "string" },
+        "exportedAt": { "type": "string", "format": "date-time" },
+        "pluginVersion": { "type": "string" },
+        "figmaUrl": { "type": "string", "format": "uri" }
+      }
+    }
+  }
+}

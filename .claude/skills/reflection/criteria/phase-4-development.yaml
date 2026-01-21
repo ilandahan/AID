@@ -1,0 +1,105 @@
+# Phase 4: Development - Reflection Criteria
+# Implementation, coding, testing
+
+phase: 4
+name: "Development"
+description: "Code implementation, unit tests, integration, documentation"
+
+criteria:
+  - id: why_alignment
+    name: "WHY Alignment"
+    weight: 3
+    checks:
+      - "Code solves the stated problem from requirements?"
+      - "Implementation follows approved architecture?"
+      - "Not adding unrequested features?"
+    scoring:
+      excellent: "Code directly addresses requirements"
+      acceptable: "Code mostly aligned, minor extras"
+      poor: "Code doesn't match requirements or over-engineered"
+
+  - id: phase_compliance
+    name: "Phase Compliance"
+    weight: 2
+    checks:
+      - "Following the approved tech spec?"
+      - "Not changing architecture without approval?"
+      - "Not deploying to production (that's Phase 5)?"
+    scoring:
+      excellent: "Strictly following approved design"
+      acceptable: "Following design with minor adaptations"
+      poor: "Significant deviation from approved architecture"
+
+  - id: correctness
+    name: "Code Quality"
+    weight: 3
+    checks:
+      - "Code compiles/runs without errors?"
+      - "Logic is correct for the requirements?"
+      - "Edge cases handled appropriately?"
+      - "No obvious bugs?"
+    scoring:
+      excellent: "Clean, working code with good edge case handling"
+      acceptable: "Working code with minor issues"
+      poor: "Bugs, syntax errors, or logic flaws"
+
+  - id: security
+    name: "Security"
+    weight: 3
+    checks:
+      - "No hardcoded secrets or credentials?"
+      - "Input validation present?"
+      - "No SQL injection vulnerabilities?"
+      - "No XSS vulnerabilities?"
+      - "No other OWASP top 10 issues?"
+      - "Proper authentication/authorization?"
+    scoring:
+      excellent: "Secure code following best practices"
+      acceptable: "Basic security present"
+      poor: "Security vulnerabilities present"
+
+  - id: completeness
+    name: "Implementation Completeness"
+    weight: 2
+    checks:
+      - "All acceptance criteria addressable?"
+      - "Tests included (if requested)?"
+      - "Error handling present?"
+      - "WHY documentation in code?"
+    scoring:
+      excellent: "Complete implementation with tests and docs"
+      acceptable: "Core functionality complete"
+      poor: "Missing key functionality or tests"
+
+  - id: qa_gate
+    name: "QA Gate Validation"
+    weight: 3
+    description: "Task passed QA sub-agent validation before proceeding"
+    checks:
+      - "QA criteria file exists for this task (.aid/qa/{task-id}.yaml)?"
+      - "All must_achieve criteria satisfied?"
+      - "No must_not violations?"
+      - "Scope boundaries respected (not_included)?"
+      - "Best practices followed?"
+    scoring:
+      10: "All criteria passed on first review"
+      8: "All criteria passed after 1 revision"
+      6: "All criteria passed after 2 revisions"
+      4: "Required 3 revisions"
+      2: "Escalated to human review"
+      0: "QA gate bypassed or skipped"
+    notes:
+      - "QA sub-agent reviews with isolated context (no tech spec)"
+      - "Hard block - cannot proceed until PASS"
+      - "Max 3 review cycles before escalation"
+
+threshold: 7
+max_iterations: 3
+
+notes:
+  borderline: "Review edge cases and add security validation"
+  improvement_focus:
+    - "Add input validation"
+    - "Include error handling"
+    - "Add WHY comments to complex logic"
+    - "Ensure test coverage"

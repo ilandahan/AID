@@ -1,0 +1,111 @@
+# Phase 5: QA & Ship - Reflection Criteria
+# Testing, validation, deployment, release
+
+phase: 5
+name: "QA & Ship"
+description: "Quality assurance, acceptance testing, deployment, release"
+
+criteria:
+  - id: why_alignment
+    name: "WHY Alignment"
+    weight: 3
+    checks:
+      - "Tests verify the original requirements are met?"
+      - "QA validates user needs, not just technical specs?"
+      - "Release delivers promised value?"
+    scoring:
+      excellent: "QA directly validates business value"
+      acceptable: "QA covers technical requirements"
+      poor: "QA disconnected from original WHY"
+
+  - id: phase_compliance
+    name: "Phase Compliance"
+    weight: 2
+    checks:
+      - "All previous phases completed and approved?"
+      - "Not adding new features (scope creep)?"
+      - "Following release procedures?"
+    scoring:
+      excellent: "Clean phase transition, no scope creep"
+      acceptable: "Minor adjustments within scope"
+      poor: "Adding features or skipping approvals"
+
+  - id: correctness
+    name: "Test Quality"
+    weight: 3
+    checks:
+      - "Tests actually test the right things?"
+      - "Test assertions are meaningful?"
+      - "No false positives or negatives?"
+      - "Acceptance criteria properly validated?"
+    scoring:
+      excellent: "Comprehensive, meaningful tests"
+      acceptable: "Good test coverage with minor gaps"
+      poor: "Tests don't properly validate requirements"
+
+  - id: security
+    name: "Security Validation"
+    weight: 3
+    checks:
+      - "Security tests included?"
+      - "Penetration testing done if required?"
+      - "No security regressions?"
+      - "Deployment is secure?"
+    scoring:
+      excellent: "Comprehensive security validation"
+      acceptable: "Basic security testing done"
+      poor: "Security not adequately tested"
+
+  - id: completeness
+    name: "Release Readiness"
+    weight: 2
+    checks:
+      - "All acceptance criteria pass?"
+      - "Documentation complete?"
+      - "Deployment procedure tested?"
+      - "Rollback plan ready?"
+      - "Monitoring in place?"
+    scoring:
+      excellent: "Fully release-ready with all checks passed"
+      acceptable: "Ready with minor items to address"
+      poor: "Not ready for release"
+
+  - id: test_code_quality
+    name: "Test Code Quality"
+    weight: 3
+    checks:
+      - "Tests organized in proper directory structure (unit/integration/e2e)?"
+      - "No hardcoded credentials in test code or README?"
+      - "Tests verified to run in any order (--randomize passed)?"
+      - "All existing tests still pass (no regressions)?"
+      - "Assertions are meaningful (specific values, not just existence)?"
+      - "Tests can actually fail (mutation test passed)?"
+    scoring:
+      excellent: "Clean, organized, secure, independent tests with strong assertions"
+      acceptable: "Minor organization issues, no security problems, tests work"
+      poor: "Disorganized, hardcoded secrets, broken tests, or weak assertions"
+
+  - id: test_independence
+    name: "Test Independence"
+    weight: 2
+    checks:
+      - "Tests pass when run in isolation?"
+      - "Tests pass when run in random order?"
+      - "No shared mutable state between tests?"
+      - "Setup in beforeEach, not beforeAll for mutable state?"
+      - "Proper cleanup in afterEach?"
+    scoring:
+      excellent: "All tests verified independent, run in any order"
+      acceptable: "Tests appear independent, not fully verified"
+      poor: "Tests depend on execution order or share state"
+
+threshold: 7
+max_iterations: 3
+
+notes:
+  borderline: "Review acceptance criteria coverage and rollback plan"
+  improvement_focus:
+    - "Ensure all acceptance criteria have tests"
+    - "Validate security requirements"
+    - "Confirm deployment procedure"
+    - "Verify monitoring and alerting"

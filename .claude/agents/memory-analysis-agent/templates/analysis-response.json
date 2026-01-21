@@ -1,0 +1,119 @@
+{
+  "$schema": "memory-analysis-response-v1",
+  "description": "Template for memory analysis agent output",
+
+  "analysis_summary": {
+    "feedback_count": 0,
+    "date_range": "YYYY-MM-DD to YYYY-MM-DD",
+    "overall_avg_rating": 0.0,
+    "overall_avg_revisions": 0.0,
+    "trend_vs_previous": {
+      "rating": "+0.0 | -0.0 | null (if no previous)",
+      "revisions": "+0.0 | -0.0 | null (if no previous)"
+    }
+  },
+
+  "by_role_phase": [
+    {
+      "role": "product-manager | developer | qa-engineer | tech-lead",
+      "phase": "discovery | prd | tech-spec | breakdown | development | qa-ship",
+      "feedback_count": 0,
+      "avg_rating": 0.0,
+      "avg_revisions": 0.0
+    }
+  ],
+
+  "patterns_found": {
+    "positive": [
+      {
+        "id": "PAT-P01",
+        "description": "Brief description of what works",
+        "occurrences": 0,
+        "avg_rating_when_present": 0.0,
+        "avg_revisions_when_present": 0.0,
+        "supporting_quotes": [
+          "Anonymized quote from feedback",
+          "Another supporting quote"
+        ]
+      }
+    ],
+    "negative": [
+      {
+        "id": "PAT-N01",
+        "description": "Brief description of what doesn't work",
+        "occurrences": 0,
+        "avg_rating_when_present": 0.0,
+        "avg_revisions_when_present": 0.0,
+        "supporting_quotes": [
+          "Anonymized quote from feedback"
+        ]
+      }
+    ]
+  },
+
+  "suggestions": [
+    {
+      "id": "SUG-001",
+      "type": "skill_update | memory_add | memory_update | memory_remove",
+      "confidence": 0.00,
+      "target": {
+        "file": "skills/memory-system/references/roles/{role}/cumulative.md",
+        "section": "High-Confidence Patterns | Medium-Confidence Patterns | Anti-Patterns"
+      },
+      "content": "Markdown content to add to the skill file",
+      "evidence": {
+        "pattern_id": "PAT-P01 | PAT-N01",
+        "occurrences": 0,
+        "avg_rating": 0.0,
+        "avg_revisions": 0.0
+      }
+    },
+    {
+      "id": "SUG-002",
+      "type": "memory_add",
+      "confidence": 0.00,
+      "entry": "AID:{ROLE}:{PHASE}:{TYPE} {insight}",
+      "evidence": {
+        "pattern_id": "PAT-P01",
+        "meets_promotion_criteria": true
+      }
+    }
+  ],
+
+  "memory_candidates": [
+    {
+      "entry": "AID:{ROLE}:{PHASE}:{TYPE} {insight}",
+      "role": "product-manager | developer | qa-engineer | tech-lead | all",
+      "phase": "discovery | prd | tech-spec | breakdown | development | qa-ship | all",
+      "type": "DO | DONT | ASK | CHECK",
+      "confidence": 0.00,
+      "evidence_summary": "X occurrences, Y.Y avg rating, Z.Z avg revisions"
+    }
+  ],
+
+  "trends_analysis": {
+    "improving": [
+      "Description of improving metric or area"
+    ],
+    "declining": [
+      "Description of declining metric or area"
+    ],
+    "stable": [
+      "Description of stable metric or area"
+    ]
+  },
+
+  "warnings": [
+    {
+      "type": "low_sample_size | conflicting_patterns | outlier_excluded",
+      "message": "Description of the warning",
+      "affected_items": ["item1", "item2"]
+    }
+  ],
+
+  "meta": {
+    "agent_version": "1.0",
+    "analysis_timestamp": "ISO-8601 timestamp",
+    "processing_notes": "Any notes about the analysis process"
+  }
+}
