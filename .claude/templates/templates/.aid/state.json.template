@@ -1,0 +1,13 @@
+{
+  "current_phase": 1,
+  "phase_name": "PRD",
+  "started_at": "",
+  "phases": {
+    "1": { "status": "not_started" },
+    "2": { "status": "locked" },
+    "3": { "status": "locked" },
+    "4": { "status": "locked" },
+    "5": { "status": "locked" }
+  },
+  "artifacts": {}
+}

@@ -1,0 +1,173 @@
+AID - AI Development Methodology for Claude Code
+
+PROJECT OVERVIEW
+AID is a comprehensive framework that transforms raw requirements into production-ready software using Claude Code and AI assistance. It systematizes the entire development journey with structured phases, phase gates, skills system, and memory learning.
+
+CORE PURPOSE
+Provide a methodical, enforced workflow for building full-stack applications with Claude Code assistance. The methodology ensures quality, consistency, and progressive disclosure of work through phase gates.
+
+KEY FEATURES
+- Phase Gates (5 phases): PRD → Tech Spec → Breakdown → Development → QA & Ship
+- Phase Enforcement: Work is blocked out-of-order, critical rule enforced
+- Context Tracking: Real-time tracking of tasks/steps in .aid/context.json
+- Skills System: Automatic skill loading based on role and phase
+- Memory System: Learning-based improvements through feedback loops
+- MCP Integrations: Jira, GitHub, Figma, Chrome DevTools, PostgreSQL
+- One-Command Setup: Automated installation and initialization
+- Slash Commands: 27+ commands for workflow management
+
+PHASE SYSTEM
+Phase 1 (PRD): Transform raw requirements into PRD document with user stories
+Phase 2 (Tech Spec): Create architecture, schemas, API contracts from PRD
+Phase 3 (Breakdown): Create Jira epics/stories/tasks from Tech Spec
+Phase 4 (Development): Write tests first (TDD), then implement features
+Phase 5 (QA & Ship): Testing, code review, deployment preparation
+
+Each phase has entry criteria, required work, exit criteria, and artifacts.
+
+TECHNOLOGY STACK
+Frontend: Next.js 16, React 19, TypeScript, SCSS
+Backend: Node.js 18+, Next.js API Routes
+Database: PostgreSQL 16+
+Testing: Jest, Testing Library, Supertest, Puppeteer
+Authentication: JWT + bcryptjs
+Deployment: Docker, Docker Compose
+
+KEY SYSTEMS
+
+Phase Gates (phase-enforcement skill)
+- Reads .aid/state.json to check current phase
+- Refuses work that belongs to future phases
+- Enforces sequential progression
+
+Work Context Tracking (context-tracking skill)
+- Maintains .aid/context.json with task/step tracking
+- Tracks previous/current/next tasks
+- Tracks previous/current/next steps within tasks
+- Session logging for continuity
+
+Memory System (learning-based improvements)
+- Collects feedback at end of each phase
+- Detects patterns in feedback
+- Updates skills based on patterns
+- Promotes insights to Claude Memory for cross-session learning
+- 30 slots in Claude Memory (roles: PM/Dev/QA/Lead, phases, universal)
+
+SLASH COMMANDS
+
+Daily Workflow:
+  /good-morning - Morning startup, load context, check MCPs
+  /context - Show current task and step
+  /context-update - Update context manually
+
+Phase Management:
+  /aid-init - Initialize new project
+  /aid-start - Start work session with role selection
+  /aid-status - Show current state
+  /aid-end - End phase with feedback
+  /phase - Show current phase status
+  /gate-check - Check if ready to advance
+  /phase-approve - Get human sign-off
+  /phase-advance - Move to next phase
+
+Development:
+  /prd - Generate PRD from requirements
+  /tech-spec - Create technical specification
+  /jira-breakdown - Break spec into Jira issues
+  /design-system - Build design system from Figma
+  /build-page - Compose pages from components
+  /write-tests - Write tests (TDD)
+  /code-review - Review code quality
+  /test-review - Review test quality
+
+Learning System:
+  /aid-improve - Run improvement cycle (weekly)
+  /aid-memory - Manage Claude Memory entries
+  /aid-reset - Reset memory system
+
+SKILLS
+Phase-specific skills loaded automatically:
+- phase-enforcement: Gate checking and phase validation
+- context-tracking: Work context management
+- system-architect: Tech spec and architecture (Phase 2)
+- atomic-design: Figma-to-code design systems (Phase 4)
+- atomic-page-builder: Compose pages from components (Phase 4)
+- code-review: Code quality assessment (Phase 5)
+- test-driven: TDD methodology (Phase 4-5)
+
+Memory System Skills (by role):
+- memory-system/skills/roles/developer/
+- memory-system/skills/roles/product-manager/
+- memory-system/skills/roles/qa-engineer/
+- memory-system/skills/roles/tech-lead/
+
+Memory System Skills (by phase):
+- memory-system/skills/phases/discovery/
+- memory-system/skills/phases/prd/
+- memory-system/skills/phases/tech-spec/
+- memory-system/skills/phases/development/
+- memory-system/skills/phases/qa-ship/
+
+STATE FILES
+.aid/state.json      - Phase state (which phase we're in)
+.aid/context.json    - Work context (current task, step, progress)
+.aid/approvals/      - Approval markers for phase gates
+~/.aid/state.json    - Session state (role, phase, session info)
+~/.aid/feedback/     - Feedback for learning system
+
+MCP INTEGRATIONS
+Atlassian (Jira/Confluence) - Project management via OAuth
+GitHub - Repository operations and version control
+Figma - Design token extraction and component documentation
+Chrome DevTools - Browser automation, testing, performance
+PostgreSQL - Direct database query access
+Filesystem - File operations and project access
+
+WORKFLOW EXAMPLE
+1. /aid-init → Creates .aid structure, starts Phase 1
+2. /good-morning → Load context each morning
+3. /prd user-auth → Create PRD for feature
+4. /phase-approve → Get approval
+5. /phase-advance → Move to Phase 2
+6. /tech-spec user-auth → Create architecture
+7. /phase-approve → Get approval
+8. /phase-advance → Move to Phase 3
+9. /jira-breakdown → Create Jira issues
+10. /phase-approve → Get approval
+11. /phase-advance → Move to Phase 4 (code allowed)
+12. /context → See current task
+13. [Implement feature, tests first]
+14. /context-update → Update progress
+15. /phase-advance → Move to Phase 5
+16. /test-review → Review test coverage
+17. /code-review → Review code quality
+
+PROJECT STRUCTURE
+.claude/commands/ - 27 slash commands
+docs/ - Documentation (phases, startup, context, MCP setup)
+skills/ - Role/phase-specific skills and references (7 skills)
+memory-system/ - Learning system (feedback, improvement cycle)
+  - skills/roles/ - 4 role-based skills
+  - skills/phases/ - 5 phase-based skills
+  - docs/ - Memory system documentation
+integrations/ - MCP integration guides
+templates/ - State and context templates
+scripts/ - Automation (init, startup check)
+prisma/ - Database schema and migrations
+src/ - Application source code
+testing/ - Test utilities and configurations
+
+FILE LOCATIONS
+.aid/state.json - Phase tracking
+.aid/context.json - Work context
+docs/PRD.md - Product requirements
+docs/TECH-SPEC.md - Technical specification
+.mcp.json - MCP server configuration
+CLAUDE.md - Main AID instructions
+
+CRITICAL RULE
+Before any work, Claude MUST read .aid/state.json to determine current phase and REFUSE work that belongs to a later phase.
+
+AUTHOR
+Created by Ilan Dahan
+Built with Claude Code by Anthropic

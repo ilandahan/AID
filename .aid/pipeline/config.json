@@ -1,0 +1,25 @@
+{
+  "$schema": "aid-pipeline-config-v1",
+  "version": "1.0",
+  "max_iterations": {
+    "code_review": 3,
+    "test_fix": 5,
+    "test_review": 3,
+    "api_fix": 5,
+    "e2e_fix": 5
+  },
+  "test_commands": {
+    "unit": "npm test",
+    "integration": "npm test -- --testPathPattern=integration",
+    "e2e": "npx playwright test",
+    "cucumber": "npm run cucumber",
+    "coverage": "npm test -- --coverage"
+  },
+  "thresholds": {
+    "code_review_pass": 7.0,
+    "test_review_min_quality": 80,
+    "auto_fail_on_critical_security": true,
+    "min_coverage_percent": 70
+  },
+  "auto_advance_phase": true
+}

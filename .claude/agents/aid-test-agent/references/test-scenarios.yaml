@@ -1,0 +1,165 @@
+# AID Test Scenarios Configuration
+
+test_project:
+  name: "TaskFlow"
+  description: "Simple task management application"
+  problem: "Users struggle to track daily tasks across multiple tools"
+  target_user: "Individual professionals needing lightweight task tracking"
+
+phases:
+  - id: 0
+    name: "Discovery"
+    outputs:
+      - id: research-summary
+        file: research-summary.md
+        description: "Market research findings"
+        required_elements:
+          - problem_validation
+          - market_size
+          - user_pain_points
+
+      - id: stakeholder-analysis
+        file: stakeholder-analysis.md
+        description: "User personas and needs"
+        required_elements:
+          - primary_persona
+          - secondary_persona
+          - needs_mapping
+
+      - id: competitive-analysis
+        file: competitive-analysis.md
+        description: "Competitor comparison"
+        required_elements:
+          - competitor_list
+          - feature_comparison
+          - differentiation
+
+    deliberate_failures:
+      - id: solution-in-research
+        description: "Include solution details in discovery research"
+        injection: "The application should use React with Redux for state management"
+        expected_failure: "Phase Compliance < 6"
+        criterion: "phase_compliance"
+
+    gate_requirements:
+      - "WHY clearly established"
+      - "Problem validated"
+      - "Target user defined"
+      - "No solution proposed"
+
+  - id: 1
+    name: "PRD"
+    outputs:
+      - id: user-stories
+        file: user-stories.md
+        description: "User stories with acceptance criteria"
+        required_elements:
+          - story_format
+          - acceptance_criteria
+          - priority
+        count: 5
+
+      - id: requirements
+        file: requirements.md
+        description: "Functional and non-functional requirements"
+        required_elements:
+          - functional_requirements
+          - non_functional_requirements
+          - security_requirements
+
+      - id: scope
+        file: scope.md
+        description: "Scope definition"
+        required_elements:
+          - in_scope
+          - out_of_scope
+          - mvp_definition
+
+    deliberate_failures:
+      - id: missing-why
+        description: "User story without WHY"
+        injection: "As a user, I want to create tasks"
+        expected_failure: "WHY Alignment < 6"
+        criterion: "why_alignment"
+
+      - id: code-in-prd
+        description: "Technical implementation in PRD"
+        injection: "Implementation: Use PostgreSQL with the following schema: CREATE TABLE tasks..."
+        expected_failure: "Phase Compliance < 6"
+        criterion: "phase_compliance"
+
+    gate_requirements:
+      - "All user stories complete"
+      - "Acceptance criteria testable"
+      - "Requirements trace to WHY"
+      - "No technical decisions"
+
+  - id: 2
+    name: "Tech Spec"
+    outputs:
+      - id: architecture-overview
+        file: architecture-overview.md
+        description: "System architecture design"
+        required_elements:
+          - system_diagram
+          - component_list
+          - technology_choices
+          - trade_off_documentation
+
+      - id: data-model
+        file: data-model.md
+        description: "Data entities and relationships"
+        required_elements:
+          - entity_definitions
+          - relationships
+          - constraints
+
+      - id: api-design
+        file: api-design.md
+        description: "API endpoint specifications"
+        required_elements:
+          - endpoints
+          - request_response_format
+          - error_handling
+          - authentication
+
+    deliberate_failures:
+      - id: implementation-code
+        description: "Actual code in tech spec"
+        injection: |
+          function createTask(data) {
+            const task = new Task(data);
+            return task.save();
+          }
+        expected_failure: "Phase Compliance < 6"
+        criterion: "phase_compliance"
+
+      - id: missing-security
+        description: "No security architecture"
+        injection: "Security will be handled later"
+        expected_failure: "Security < 6"
+        criterion: "security"
+
+    gate_requirements:
+      - "Architecture documented"
+      - "Data model complete"
+      - "API design complete"
+      - "Security considered"
+      - "No implementation code"
+
+validation_checks:
+  reflection_system:
+    - "Phase violations detected correctly"
+    - "Missing WHY detected"
+    - "Security gaps identified"
+    - "Incomplete outputs flagged"
+
+  phase_transitions:
+    - "Gate requirements enforced"
+    - "Artifacts validated before advance"
+    - "No skipping phases"
+
+  quality_scores:
+    - "Good outputs score >= 7"
+    - "Bad outputs score < 7"
+    - "Scores differentiate quality levels"

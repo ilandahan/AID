@@ -1,0 +1,61 @@
+AID (AI Development Methodology) - Quick Reference
+
+AID is a phase-gated methodology for Claude Code that enforces structured development: PRD → Tech Spec → Breakdown → Development → QA & Ship.
+
+CORE COMPONENTS
+
+1. Phase Gates (Enforced Sequential Progression)
+   - Phase 1 PRD: Requirements, scope, user stories
+   - Phase 2 Tech Spec: Architecture, schemas, APIs
+   - Phase 3 Breakdown: Jira epics, stories, tasks
+   - Phase 4 Development: Code, tests, components
+   - Phase 5 QA & Ship: Testing, review, deployment
+
+   State tracked in .aid/state.json with entry/exit criteria.
+
+2. Context Tracking (.aid/context.json)
+   Maintains real-time tracking:
+   - Previous/Current/Next task
+   - Previous/Current/Next step within task
+   - Session log with timestamps
+   Used by /good-morning for continuity.
+
+3. Skills System (Auto-loaded by Phase)
+   - phase-enforcement: Blocks out-of-order work
+   - context-tracking: Task/step management
+   - system-architect: Phase 2 architecture
+   - atomic-design: Phase 4 design systems
+   - code-review: Phase 5 review
+   - test-driven: Phase 4-5 TDD
+
+4. Memory System (Learning from Feedback)
+   - Feedback collected at phase end
+   - Patterns detected automatically
+   - Skills updated based on patterns
+   - Insights promoted to Claude Memory
+   - 30 slots for persistent learning
+
+5. MCP Integrations
+   Jira/Confluence, GitHub, Figma, Chrome DevTools, PostgreSQL
+
+ESSENTIAL COMMANDS
+
+Daily: /good-morning, /context, /phase
+Phase Management: /aid-init, /gate-check, /phase-approve, /phase-advance
+Development: /prd, /tech-spec, /jira-breakdown, /write-tests, /code-review
+Learning: /aid-improve, /aid-memory
+
+CRITICAL RULES
+1. Read .aid/state.json before starting work
+2. REFUSE work that belongs to future phases
+3. Update .aid/context.json when starting/completing tasks
+4. Use TDD in Phase 4 (write tests before code)
+5. Get approval before advancing phases
+
+TECH STACK
+Next.js 16, React 19, TypeScript, Node.js 18+, PostgreSQL 16+, Jest, Docker
+
+STATUS FILES
+.aid/state.json - Current phase and phase status
+.aid/context.json - Current task, step, progress
+.aid/approvals/ - Phase approval markers

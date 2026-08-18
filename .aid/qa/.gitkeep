@@ -1,0 +1,13 @@
+# QA Criteria Directory
+
+This directory contains QA acceptance criteria files for each task.
+Files are auto-generated during Phase 3c: Success Criteria Generation.
+
+## Structure
+- {TASK-ID}.yaml - Acceptance criteria for each task
+- {TASK-ID}-review-{N}.json - QA review results (generated during Phase 4)
+
+## Usage
+- QA sub-agent reads ONLY files from this directory
+- Never add tech spec or implementation details here
+- See `.claude/skills/aid-impl-plan/references/iron-rules.md` for content rules

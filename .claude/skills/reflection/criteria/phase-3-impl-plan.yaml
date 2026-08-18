@@ -1,0 +1,276 @@
+# Phase 3: Implementation Plan - Reflection Criteria
+# Now includes sub-phase validation (3a, 3b, 3c)
+
+phase: 3
+name: "Implementation Plan"
+description: "Consolidation, task breakdown, sprint planning, Jira population"
+
+sub_phases:
+  - id: "3a"
+    name: "Consolidation & Validation"
+    description: "Resolve contradictions, create consolidated master document"
+  - id: "3b"
+    name: "Task Breakdown"
+    description: "Break down into actionable tasks with estimates"
+  - id: "3c"
+    name: "Jira Population"
+    description: "Create Jira issues with full information"
+
+criteria:
+  # ===== PHASE 3a CRITERIA =====
+  - id: consolidation_completeness
+    name: "Consolidation Completeness"
+    weight: 3
+    sub_phase: "3a"
+    checks:
+      - "All source documents analyzed (PRD, Tech Spec, Research)?"
+      - "All contradictions between documents identified?"
+      - "No information lost or removed from source documents?"
+      - "Consolidated document is self-contained?"
+    scoring:
+      excellent: "Complete consolidation with all information preserved"
+      acceptable: "Minor information gaps, easily fixable"
+      poor: "Missing major sections or information lost"
+
+  - id: contradiction_resolution
+    name: "Contradiction Resolution"
+    weight: 3
+    sub_phase: "3a"
+    checks:
+      - "All contradictions explicitly documented?"
+      - "Resolution follows hierarchy (Research > PRD > Tech Spec)?"
+      - "Rationale provided for each resolution?"
+      - "Original conflicting text preserved for reference?"
+    scoring:
+      excellent: "All contradictions resolved with clear rationale"
+      acceptable: "Most resolved, minor gaps in rationale"
+      poor: "Contradictions unresolved or resolutions unjustified"
+
+  - id: consolidation_approval
+    name: "User Approval"
+    weight: 2
+    sub_phase: "3a"
+    checks:
+      - "Consolidated document presented to user?"
+      - "User explicitly approved the consolidation?"
+      - "Any user feedback incorporated?"
+    scoring:
+      excellent: "Explicit user approval received"
+      acceptable: "Implicit approval or minor changes pending"
+      poor: "No approval or user rejected"
+
+  # ===== PHASE 3b CRITERIA =====
+  - id: why_alignment
+    name: "WHY Alignment"
+    weight: 3
+    sub_phase: "3b"
+    checks:
+      - "Each task traces back to consolidated spec section?"
+      - "Task breakdown serves the defined architecture?"
+      - "Priority reflects business value from PRD?"
+      - "No orphan tasks without spec reference?"
+    scoring:
+      excellent: "Clear traceability from every task to requirements"
+      acceptable: "Most tasks link to specs, minor gaps"
+      poor: "Tasks without clear connection to specs"
+
+  - id: phase_compliance
+    name: "Phase Compliance"
+    weight: 2
+    sub_phase: "3b"
+    checks:
+      - "Planning tasks, not executing them?"
+      - "Not writing production code yet?"
+      - "Following approved architecture from consolidated spec?"
+    scoring:
+      excellent: "Pure planning and task definition"
+      acceptable: "Mostly planning with minor scaffolding"
+      poor: "Contains implementation code"
+
+  - id: task_quality
+    name: "Task Quality"
+    weight: 3
+    sub_phase: "3b"
+    checks:
+      - "All tasks < 4 hours (prefer 1-2 hours)?"
+      - "Each task has clear, testable acceptance criteria?"
+      - "Dependencies correctly identified?"
+      - "Critical path documented?"
+      - "Estimates are realistic based on complexity?"
+    scoring:
+      excellent: "Well-structured tasks with realistic estimates"
+      acceptable: "Good structure with minor sizing issues"
+      poor: "Unrealistic estimates or missing dependencies"
+
+  - id: sprint_planning
+    name: "Sprint/Agile Planning"
+    weight: 2
+    sub_phase: "3b"
+    checks:
+      - "Sprint goals clearly defined?"
+      - "Capacity considered in sprint allocation?"
+      - "Stories prioritized by business value?"
+      - "Dependencies respected in sprint order?"
+    scoring:
+      excellent: "Realistic sprint plan with clear goals"
+      acceptable: "Sprint plan exists with minor capacity issues"
+      poor: "No sprint plan or unrealistic allocation"
+
+  - id: risk_assessment
+    name: "Risk Assessment"
+    weight: 2
+    sub_phase: "3b"
+    checks:
+      - "Technical risks identified with mitigations?"
+      - "Dependency risks documented?"
+      - "Resource/skill gap risks addressed?"
+      - "Contingency plans defined for high risks?"
+    scoring:
+      excellent: "Comprehensive risk assessment with mitigations"
+      acceptable: "Major risks identified, some gaps"
+      poor: "Risks not assessed or no mitigations"
+
+  - id: test_strategy
+    name: "Test Strategy"
+    weight: 2
+    sub_phase: "3b"
+    checks:
+      - "Unit test scope defined?"
+      - "Integration test scope defined?"
+      - "E2E test scenarios from user stories?"
+      - "Coverage target specified (minimum 70%)?"
+      - "Test tasks included in breakdown?"
+    scoring:
+      excellent: "Complete test strategy with coverage targets"
+      acceptable: "Basic test strategy, gaps in coverage plan"
+      poor: "Test strategy missing or incomplete"
+
+  # ===== PHASE 3c CRITERIA =====
+  - id: jira_completeness
+    name: "Jira Issue Completeness"
+    weight: 3
+    sub_phase: "3c"
+    checks:
+      - "All tasks from breakdown have Jira issues?"
+      - "Every issue has full description from consolidated spec?"
+      - "Every issue has acceptance criteria?"
+      - "Every issue has estimate?"
+    scoring:
+      excellent: "All issues complete with full information"
+      acceptable: "Most issues complete, minor gaps"
+      poor: "Issues missing or incomplete"
+
+  - id: jira_information_transfer
+    name: "Information Transfer"
+    weight: 3
+    sub_phase: "3c"
+    checks:
+      - "Business context from PRD included in descriptions?"
+      - "Technical notes from Tech Spec included?"
+      - "Spec section references in every issue?"
+      - "No information lost from consolidated spec?"
+    scoring:
+      excellent: "Full information transfer to Jira"
+      acceptable: "Most information transferred, minor omissions"
+      poor: "Significant information missing from Jira"
+
+  - id: jira_structure
+    name: "Jira Structure & Links"
+    weight: 2
+    sub_phase: "3c"
+    checks:
+      - "Proper hierarchy (Epic > Story > Task > Subtask)?"
+      - "Dependencies linked between issues?"
+      - "Issues assigned to correct sprints?"
+      - "Labels and components properly set?"
+    scoring:
+      excellent: "Well-structured Jira with all links"
+      acceptable: "Good structure, some linking gaps"
+      poor: "Poor hierarchy or missing dependencies"
+
+  # ===== CROSS-PHASE CRITERIA =====
+  - id: security_tasks
+    name: "Security Tasks"
+    weight: 2
+    sub_phase: "all"
+    checks:
+      - "Security implementation tasks included?"
+      - "Security review checkpoints planned?"
+      - "Penetration testing scheduled if needed?"
+      - "Security requirements from consolidated spec covered?"
+    scoring:
+      excellent: "Security tasks properly planned"
+      acceptable: "Basic security tasks present"
+      poor: "Security tasks missing from plan"
+
+  - id: documentation_tasks
+    name: "Documentation Tasks"
+    weight: 1
+    sub_phase: "all"
+    checks:
+      - "API documentation tasks included?"
+      - "User documentation planned if needed?"
+      - "Architecture decision records planned?"
+    scoring:
+      excellent: "All documentation tasks planned"
+      acceptable: "Basic documentation tasks"
+      poor: "Documentation not planned"
+
+# Thresholds by sub-phase
+thresholds:
+  "3a": 7
+  "3b": 7
+  "3c": 7
+  overall: 7
+
+max_iterations: 3
+
+checkpoints:
+  - sub_phase: "3a"
+    name: "Consolidation Checkpoint"
+    requires_user_approval: true
+    gate_criteria:
+      - "consolidation_completeness >= 7"
+      - "contradiction_resolution >= 7"
+      - "consolidation_approval = approved"
+
+  - sub_phase: "3b"
+    name: "Task Breakdown Checkpoint"
+    requires_user_approval: false
+    gate_criteria:
+      - "task_quality >= 7"
+      - "sprint_planning >= 6"
+      - "risk_assessment >= 6"
+      - "test_strategy >= 6"
+
+  - sub_phase: "3c"
+    name: "Jira Population Checkpoint"
+    requires_user_approval: false
+    gate_criteria:
+      - "jira_completeness >= 7"
+      - "jira_information_transfer >= 7"
+      - "jira_structure >= 6"
+
+notes:
+  borderline: "Review task dependencies, estimation accuracy, and information completeness"
+  improvement_focus:
+    - "Ensure all contradictions are resolved with rationale"
+    - "Ensure tasks are 1-3 hour sized"
+    - "Add missing dependencies"
+    - "Include all information from consolidated spec in Jira"
+    - "Include testing and documentation tasks"
+
+  phase_3a_focus:
+    - "No information may be lost during consolidation"
+    - "PRD is source of truth unless Research contradicts"
+    - "User must approve before proceeding"
+
+  phase_3b_focus:
+    - "Tasks should be independently completable"
+    - "Every task must link to consolidated spec"
+    - "Critical path must be visible"
+
+  phase_3c_focus:
+    - "Jira descriptions should be comprehensive"
+    - "All acceptance criteria must transfer"
+    - "Dependencies must be linked, not just documented"

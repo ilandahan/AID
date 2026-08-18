@@ -1,0 +1,135 @@
+{
+  "$schema": "test-review-response-v1",
+  "description": "Expected JSON response schema for test-review-agent",
+  "type": "object",
+  "required": ["review_id", "timestamp", "verdict", "categories", "mock_analysis", "coverage_assessment", "summary", "strengths", "action_required", "handoff"],
+  "properties": {
+    "review_id": {
+      "type": "string",
+      "pattern": "^tr-",
+      "description": "Unique review ID prefixed with tr-"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["PASS", "FAIL"]
+    },
+    "categories": {
+      "type": "object",
+      "required": ["test_quality", "coverage", "independence", "alignment", "production_safety", "mock_analysis"],
+      "properties": {
+        "test_quality": { "$ref": "#/$defs/category" },
+        "coverage": { "$ref": "#/$defs/category" },
+        "independence": { "$ref": "#/$defs/category" },
+        "alignment": { "$ref": "#/$defs/category" },
+        "production_safety": { "$ref": "#/$defs/category" },
+        "mock_analysis": { "$ref": "#/$defs/category" }
+      }
+    },
+    "mock_analysis": {
+      "type": "object",
+      "required": ["total_dependencies", "mocked_dependencies", "mock_ratio_percent"],
+      "properties": {
+        "total_dependencies": { "type": "integer" },
+        "mocked_dependencies": { "type": "integer" },
+        "mock_ratio_percent": { "type": "number" },
+        "mocked_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "what": { "type": "string" },
+              "why": { "type": "string" },
+              "acceptable": { "type": "boolean" }
+            }
+          }
+        },
+        "internal_mocks_flagged": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "coverage_assessment": {
+      "type": "object",
+      "required": ["functions_found", "functions_with_happy_path", "functions_with_edge_cases", "functions_with_error_cases"],
+      "properties": {
+        "functions_found": { "type": "integer" },
+        "functions_with_happy_path": { "type": "integer" },
+        "functions_with_edge_cases": { "type": "integer" },
+        "functions_with_error_cases": { "type": "integer" },
+        "coverage_map": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "happy_path": { "type": "string", "enum": ["YES", "NO"] },
+              "edge_cases": { "type": "string", "enum": ["YES", "NO"] },
+              "error_cases": { "type": "string", "enum": ["YES", "NO"] }
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_issues", "critical", "major", "minor"],
+      "properties": {
+        "total_issues": { "type": "integer" },
+        "critical": { "type": "integer" },
+        "major": { "type": "integer" },
+        "minor": { "type": "integer" }
+      }
+    },
+    "strengths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "action_required": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "handoff": {
+      "type": "object",
+      "required": ["next_action", "message"],
+      "properties": {
+        "next_action": {
+          "type": "string",
+          "enum": ["proceed_to_phase_gate", "fix_and_retry", "human_review_required"]
+        },
+        "message": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "category": {
+      "type": "object",
+      "required": ["status", "issues"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["PASS", "FAIL"]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["severity", "file", "line", "pattern", "description", "fix"],
+            "properties": {
+              "severity": { "type": "string", "enum": ["CRITICAL", "MAJOR", "MINOR"] },
+              "file": { "type": "string" },
+              "line": { "type": "integer" },
+              "pattern": { "type": "string" },
+              "description": { "type": "string" },
+              "fix": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

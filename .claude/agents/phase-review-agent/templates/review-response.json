@@ -1,0 +1,33 @@
+{
+  "$schema": "Phase Review Agent Response Format",
+  "$description": "Template for phase review output - main agent uses this to understand expected format",
+
+  "verdict": "{{PASS | PARTIAL | FAIL}}",
+
+  "checklist": [
+    {
+      "item": "{{checklist item from phase-prompts/phase-N.md}}",
+      "status": "{{pass | fail}}",
+      "note": "{{specific evidence found or what's missing}}",
+      "location": "{{filename:line-number or 'not found'}}"
+    }
+  ],
+
+  "summary": "{{2-3 sentence overall assessment}}",
+
+  "blocking_issues": [
+    "{{critical items that MUST be fixed before proceeding}}",
+    "{{only present if verdict is FAIL}}"
+  ],
+
+  "suggestions": [
+    "{{nice-to-have improvements}}",
+    "{{won't block advancement}}"
+  ],
+
+  "phase_specific": {
+    "completeness_score": "{{0-100: how much of required content is present}}",
+    "quality_score": "{{0-100: how well the content meets standards}}",
+    "ready_for_next_phase": "{{true | false}}"
+  }
+}

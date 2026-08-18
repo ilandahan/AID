@@ -1,0 +1,157 @@
+# AID Test Validation Rules
+
+scoring:
+  pass_threshold: 7
+  excellent_threshold: 8
+  weights:
+    why_alignment: 3
+    phase_compliance: 2
+    correctness: 3
+    security: 2
+    completeness: 2
+  total_weight: 12
+
+phase_rules:
+  phase_0:
+    allowed:
+      - research
+      - analysis
+      - problem_validation
+      - stakeholder_identification
+      - competitive_analysis
+    blocked:
+      - requirements
+      - user_stories
+      - architecture
+      - code
+      - database_schema
+      - api_design
+    violation_patterns:
+      - "should use"
+      - "will implement"
+      - "CREATE TABLE"
+      - "function"
+      - "class"
+      - "React"
+      - "Node.js"
+      - "PostgreSQL"
+
+  phase_1:
+    allowed:
+      - requirements
+      - user_stories
+      - acceptance_criteria
+      - scope_definition
+      - personas
+    blocked:
+      - architecture
+      - code
+      - database_schema
+      - api_endpoints
+      - technology_choices
+    violation_patterns:
+      - "CREATE TABLE"
+      - "function"
+      - "class"
+      - "endpoint:"
+      - "schema:"
+      - "API:"
+
+  phase_2:
+    allowed:
+      - architecture
+      - system_design
+      - data_model
+      - api_design
+      - technology_choices
+      - security_architecture
+    blocked:
+      - implementation_code
+      - production_code
+      - deployment
+    violation_patterns:
+      - "function.*{"
+      - "class.*{"
+      - "const.*="
+      - "let.*="
+      - "import"
+      - "require("
+
+gate_checks:
+  phase_0_to_1:
+    required_files:
+      - research-summary.md
+      - stakeholder-analysis.md
+      - competitive-analysis.md
+    required_content:
+      - "problem" in research-summary
+      - "persona" in stakeholder-analysis
+      - "competitor" in competitive-analysis
+    min_score: 7
+
+  phase_1_to_2:
+    required_files:
+      - user-stories.md
+      - requirements.md
+      - scope.md
+    required_content:
+      - "As a" in user-stories
+      - "acceptance criteria" in user-stories
+      - "functional" in requirements
+      - "in scope" in scope
+    min_score: 7
+
+reflection_validation:
+  must_detect:
+    - type: phase_violation
+      test: solution-in-research
+      expected_criterion: phase_compliance
+      expected_max_score: 6
+
+    - type: missing_why
+      test: missing-why
+      expected_criterion: why_alignment
+      expected_max_score: 6
+
+    - type: code_in_wrong_phase
+      test: code-in-prd
+      expected_criterion: phase_compliance
+      expected_max_score: 6
+
+    - type: implementation_code
+      test: implementation-code
+      expected_criterion: phase_compliance
+      expected_max_score: 6
+
+    - type: security_gap
+      test: missing-security
+      expected_criterion: security
+      expected_max_score: 6
+
+  score_distribution:
+    excellent_outputs:
+      - name: "Well-formed research"
+        expected_min: 8
+    good_outputs:
+      - name: "Standard PRD section"
+        expected_min: 7
+    poor_outputs:
+      - name: "Phase-violating content"
+        expected_max: 6
+
+test_assertions:
+  - id: reflection_catches_violations
+    description: "Reflection must catch all deliberate violations"
+    pass_criteria: "All violation tests score < 7 on expected criterion"
+
+  - id: good_content_passes
+    description: "Well-formed content should pass"
+    pass_criteria: "All standard outputs score >= 7"
+
+  - id: gates_enforce_rules
+    description: "Gates must require all artifacts"
+    pass_criteria: "Cannot advance without required files"
+
+  - id: scores_differentiate
+    description: "Scores should distinguish quality"
+    pass_criteria: "Score difference between good/bad >= 2 points"

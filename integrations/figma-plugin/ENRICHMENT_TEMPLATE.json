@@ -1,0 +1,393 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "atomic-component-enrichment",
+  "title": "Atomic Component Enrichment Template",
+  "description": "Template for enriching Figma components with metadata for code generation",
+  
+  "component": {
+    "_comment": "=== COMPONENT IDENTIFICATION ===",
+    
+    "componentId": {
+      "_value": "1:234",
+      "_source": "AUTO - Figma node.id",
+      "_figmaField": "node.id"
+    },
+    
+    "componentName": {
+      "_value": "Button / Primary / Large",
+      "_source": "AUTO - Figma node.name",
+      "_figmaField": "node.name"
+    },
+    
+    "displayName": {
+      "_value": "ButtonPrimary",
+      "_source": "AUTO - Generated from name (PascalCase)",
+      "_override": true,
+      "_description": "Override if you want a different component name in code"
+    },
+    
+    "description": {
+      "_value": "Primary action button used for main CTAs throughout the application",
+      "_source": "MANUAL",
+      "_figmaField": "node.description (if using Figma's description field)",
+      "_required": true
+    },
+
+    "_comment2": "=== ATOMIC CLASSIFICATION ===",
+    
+    "level": {
+      "_value": "atom",
+      "_options": ["atom", "molecule", "organism", "template", "page"],
+      "_source": "AUTO - Calculated from structure",
+      "_override": true,
+      "_description": "Override if auto-classification is wrong"
+    },
+    
+    "category": {
+      "_value": "button",
+      "_options": ["button", "input", "select", "checkbox", "radio", "icon", "text", "link", "card", "modal", "navigation", "form", "table", "media", "layout", "other"],
+      "_source": "AUTO - Inferred from name",
+      "_override": true
+    },
+
+    "_comment3": "=== PROPS DEFINITION ===",
+    
+    "props": [
+      {
+        "name": "label",
+        "type": "string",
+        "required": true,
+        "defaultValue": "Click me",
+        "description": "Button text content",
+        "_source": "AUTO - From text node",
+        "_figmaField": "TextNode.characters",
+        "_figmaNodeName": "Label, Title, Text, Button Text"
+      },
+      {
+        "name": "onClick",
+        "type": "function",
+        "required": false,
+        "description": "Click event handler",
+        "_source": "AUTO - Added for interactive components"
+      },
+      {
+        "name": "disabled",
+        "type": "boolean",
+        "required": false,
+        "defaultValue": false,
+        "description": "Disables the button",
+        "_source": "AUTO - From variant property 'State=Disabled'"
+      },
+      {
+        "name": "loading",
+        "type": "boolean",
+        "required": false,
+        "defaultValue": false,
+        "description": "Shows loading spinner",
+        "_source": "MANUAL - Add if component has loading state"
+      },
+      {
+        "name": "icon",
+        "type": "node",
+        "required": false,
+        "description": "Icon element to display",
+        "_source": "AUTO - From node named 'Icon' or 'icon'",
+        "_figmaNodeName": "Icon, ico, Leading Icon, Trailing Icon"
+      },
+      {
+        "name": "iconPosition",
+        "type": "enum",
+        "required": false,
+        "enumValues": ["left", "right"],
+        "defaultValue": "left",
+        "description": "Position of the icon",
+        "_source": "MANUAL"
+      }
+    ],
+
+    "_comment4": "=== VARIANTS (from Figma Component Properties) ===",
+    
+    "variants": [
+      {
+        "name": "variant",
+        "options": ["primary", "secondary", "ghost", "danger"],
+        "defaultOption": "primary",
+        "description": "Visual style variant",
+        "_source": "AUTO - From Figma variant property",
+        "_figmaField": "componentSet.variantGroupProperties['Type'] or ['Variant']"
+      },
+      {
+        "name": "size",
+        "options": ["sm", "md", "lg"],
+        "defaultOption": "md",
+        "description": "Button size",
+        "_source": "AUTO - From Figma variant property",
+        "_figmaField": "componentSet.variantGroupProperties['Size']"
+      }
+    ],
+
+    "_comment5": "=== STATES (CSS pseudo-classes) ===",
+    
+    "states": {
+      "_value": ["default", "hover", "active", "focus", "disabled"],
+      "_source": "AUTO - From variant 'State' property",
+      "_figmaField": "variantGroupProperties['State']",
+      "_mapping": {
+        "Default": "default",
+        "Hover": "hover", 
+        "Pressed": "active",
+        "Active": "active",
+        "Focus": "focus",
+        "Focused": "focus",
+        "Disabled": "disabled",
+        "Loading": "loading"
+      }
+    },
+
+    "_comment6": "=== DESIGN TOKENS ===",
+    
+    "tokens": [
+      {
+        "name": "button-primary-bg",
+        "value": "#3b82f6",
+        "category": "color",
+        "cssVariable": "--color-button-primary-bg",
+        "semanticName": "primary",
+        "_source": "AUTO",
+        "_figmaField": "node.fills[0].color (SOLID fill)"
+      },
+      {
+        "name": "button-primary-text",
+        "value": "#ffffff",
+        "category": "color",
+        "cssVariable": "--color-button-primary-text",
+        "_source": "AUTO",
+        "_figmaField": "TextNode.fills[0].color"
+      },
+      {
+        "name": "button-border",
+        "value": "#e5e7eb",
+        "category": "color",
+        "cssVariable": "--color-button-border",
+        "_source": "AUTO",
+        "_figmaField": "node.strokes[0].color"
+      },
+      {
+        "name": "button-padding",
+        "value": "12px 24px",
+        "category": "spacing",
+        "cssVariable": "--spacing-button-padding",
+        "_source": "AUTO",
+        "_figmaField": "node.paddingTop, paddingRight, paddingBottom, paddingLeft"
+      },
+      {
+        "name": "button-gap",
+        "value": "8px",
+        "category": "spacing",
+        "cssVariable": "--spacing-button-gap",
+        "_source": "AUTO",
+        "_figmaField": "node.itemSpacing (Auto Layout)"
+      },
+      {
+        "name": "button-radius",
+        "value": "8px",
+        "category": "borderRadius",
+        "cssVariable": "--radius-button",
+        "_source": "AUTO",
+        "_figmaField": "node.cornerRadius"
+      },
+      {
+        "name": "button-font-size",
+        "value": "14px",
+        "category": "typography",
+        "cssVariable": "--font-size-button",
+        "_source": "AUTO",
+        "_figmaField": "TextNode.fontSize"
+      },
+      {
+        "name": "button-font-weight",
+        "value": "600",
+        "category": "typography",
+        "cssVariable": "--font-weight-button",
+        "_source": "AUTO",
+        "_figmaField": "TextNode.fontWeight"
+      },
+      {
+        "name": "button-shadow",
+        "value": "0 1px 2px rgba(0,0,0,0.05)",
+        "category": "shadow",
+        "cssVariable": "--shadow-button",
+        "_source": "AUTO",
+        "_figmaField": "node.effects (DROP_SHADOW)"
+      }
+    ],
+
+    "_comment7": "=== RESPONSIVE BREAKPOINTS ===",
+    
+    "breakpoints": {
+      "_value": ["default", "mobile"],
+      "_source": "MANUAL or AUTO from variant names",
+      "_description": "Add breakpoints if component has responsive variants",
+      "_figmaField": "Look for variants with 'Mobile', 'Tablet', 'Desktop' in name"
+    },
+
+    "_comment8": "=== DEPENDENCIES ===",
+    
+    "dependencies": {
+      "internal": {
+        "_value": ["icon-check", "spinner"],
+        "_source": "AUTO - From instance nodes inside component",
+        "_figmaField": "InstanceNode.mainComponent.id",
+        "_description": "Other components from your design system used inside"
+      },
+      "external": {
+        "_value": ["lucide-react"],
+        "_source": "MANUAL",
+        "_description": "External libraries the component needs"
+      }
+    },
+
+    "_comment9": "=== ACCESSIBILITY ===",
+    
+    "accessibility": {
+      "role": {
+        "_value": "button",
+        "_source": "AUTO - Inferred from category",
+        "_options": ["button", "link", "textbox", "checkbox", "radio", "combobox", "dialog", "navigation", "banner", "contentinfo", "form", "table", "list", "article"]
+      },
+      "ariaLabel": {
+        "_value": null,
+        "_source": "MANUAL - Set if button has no visible text",
+        "_description": "Required for icon-only buttons"
+      },
+      "keyboardInteraction": {
+        "_value": ["Enter", "Space"],
+        "_source": "AUTO - Based on role",
+        "_description": "Keyboard shortcuts for interaction"
+      }
+    },
+
+    "_comment10": "=== METADATA ===",
+    
+    "figmaUrl": {
+      "_value": "https://www.figma.com/file/ABC123?node-id=1:234",
+      "_source": "AUTO - Generated from file key and node id"
+    },
+    
+    "version": {
+      "_value": "1.0.0",
+      "_source": "MANUAL or AUTO increment"
+    },
+    
+    "tags": {
+      "_value": ["button", "cta", "primary", "interactive"],
+      "_source": "MANUAL",
+      "_description": "Tags for searching/filtering components"
+    },
+    
+    "notes": {
+      "_value": "Use this button for primary actions only. Max 2 per page.",
+      "_source": "MANUAL",
+      "_description": "Usage guidelines and notes for developers"
+    }
+  },
+
+  "_comment_figma_setup": "=== FIGMA SETUP GUIDE ===",
+  
+  "figmaFieldsToFill": {
+    "_description": "Fields you should set in Figma for best auto-extraction",
+    
+    "required": [
+      {
+        "field": "Component Name",
+        "location": "Layer panel → Component name",
+        "format": "Category / Variant / Size",
+        "example": "Button / Primary / Large",
+        "why": "Used to generate displayName and infer category"
+      },
+      {
+        "field": "Variant Properties",
+        "location": "Component Set → Properties panel",
+        "recommended": ["Type/Variant", "Size", "State"],
+        "example": "Type=Primary, Size=Large, State=Default",
+        "why": "Becomes component variants and states in code"
+      }
+    ],
+    
+    "recommended": [
+      {
+        "field": "Description",
+        "location": "Right panel → Design tab → Component description",
+        "example": "Primary action button for main CTAs",
+        "why": "Becomes component JSDoc/description"
+      },
+      {
+        "field": "Auto Layout",
+        "location": "Right panel → Auto Layout",
+        "settings": ["Padding", "Gap", "Direction"],
+        "why": "Extracted as spacing tokens"
+      },
+      {
+        "field": "Text Node Names",
+        "location": "Layer panel → Rename text layers",
+        "recommended": ["Label", "Title", "Description", "Placeholder"],
+        "why": "Becomes prop names automatically"
+      },
+      {
+        "field": "Slot Node Names", 
+        "location": "Layer panel → Rename frame/group",
+        "recommended": ["Icon", "Leading", "Trailing", "Content", "Children"],
+        "why": "Becomes React children/slot props"
+      }
+    ],
+    
+    "optional": [
+      {
+        "field": "Component Properties (Boolean)",
+        "location": "Component → Add property → Boolean",
+        "example": "Show Icon = true/false",
+        "why": "Becomes boolean props"
+      },
+      {
+        "field": "Component Properties (Instance Swap)",
+        "location": "Component → Add property → Instance swap",
+        "example": "Icon = icon-check",
+        "why": "Becomes component/node props"
+      },
+      {
+        "field": "Component Properties (Text)",
+        "location": "Component → Add property → Text",
+        "example": "Label = Click me",
+        "why": "Becomes string props with defaults"
+      }
+    ]
+  },
+
+  "namingConventions": {
+    "_description": "Recommended naming patterns in Figma",
+    
+    "components": {
+      "pattern": "Category / Variant / Size",
+      "examples": [
+        "Button / Primary / Large",
+        "Input / Text / Default",
+        "Card / Product / Horizontal",
+        "Modal / Confirmation / Small"
+      ]
+    },
+    
+    "variants": {
+      "Type": ["Primary", "Secondary", "Ghost", "Danger", "Link"],
+      "Size": ["XS", "SM", "MD", "LG", "XL"],
+      "State": ["Default", "Hover", "Active", "Focus", "Disabled", "Loading", "Error"],
+      "Orientation": ["Horizontal", "Vertical"],
+      "Breakpoint": ["Mobile", "Tablet", "Desktop"]
+    },
+    
+    "layers": {
+      "text": ["Label", "Title", "Subtitle", "Description", "Placeholder", "Helper", "Error"],
+      "slots": ["Icon", "Leading Icon", "Trailing Icon", "Content", "Children", "Header", "Footer", "Actions"],
+      "containers": ["Container", "Wrapper", "Inner", "Content Area"]
+    }
+  }
+}

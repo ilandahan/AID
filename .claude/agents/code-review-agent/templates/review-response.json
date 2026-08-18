@@ -1,0 +1,88 @@
+{
+  "$schema": "code-review-response-v1",
+  "description": "Expected JSON response schema for code-review-agent",
+  "type": "object",
+  "required": ["review_id", "timestamp", "verdict", "categories", "summary", "strengths", "action_required", "handoff"],
+  "properties": {
+    "review_id": {
+      "type": "string",
+      "pattern": "^cr-",
+      "description": "Unique review ID prefixed with cr-"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["PASS", "FAIL"]
+    },
+    "categories": {
+      "type": "object",
+      "required": ["security", "code_quality", "documentation", "architecture"],
+      "properties": {
+        "security": { "$ref": "#/$defs/category" },
+        "code_quality": { "$ref": "#/$defs/category" },
+        "documentation": { "$ref": "#/$defs/category" },
+        "architecture": { "$ref": "#/$defs/category" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_issues", "critical", "major", "minor"],
+      "properties": {
+        "total_issues": { "type": "integer" },
+        "critical": { "type": "integer" },
+        "major": { "type": "integer" },
+        "minor": { "type": "integer" }
+      }
+    },
+    "strengths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "action_required": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "handoff": {
+      "type": "object",
+      "required": ["next_action", "message"],
+      "properties": {
+        "next_action": {
+          "type": "string",
+          "enum": ["proceed_to_tests", "fix_and_retry", "human_review_required"]
+        },
+        "message": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "category": {
+      "type": "object",
+      "required": ["status", "issues"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["PASS", "FAIL"]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["severity", "file", "line", "pattern", "description", "fix"],
+            "properties": {
+              "severity": { "type": "string", "enum": ["CRITICAL", "MAJOR", "MINOR"] },
+              "file": { "type": "string" },
+              "line": { "type": "integer" },
+              "pattern": { "type": "string" },
+              "description": { "type": "string" },
+              "fix": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,139 @@
+# AUTO-GENERATED - DO NOT ADD TECH DETAILS
+# This file is the ONLY context QA sub-agent reads
+# See: .claude/skills/aid-impl-plan/references/iron-rules.md
+
+schema_version: "1.0"
+task_id: "EXAMPLE-TASK"
+task_name: "Example: Implement email validation on login form"
+generated_at: "2025-01-13T10:00:00Z"
+generated_from: "consolidated-spec.md"
+
+# ============================================================
+# BUSINESS CONTEXT (Sanitized - from Epic/Story only)
+# ============================================================
+# This section provides the QA agent with business awareness
+# WITHOUT exposing technical implementation details.
+#
+# ALLOWED: Goals, user value, acceptance criteria (user perspective)
+# FORBIDDEN: Tech stack, architecture, API details
+# ============================================================
+
+business_context:
+  epic_goal: "Reduce failed login attempts by 40%"
+  user_value: "Users understand what's wrong and can fix it themselves"
+  acceptance_criteria:
+    - "Error messages are actionable and helpful"
+    - "Users can self-correct without contacting support"
+    - "Validation feedback is immediate and clear"
+
+# ============================================================
+# CRITERIA (What to verify - NO HOW, only WHAT)
+# ============================================================
+# These are the actual checkpoints the QA sub-agent validates.
+# Each criterion must be:
+# - Testable without knowing implementation
+# - Specific enough to give PASS/FAIL verdict
+# - Free of technical terms
+# ============================================================
+
+criteria:
+  # --------------------------------------------------------
+  # MUST ACHIEVE: Things the code MUST do
+  # --------------------------------------------------------
+  must_achieve:
+    - "Email format is validated before form can be submitted"
+    - "Error message displays directly below the invalid input field"
+    - "Error message clears automatically when user corrects the input"
+    - "Form submission is blocked when email validation fails"
+    - "Valid email format allows form submission to proceed"
+
+  # --------------------------------------------------------
+  # MUST NOT: Things the code must NEVER do
+  # --------------------------------------------------------
+  must_not:
+    - "Must NOT allow form submission with invalid email format"
+    - "Must NOT log email values to console or any log files"
+    - "Must NOT make API calls before client-side validation passes"
+    - "Must NOT expose validation logic details in error messages"
+    - "Must NOT allow bypassing validation through browser tools"
+
+  # --------------------------------------------------------
+  # NOT INCLUDED: Explicit scope boundaries
+  # --------------------------------------------------------
+  not_included:
+    - "Password validation (see task AUTH-124)"
+    - "Remember me checkbox functionality (out of MVP scope)"
+    - "SSO/OAuth integration (future sprint)"
+    - "Email verification/confirmation flow (separate feature)"
+
+  # --------------------------------------------------------
+  # BEST PRACTICES: Quality standards to verify
+  # --------------------------------------------------------
+  best_practices:
+    - "Unit tests exist for valid and invalid email scenarios"
+    - "Error messages are externalized and ready for translation"
+    - "Accessible error announcements for screen readers"
+    - "No console warnings or errors in browser developer tools"
+
+# ============================================================
+# FILES TO REVIEW (Populated by hook when task completes)
+# ============================================================
+# This list is populated automatically when the developer
+# marks the task as complete. The QA agent reviews ONLY
+# these files - nothing else.
+# ============================================================
+
+files_to_review: []
+# Example after task completion:
+# files_to_review:
+#   - "src/components/LoginForm.tsx"
+#   - "src/components/LoginForm.test.tsx"
+#   - "src/utils/validation.ts"
+
+# ============================================================
+# COMPLETION PROTOCOL (Triple Trigger System)
+# ============================================================
+# This section defines what happens when the task is completed.
+# It creates redundant triggers to ensure QA validation runs.
+# ============================================================
+
+completion_protocol:
+  # TRIGGER 1: Instruction to dev agent
+  on_task_complete: |
+    When this task is marked complete:
+    1. Spawn QA sub-agent using Task() tool
+    2. Wait for QA verdict before starting next task
+    3. If FAIL: Fix issues and retry QA
+
+  # TRIGGER 2: Signal back from QA to Dev
+  on_qa_pass: |
+    QA sub-agent should return:
+    - verdict: "PASS"
+    - next_action: "proceed_to_next_task"
+    - message: "All criteria satisfied. Dev agent may continue."
+
+  on_qa_fail: |
+    QA sub-agent should return:
+    - verdict: "FAIL"
+    - next_action: "fix_and_retry"
+    - action_required: [list of specific fixes]
+    - message: "Issues found. Dev agent must fix before continuing."
+
+# ============================================================
+# REVIEW HISTORY (Populated after each QA cycle)
+# ============================================================
+# Tracks all QA review attempts for this task.
+# Each entry references a detailed report JSON file.
+# ============================================================
+
+review_history: []
+# Example after QA reviews:
+# review_history:
+#   - review_number: 1
+#     timestamp: "2025-01-13T14:30:00Z"
+#     verdict: "FAIL"
+#     report_file: ".aid/qa/EXAMPLE-TASK-review-1.json"
+#   - review_number: 2
+#     timestamp: "2025-01-13T15:45:00Z"
+#     verdict: "PASS"
+#     report_file: ".aid/qa/EXAMPLE-TASK-review-2.json"

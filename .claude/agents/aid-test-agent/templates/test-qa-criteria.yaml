@@ -1,0 +1,70 @@
+# Template for test QA criteria file
+# Used by aid-test-agent to simulate QA validation
+
+schema_version: "1.0"
+task_id: "TEST-EMAIL-001"
+task_name: "Test: Email validation for login form"
+generated_at: "{{TIMESTAMP}}"
+generated_from: "test-scenario"
+
+# BUSINESS CONTEXT (sanitized - no tech details)
+business_context:
+  epic_goal: "Reduce failed login attempts by 40%"
+  user_value: "Users understand what's wrong and can fix it"
+  acceptance_criteria:
+    - "Error messages are actionable"
+    - "Users can self-correct without support"
+    - "Validation feedback is immediate"
+
+# CRITERIA (What to verify - NO HOW, only WHAT)
+criteria:
+  # Things the code MUST do
+  must_achieve:
+    - "Email format is validated before submission"
+    - "Error message displays below invalid input"
+    - "Error clears when user corrects input"
+    - "Form blocked when validation fails"
+
+  # Things the code must NEVER do
+  must_not:
+    - "Must NOT allow submission with invalid email"
+    - "Must NOT log email values to console"
+    - "Must NOT make API calls before validation passes"
+
+  # Explicit scope boundaries
+  not_included:
+    - "Password validation (different task)"
+    - "Remember me checkbox (out of scope)"
+
+  # Quality standards to verify
+  best_practices:
+    - "Unit tests exist for valid/invalid scenarios"
+    - "Error messages ready for translation"
+    - "Accessible error announcements"
+
+# Files to review (populated by test)
+files_to_review:
+  - "test-outputs/phase-4/email-validator.ts"
+  - "test-outputs/phase-4/email-validator.test.ts"
+
+# Completion protocol
+completion_protocol:
+  on_task_complete: |
+    Run inline QA validation:
+    1. Check all must_achieve criteria against code
+    2. Check all must_not criteria against code
+    3. Check best_practices criteria
+    4. Return PASS/FAIL verdict
+
+  on_qa_pass: |
+    Return:
+    - verdict: "PASS"
+    - criteria_met: [list]
+
+  on_qa_fail: |
+    Return:
+    - verdict: "FAIL"
+    - violations: [list specific failures]
+
+# Review history (populated during test)
+review_history: []

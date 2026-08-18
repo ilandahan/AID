@@ -1,0 +1,23 @@
+# Normalize line endings so the repo is safe to clone on any platform.
+# WHY: a .sh file stored with CRLF fails on macOS/Linux with "bad interpreter:
+# No such file or directory". Windows contributors would otherwise commit CRLF
+# and silently break the install path for everyone else.
+
+# Default: normalize text to LF in the repository.
+* text=auto eol=lf
+
+# Shell scripts and hooks MUST be LF, on every platform.
+*.sh text eol=lf
+.claude/hooks/* text eol=lf
+
+# Batch files MUST be CRLF, or cmd.exe mis-parses multi-line blocks.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets: never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

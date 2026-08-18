@@ -1,0 +1,63 @@
+{
+  "$schema": "Reflection Agent Evaluation Response Format",
+  "$description": "This template shows the exact JSON structure the sub-agent must return",
+
+  "evaluation": {
+    "why_alignment": {
+      "score": "{{0-10}}",
+      "note": "{{max 50 chars}}",
+      "issues": ["{{issue 1}}", "{{issue 2}}"],
+      "would_improve": "{{what would make this 10/10}}"
+    },
+    "phase_compliance": {
+      "score": "{{0-10}}",
+      "note": "{{max 50 chars}}",
+      "violations": ["{{violation 1}}"],
+      "would_improve": "{{what would make this 10/10}}"
+    },
+    "correctness": {
+      "score": "{{0-10}}",
+      "note": "{{max 50 chars}}",
+      "errors": ["{{error 1}}"],
+      "would_improve": "{{what would make this 10/10}}"
+    },
+    "security": {
+      "score": "{{0-10}}",
+      "note": "{{max 50 chars}}",
+      "vulnerabilities": ["{{vuln 1}}"],
+      "would_improve": "{{what would make this 10/10}}"
+    },
+    "completeness": {
+      "score": "{{0-10}}",
+      "note": "{{max 50 chars}}",
+      "missing": ["{{missing 1}}"],
+      "would_improve": "{{what would make this 10/10}}"
+    }
+  },
+
+  "overall": {
+    "weighted_score": "{{0.0-10.0, formula: (WHY×3 + Phase×2 + Correct×3 + Security×2 + Complete×2) / 12}}",
+    "pass": "{{true if weighted_score >= 7.0, else false}}",
+    "status": "{{PASSED | NEEDS_REVISION | CRITICAL_ISSUES}}",
+    "primary_concern": "{{single biggest issue, or 'None' if pass}}"
+  },
+
+  "revision_guidance": {
+    "required_changes": [
+      {
+        "location": "{{line number or code identifier}}",
+        "issue": "{{clear description of problem}}",
+        "instruction": "{{specific, actionable fix instruction}}",
+        "priority": "{{HIGH | MEDIUM | LOW}}"
+      }
+    ],
+    "suggested_improvements": [
+      "{{optional enhancement 1}}",
+      "{{optional enhancement 2}}"
+    ],
+    "do_not_change": [
+      "{{what IS working well - preserve this}}",
+      "{{another thing working well}}"
+    ]
+  }
+}

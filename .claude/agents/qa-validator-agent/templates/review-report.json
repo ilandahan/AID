@@ -1,0 +1,72 @@
+{
+  "$schema": "QA Validator Review Report Format",
+  "$description": "Template for QA review output - main agent uses this to understand expected format",
+
+  "task_id": "{{TASK-ID from criteria file}}",
+  "review_number": "{{1, 2, or 3 - increments on each review cycle}}",
+  "timestamp": "{{ISO-8601 timestamp}}",
+  "verdict": "{{PASS | FAIL}}",
+
+  "results": {
+    "must_achieve": [
+      {
+        "criterion": "{{exact text from criteria.must_achieve}}",
+        "status": "{{PASS | FAIL | UNCLEAR}}",
+        "file": "{{only if FAIL: path/to/file.ext}}",
+        "line": "{{only if FAIL: line number}}",
+        "finding": "{{only if FAIL: what's wrong}}",
+        "suggestion": "{{only if FAIL: how to fix}}"
+      }
+    ],
+
+    "must_not": [
+      {
+        "criterion": "{{exact text from criteria.must_not}}",
+        "status": "{{PASS | FAIL}}",
+        "file": "{{only if FAIL}}",
+        "line": "{{only if FAIL}}",
+        "finding": "{{only if FAIL}}",
+        "suggestion": "{{only if FAIL}}"
+      }
+    ],
+
+    "not_included": [
+      {
+        "criterion": "{{item from not_included with task ID}}",
+        "status": "{{PASS}}",
+        "note": "{{confirmation that out-of-scope work wasn't done}}"
+      }
+    ],
+
+    "best_practices": [
+      {
+        "criterion": "{{standard from best_practices}}",
+        "status": "{{PASS | FAIL}}",
+        "finding": "{{only if FAIL}}",
+        "suggestion": "{{only if FAIL}}"
+      }
+    ]
+  },
+
+  "summary": {
+    "total_criteria": "{{count of all criteria}}",
+    "passed": "{{count of PASS}}",
+    "failed": "{{count of FAIL}}",
+    "unclear": "{{count of UNCLEAR}}",
+    "pass_rate": "{{percentage}}"
+  },
+
+  "action_required": [
+    "{{numbered list of specific fixes needed}}",
+    "{{e.g., '1. Add disabled={!isValid} to submit button (LoginForm.tsx:45)'}}"
+  ],
+
+  "overall_verdict": "{{PASS | FAIL}}",
+  "can_proceed": "{{true | false}}",
+
+  "handoff": {
+    "next_action": "{{proceed_to_next_task | fix_and_retry | human_review_required}}",
+    "message": "{{human-readable summary for main agent}}",
+    "target": "main_dev_agent"
+  }
+}

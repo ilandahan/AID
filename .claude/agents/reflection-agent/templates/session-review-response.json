@@ -1,0 +1,103 @@
+{
+  "$schema": "session-review-response-v1",
+  "description": "Response format for reflection agent session review mode",
+  "template": {
+    "session_review": {
+      "overall_status": "ON_TRACK|NEEDS_ATTENTION|OFF_TRACK",
+      "phase_assessment": {
+        "current_phase": "{{number: 0-5}}",
+        "phase_name": "{{string: Discovery|PRD|Tech Spec|Impl Plan|Development|QA & Ship}}",
+        "phase_appropriate": "{{boolean}}",
+        "violations": ["{{string: description of any phase violations}}"],
+        "observations": "{{string: what you noticed about phase compliance}}"
+      },
+      "progress_assessment": {
+        "completed_recently": ["{{string: tasks/items completed}}"],
+        "in_progress": ["{{string: tasks/items in progress}}"],
+        "blocked_or_stale": ["{{string: items that are stuck}}"],
+        "momentum": "GOOD|SLOW|STALLED",
+        "observations": "{{string: assessment of progress}}"
+      },
+      "direction_check": {
+        "coherent": "{{boolean: is work heading in consistent direction}}",
+        "concerns": ["{{string: any concerns about direction}}"],
+        "observations": "{{string: what the recent work seems to be building toward}}"
+      },
+      "risks_identified": [
+        {
+          "severity": "HIGH|MEDIUM|LOW",
+          "description": "{{string: what the risk is}}",
+          "evidence": "{{string: what you observed that indicates this risk}}",
+          "suggestion": "{{string: how to mitigate}}"
+        }
+      ],
+      "recommendations": {
+        "immediate": ["{{string: what to do first today}}"],
+        "soon": ["{{string: what to address this session}}"],
+        "consider": ["{{string: longer-term suggestions}}"]
+      }
+    },
+    "summary": {
+      "one_liner": "{{string: one sentence summary of project state}}",
+      "key_insight": "{{string: the most important thing the main agent should know}}",
+      "suggested_focus": "{{string: what to work on next and why}}"
+    }
+  },
+  "example": {
+    "session_review": {
+      "overall_status": "NEEDS_ATTENTION",
+      "phase_assessment": {
+        "current_phase": 2,
+        "phase_name": "Tech Spec",
+        "phase_appropriate": true,
+        "violations": [],
+        "observations": "Work is appropriately focused on architecture and API design for Phase 2"
+      },
+      "progress_assessment": {
+        "completed_recently": [
+          "Database schema design",
+          "API endpoint definitions"
+        ],
+        "in_progress": [
+          "Authentication flow architecture"
+        ],
+        "blocked_or_stale": [
+          "Third-party integration decision (noted as blocker 3 days ago)"
+        ],
+        "momentum": "SLOW",
+        "observations": "Good technical progress but blocker has not been addressed"
+      },
+      "direction_check": {
+        "coherent": true,
+        "concerns": [
+          "Third-party integration decision may affect authentication architecture"
+        ],
+        "observations": "Building toward a well-structured backend with clear API contracts"
+      },
+      "risks_identified": [
+        {
+          "severity": "MEDIUM",
+          "description": "Stale blocker may cause rework",
+          "evidence": "Third-party integration blocker noted 3 days ago, no resolution. Auth architecture continues without this decision.",
+          "suggestion": "Resolve third-party decision before finalizing authentication flow to avoid rework"
+        }
+      ],
+      "recommendations": {
+        "immediate": [
+          "Address third-party integration blocker"
+        ],
+        "soon": [
+          "Complete authentication architecture with third-party decision incorporated"
+        ],
+        "consider": [
+          "Document decision rationale for future reference"
+        ]
+      }
+    },
+    "summary": {
+      "one_liner": "Good technical progress but stale blocker creating risk",
+      "key_insight": "The third-party integration decision should be resolved before finalizing auth architecture - currently building without this information",
+      "suggested_focus": "Spend first 30 minutes resolving the third-party integration decision, then continue with authentication flow"
+    }
+  }
+}
