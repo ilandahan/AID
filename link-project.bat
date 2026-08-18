@@ -115,7 +115,7 @@ REM WHY: every branch below deletes the target folder before recreating it. If a
 REM source folder is missing, the delete removes the project's copy and puts
 REM nothing back. Fail before the first rmdir, not after.
 REM ============================================
-for %%D in (commands skills agents references rules) do (
+for %%D in (commands skills agents references rules hooks) do (
     if not exist "!AID_PATH!\.claude\%%D" (
         echo [ERROR] AID installation is incomplete - missing .claude\%%D
         echo         Nothing was changed in "!TARGET_PATH!".
@@ -218,6 +218,23 @@ if not exist "!TARGET_PATH!\.claude\rules" (
     echo   [SKIP] rules already exists
 )
 
+REM hooks MUST be linked: the settings.json copied later declares Stop and
+REM PostToolUse hooks by the path .claude\hooks\*. Without this a linked project gets
+REM a settings file pointing at scripts that are not there.
+if "!FORCE_MODE!"=="1" (
+    if exist "!TARGET_PATH!\.claude\hooks" rmdir /S /Q "!TARGET_PATH!\.claude\hooks" 2>nul
+)
+if not exist "!TARGET_PATH!\.claude\hooks" (
+    mklink /J "!TARGET_PATH!\.claude\hooks" "!AID_PATH!\.claude\hooks" >nul 2>&1
+    if !ERRORLEVEL! EQU 0 (
+        echo   [LINK] .claude\hooks -^> AID
+    ) else (
+        echo   [ERROR] Failed to create junction for hooks
+    )
+) else (
+    echo   [SKIP] hooks already exists
+)
+
 REM For CLAUDE.md (file), try hard link first, fall back to copy
 echo.
 echo Linking CLAUDE.md...
@@ -292,6 +309,16 @@ if not exist "!TARGET_PATH!\.claude\rules" (
     echo   [COPY] .claude\rules
 ) else (
     echo   [SKIP] rules already exists
+)
+
+if "!FORCE_MODE!"=="1" (
+    if exist "!TARGET_PATH!\.claude\hooks" rmdir /S /Q "!TARGET_PATH!\.claude\hooks" 2>nul
+)
+if not exist "!TARGET_PATH!\.claude\hooks" (
+    xcopy /E /I /Q "!AID_PATH!\.claude\hooks" "!TARGET_PATH!\.claude\hooks" >nul
+    echo   [COPY] .claude\hooks
+) else (
+    echo   [SKIP] hooks already exists
 )
 
 REM Copy CLAUDE.md

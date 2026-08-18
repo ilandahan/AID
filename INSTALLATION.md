@@ -197,7 +197,30 @@ link-project.bat C:\path\to\my-project
 | `.claude/agents/` | `.aid/context.json` |
 | `.claude/references/` | `.mcp.json` |
 | `.claude/rules/` | `docs/` |
+| `.claude/hooks/` | |
 | `CLAUDE.md` | |
+
+`.claude/hooks/` must be linked because the copied `settings.json` registers its hooks by
+the path `.claude/hooks/*`.
+
+### Permissions
+
+The shipped `.claude/settings.json` pre-approves **file operations only**:
+
+```json
+"allow": ["Read", "Grep", "Glob", "Edit", "Write"]
+```
+
+`Bash` is deliberately **not** pre-approved, so shell commands prompt for confirmation.
+An earlier default included a bare `"Bash"` entry, which silently auto-approves *any*
+shell command — including in a project you just cloned.
+
+If you want the pipeline to run test commands without prompting, add the specific
+commands you trust rather than all of `Bash`:
+
+```json
+"allow": ["Read", "Grep", "Glob", "Edit", "Write", "Bash(npm test:*)", "Bash(git status:*)"]
+```
 
 ### Manual Linking (Alternative)
 

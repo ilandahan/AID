@@ -1,0 +1,67 @@
+{
+  "$schema": "aid-trends-v1",
+  "version": "1.0",
+  "last_updated": null,
+  
+  "all_time": {
+    "total_sessions": 0,
+    "total_feedback": 0,
+    "avg_rating": null,
+    "avg_revisions": null
+  },
+  
+  "by_role": {
+    "product-manager": {
+      "sessions": 0,
+      "avg_rating": null,
+      "avg_revisions": null
+    },
+    "developer": {
+      "sessions": 0,
+      "avg_rating": null,
+      "avg_revisions": null
+    },
+    "qa-engineer": {
+      "sessions": 0,
+      "avg_rating": null,
+      "avg_revisions": null
+    },
+    "tech-lead": {
+      "sessions": 0,
+      "avg_rating": null,
+      "avg_revisions": null
+    }
+  },
+  
+  "by_phase": {
+    "discovery": {
+      "sessions": 0,
+      "avg_rating": null,
+      "avg_revisions": null
+    },
+    "prd": {
+      "sessions": 0,
+      "avg_rating": null,
+      "avg_revisions": null
+    },
+    "tech-spec": {
+      "sessions": 0,
+      "avg_rating": null,
+      "avg_revisions": null
+    },
+    "development": {
+      "sessions": 0,
+      "avg_rating": null,
+      "avg_revisions": null
+    },
+    "qa-ship": {
+      "sessions": 0,
+      "avg_rating": null,
+      "avg_revisions": null
+    }
+  },
+  
+  "weekly_history": [],
+  
+  "improvement_runs": []
+}

@@ -1,0 +1,80 @@
+# Phase 4b: Code Function (AR-2) - Reflection Criteria
+# Autoresearch FUNCTION pass — post-TDD functional + quality KPIs.
+#
+# IMPORTANT: These are the TIER-2 QUALITY dimensions only (0-10, weighted).
+# The TIER-1 HARD gates (100% tests green, coverage >= min_coverage_percent,
+# ZERO new silent-failure paths vs baseline) are DETERMINISTIC and enforced by
+# the autoresearch runner OUTSIDE this rubric. The composite KPI is:
+#   composite = quality * (all Tier-1 gates pass ? 1 : 0)
+# Tests are a FROZEN harness — never edit them. A test going red forces an
+# automatic revert from snapshot. See notes below.
+
+phase: "4b"
+name: "Code Function (AR-2)"
+description: "Post-TDD functional correctness and code quality under a frozen test harness; Tier-2 quality score for the autoresearch composite KPI"
+
+criteria:
+  - id: functional_correctness
+    name: "Functional Correctness"
+    weight: 3
+    checks:
+      - "Does observed behavior match the stated intent for the changed code?"
+      - "Do end-to-end flows complete without a silent failure path?"
+      - "Are error and edge cases handled by surfacing, not swallowing, the failure?"
+      - "Does the change preserve behavior the frozen tests assert (no behavioral regressions)?"
+    scoring:
+      excellent: "Behavior matches intent across all flows; failures surface loudly, never silently"
+      acceptable: "Behavior matches intent with minor edge-case gaps; no silent failures"
+      poor: "Behavior diverges from intent, or a flow can fail silently"
+
+  - id: correctness_of_defaults
+    name: "Correctness of Defaults"
+    weight: 3
+    checks:
+      - "Are safety-relevant defaults required (throw/fail-fast when missing) rather than guessed?"
+      - "Where a default is unavoidable, is it the pessimistic / least-privileged choice?"
+      - "No optimistic fallback that masks a missing or invalid value on a safety-critical path?"
+      - "Do defaults avoid '|| DEFAULT' / '?? DEFAULT' substitutions that hide bad input?"
+    scoring:
+      excellent: "Safety-relevant values are required or pessimistic; no value-masking defaults"
+      acceptable: "Defaults are reasonable and non-masking, with minor non-critical assumptions"
+      poor: "Optimistic or guessed defaults on safety-relevant paths; missing values silently substituted"
+
+  - id: security
+    name: "Security"
+    weight: 2
+    checks:
+      - "No injected vulnerabilities introduced by this change (injection, traversal, deserialization, etc.)?"
+      - "No secrets, tokens, or credentials exposed in code, logs, or error output?"
+      - "Is untrusted input validated and sanitized before use?"
+      - "No new trust-boundary violations vs the baseline?"
+    scoring:
+      excellent: "No new vulnerabilities; inputs validated; no exposed secrets"
+      acceptable: "No exploitable issues; minor hardening opportunities remain"
+      poor: "Introduces a vulnerability, exposes a secret, or trusts unvalidated input"
+
+  - id: loudness_of_failures
+    name: "Loudness of Failures"
+    weight: 2
+    checks:
+      - "No NEW silent catch blocks added vs baseline (catch without rethrow/log+propagate)?"
+      - "No NEW silent default substitutions ('|| DEFAULT', '?? DEFAULT', '.catch' without rethrow)?"
+      - "Do errors propagate with enough context to diagnose, rather than being swallowed?"
+      - "Is failure observable (thrown, logged-and-rethrown, or returned as an explicit error)?"
+    scoring:
+      excellent: "Every failure path is loud; zero new silent catches or defaults vs baseline"
+      acceptable: "Failures are loud overall; no new silent paths, minor context gaps"
+      poor: "Adds a silent catch or default that swallows a failure relative to baseline"
+
+threshold: 8.0
+max_iterations: 3
+
+notes:
+  composite: "composite = quality * (all Tier-1 gates pass ? 1 : 0). Tier-1 gates are deterministic and live OUTSIDE this rubric: 100% tests pass; coverage >= min_coverage_percent; zero new silent-failure paths vs baseline (judge-confirmed). If any Tier-1 gate fails, composite is forced to 0 and the edit is reverted. Coverage gate also fails when coverage is ABSENT/UNPARSEABLE: if tests complete and pass but no coverage value can be parsed, that is a Tier-1 FAILURE (composite=0) — NEVER silently default to 0% and NEVER advance. Distinguish a measured 0% (real parsed value, fail) from absent/unparseable coverage (no value extracted, also fail, logged with a loud 'coverage tooling missing/unparseable' note)."
+  frozen_tests: "Tests are the fixed evaluation harness for AR-2 — NEVER edit them. A test going red is an automatic revert from snapshot. No new dependencies; no framework migration."
+  borderline: "Re-check defaults and failure loudness on safety-critical flows before keeping a marginal edit"
+  improvement_focus:
+    - "Convert any optimistic default on a safety-relevant path to fail-fast (throw if missing)"
+    - "Replace silent catches and '|| / ??' default substitutions with loud, contextful failures"
+    - "Validate and sanitize untrusted input; never expose secrets in errors or logs"
+    - "Tighten behavior to match stated intent without touching the frozen test harness"

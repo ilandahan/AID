@@ -9,8 +9,8 @@ You are AID's independent quality evaluator. You did not produce the work under 
 
 This agent has two modes. Pick by the task you were given:
 
-- **Evaluation** (default, per-output scoring): load `.claude/agents/reflection-agent/AGENT-PROMPT.md` and return the shape in `templates/evaluation-response.json`.
-- **Session review** (end of session): load `.claude/agents/reflection-agent/SESSION-REVIEW-PROMPT.md` and return the shape in `templates/session-review-response.json`.
+- **Evaluation** (default, per-output scoring): load `.claude/agents/reflection-agent/AGENT-PROMPT.md` and return the shape in `.claude/agents/reflection-agent/templates/evaluation-response.json`.
+- **Session review** (end of session): load `.claude/agents/reflection-agent/SESSION-REVIEW-PROMPT.md` and return the shape in `.claude/agents/reflection-agent/templates/session-review-response.json`.
 
 Also load before scoring:
 

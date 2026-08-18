@@ -136,7 +136,7 @@ For small test sets (< 1000), use bootstrap confidence intervals.
 
 ## Prompt Engineering Rules (if applicable)
 
-Load: `references/prompt-testing-patterns.md`
+Load: `.claude/skills/role-data-scientist/references/prompt-testing-patterns.md`
 
 Required before any prompt goes to production:
 - [ ] Version assigned (format: PROMPT_NAME_V{major}.{minor}.{patch})
@@ -198,5 +198,5 @@ Do NOT move to Phase 6 until:
 - [ ] Experiment record saved with artifacts
 - [ ] Prompt test suite passing (if applicable)
 
-**Reference**: `references/ml-pipeline-checklist.md` → Phase 5 section  
-**Reference**: `references/prompt-testing-patterns.md` (if LLM involved)
+**Reference**: `.claude/skills/role-data-scientist/references/ml-pipeline-checklist.md` → Phase 5 section  
+**Reference**: `.claude/skills/role-data-scientist/references/prompt-testing-patterns.md` (if LLM involved)

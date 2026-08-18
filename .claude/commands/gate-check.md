@@ -168,9 +168,9 @@ When this command is invoked:
 
 If review status is PENDING, Claude will:
 
-1. Load skill: `.claude/skills/phase-review-agent/SKILL.md`
+1. Load skill: `.claude/agents/phase-review-agent.md`
 2. Gather all phase deliverables (files)
-3. Load phase-specific checklist: `.claude/skills/phase-review-agent/phase-prompts/phase-{N}.md`
+3. Load phase-specific checklist: `.claude/agents/phase-review-agent/phase-prompts/phase-{N}.md`
 4. Spawn sub-agent using Task tool:
    ```
    Task(
@@ -190,7 +190,7 @@ The sub-agent review is **mandatory** and **cannot be bypassed**. This ensures:
 - Consistent quality gates across all phases
 - Objective checklist validation without context bias
 
-See: `.claude/skills/phase-review-agent/SKILL.md` for full details.
+See: `.claude/agents/phase-review-agent.md` for full details.
 
 ## Related Commands
 

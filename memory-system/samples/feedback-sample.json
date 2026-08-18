@@ -1,0 +1,30 @@
+{
+  "$schema": "aid-feedback-v1",
+  "version": "1.0",
+  
+  "id": "FB-2025-01-15-143022",
+  "timestamp": "2025-01-15T14:30:22Z",
+  
+  "context": {
+    "role": "product-manager",
+    "phase": "discovery"
+  },
+  
+  "metrics": {
+    "rating": 3,
+    "revisions": 4,
+    "time_to_approval_minutes": 25
+  },
+  
+  "qualitative": {
+    "what_worked": "SCQ format was clear and helped structure the problem",
+    "what_didnt": "Missing stakeholder in initial identification",
+    "user_note": "Need to ask about data flow between departments earlier"
+  },
+  
+  "derived": {
+    "is_low_rating": false,
+    "is_high_revision": true,
+    "needs_attention": true
+  }
+}

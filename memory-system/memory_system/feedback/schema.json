@@ -1,0 +1,154 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AID Learning Mode Feedback Entry",
+  "description": "Schema for structured feedback from Learning Mode interactions",
+  "type": "object",
+  "required": ["id", "timestamp", "session_id", "context"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this feedback entry"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp when feedback was collected"
+    },
+    "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the session this feedback belongs to"
+    },
+    "context": {
+      "type": "object",
+      "required": ["phase", "role", "interaction_type"],
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": ["0-discovery", "1-prd", "2-tech-spec", "3-planning", "4-development", "5-qa-ship"],
+          "description": "AID methodology phase"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["developer", "pm", "qa", "tech-lead"],
+          "description": "User's role in the session"
+        },
+        "interaction_type": {
+          "type": "string",
+          "enum": ["decision", "implementation", "review", "clarification", "morning-startup", "phase-gate"],
+          "description": "Type of interaction"
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "description": "Details about the decision made (if applicable)",
+      "properties": {
+        "topic": {
+          "type": "string",
+          "description": "What the decision was about"
+        },
+        "topic_category": {
+          "type": "string",
+          "enum": ["architecture", "technology", "scope", "testing", "security", "performance", "process", "other"],
+          "description": "Category of the decision topic"
+        },
+        "chosen": {
+          "type": "string",
+          "description": "What was decided"
+        },
+        "alternatives": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Other options that were considered"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Why this option was chosen over alternatives"
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["high", "medium", "low"],
+          "description": "Claude's confidence in the decision"
+        }
+      }
+    },
+    "debate": {
+      "type": "object",
+      "description": "Details about any debate that occurred",
+      "properties": {
+        "occurred": {
+          "type": "boolean",
+          "description": "Whether a debate occurred"
+        },
+        "user_challenge": {
+          "type": "string",
+          "description": "What the user questioned or challenged"
+        },
+        "original_recommendation": {
+          "type": "string",
+          "description": "Claude's original recommendation before debate"
+        },
+        "final_decision": {
+          "type": "string",
+          "description": "What was ultimately decided"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": ["changed", "confirmed", "partially_changed"],
+          "description": "Whether Claude's position changed"
+        },
+        "learning": {
+          "type": "string",
+          "description": "Insight gained from the debate"
+        }
+      }
+    },
+    "feedback": {
+      "type": "object",
+      "description": "User's explicit feedback",
+      "properties": {
+        "rating": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 5,
+          "description": "1-5 rating (null if not provided)"
+        },
+        "verbal": {
+          "type": ["string", "null"],
+          "description": "Verbal/text feedback from user"
+        },
+        "skipped": {
+          "type": "boolean",
+          "description": "Whether user skipped providing feedback"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about the interaction",
+      "properties": {
+        "response_length": {
+          "type": "string",
+          "enum": ["short", "medium", "long"],
+          "description": "Length of Claude's response"
+        },
+        "transparency_format": {
+          "type": "string",
+          "enum": ["full", "abbreviated", "none"],
+          "description": "Format of transparency block used"
+        },
+        "time_to_feedback": {
+          "type": ["integer", "null"],
+          "description": "Seconds until user provided feedback"
+        },
+        "tools_used": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tools used during the interaction"
+        }
+      }
+    }
+  }
+}

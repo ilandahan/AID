@@ -65,12 +65,12 @@ Then adapt ALL code examples and library recommendations to the user's answer.
 ## Phase-Specific Rule Files
 
 Load when entering a phase:
-- `.claude/rules/phase-1-eda.md`
-- `.claude/rules/phase-2-feasibility.md`
-- `.claude/rules/phase-3-experiment-planning.md`
-- `.claude/rules/phase-4-ml-architecture.md`
-- `.claude/rules/phase-5-development.md`
-- `.claude/rules/phase-6-production.md`
+- `.claude/rules/skills/phase-1-eda.md`
+- `.claude/rules/skills/phase-2-feasibility.md`
+- `.claude/rules/skills/phase-3-experiment-planning.md`
+- `.claude/rules/skills/phase-4-ml-architecture.md`
+- `.claude/rules/skills/phase-5-development.md`
+- `.claude/rules/skills/phase-6-production.md`
 
 ## Anti-Patterns to Prevent
 

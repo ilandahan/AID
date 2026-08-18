@@ -15,6 +15,7 @@ Every test EXECUTES the real script against a throwaway fixture tree. Nothing
 here points the script at this repo: if a guard regresses, the fixture dies
 instead of your skills.
 """
+import json
 import os
 import re
 import shlex
@@ -29,8 +30,11 @@ REPO_ROOT = os.path.dirname(
 )
 LINK_SCRIPT = os.path.join(REPO_ROOT, 'link-project.sh')
 
-# The five directories link-project removes before recreating.
-LINKED_DIRS = ['commands', 'skills', 'agents', 'references', 'rules']
+# The directories link-project removes before recreating. 'hooks' is included because
+# the settings.json that link-project copies declares Stop/PostToolUse hooks by the
+# path .claude/hooks/* - if hooks are not installed, every linked project gets a
+# settings file pointing at scripts that do not exist.
+LINKED_DIRS = ['commands', 'skills', 'agents', 'references', 'rules', 'hooks']
 
 SENTINEL = 'do-not-delete-me\n'
 
@@ -323,6 +327,39 @@ class TestLegitimateLinkStillWorks:
             "project did not see the AID edit - it was copied, not symlinked, "
             f"so linked projects will silently go stale (saw: {seen!r})"
         )
+
+    def test_linked_project_can_reach_every_hook_settings_declares(self):
+        """
+        WHY THIS TEST:
+        - PROBLEM: link-project copies .claude/settings.json into the target, and that
+          file declares Stop and PostToolUse hooks by the path .claude/hooks/*. hooks/
+          was not in the linked directory list, so every linked project received a
+          settings file pointing at scripts that were not there - a hook failure on
+          every turn end, in a file the user never edited.
+        - SUCCESS: each hook path settings.json names is present in the AID install, so
+          linking it makes the path resolve in the target too.
+        """
+        with open(os.path.join(REPO_ROOT, '.claude', 'settings.json'),
+                  encoding='utf-8') as f:
+            settings = json.load(f)
+
+        commands = [
+            h.get('command', '')
+            for event in settings.get('hooks', {}).values()
+            for group in event for h in group.get('hooks', [])
+        ]
+        referenced = set(re.findall(r'\.claude/hooks/[\w.-]+', ' '.join(commands)))
+        assert referenced, 'settings.json declares no hooks - expected at least one'
+
+        for ref in sorted(referenced):
+            assert os.path.isfile(os.path.join(REPO_ROOT, ref)), (
+                f'settings.json points at {ref}, which does not exist'
+            )
+            # The directory that must therefore be linked into target projects.
+            assert ref.split('/')[1] in LINKED_DIRS, (
+                f'{ref} lives in a directory link-project does not install; '
+                f'linked projects would get a settings file pointing at nothing'
+            )
 
     def test_creates_project_state(self, tmp_path):
         aid = _make_aid_fixture(str(tmp_path / 'aid'))

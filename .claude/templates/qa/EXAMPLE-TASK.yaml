@@ -1,0 +1,40 @@
+# QA Criteria Template
+# Copy this file and rename to your task name (e.g., TASK-123.yaml)
+
+task_id: EXAMPLE-TASK
+description: "Example task for QA criteria demonstration"
+
+# Acceptance Criteria (from PRD/User Story)
+acceptance_criteria:
+  - id: AC-1
+    description: "User can perform the primary action"
+    status: pending  # pending | passed | failed
+    
+  - id: AC-2
+    description: "Error handling works correctly"
+    status: pending
+
+# Test Scenarios
+test_scenarios:
+  - id: TS-1
+    type: happy_path
+    description: "Basic functionality works"
+    steps:
+      - "Step 1: Setup"
+      - "Step 2: Action"
+      - "Step 3: Verify"
+    expected_result: "Success"
+    
+  - id: TS-2
+    type: edge_case
+    description: "Edge case handling"
+    steps:
+      - "Trigger edge case condition"
+    expected_result: "Graceful handling"
+
+# QA Sign-off
+qa_signoff:
+  reviewed_by: null
+  reviewed_at: null
+  status: pending  # pending | approved | rejected
+  notes: ""

@@ -159,6 +159,10 @@ create_dir_symlink "skills"
 create_dir_symlink "agents"
 create_dir_symlink "references"
 create_dir_symlink "rules"
+# hooks MUST be linked: the settings.json copied below declares Stop and PostToolUse
+# hooks by the path .claude/hooks/*. Without this, a linked project gets a settings
+# file pointing at scripts that are not there and every turn end runs a missing file.
+create_dir_symlink "hooks"
 
 #============================================
 # Create symlink for CLAUDE.md
@@ -311,6 +315,7 @@ echo "  .claude/skills/     -> AID"
 echo "  .claude/agents/     -> AID"
 echo "  .claude/references/ -> AID"
 echo "  .claude/rules/      -> AID"
+echo "  .claude/hooks/      -> AID"
 echo "  CLAUDE.md           -> AID"
 echo ""
 echo "Project-specific (copied):"

@@ -44,49 +44,25 @@ if %ERRORLEVEL% NEQ 0 (
 
 REM Create .claude directories
 echo.
-echo [STEP 2/9] Setting up Claude commands and skills...
-if not exist ".claude\commands" mkdir ".claude\commands"
-if not exist ".claude\skills" mkdir ".claude\skills"
-if not exist ".claude\references" mkdir ".claude\references"
-
-REM Note: Commands are stored in .claude\commands\ (already in git)
-REM Do NOT use skills\commands\ - that's not a valid Claude Code pattern
-echo [OK] Commands installed
-
-REM Copy skills to .claude/skills
-echo Copying skills...
-REM Core methodology skills
-xcopy /E /I /Y "skills\aid-development" ".claude\skills\aid-development" >nul 2>nul
-xcopy /E /I /Y "skills\aid-discovery" ".claude\skills\aid-discovery" >nul 2>nul
-xcopy /E /I /Y "skills\aid-prd" ".claude\skills\aid-prd" >nul 2>nul
-xcopy /E /I /Y "skills\aid-qa-ship" ".claude\skills\aid-qa-ship" >nul 2>nul
-xcopy /E /I /Y "skills\aid-tech-spec" ".claude\skills\aid-tech-spec" >nul 2>nul
-REM Design system skills
-xcopy /E /I /Y "skills\atomic-design" ".claude\skills\atomic-design" >nul 2>nul
-xcopy /E /I /Y "skills\atomic-page-builder" ".claude\skills\atomic-page-builder" >nul 2>nul
-REM Development skills
-xcopy /E /I /Y "skills\aid-impl-plan" ".claude\skills\aid-impl-plan" >nul 2>nul
-xcopy /E /I /Y "skills\code-review" ".claude\skills\code-review" >nul 2>nul
-xcopy /E /I /Y "skills\context-tracking" ".claude\skills\context-tracking" >nul 2>nul
-xcopy /E /I /Y "skills\learning-mode" ".claude\skills\learning-mode" >nul 2>nul
-xcopy /E /I /Y "skills\phase-enforcement" ".claude\skills\phase-enforcement" >nul 2>nul
-xcopy /E /I /Y "skills\pre-prd-research" ".claude\skills\pre-prd-research" >nul 2>nul
-xcopy /E /I /Y "skills\system-architect" ".claude\skills\system-architect" >nul 2>nul
-xcopy /E /I /Y "skills\test-driven" ".claude\skills\test-driven" >nul 2>nul
-REM Role-based skills
-xcopy /E /I /Y "skills\role-developer" ".claude\skills\role-developer" >nul 2>nul
-xcopy /E /I /Y "skills\role-product-manager" ".claude\skills\role-product-manager" >nul 2>nul
-xcopy /E /I /Y "skills\role-qa-engineer" ".claude\skills\role-qa-engineer" >nul 2>nul
-xcopy /E /I /Y "skills\role-tech-lead" ".claude\skills\role-tech-lead" >nul 2>nul
-xcopy /E /I /Y "skills\role-data-scientist" ".claude\skills\role-data-scientist" >nul 2>nul
-REM Optional skills
-xcopy /E /I /Y "skills\nano-banana-visual" ".claude\skills\nano-banana-visual" >nul 2>nul
-xcopy /E /I /Y "skills\figma-design-review" ".claude\skills\figma-design-review" >nul 2>nul
-REM Foundational skills
-xcopy /E /I /Y "skills\why-driven-decision" ".claude\skills\why-driven-decision" >nul 2>nul
-xcopy /E /I /Y "skills\reflection" ".claude\skills\reflection" >nul 2>nul
-xcopy /E /I /Y "skills\aid-test-agent" ".claude\skills\aid-test-agent" >nul 2>nul
-echo [OK] Skills installed (24 skills)
+echo [STEP 2/9] Verifying Claude commands and skills...
+REM Skills, commands, agents, rules, references and hooks all ship in git under
+REM .claude\. There is NO copy step. This block used to run 25 xcopy lines against a
+REM root skills\ directory that v2.1 removed, with output suppressed, so every copy
+REM silently did nothing while reporting "Skills installed (24 skills)".
+set "AID_MISSING=0"
+for %%D in (commands skills agents rules references hooks) do (
+    if exist ".claude\%%D" (
+        echo [OK] .claude\%%D present
+    ) else (
+        echo [WARN] .claude\%%D is MISSING - restore it before using AID
+        set "AID_MISSING=1"
+    )
+)
+if "!AID_MISSING!"=="0" (
+    echo [OK] AID content verified
+) else (
+    echo [WARN] Installation incomplete - see the warnings above
+)
 
 REM Create .aid directory
 echo.

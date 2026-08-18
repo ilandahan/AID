@@ -1,0 +1,77 @@
+# Phase 4a: Code Design - Reflection Criteria (Autoresearch AR-1 / DESIGN pass)
+# Pre-TDD design/quality reflection pass. Judge-only scoring.
+# Generalized from the Waze rubric dimensions E/F (structure, loud failures) + B.
+
+phase: "4a"
+name: "Code Design (AR-1)"
+description: "Pre-TDD design & quality reflection: structural health, loud failures, naming, traceability. NO interface/public-API/data-shape changes."
+
+criteria:
+  - id: structural_health
+    name: "Structural Health"
+    weight: 3
+    checks:
+      - "No copy-paste duplication; repeated logic is factored into one place?"
+      - "Functions/modules are decomposed to a single clear responsibility (no god-functions)?"
+      - "Magic numbers and literals are centralised into named constants/config, not scattered?"
+      - "Module boundaries are clean; no leaking of internal concerns across layers?"
+    scoring:
+      excellent: "Well-decomposed, DRY, constants centralised, clean module boundaries"
+      acceptable: "Mostly clean with minor duplication or a few stray literals"
+      poor: "Significant duplication, god-functions, scattered magic numbers, or tangled boundaries"
+
+  - id: loudness_of_failures
+    name: "Loudness of Failures"
+    weight: 3
+    checks:
+      - "Every catch block surfaces the failure (banner/throw/log) or is justified by an inline comment?"
+      - "Every '|| DEFAULT' fallback is intentional and surfaced/justified, not silently masking an error?"
+      - "Every '?? DEFAULT' fallback is intentional and surfaced/justified?"
+      - "No swallowed promises (.catch without rethrow/log, fire-and-forget async)?"
+    scoring:
+      excellent: "All failure paths are loud or explicitly justified; nothing swallowed silently"
+      acceptable: "Failures mostly surfaced; one or two defaults lack justification comments"
+      poor: "Silent catches, unexplained '||'/'??' defaults, or swallowed promises mask errors"
+
+  - id: naming_clarity
+    name: "Naming Clarity"
+    weight: 2
+    checks:
+      - "Names reveal intent (what the thing is/does), not just its type?"
+      - "No misleading names that contradict behaviour?"
+      - "No cryptic abbreviations or single-letter names outside tight loops?"
+    scoring:
+      excellent: "Names are intent-revealing, accurate, and unabbreviated"
+      acceptable: "Mostly clear names with a few abbreviations or vague identifiers"
+      poor: "Misleading, cryptic, or abbreviation-heavy names obscure intent"
+
+  - id: docs_traceability
+    name: "Docs & Traceability"
+    weight: 2
+    checks:
+      - "File/module headers explain purpose and ownership?"
+      - "Non-obvious decisions carry WHY comments (rationale, not restating the code)?"
+      - "Code links back to the spec/task it implements (task id, ticket, or spec reference)?"
+    scoring:
+      excellent: "Headers present, WHY comments on non-obvious logic, clear links back to spec/task"
+      acceptable: "Some documentation; partial traceability to spec/task"
+      poor: "No headers, no WHY comments, no traceability to the originating spec/task"
+
+# Aligned with kpi_target (>= 8.0) — design pass must clear a high bar before TDD.
+threshold: 8.0
+max_iterations: 3
+
+notes:
+  pass_type: "PRE-TDD design pass (AR-1). Judge-only: no running tests exist yet at this stage."
+  hard_constraints:
+    - "Exported signatures / public API must NOT change."
+    - "Data shapes / contracts must NOT change (keeps TDD from chasing a moving target)."
+    - "One focused edit per iteration; edit only source changed in this task."
+    - "No new dependencies, no framework migration, no plaintext secrets."
+    - "Never auto-commit; never destructive git. Validation only."
+  borderline: "Review loudness_of_failures justification comments and magic-number centralisation."
+  improvement_focus:
+    - "Surface or justify every catch / '||' / '??' default"
+    - "Factor out duplication and centralise magic numbers"
+    - "Make names intent-revealing"
+    - "Add file headers, WHY comments, and spec/task links"

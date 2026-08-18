@@ -421,5 +421,4 @@ weighted_score = (implementation × 0.7) + (llm × 0.3)
 
 | Document | Purpose |
 |----------|---------|
-| `../component-metadata/SKILL.md` | Metadata format specification |
 | `../atomic-page-builder/SKILL.md` | Page composition (uses same atomic-design skill)

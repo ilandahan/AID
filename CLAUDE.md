@@ -434,6 +434,7 @@ Claude MUST update `.aid/context.json` when:
 | 4 | `skills/atomic-design/`, `skills/atomic-page-builder/`, `skills/figma-design-review/` |
 | 4 | `skills/aid-development/` **(Phase 4 base skill)** |
 | 4-5 | `skills/code-review/`, `skills/test-driven/`, `skills/cucumber-bdd/`, `skills/pipeline-orchestrator/` |
+| 4-5 | `skills/autoresearch/` **(bounded keep/revert runner for the AR_DESIGN / AR_FUNCTION / AR_ACCEPTANCE steps — invoked by pipeline-orchestrator)** |
 | 5 | `skills/aid-qa-ship/` **(Phase 5 base skill)** |
 | All | `skills/phase-enforcement/`, `skills/context-tracking/`, `skills/learning-mode/` |
 | All | `skills/memory-system/` **(Feedback & improvement tracking)** |
@@ -545,7 +546,11 @@ AID includes a learning system that improves Claude's assistance over time.
 
 ### Sub-Agent CLI
 
+Run from the `memory-system/` directory, so the `memory_system` package is importable:
+
 ```bash
+cd memory-system
+
 # Run quality analysis
 python -m memory_system --analyze
 
@@ -558,6 +563,9 @@ python -m memory_system --sync-memory
 # Show status
 python -m memory_system --status
 ```
+
+Docs: `memory-system/docs/` (USER-GUIDE.md, COMMANDS.md, AGENT.md, MEMORY.md,
+IMPROVEMENT-FLOW.md, TROUBLESHOOTING.md).
 
 ### Session Flow
 

@@ -52,7 +52,7 @@ Required signal categories (skip only with documented justification):
 - Refusal rate: threshold = 10% | window = 1h | severity = warning
 - Timeout rate: threshold = 2% | window = 1h | severity = critical
 
-**Reference**: `references/monitoring-setup-guide.md` for full configuration template
+**Reference**: `.claude/skills/role-data-scientist/references/monitoring-setup-guide.md` for full configuration template
 
 ### Deploy-Time Baseline Recording
 Record at deployment — this is the drift detection reference:
@@ -63,13 +63,13 @@ Record at deployment — this is the drift detection reference:
 - [ ] Null rates per feature in production traffic
 
 ### Bias Audit (Iron Rule #7)
-- [ ] Bias audit completed per `references/bias-audit-checklist.md`
+- [ ] Bias audit completed per `.claude/skills/role-data-scientist/references/bias-audit-checklist.md`
 - [ ] Per-slice metrics documented (not just aggregate)
 - [ ] Protected attributes and proxies verified
 - [ ] Sign-off obtained from all required roles
 
 ### Model Card (Iron Rule #6)
-- [ ] Model card completed per `references/model-card-template.md`
+- [ ] Model card completed per `.claude/skills/role-data-scientist/references/model-card-template.md`
 - [ ] All sections filled (or N/A with justification)
 - [ ] Feature engineering decisions documented
 - [ ] Limitations section is honest and specific
@@ -150,6 +150,6 @@ Production is operating when ALL of the following are true:
 - [ ] Retraining criteria defined
 - [ ] On-call rotation aware of the model and its failure modes
 
-**Reference**: `references/monitoring-setup-guide.md`  
-**Reference**: `references/model-card-template.md`  
-**Reference**: `references/bias-audit-checklist.md`
+**Reference**: `.claude/skills/role-data-scientist/references/monitoring-setup-guide.md`  
+**Reference**: `.claude/skills/role-data-scientist/references/model-card-template.md`  
+**Reference**: `.claude/skills/role-data-scientist/references/bias-audit-checklist.md`

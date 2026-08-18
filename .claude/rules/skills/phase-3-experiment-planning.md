@@ -110,4 +110,4 @@ Do NOT move to Phase 4 until:
 - [ ] Train/val/test split strategy documented
 - [ ] Baseline approach and evaluation method defined
 
-**Reference**: `references/ml-pipeline-checklist.md` → Phase 3 section
+**Reference**: `.claude/skills/role-data-scientist/references/ml-pipeline-checklist.md` → Phase 3 section

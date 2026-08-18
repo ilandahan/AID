@@ -109,11 +109,11 @@ lerna-debug.log*
 .turbo
 
 # ================== AID Specific ==================
-# Root-level scripts/ only (local helper scripts, not part of the framework).
-# WHY the leading slash: an unanchored "scripts/" matches EVERY directory named
-# scripts at any depth, which silently excluded three real skill scripts
+# NOTE: scripts/ is TRACKED - it holds init-project.sh, which package.json's
+# "new-project" and the /start-project command both invoke. It was previously ignored
+# by an unanchored "scripts/" rule, which also matched EVERY directory named scripts at
+# any depth and silently excluded three real skill scripts
 # (role-developer/scripts/, role-qa-engineer/scripts/) from the repo.
-/scripts/
 
 # State files (contain session-specific data)
 .aid/state.json

@@ -97,4 +97,4 @@ Do NOT move to Phase 2 until:
 - [ ] Proxy variable scan completed
 - [ ] Derived feature relationships documented
 
-**Reference**: `references/ml-pipeline-checklist.md` → Phase 1 section
+**Reference**: `.claude/skills/role-data-scientist/references/ml-pipeline-checklist.md` → Phase 1 section

@@ -32,7 +32,7 @@ Do NOT accept "it's the most common choice" as a rationale.
 | Mixed tabular + text | Embedding layer + tabular features concatenated |
 
 **RAG vs. Fine-Tuning decision**:
-- Use `references/rag-architecture-guide.md` → Decision Matrix
+- Use `.claude/skills/role-data-scientist/references/rag-architecture-guide.md` → Decision Matrix
 - Default to RAG when: < 10K docs, frequent updates, explainability needed
 - Move to fine-tuning only when RAG's retrieval ceiling is confirmed
 
@@ -81,7 +81,7 @@ Required signal categories:
 
 For each signal: metric, threshold, window, alert severity.
 
-**Reference**: `references/monitoring-setup-guide.md` for full signal catalog
+**Reference**: `.claude/skills/role-data-scientist/references/monitoring-setup-guide.md` for full signal catalog
 
 ## Step 5 — Task Breakdown
 
@@ -141,5 +141,5 @@ Do NOT move to Phase 5 until:
 - [ ] Monitoring signals specified (metric, threshold, window, severity)
 - [ ] Task breakdown complete and sequenced
 
-**Reference**: `references/ml-pipeline-checklist.md` → Phase 4 section  
-**Reference**: `references/rag-architecture-guide.md` (if RAG system)
+**Reference**: `.claude/skills/role-data-scientist/references/ml-pipeline-checklist.md` → Phase 4 section  
+**Reference**: `.claude/skills/role-data-scientist/references/rag-architecture-guide.md` (if RAG system)

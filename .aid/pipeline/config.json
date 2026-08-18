@@ -15,6 +15,26 @@
     "cucumber": "npm run cucumber",
     "coverage": "npm test -- --coverage"
   },
+  "autoresearch": {
+    "kpi_target": 8,
+    "ar_design": {
+      "max_iterations": 15,
+      "max_consecutive_reverts": 5
+    },
+    "ar_function": {
+      "max_iterations": 15,
+      "max_consecutive_reverts": 5,
+      "internal_rounds": 2
+    },
+    "ar_acceptance": {
+      "max_acceptance_rounds": 2,
+      "max_reality_rounds": 2,
+      "pass_rate_target": 90
+    },
+    "bundle_dir": ".claude/skills/autoresearch",
+    "criticality_profile": "standard business app",
+    "safety_critical_flows": []
+  },
   "thresholds": {
     "code_review_pass": 7.0,
     "test_review_min_quality": 80,

@@ -78,58 +78,33 @@ setup_claude_commands_and_skills() {
     echo ""
     echo "[STEP 2/9] Setting up Claude commands and skills..."
 
-    # Create .claude directories (project level)
-    mkdir -p ".claude/commands"
-    mkdir -p ".claude/skills"
-    mkdir -p ".claude/references"
+    # Skills, commands, agents, rules, references and hooks all ship in git under
+    # .claude/. There is NO copy step.
+    #
+    # WHY this is a verification and not an installation: this function used to run 25
+    # `cp -r skills/<name> .claude/skills/` lines against a root skills/ directory that
+    # v2.1 removed, each ending in `|| true`. Every copy silently did nothing while the
+    # step reported "Skills installed (24 skills)" - a count that was hardcoded and also
+    # wrong. A step that cannot fail cannot tell you anything.
+    missing=0
+    for d in commands skills agents rules references hooks; do
+        if [ -d ".claude/$d" ]; then
+            count=$(find ".claude/$d" -type f | wc -l | tr -d ' ')
+            log_success ".claude/$d present ($count files)"
+        else
+            log_warning ".claude/$d is MISSING - restore it before using AID"
+            missing=1
+        fi
+    done
 
-    # Note: Commands are stored in .claude/commands/ (already in git)
-    # Do NOT use skills/commands/ - that's not a valid Claude Code pattern
-    log_success "Commands installed"
+    skill_count=$(find .claude/skills -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+    agent_count=$(find .claude/agents -maxdepth 1 -name '*.md' ! -name 'AGENT-STANDARD.md' 2>/dev/null | wc -l | tr -d ' ')
 
-    # Copy skills to .claude/skills (project level)
-    echo "Copying skills..."
-
-    # Core methodology skills
-    cp -r skills/aid-development .claude/skills/ 2>/dev/null || true
-    cp -r skills/aid-discovery .claude/skills/ 2>/dev/null || true
-    cp -r skills/aid-prd .claude/skills/ 2>/dev/null || true
-    cp -r skills/aid-qa-ship .claude/skills/ 2>/dev/null || true
-    cp -r skills/aid-tech-spec .claude/skills/ 2>/dev/null || true
-
-    # Design system skills
-    cp -r skills/atomic-design .claude/skills/ 2>/dev/null || true
-    cp -r skills/atomic-page-builder .claude/skills/ 2>/dev/null || true
-
-    # Development skills
-    cp -r skills/aid-impl-plan .claude/skills/ 2>/dev/null || true
-    cp -r skills/code-review .claude/skills/ 2>/dev/null || true
-    cp -r skills/context-tracking .claude/skills/ 2>/dev/null || true
-    cp -r skills/learning-mode .claude/skills/ 2>/dev/null || true
-    cp -r skills/phase-enforcement .claude/skills/ 2>/dev/null || true
-    cp -r skills/pre-prd-research .claude/skills/ 2>/dev/null || true
-    cp -r skills/system-architect .claude/skills/ 2>/dev/null || true
-    cp -r skills/test-driven .claude/skills/ 2>/dev/null || true
-
-    # Role-based skills
-    cp -r skills/role-developer .claude/skills/ 2>/dev/null || true
-    cp -r skills/role-product-manager .claude/skills/ 2>/dev/null || true
-    cp -r skills/role-qa-engineer .claude/skills/ 2>/dev/null || true
-    cp -r skills/role-tech-lead .claude/skills/ 2>/dev/null || true
-    cp -r skills/role-data-scientist .claude/skills/ 2>/dev/null || true
-
-    # Optional skills
-    cp -r skills/nano-banana-visual .claude/skills/ 2>/dev/null || true
-
-    # Figma design review skill
-    cp -r skills/figma-design-review .claude/skills/ 2>/dev/null || true
-
-    # Foundational skills
-    cp -r skills/why-driven-decision .claude/skills/ 2>/dev/null || true
-    cp -r skills/reflection .claude/skills/ 2>/dev/null || true
-    cp -r skills/aid-test-agent .claude/skills/ 2>/dev/null || true
-
-    log_success "Skills installed (24 skills)"
+    if [ "$missing" -eq 0 ]; then
+        log_success "Verified: $skill_count skills, $agent_count registered agents"
+    else
+        log_warning "Installation incomplete - see the warnings above"
+    fi
 }
 
 # Step 3: Create project state directory

@@ -152,7 +152,7 @@ For each mapped pair:
 
 #### Step 3: Create Contradiction Log
 
-Use template: `references/templates/contradiction-log-template.md`
+Use template: `templates/contradiction-log-template.md`
 
 ```markdown
 ### C-01: Token Expiry

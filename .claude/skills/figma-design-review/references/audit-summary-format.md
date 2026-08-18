@@ -882,7 +882,7 @@ The plugin should have **ONE export button** that:
 
 ### Auto-Classification Logic (via atomic-design skill)
 
-The classification logic follows the **atomic-design skill** rules (see `../atomic-design/SKILL.md`):
+The classification logic follows the **atomic-design skill** rules (see `../../atomic-design/SKILL.md`):
 
 ```typescript
 /**

@@ -1,0 +1,62 @@
+# ~/.aid/config.yaml
+# AID Memory System Configuration
+# Version 1.0
+
+version: "1.0"
+
+# User identification
+user:
+  name: ""                          # Set during /aid init
+  preferred_language: "he"          # he | en
+  default_role: null                # Learned from usage
+
+# Session defaults
+session:
+  remember_last_role: true
+  remember_last_phase: true
+  ask_confirmation_on_start: true
+
+# Feedback collection settings
+feedback:
+  prompt_at_phase_gate: true
+  prompt_rating_required: true      # Rating is mandatory
+  prompt_notes_required: false      # Notes are optional
+  
+  collect_what_worked: true
+  collect_what_didnt: true
+  collect_revision_count: true
+
+# Improvement triggers
+improvement:
+  auto_prompt_after_sessions: 10    # Suggest /aid improve after N sessions
+  auto_prompt_after_days: 7         # Or after N days
+  
+  min_feedback_for_pattern: 3       # Need 3+ occurrences for pattern
+  high_confidence_threshold: 0.8    # Confidence for Claude Memory promotion
+  
+  low_rating_threshold: 2           # ≤2 = needs attention
+  high_rating_threshold: 4          # ≥4 = working well
+  high_revision_threshold: 4        # ≥4 = needs clearer guidance
+
+# Compaction settings
+compaction:
+  max_pending_feedback: 50          # Archive after 50 pending
+  archive_after_days: 30            # Move processed to archive
+
+# Claude Memory settings
+memory:
+  max_entries: 30
+  reserved_slots:
+    universal: 5                    # AID:ALL:ALL patterns
+    product_manager: 5              # AID:PM:* patterns
+    developer: 5                    # AID:DEV:* patterns
+    qa_engineer: 5                  # AID:QA:* patterns
+    tech_lead: 3                    # AID:LEAD:* patterns
+    phase_specific: 5               # AID:*:{phase}:* patterns
+    anti_patterns: 2                # AID:*:*:DONT patterns
+
+# Skills source
+skills:
+  source: "local"                   # "local" | "aid-repo"
+  repo_url: null                    # Set if syncing with repo
+  last_sync: null                   # ISO timestamp

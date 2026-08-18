@@ -56,7 +56,7 @@ definition references must exist.
                             │ tells main agent to spawn
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  agents/{agent-name}/AGENT-PROMPT.md                        │
+│  .claude/agents/{agent-name}/AGENT-PROMPT.md                │
 │  "The actual prompt with {{variables}} sent to sub-agent"   │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -151,6 +151,7 @@ Calibration examples showing good and bad outputs.
 | **memory-analysis-agent** | Feedback analysis & skill improvement | AGENT-PROMPT.md |
 | **code-review-agent** | Isolated code review (security, quality, docs, architecture) | AGENT-PROMPT.md |
 | **test-review-agent** | Isolated test quality review (assertions, coverage, mocks, independence) | AGENT-PROMPT.md |
+| **visual-qa-agent** | Visual/interaction review of a running app in a real browser | AGENT-PROMPT.md |
 
 ---
 
@@ -161,7 +162,7 @@ Each agent should have a skill that tells the main agent when/how to spawn it:
 | Agent | Skill Location |
 |-------|----------------|
 | reflection-agent | `.claude/skills/reflection/SKILL.md` |
-| qa-validator-agent | `.claude/skills/qa-validator/SKILL.md` (or hooks) |
+| qa-validator-agent | `.claude/hooks/validate-qa-gate.py` (QA gate Stop hook) |
 | phase-review-agent | `.claude/skills/phase-enforcement/SKILL.md` |
 | aid-test-agent | `.claude/commands/aid-test.md` |
 | memory-analysis-agent | `.claude/skills/memory-system/SKILL.md` |
@@ -172,16 +173,21 @@ Each agent should have a skill that tells the main agent when/how to spawn it:
 
 ## Spawning Pattern
 
-All sub-agents are spawned using the Task tool:
+Sub-agents are spawned by NAME, which works because each has a registered definition
+file (`.claude/agents/{agent-name}.md`):
 
 ```
 Task(
-  subagent_type: "general-purpose",
-  model: "opus",
-  prompt: [AGENT-PROMPT.md with {{variables}} replaced],
+  subagent_type: "reflection-agent",
+  prompt: [the task, with {{variables}} replaced],
   description: "[Brief description]"
 )
 ```
+
+The definition loads `AGENT-PROMPT.md` itself, so the prompt does not have to be pasted
+in. Use `subagent_type: "general-purpose"` only for an agent that has no definition
+file — if you find yourself doing that for one of the agents listed above, its
+definition is missing and Claude Code cannot see it.
 
 **CRITICAL:** Sub-agents receive NO conversation context. They evaluate inputs in complete isolation.
 
@@ -205,14 +211,18 @@ After:  "Original Request: Add user authentication with email/password"
 
 ## Adding a New Sub-Agent
 
-1. Create folder: `agents/{agent-name}/`
-2. Create `AGENT-PROMPT.md` with full prompt template
+1. Create folder: `.claude/agents/{agent-name}/`
+2. Create `AGENT-PROMPT.md` with the full prompt template
 3. Create `references/` with supporting documentation (if needed)
 4. Create `templates/` with response JSON schemas
 5. Create `examples/` with good/bad examples
-6. Create corresponding **skill** in `.claude/skills/` that tells main agent when to spawn
-7. Add to this document's agent list
-8. Run link-project script to copy to `.claude/agents/`
+6. **Create the definition `.claude/agents/{agent-name}.md`** (frontmatter `name` must
+   equal the filename). Without it Claude Code will not register the agent.
+7. Create the corresponding **skill** in `.claude/skills/` that tells the main agent when
+   to spawn it
+8. Add it to this document's agent list
+9. Run `python -m pytest testing/e2e/test_agents_and_hooks.py` — it fails if the
+   definition is missing, misnamed, or points at files that do not exist
 
 ---
 
