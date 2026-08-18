@@ -7,7 +7,9 @@
 [![Claude Code](https://img.shields.io/badge/Claude-Code-orange)](https://claude.ai)
 [![License](https://img.shields.io/badge/License-AID%20Community%20v1.0-blue.svg)](LICENSE)
 [![MCP Integrations](https://img.shields.io/badge/MCP-6%20Integrations-green)](#mcp-integrations)
-[![Skills](https://img.shields.io/badge/Skills-21%20Specialized-purple)](#skills-system)
+[![Skills](https://img.shields.io/badge/Skills-28%20Specialized-purple)](#skills-system)
+[![Sub-Agents](https://img.shields.io/badge/Sub--Agents-8-teal)](#sub-agents)
+[![Tests](https://img.shields.io/badge/Tests-114-brightgreen)](#testing)
 
 *A complete AI-powered software development lifecycle framework*
 
@@ -19,18 +21,54 @@
 
 ## Table of Contents
 
+- [What's New](#whats-new)
 - [What is AID?](#what-is-aid)
 - [Research & Methodology](#research--methodology)
 - [Key Features](#key-features)
 - [Phase Gate System](#phase-gate-system)
+- [Sub-Agents](#sub-agents)
 - [MCP Integrations](#mcp-integrations)
 - [Nano Banana Pro (Visual AI)](#nano-banana-pro-visual-ai)
-- [Skills System (21 Skills)](#skills-system)
-- [Commands Reference (25 Commands)](#commands-reference)
+- [Skills System (28 Skills)](#skills-system)
+- [Commands Reference (45 Commands)](#commands-reference)
 - [Quick Start](#quick-start)
 - [Tech Stack](#tech-stack)
+- [Testing](#testing)
 - [Project Structure](#project-structure)
 - [Documentation](#documentation)
+
+---
+
+## What's New
+
+### New capabilities
+
+| Feature | What it gives you |
+|---------|-------------------|
+| **Data Science / ML track** | A full `role-data-scientist` skill plus 6 phase-specific rule sets — EDA, feasibility, experiment planning, ML architecture, development, production. Covers data pipelines, RAG/CAG, prompt engineering, bias auditing, model cards and monitoring. Phases are relabelled for the role (Phase 0 becomes *EDA — Data Gathering & Analysis*). |
+| **Cucumber / BDD** | `cucumber-bdd` skill with step-definition guides for **JS, Python, Java, Ruby and Go**. Phase 1 acceptance criteria are written as Gherkin, so the PRD and the test suite are the same artifact. Runs via `npm run cucumber`. |
+| **Automated dev pipeline** | `pipeline-orchestrator` drives a 12-step state machine: DEVELOP → CODE_REVIEW → AR_DESIGN → TDD → AR_FUNCTION → VISUAL_QA → TEST_REVIEW → PHASE_GATE → AR_ACCEPTANCE, with hard iteration caps and escalation instead of infinite retry loops. |
+| **Autoresearch runner** | `autoresearch` performs bounded keep/revert improvement: snapshot → one focused edit → score → keep **only if strictly better**, else revert. Every edit is reversible and the loop always terminates. |
+| **8 registered sub-agents** | Independent, context-free reviewers for code, tests, visual QA, phase gates, QA validation, quality reflection and feedback analysis. Invocable directly by name. |
+| **Quality Check on every output** | The `reflection` skill scores WHY alignment, phase compliance, correctness, security and completeness before you see the result. |
+| **WHY-first foundation** | `why-driven-decision` loads before everything else — no implementation without an articulated purpose. |
+| **Learning system** | `memory-system` collects session feedback and turns recurring patterns into concrete skill improvements, with a Python CLI for analysis and dashboards. |
+| **Enforcement hooks** | A QA gate that blocks task completion until acceptance criteria pass, a language-check gate that blocks a turn ending on code that does not compile, and automatic pipeline initialization when a plan is approved. |
+| **Figma design review** | `figma-design-review` audits components *before* extraction, so bad structure never reaches your codebase. |
+
+### Reliability fixes in this release
+
+| Area | Fix |
+|------|-----|
+| **`link-project` data loss** | Pointing the linker at the AID install itself deleted its own skills, agents and commands — and on Windows the fallback recreated the folders *empty* while reporting success. Both installers now refuse a self-target or a home-directory target, and never delete before confirming a source exists. |
+| **Sub-agents were not invocable** | Agents shipped as prompt folders with no definition files, so `subagent_type` could never resolve them. All 8 now have registered definitions. |
+| **QA gate never fired** | The hook emitted a response shape Claude Code does not read, so it could not block, and it was only ever registered in a personal local settings file. Now it blocks correctly, is registered in `.claude/settings.json`, and carries a loop guard. |
+| **Hooks missing in linked projects** | `settings.json` was copied into linked projects while `hooks/` was not, leaving hooks pointing at absent scripts. `hooks/` is now linked. |
+| **Least-privilege permissions** | The shipped settings no longer pre-approve a bare `Bash`, which auto-approved *any* shell command. See [Permissions](INSTALLATION.md#permissions) to widen it deliberately. |
+| **Cross-platform line endings** | `.gitattributes` pins `.sh` to LF and `.bat` to CRLF, so a clone on either OS gets working scripts. |
+| **Silent installer** | 50 copy commands ran against a directory removed in v2.1, each suppressing its own failure while reporting "Skills installed". Replaced with a real verification. |
+| **Dead references** | 22 documentation links pointed at files that did not exist. All fixed, and the missing `memory-system` package and `scripts/init-project.sh` were restored. |
+| **Test suite** | 114 tests now cover the destructive-guard behaviour, hook block/allow paths, agent registration and repository integrity. |
 
 ---
 
@@ -221,6 +259,32 @@ Before each phase transition, a **sub-agent must review** all deliverables:
 
 ---
 
+## Sub-Agents
+
+AID ships **8 registered sub-agents**. Each runs with **no knowledge of the conversation
+that produced the work** - that isolation is the point. An agent with no attachment to the
+code being good is the only one that reliably finds what is wrong with it.
+
+| Agent | Reviews | Triggered by |
+|-------|---------|--------------|
+| `reflection-agent` | Any output: WHY alignment, phase compliance, correctness, security, completeness | Automatic Quality Check; `/reflect` |
+| `code-review-agent` | A diff or file set: security, quality, documentation, architecture | Pipeline CODE_REVIEW; `/code-review` |
+| `test-review-agent` | Test quality: coverage, over-mocking, weak assertions, independence | Pipeline TEST_REVIEW; `/test-review` |
+| `visual-qa-agent` | A **running** app in a real browser - never the source | Pipeline VISUAL_QA |
+| `qa-validator-agent` | Completed work against `.aid/qa/<task>.yaml` acceptance criteria | QA gate Stop hook |
+| `phase-review-agent` | Whether a phase's deliverables justify advancing | `/gate-check` |
+| `memory-analysis-agent` | Session feedback → concrete skill improvements | `/aid-improve` |
+| `aid-test-agent` | The AID methodology itself, end to end | `/aid-test` |
+
+Reviewer agents are **read-only by design** - a reviewer that can edit the code is no
+longer independent.
+
+Each agent is a definition file (`.claude/agents/<name>.md`) plus an asset folder holding
+its prompt, references, response templates and calibration examples. The definition is what
+makes it invocable by name; see `.claude/agents/AGENT-STANDARD.md` to add your own.
+
+---
+
 ## MCP Integrations
 
 AID integrates with 6 Model Context Protocol (MCP) servers for seamless tool connectivity:
@@ -320,15 +384,22 @@ if (isNanoBananaEnabled()) {
 
 ## Skills System
 
-AID uses **21 specialized skills** - AI sub-agents with domain expertise organized by role and phase.
+AID uses **28 specialized skills** - domain expertise organized by role and phase.
+
+Each skill ships as a pair: `SKILL.md` is the compact version the model loads, and
+`SKILL.extended.md` is the human-readable companion. Keeping them separate means the model
+spends its context on instructions rather than on formatting.
 
 ### Core Skills (Always Active)
 
 | Skill | Purpose |
 |-------|---------|
+| `why-driven-decision` | **Foundational** - loads first. No work without an articulated WHY |
+| `reflection` | Quality Check scoring on every significant output |
 | `phase-enforcement` | Enforce phase gates, refuse out-of-phase work |
 | `context-tracking` | Track tasks, steps, progress across sessions |
 | `learning-mode` | Decision transparency, feedback collection |
+| `memory-system` | Feedback analysis, pattern detection, skill improvement |
 
 ### Phase Skills
 
@@ -338,6 +409,7 @@ AID uses **21 specialized skills** - AI sub-agents with domain expertise organiz
 | `aid-discovery` | 0-1 | Stakeholder identification, success metrics |
 | `aid-prd` | 1 | User stories, acceptance criteria, scope definition |
 | `aid-tech-spec` | 2 | Architecture, API contracts, security design |
+| `aid-impl-plan` | 3 | Contradiction resolution, task breakdown, Jira population |
 | `aid-development` | 4 | Implementation guidance, TDD practices |
 | `aid-qa-ship` | 5 | Validation, release preparation, deployment |
 
@@ -357,10 +429,36 @@ AID uses **21 specialized skills** - AI sub-agents with domain expertise organiz
 |-------|---------|
 | `atomic-design` | Figma-to-code component system (atoms, molecules, organisms) |
 | `atomic-page-builder` | Compose pages from existing components only |
+| `figma-design-review` | Audit Figma components **before** extraction, with a scoring rubric |
 | `system-architect` | Security-first architecture (ISO 27001, OWASP Top 10) |
 | `test-driven` | TDD methodology, test patterns, coverage requirements |
+| `cucumber-bdd` | Gherkin acceptance criteria + step definitions for JS, Python, Java, Ruby, Go |
 | `code-review` | Quality review, security audit, production readiness |
 | `nano-banana-visual` | AI-powered visual artifact generation (optional) |
+
+### Automation Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `pipeline-orchestrator` | Drives the Phase 4-5 dev pipeline state machine with sub-agent review gates and hard iteration caps |
+| `autoresearch` | Bounded keep/revert improvement loop - one edit at a time, kept only if it strictly improves the score |
+
+### Data Science / ML Track
+
+`role-data-scientist` carries its own 6-phase rule set under `.claude/rules/skills/`, so the
+lifecycle maps onto ML work instead of forcing it into a web-app shape:
+
+| Phase | Data Science framing | Rules |
+|-------|---------------------|-------|
+| 0 | EDA - data gathering & analysis | `phase-1-eda.md` |
+| 1 | Feasibility assessment | `phase-2-feasibility.md` |
+| 2 | Experiment planning | `phase-3-experiment-planning.md` |
+| 3 | ML architecture & pipeline design | `phase-4-ml-architecture.md` |
+| 4 | Development & validation | `phase-5-development.md` |
+| 5 | Deploy to production & monitoring | `phase-6-production.md` |
+
+Supporting references include an ML pipeline checklist, RAG architecture guide, prompt
+testing patterns, model card template, bias audit checklist and monitoring setup guide.
 
 ### Design System (Atomic Design)
 
@@ -392,7 +490,7 @@ Pages (Complete screens)
 
 ## Commands Reference
 
-AID provides **25 slash commands** organized by workflow.
+AID provides **45 slash commands** organized by workflow.
 
 ### Setup & Initialization
 
@@ -415,6 +513,7 @@ AID provides **25 slash commands** organized by workflow.
 
 | Command | Description |
 |---------|-------------|
+| `/discovery` | Start Phase 0 - research and validation |
 | `/phase` | Show current phase status |
 | `/gate-check` | Check if ready to advance to next phase |
 | `/phase-approve` | Human sign-off for current phase |
@@ -431,12 +530,31 @@ AID provides **25 slash commands** organized by workflow.
 | `/tech-spec` | aid-tech-spec | Create Technical Specification |
 | `/jira-breakdown` | - | Break spec into Jira issues |
 | `/design-system` | atomic-design | Build design system from Figma |
+| `/design-review` | figma-design-review | Review Figma components before extraction |
 | `/build-page` | atomic-page-builder | Compose pages from components |
+| `/storybook` | atomic-design | Manage Storybook component previews |
 | `/architecture` | system-architect | System architecture design |
 | `/write-tests` | test-driven | Write tests (TDD methodology) |
 | `/test-review` | test-driven | Review test quality |
 | `/code-review` | code-review | Review code quality |
 | `/qa-ship` | aid-qa-ship | QA validation and release |
+
+### Pipeline & Automation
+
+| Command | Description |
+|---------|-------------|
+| `/pipeline` | Start or resume the automated 12-step dev pipeline |
+| `/pipeline-status` | Show current pipeline state and step history |
+| `/reflect` | Detailed breakdown of the last Quality Check (`--history`, `--strict`, `--explain`) |
+| `/yolo` | Enable full automation (skip confirmations) |
+| `/yolo-off` | Disable full automation (restore confirmations) |
+
+### Figma Integration
+
+| Command | Description |
+|---------|-------------|
+| `/aid-pair` | Pair with the Figma plugin (auth code) |
+| `/figma-relay` | Process Figma plugin server requests |
 
 ### Learning & Improvement
 
@@ -453,7 +571,62 @@ AID provides **25 slash commands** organized by workflow.
 
 | Command | Description |
 |---------|-------------|
-| `/aid-test` | Run full methodology test suite |
+| `/aid-test` | Run the methodology test (Phases 0-4; `--phase N`, `--quick`, `--verbose`) |
+| `/test-all-agents` | Run every agent test in sequence |
+| `/test-reflection` | Test reflection-agent isolation and scoring |
+| `/test-qa-validator` | Test QA validator criteria checking |
+| `/test-phase-review` | Test phase gate validation |
+
+---
+
+## Testing
+
+Two independent layers, because they answer different questions.
+
+### The repository's own test suite
+
+**114 pytest tests** under `testing/e2e/` verify that *AID itself* works - not that
+your application works. Run them after cloning, and after any change to a hook,
+installer or link script:
+
+```bash
+pip install pytest pyyaml
+npm run test:all              # or: python -m pytest testing/e2e/ -v
+```
+
+Narrower runs: `npm run test:install`, `npm run test:mcp`, `npm run test:memory`.
+
+10 of the 114 skip unless `node` and `typescript` are reachable from the shell that runs
+hooks - run `npm install` first to exercise them. They **skip**, they do not silently pass.
+
+| Suite | What it proves |
+|-------|----------------|
+| `test_repo_integrity.py` | Every path the docs promise exists and runs - `python -m memory_system`, `scripts/init-project.sh`, the autoresearch assets, no skill without a `SKILL.md` |
+| `test_agents_and_hooks.py` | All 8 agents are registered with valid frontmatter; every hook in `settings.json` exists and parses; no bare `Bash` in the allow list |
+| `test_link_project_guards.py` | Linking refuses to run against the AID install itself, and refuses to link a source directory that is missing |
+| `test_pipeline_hooks.py` | The Stop hook blocks in the schema Claude Code actually reads, respects `stop_hook_active`, and does not claim a `tsc` pass it never ran |
+| `test_installation.py` | A fresh install produces a working tree |
+| `test_mcp_sanity.py` | MCP templates are valid JSON and carry no real tokens |
+
+Every assertion here corresponds to a defect that shipped silently, and each one
+was verified by **removing the fix and watching the test fail**. A test that has
+never been red is an unverified claim - see the docstring at the top of
+`test_repo_integrity.py` for the specific defect behind each check.
+
+### Your project's tests
+
+Written by you (or by Phase 4 with `/write-tests`), and enforced by the pipeline:
+
+```bash
+npm run cucumber        # executable Gherkin acceptance criteria
+npm run cucumber:dry    # validate feature files without running them
+npm run test:bdd        # Cucumber + HTML report in reports/
+npm run test:smoke      # @smoke-tagged scenarios only
+npm run test:critical   # @critical-tagged scenarios only
+```
+
+The `TEST_REVIEW` pipeline step hands these to `test-review-agent`, which looks for
+over-mocking, weak assertions and coverage that measures nothing.
 
 ---
 
@@ -540,40 +713,62 @@ git clone https://github.com/ilandahan/AID.git /shared/aid
 
 ```
 AID/
-├── .aid/
+├── .aid/                       # Per-project runtime state (created by /aid-init)
 │   ├── state.json              # Current phase state
-│   └── context.json            # Work context tracking
-├── .claude/
-│   ├── commands/               # 25 slash commands
+│   ├── context.json            # Work context tracking
+│   ├── qa/                     # Acceptance criteria the QA gate enforces
+│   └── pipeline/               # Pipeline config (tracked) + run state (ignored)
+├── .claude/                    # Everything Claude Code loads
+│   ├── commands/               # 45 slash commands
 │   │   ├── good-morning.md
 │   │   ├── phase.md
-│   │   ├── aid-start.md
-│   │   └── ... (22 more)
-│   └── skills/                 # 21 specialized skills
-│       ├── phase-enforcement/
-│       ├── context-tracking/
-│       ├── atomic-design/
-│       ├── test-driven/
-│       └── ... (17 more)
+│   │   └── ... (43 more)
+│   ├── skills/                 # 28 specialized skills
+│   │   ├── why-driven-decision/    # Foundational - loads first
+│   │   ├── reflection/            # Quality Check + phase criteria
+│   │   ├── pipeline-orchestrator/ # 12-step machine + gate.mjs
+│   │   ├── autoresearch/          # Bounded keep/revert improvement loop
+│   │   ├── cucumber-bdd/          # Gherkin across 5 languages
+│   │   └── ... (23 more)
+│   ├── agents/                 # 8 sub-agents (definition + assets each)
+│   │   ├── reflection-agent.md         # Definition = what makes it invocable
+│   │   ├── reflection-agent/           # Prompt, references, templates, examples
+│   │   ├── code-review-agent.md
+│   │   └── ... (6 more)
+│   ├── rules/                  # 23 rule files, incl. the Data Science / ML track
+│   ├── references/             # Shared lookup data (role/phase terminology)
+│   ├── hooks/                  # Phase gate, QA gate, pipeline enforcement
+│   └── settings.json           # Permissions + hook registration (copied, not linked)
+├── testing/e2e/                # 114 tests covering AID itself
 ├── docs/
 │   ├── prd/                    # Phase 1 outputs
 │   ├── tech-spec/              # Phase 2 outputs
 │   ├── implementation-plan/    # Phase 3 outputs
+│   ├── research/               # Phase 0 outputs
 │   ├── PHASE-GATES.md
 │   └── MORNING-STARTUP.md
 ├── memory-system/              # Learning & improvement
-│   ├── docs/
-│   └── skills/
-├── src/                        # Application code (Phase 4)
-│   └── lib/
-│       └── nano-banana-pro/    # Visual AI integration
-├── integrations/               # MCP setup guides
-├── scripts/                    # Automation scripts
-├── .mcp.json                   # MCP configuration
-├── .env.example                # Environment template
-├── CLAUDE.md                   # Critical instructions
-└── BEST-PRACTICES.md           # Code standards
+│   ├── memory_system/          # Python package: python -m memory_system
+│   └── docs/
+├── storybook-preview/          # Component preview workspace
+├── integrations/               # MCP setup guides (jira, figma, github, chrome-devtools)
+│   └── figma-plugin/           # Figma plugin for /aid-pair
+├── scripts/init-project.sh     # New-project scaffolding
+├── install.sh / install.bat    # Installers
+├── link-project.sh / .bat      # Link an existing project (one source of truth)
+├── .mcp.json.mac / .windows    # MCP templates - copy to .mcp.json, add your tokens
+├── .gitattributes              # LF for .sh, CRLF for .bat
+└── CLAUDE.md                   # Critical instructions Claude loads every session
 ```
+
+Two things in this tree are load-bearing and easy to get wrong:
+
+- **`.claude/agents/<name>.md` next to `.claude/agents/<name>/`.** The folder holds the
+  agent's prompt and templates; only the `.md` file with YAML frontmatter makes the agent
+  invocable by name. A folder on its own is silently inert.
+- **`settings.json` is copied, `hooks/` is linked.** The copied settings register hooks by
+  the relative path `.claude/hooks/*`, so a linked project that did not also link `hooks/`
+  registers hooks that do not exist.
 
 ---
 
@@ -583,11 +778,12 @@ AID/
 |----------|-------------|
 | [INSTALLATION.md](INSTALLATION.md) | Complete setup guide for all skill levels |
 | [CLAUDE.md](CLAUDE.md) | Critical instructions for Claude (phase gates, commands) |
-| [BEST-PRACTICES.md](BEST-PRACTICES.md) | Code standards and patterns |
 | [docs/PHASE-GATES.md](docs/PHASE-GATES.md) | Phase system details |
 | [docs/MORNING-STARTUP.md](docs/MORNING-STARTUP.md) | Daily workflow guide |
 | [docs/WORK-CONTEXT-TRACKER.md](docs/WORK-CONTEXT-TRACKER.md) | Context tracking details |
 | [memory-system/docs/](memory-system/docs/) | Learning system documentation |
+| [.claude/agents/AGENT-STANDARD.md](.claude/agents/AGENT-STANDARD.md) | How to write a sub-agent |
+| [.claude/rules/](.claude/rules/) | Code standards, and the Data Science / ML phase rules |
 
 ---
 
