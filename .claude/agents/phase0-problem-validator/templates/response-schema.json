@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Problem Validator Agent Response",
+  "type": "object",
+  "required": ["report", "meta"],
+  "properties": {
+    "report": {
+      "type": "string",
+      "description": "Complete markdown Problem Validation Report with traceability IDs [PV-XXX] on every finding"
+    },
+    "meta": {
+      "type": "object",
+      "required": ["total_findings", "confidence_level", "confidence_rationale", "severity_score", "root_cause", "root_cause_differs_from_stated", "validation_verdict", "critical_assumptions", "research_gaps", "recommended_validation"],
+      "properties": {
+        "total_findings": { "type": "integer", "minimum": 0 },
+        "confidence_level": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] },
+        "confidence_rationale": { "type": "string" },
+        "severity_score": {
+          "type": "object",
+          "required": ["frequency", "impact", "reach", "urgency", "strategic", "composite"],
+          "properties": {
+            "frequency": { "type": "integer", "minimum": 1, "maximum": 10 },
+            "impact": { "type": "integer", "minimum": 1, "maximum": 10 },
+            "reach": { "type": "integer", "minimum": 1, "maximum": 10 },
+            "urgency": { "type": "integer", "minimum": 1, "maximum": 10 },
+            "strategic": { "type": "integer", "minimum": 1, "maximum": 10 },
+            "composite": { "type": "number" }
+          }
+        },
+        "root_cause": { "type": "string" },
+        "root_cause_differs_from_stated": { "type": "boolean" },
+        "validation_verdict": { "type": "string", "enum": ["VALIDATED", "PARTIALLY_VALIDATED", "NOT_VALIDATED", "INSUFFICIENT_EVIDENCE"] },
+        "critical_assumptions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["assumption", "impact_if_wrong", "certainty"],
+            "properties": {
+              "assumption": { "type": "string" },
+              "impact_if_wrong": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] },
+              "certainty": { "type": "string", "enum": ["VALIDATED", "LIKELY", "UNCERTAIN", "UNVALIDATED"] }
+            }
+          }
+        },
+        "research_gaps": { "type": "array", "items": { "type": "string" } },
+        "recommended_validation": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
