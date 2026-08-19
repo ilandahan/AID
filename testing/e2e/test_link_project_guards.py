@@ -43,12 +43,16 @@ def _make_aid_fixture(root):
     """Build a minimal but realistic AID install with detectable content.
 
     WHY a fixture instead of the real repo: the failure mode under test is
-    deletion. Aiming a possibly-broken guard at the real .claude/skills would
+    deletion. Aiming a possibly-broken guard at the real skills/ would
     reproduce the original data loss every time the guard regressed.
+
+    Component dirs sit at the AID ROOT (commands/, skills/, ...) because that is
+    what a plugin layout requires and therefore what link-project reads from. The
+    link TARGET is still the project's .claude/<name>.
     """
     os.makedirs(os.path.join(root, '.claude'), exist_ok=True)
     for name in LINKED_DIRS:
-        d = os.path.join(root, '.claude', name)
+        d = os.path.join(root, name)
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, 'sentinel.md'), 'w') as f:
             f.write(SENTINEL)
@@ -126,7 +130,7 @@ def _read_via_bash(cwd, rel_path):
 def _sentinels_intact(root):
     """True only if every linked dir still holds its sentinel content."""
     for name in LINKED_DIRS:
-        p = os.path.join(root, '.claude', name, 'sentinel.md')
+        p = os.path.join(root, name, 'sentinel.md')
         if not os.path.isfile(p):
             return False
         with open(p) as f:
@@ -179,7 +183,7 @@ class TestRefusesDestructiveTargets:
     def test_missing_source_does_not_delete_target_content(self, tmp_path):
         """The delete must never run when there is nothing to put back."""
         aid = _make_aid_fixture(str(tmp_path / 'aid'))
-        shutil.rmtree(os.path.join(aid, '.claude', 'skills'))
+        shutil.rmtree(os.path.join(aid, 'skills'))
 
         target = tmp_path / 'project'
         (target / '.claude' / 'skills').mkdir(parents=True)
@@ -269,7 +273,7 @@ class TestWindowsLinkerRefusesSelfTarget:
         )
 
         # Edit an existing file in AID.
-        source_file = os.path.join(aid, '.claude', 'skills', 'sentinel.md')
+        source_file = os.path.join(aid, 'skills', 'sentinel.md')
         with open(source_file, 'w') as f:
             f.write('UPDATED-IN-AID\n')
         assert (target / '.claude' / 'skills' / 'sentinel.md').read_text() == \
@@ -279,8 +283,8 @@ class TestWindowsLinkerRefusesSelfTarget:
             )
 
         # Add a whole new skill in AID.
-        os.makedirs(os.path.join(aid, '.claude', 'skills', 'brand-new-skill'))
-        with open(os.path.join(aid, '.claude', 'skills', 'brand-new-skill',
+        os.makedirs(os.path.join(aid, 'skills', 'brand-new-skill'))
+        with open(os.path.join(aid, 'skills', 'brand-new-skill',
                                'SKILL.md'), 'w') as f:
             f.write('new\n')
         assert (target / '.claude' / 'skills' / 'brand-new-skill' /
@@ -319,7 +323,7 @@ class TestLegitimateLinkStillWorks:
 
         _run_link(aid, '../project')
 
-        with open(os.path.join(aid, '.claude', 'skills', 'sentinel.md'), 'w') as f:
+        with open(os.path.join(aid, 'skills', 'sentinel.md'), 'w') as f:
             f.write('UPDATED-IN-AID\n')
 
         seen = _read_via_bash(aid, '../project/.claude/skills/sentinel.md')
@@ -352,11 +356,21 @@ class TestLegitimateLinkStillWorks:
         assert referenced, 'settings.json declares no hooks - expected at least one'
 
         for ref in sorted(referenced):
-            assert os.path.isfile(os.path.join(REPO_ROOT, ref)), (
-                f'settings.json points at {ref}, which does not exist'
+            component = ref.split('/')[1]          # e.g. 'hooks'
+            leaf = ref.split('/', 2)[2]            # e.g. 'dev-pipeline-gate.sh'
+
+            # settings.json names .claude/hooks/* because it is COPIED into the target,
+            # where link-project makes .claude/hooks a link to AID's hooks/. So the file
+            # that has to exist in AID is hooks/<leaf> at the repository root. AID's own
+            # .claude/hooks mirror is created by install.sh and gitignored, so asserting
+            # on it would fail on a fresh clone while the link contract is perfectly fine.
+            source = os.path.join(REPO_ROOT, component, leaf)
+            assert os.path.isfile(source), (
+                f'settings.json points at {ref}; linking makes that resolve to '
+                f'{component}/{leaf} in AID, which does not exist'
             )
             # The directory that must therefore be linked into target projects.
-            assert ref.split('/')[1] in LINKED_DIRS, (
+            assert component in LINKED_DIRS, (
                 f'{ref} lives in a directory link-project does not install; '
                 f'linked projects would get a settings file pointing at nothing'
             )

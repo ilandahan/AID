@@ -23,19 +23,16 @@ import pytest
 REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
-AGENTS_DIR = os.path.join(REPO_ROOT, '.claude', 'agents')
-HOOK = os.path.join(REPO_ROOT, '.claude', 'hooks', 'validate-qa-gate.py')
+# Components live at the repository root so Claude Code can load this repo as a plugin.
+# settings.json stays under .claude/ - it is project configuration, not a component, and
+# it is what gets copied into a linked project.
+AGENTS_DIR = os.path.join(REPO_ROOT, 'agents')
+HOOK = os.path.join(REPO_ROOT, 'hooks', 'validate-qa-gate.py')
 SETTINGS = os.path.join(REPO_ROOT, '.claude', 'settings.json')
-
-# Files that live in .claude/agents/ but are documentation, not agent definitions.
-NON_AGENT_MD = {'AGENT-STANDARD.md'}
 
 
 def _agent_definitions():
-    return sorted(
-        f for f in os.listdir(AGENTS_DIR)
-        if f.endswith('.md') and f not in NON_AGENT_MD
-    )
+    return sorted(f for f in os.listdir(AGENTS_DIR) if f.endswith('.md'))
 
 
 def _agent_folders():
@@ -56,14 +53,33 @@ def _frontmatter(path):
 class TestAgentsAreRegisterable:
     """Without these, `subagent_type="<name>"` cannot resolve."""
 
-    def test_every_agent_folder_has_a_definition(self):
+    def test_agents_dir_contains_only_definitions(self):
+        """
+        WHY: Claude Code registers EVERY .md under agents/ as an agent - recursively.
+        Verified with `claude plugin validate`, which reported
+        agents/aid-test-agent/examples/failed-test.md as an agent. Shipping asset folders
+        here exposed ~71 agents, most of them prompt fragments and calibration examples.
+
+        Mandatory assets are inlined into the definition; examples live in agent-assets/,
+        which nothing scans.
+        """
         folders = _agent_folders()
-        defs = {f[:-3] for f in _agent_definitions()}
-        missing = [d for d in folders if d not in defs]
-        assert not missing, (
-            f"agent folders with no registerable .md (Claude Code cannot invoke these): "
-            f"{missing}"
+        assert not folders, (
+            f"agents/ must be flat - every .md inside these folders would register as a "
+            f"junk agent: {folders}"
         )
+        stray = [f for f in os.listdir(AGENTS_DIR) if not f.endswith('.md')]
+        assert not stray, f"non-definition files in agents/: {stray}"
+
+    def test_no_nested_markdown_anywhere_under_agents(self):
+        """Belt and braces: the recursion is what bites, so check recursively."""
+        nested = []
+        for root, _dirs, files in os.walk(AGENTS_DIR):
+            if os.path.abspath(root) == os.path.abspath(AGENTS_DIR):
+                continue
+            nested += [os.path.relpath(os.path.join(root, f), REPO_ROOT)
+                       for f in files if f.endswith('.md')]
+        assert not nested, f"nested .md files would register as agents: {nested}"
 
     @pytest.mark.parametrize('definition', _agent_definitions())
     def test_definition_has_valid_frontmatter(self, definition):
@@ -90,22 +106,30 @@ class TestAgentsAreRegisterable:
         with open(path, encoding='utf-8') as f:
             body = f.read()
 
-        # Backtick-quoted repo-relative paths under .claude/, minus glob placeholders.
-        referenced = set(re.findall(r'`(\.claude/[^`]+?)`', body))
+        # Backtick-quoted repo-relative paths at any component root, minus placeholders.
+        referenced = set(re.findall(
+            r'`((?:agents|agent-assets|skills|commands|rules|references|hooks)/[^`]+?)`',
+            body))
         missing = []
         for ref in referenced:
-            if '<' in ref or '*' in ref:
-                continue  # e.g. phase-<N>.md - a family, checked below
+            if '<' in ref or '*' in ref or '{' in ref:
+                continue  # a family or a template variable, not a literal path
             if not os.path.exists(os.path.join(REPO_ROOT, ref)):
                 missing.append(ref)
         assert not missing, f"{definition} points at files that do not exist: {missing}"
 
-    def test_phase_review_agent_has_all_phase_prompts(self):
-        """The <N> placeholder above hides 6 real files; check them explicitly."""
+    def test_phase_review_agent_carries_all_six_phase_prompts(self):
+        """
+        These were 6 separate files under phase-prompts/. They are now inlined, because a
+        plugin agent's cwd is the user's project - an external asset path resolves against
+        their code, not the plugin. Inlined means present, so assert the content, not a path.
+        """
+        body = open(os.path.join(AGENTS_DIR, 'phase-review-agent.md'),
+                    encoding='utf-8').read()
         for n in range(6):
-            p = os.path.join(AGENTS_DIR, 'phase-review-agent', 'phase-prompts',
-                             f'phase-{n}.md')
-            assert os.path.isfile(p), f"missing phase prompt: phase-{n}.md"
+            assert f'phase-prompts/phase-{n}.md' in body, (
+                f'phase-review-agent.md lost the phase-{n} prompt section'
+            )
 
 
 class TestQAGateHookIsWired:

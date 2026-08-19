@@ -5,7 +5,8 @@ Validates that the AID memory system references and structure are intact.
 import os
 import pytest
 
-SKILLS_DIR = os.path.join('.claude', 'skills')
+# Components live at the repository root for plugin loading.
+SKILLS_DIR = 'skills'
 MEMORY_DIR = os.path.join(SKILLS_DIR, 'memory-system')
 REFS_DIR = os.path.join(MEMORY_DIR, 'references')
 

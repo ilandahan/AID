@@ -69,10 +69,52 @@ You're ready to go! See the [README.md](README.md) for your daily workflow and a
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Node.js | 18+ | MCP servers, Storybook |
-| Claude Code CLI | Latest | AI assistance |
+| Claude Code CLI | Latest | Required |
+| Python | 3.8+ | Enforcement hooks, memory-system CLI |
+| Node.js | 18+ | Optional: MCP servers, Storybook, Cucumber |
 
-### Quick Install
+### Install as a plugin (recommended)
+
+```bash
+claude plugin marketplace add ilandahan/AID
+claude plugin install aid@AID
+```
+
+Restart Claude Code. That is the whole installation - no clone, no symlinks, and none of
+the Windows Developer Mode requirement that symlink-based linking has.
+
+| Command | What it does |
+|---------|--------------|
+| `claude plugin list` | Confirm `aid@AID` is enabled |
+| `claude plugin details aid` | Component inventory and projected token cost |
+| `claude plugin update aid` | Update every project at once (restart to apply) |
+| `claude plugin disable aid` | Turn it off without uninstalling |
+| `claude plugin uninstall aid` | Remove it |
+
+Then, in any project:
+
+```bash
+/aid-init          # create .aid/ state for this project
+/aid-start         # pick a role and phase
+```
+
+`.aid/` stays in your project - it is per-project runtime state (current phase, work
+context, QA criteria), which is exactly where it belongs. The plugin supplies the
+commands, skills, agents and hooks; your repo keeps its own state.
+
+#### Which install should I use?
+
+| | Plugin | Clone + `link-project` |
+|---|---|---|
+| Setup | 2 commands | clone, `install.sh`, then link each project |
+| Windows symlink permissions | not needed | Developer Mode or junctions |
+| Updating | `claude plugin update aid` | `git pull` in the AID clone |
+| Editing the methodology yourself | fork the repo | edit in place, projects see it instantly |
+| Best for | using AID | developing AID |
+
+Both are supported and read the same files. The clone route is unchanged.
+
+### Quick Install (clone)
 
 ```bash
 # Clone repository
@@ -190,18 +232,30 @@ link-project.bat C:\path\to\my-project
 
 ### What Gets Linked vs Copied
 
-| Linked (Auto-Update) | Copied (Project-Specific) |
-|----------------------|---------------------------|
-| `.claude/commands/` | `.claude/settings.json` |
-| `.claude/skills/` | `.aid/state.json` |
-| `.claude/agents/` | `.aid/context.json` |
-| `.claude/references/` | `.mcp.json` |
-| `.claude/rules/` | `docs/` |
-| `.claude/hooks/` | |
-| `CLAUDE.md` | |
+| In AID (source) | In your project | Linked or copied |
+|-----------------|-----------------|------------------|
+| `commands/` | `.claude/commands/` | Linked - auto-updates |
+| `skills/` | `.claude/skills/` | Linked - auto-updates |
+| `agents/` | `.claude/agents/` | Linked - auto-updates |
+| `references/` | `.claude/references/` | Linked - auto-updates |
+| `rules/` | `.claude/rules/` | Linked - auto-updates |
+| `hooks/` | `.claude/hooks/` | Linked - auto-updates |
+| `CLAUDE.md` | `CLAUDE.md` | Linked |
+| `.claude/settings.json` | `.claude/settings.json` | Copied - yours to edit |
+| `.mcp.json.*` | `.mcp.json` | Copied - holds your tokens |
+| - | `.aid/state.json`, `.aid/context.json` | Created per project |
 
-`.claude/hooks/` must be linked because the copied `settings.json` registers its hooks by
-the path `.claude/hooks/*`.
+Note the asymmetry: AID's components live at its **repository root**, while the link
+target is your project's `.claude/<name>`. The root layout is what lets the same files
+load as a plugin; `.claude/` is where Claude Code looks in a plain project.
+
+`hooks/` must be linked because the copied `settings.json` registers its hooks by the
+path `.claude/hooks/*`. Without the link, every linked project gets a settings file
+pointing at scripts that are not there.
+
+**Upgrading a clone from before 3.0:** run `./install.sh` once. It recreates `.claude/*`
+as links to the new root directories, so projects you have already linked keep working
+without re-linking.
 
 ### Permissions
 

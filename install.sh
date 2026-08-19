@@ -78,8 +78,9 @@ setup_claude_commands_and_skills() {
     echo ""
     echo "[STEP 2/9] Setting up Claude commands and skills..."
 
-    # Skills, commands, agents, rules, references and hooks all ship in git under
-    # .claude/. There is NO copy step.
+    # Components ship in git at the REPOSITORY ROOT (commands/, skills/, agents/,
+    # rules/, references/, hooks/) because that is where Claude Code looks when this
+    # repo is loaded as a plugin. There is NO copy step.
     #
     # WHY this is a verification and not an installation: this function used to run 25
     # `cp -r skills/<name> .claude/skills/` lines against a root skills/ directory that
@@ -88,23 +89,63 @@ setup_claude_commands_and_skills() {
     # wrong. A step that cannot fail cannot tell you anything.
     missing=0
     for d in commands skills agents rules references hooks; do
-        if [ -d ".claude/$d" ]; then
-            count=$(find ".claude/$d" -type f | wc -l | tr -d ' ')
-            log_success ".claude/$d present ($count files)"
+        if [ -d "$d" ]; then
+            count=$(find "$d" -type f | wc -l | tr -d ' ')
+            log_success "$d/ present ($count files)"
         else
-            log_warning ".claude/$d is MISSING - restore it before using AID"
+            log_warning "$d/ is MISSING - restore it before using AID"
             missing=1
         fi
     done
 
-    skill_count=$(find .claude/skills -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
-    agent_count=$(find .claude/agents -maxdepth 1 -name '*.md' ! -name 'AGENT-STANDARD.md' 2>/dev/null | wc -l | tr -d ' ')
+    skill_count=$(find skills -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+    agent_count=$(find agents -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
 
     if [ "$missing" -eq 0 ]; then
         log_success "Verified: $skill_count skills, $agent_count registered agents"
     else
         log_warning "Installation incomplete - see the warnings above"
+        return
     fi
+
+    # Mirror the root components into .claude/ as links.
+    #
+    # WHY: two consumers want them in different places. As a PLUGIN, Claude Code reads
+    # commands/, skills/ and agents/ from the plugin root. As a plain PROJECT - which is
+    # what this repo is when you open Claude Code in it, and what every already-linked
+    # project expects - Claude Code reads .claude/<name>. Links satisfy both from one
+    # copy of the files.
+    #
+    # These links are NOT tracked in git: core.symlinks defaults to false on Windows, so
+    # a committed symlink checks out as a text file containing a path. They are created
+    # here instead, per machine.
+    echo ""
+    log_info "Mirroring components into .claude/ (for project-mode and existing links)"
+    mkdir -p .claude
+    for d in commands skills agents rules references hooks; do
+        target=".claude/$d"
+        # Already a working link or directory? Leave it alone.
+        if [ -e "$target" ] || [ -L "$target" ]; then
+            if [ -L "$target" ] || [ -d "$target" ]; then
+                log_success ".claude/$d already present"
+                continue
+            fi
+        fi
+        if ln -s "../$d" "$target" 2>/dev/null && [ -d "$target" ]; then
+            log_success ".claude/$d -> ../$d (symlink)"
+        else
+            # MSYS/Git-Bash on Windows silently COPIES instead of linking, and plain
+            # Windows needs a junction. Fall back to mklink /J, which needs no admin.
+            rm -rf "$target" 2>/dev/null
+            abs="$(cd "$d" && pwd -W 2>/dev/null || cd "$d" && pwd)"
+            if command -v cmd >/dev/null 2>&1 && \
+               MSYS_NO_PATHCONV=1 cmd //c mklink /J ".claude\\$d" "$(echo "$abs" | tr '/' '\\')" >/dev/null 2>&1; then
+                log_success ".claude/$d -> $d (junction)"
+            else
+                log_warning ".claude/$d could not be linked - project mode will not see $d/"
+            fi
+        fi
+    done
 }
 
 # Step 3: Create project state directory

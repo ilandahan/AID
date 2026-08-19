@@ -1,5 +1,5 @@
 """
-AID Hooks Dispatcher Tests (.claude/hooks/aid_hooks.py)
+AID Hooks Dispatcher Tests (hooks/aid_hooks.py)
 
 WHY THIS TEST:
 aid_hooks.py is the phase-gate enforcement engine CLAUDE.md documents as CRITICAL. It
@@ -28,7 +28,7 @@ import sys
 import pytest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-HOOK = os.path.join(REPO_ROOT, '.claude', 'hooks', 'aid_hooks.py')
+HOOK = os.path.join(REPO_ROOT, 'hooks', 'aid_hooks.py')
 
 
 def make_project(tmp_path, phase, enforcement=None):

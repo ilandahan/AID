@@ -119,14 +119,17 @@ echo ""
 # Function to create symlink for a directory
 create_dir_symlink() {
     local name="$1"
-    local source="$AID_PATH/.claude/$name"
+    # AID's components live at the repository root (commands/, skills/, agents/, ...) so
+    # that Claude Code can load this repo as a plugin. The link TARGET is still the
+    # project's .claude/<name>, which is where Claude Code looks in a plain project.
+    local source="$AID_PATH/$name"
     local target="$TARGET_PATH/.claude/$name"
 
     # WHY: never delete the target when there is nothing to replace it with.
     # Deleting first and discovering the source is gone is how AID erased its own
     # .claude/skills. Check before destroying, not after.
     if [ ! -d "$source" ]; then
-        echo "  [ERROR] Source missing in AID, nothing linked: .claude/$name"
+        echo "  [ERROR] Source missing in AID, nothing linked: $name/"
         return 1
     fi
 

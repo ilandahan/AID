@@ -8,8 +8,9 @@
 [![License](https://img.shields.io/badge/License-AID%20Community%20v1.0-blue.svg)](LICENSE)
 [![MCP Integrations](https://img.shields.io/badge/MCP-6%20Integrations-green)](#mcp-integrations)
 [![Skills](https://img.shields.io/badge/Skills-28%20Specialized-purple)](#skills-system)
-[![Sub-Agents](https://img.shields.io/badge/Sub--Agents-8-teal)](#sub-agents)
-[![Tests](https://img.shields.io/badge/Tests-114-brightgreen)](#testing)
+[![Sub-Agents](https://img.shields.io/badge/Sub--Agents-38-teal)](#sub-agents)
+[![Tests](https://img.shields.io/badge/Tests-228-brightgreen)](#testing)
+[![Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet)](#install-as-a-plugin)
 
 *A complete AI-powered software development lifecycle framework*
 
@@ -49,7 +50,7 @@
 | **Cucumber / BDD** | `cucumber-bdd` skill with step-definition guides for **JS, Python, Java, Ruby and Go**. Phase 1 acceptance criteria are written as Gherkin, so the PRD and the test suite are the same artifact. Runs via `npm run cucumber`. |
 | **Automated dev pipeline** | `pipeline-orchestrator` drives a 12-step state machine: DEVELOP → CODE_REVIEW → AR_DESIGN → TDD → AR_FUNCTION → VISUAL_QA → TEST_REVIEW → PHASE_GATE → AR_ACCEPTANCE, with hard iteration caps and escalation instead of infinite retry loops. |
 | **Autoresearch runner** | `autoresearch` performs bounded keep/revert improvement: snapshot → one focused edit → score → keep **only if strictly better**, else revert. Every edit is reversible and the loop always terminates. |
-| **8 registered sub-agents** | Independent, context-free reviewers for code, tests, visual QA, phase gates, QA validation, quality reflection and feedback analysis. Invocable directly by name. |
+| **38 registered sub-agents** | Independent, context-free specialists: 8 reviewers (code, tests, visual QA, phase gates, QA validation, reflection, feedback analysis) plus 30 phase specialists covering Phase 0 discovery, Phase 2 architecture, Phase 3 breakdown, Phase 4 sprint work, Phase 5 release and the PRD pipeline. All invocable by name. |
 | **Quality Check on every output** | The `reflection` skill scores WHY alignment, phase compliance, correctness, security and completeness before you see the result. |
 | **WHY-first foundation** | `why-driven-decision` loads before everything else — no implementation without an articulated purpose. |
 | **Learning system** | `memory-system` collects session feedback and turns recurring patterns into concrete skill improvements, with a Python CLI for analysis and dashboards. |
@@ -61,14 +62,16 @@
 | Area | Fix |
 |------|-----|
 | **`link-project` data loss** | Pointing the linker at the AID install itself deleted its own skills, agents and commands — and on Windows the fallback recreated the folders *empty* while reporting success. Both installers now refuse a self-target or a home-directory target, and never delete before confirming a source exists. |
-| **Sub-agents were not invocable** | Agents shipped as prompt folders with no definition files, so `subagent_type` could never resolve them. All 8 now have registered definitions. |
+| **Sub-agents were not invocable** | Agents shipped as prompt folders with no definition files, so `subagent_type` could never resolve them. All 38 now have registered definitions - and because Claude Code registers every `.md` under `agents/` recursively, asset folders were moved out of it so no prompt fragment registers as an agent. |
 | **QA gate never fired** | The hook emitted a response shape Claude Code does not read, so it could not block, and it was only ever registered in a personal local settings file. Now it blocks correctly, is registered in `.claude/settings.json`, and carries a loop guard. |
 | **Hooks missing in linked projects** | `settings.json` was copied into linked projects while `hooks/` was not, leaving hooks pointing at absent scripts. `hooks/` is now linked. |
 | **Least-privilege permissions** | The shipped settings no longer pre-approve a bare `Bash`, which auto-approved *any* shell command. See [Permissions](INSTALLATION.md#permissions) to widen it deliberately. |
 | **Cross-platform line endings** | `.gitattributes` pins `.sh` to LF and `.bat` to CRLF, so a clone on either OS gets working scripts. |
 | **Silent installer** | 50 copy commands ran against a directory removed in v2.1, each suppressing its own failure while reporting "Skills installed". Replaced with a real verification. |
 | **Dead references** | 22 documentation links pointed at files that did not exist. All fixed, and the missing `memory-system` package and `scripts/init-project.sh` were restored. |
-| **Test suite** | 114 tests now cover the destructive-guard behaviour, hook block/allow paths, agent registration and repository integrity. |
+| **Ships as a plugin** | `claude plugin marketplace add ilandahan/AID` then `claude plugin install aid@AID`. No cloning, no symlinks, no Developer Mode on Windows, and `claude plugin update aid` moves every project at once. The clone + `link-project` route still works unchanged. |
+| **Phase-gate hooks that actually block** | The enforcement dispatcher emitted `decision`/`reason` without `hookEventName`, a shape Claude Code discards - so every gate was read as an allow and never stopped a write. Fixed, and pinned by tests that execute the hook and assert the payload. |
+| **Test suite** | 228 tests cover destructive-guard behaviour, hook block/allow payload schemas, agent registration, the plugin layout and repository integrity. |
 
 ---
 
@@ -261,7 +264,7 @@ Before each phase transition, a **sub-agent must review** all deliverables:
 
 ## Sub-Agents
 
-AID ships **8 registered sub-agents**. Each runs with **no knowledge of the conversation
+AID ships **38 registered sub-agents**. Each runs with **no knowledge of the conversation
 that produced the work** - that isolation is the point. An agent with no attachment to the
 code being good is the only one that reliably finds what is wrong with it.
 
@@ -281,7 +284,7 @@ longer independent.
 
 Each agent is a definition file (`.claude/agents/<name>.md`) plus an asset folder holding
 its prompt, references, response templates and calibration examples. The definition is what
-makes it invocable by name; see `.claude/agents/AGENT-STANDARD.md` to add your own.
+makes it invocable by name; see `.claude/agent-assets/AGENT-STANDARD.md` to add your own.
 
 ---
 
@@ -585,7 +588,7 @@ Two independent layers, because they answer different questions.
 
 ### The repository's own test suite
 
-**114 pytest tests** under `testing/e2e/` verify that *AID itself* works - not that
+**228 pytest tests** under `testing/e2e/` verify that *AID itself* works - not that
 your application works. Run them after cloning, and after any change to a hook,
 installer or link script:
 
@@ -596,7 +599,7 @@ npm run test:all              # or: python -m pytest testing/e2e/ -v
 
 Narrower runs: `npm run test:install`, `npm run test:mcp`, `npm run test:memory`.
 
-10 of the 114 skip unless `node` and `typescript` are reachable from the shell that runs
+11 of the 228 skip unless `node` and `typescript` are reachable from the shell that runs
 hooks - run `npm install` first to exercise them. They **skip**, they do not silently pass.
 
 | Suite | What it proves |
@@ -632,7 +635,27 @@ over-mocking, weak assertions and coverage that measures nothing.
 
 ## Quick Start
 
-### For Non-Technical Users (Recommended)
+### Install as a plugin
+
+**Recommended.** AID ships as a Claude Code plugin: two commands, no cloning, no
+symlinks, and no Developer Mode on Windows.
+
+```bash
+claude plugin marketplace add ilandahan/AID
+claude plugin install aid@AID
+```
+
+Restart Claude Code, then run `/aid-init` in any project. Every project gets the same 45
+commands, 28 skills and 38 sub-agents, and one command moves them all forward:
+
+```bash
+claude plugin update aid
+```
+
+Useful checks: `claude plugin list`, `claude plugin details aid` (component inventory and
+projected token cost), `claude plugin disable aid`.
+
+### For Non-Technical Users
 
 ```
 1. Open Claude Code in this folder
@@ -718,28 +741,31 @@ AID/
 │   ├── context.json            # Work context tracking
 │   ├── qa/                     # Acceptance criteria the QA gate enforces
 │   └── pipeline/               # Pipeline config (tracked) + run state (ignored)
-├── .claude/                    # Everything Claude Code loads
-│   ├── commands/               # 45 slash commands
-│   │   ├── good-morning.md
-│   │   ├── phase.md
-│   │   └── ... (43 more)
-│   ├── skills/                 # 28 specialized skills
-│   │   ├── why-driven-decision/    # Foundational - loads first
-│   │   ├── reflection/            # Quality Check + phase criteria
-│   │   ├── pipeline-orchestrator/ # 12-step machine + gate.mjs
-│   │   ├── autoresearch/          # Bounded keep/revert improvement loop
-│   │   ├── cucumber-bdd/          # Gherkin across 5 languages
-│   │   └── ... (23 more)
-│   ├── agents/                 # 8 sub-agents (definition + assets each)
-│   │   ├── reflection-agent.md         # Definition = what makes it invocable
-│   │   ├── reflection-agent/           # Prompt, references, templates, examples
-│   │   ├── code-review-agent.md
-│   │   └── ... (6 more)
-│   ├── rules/                  # 23 rule files, incl. the Data Science / ML track
-│   ├── references/             # Shared lookup data (role/phase terminology)
-│   ├── hooks/                  # Phase gate, QA gate, pipeline enforcement
-│   └── settings.json           # Permissions + hook registration (copied, not linked)
-├── testing/e2e/                # 114 tests covering AID itself
+├── .claude-plugin/             # Plugin manifests
+│   ├── plugin.json             # Name, version, and the hooks AID registers
+│   └── marketplace.json        # Lets the repo host itself as a marketplace
+├── commands/                   # 45 slash commands
+│   ├── good-morning.md
+│   ├── phase.md
+│   └── ... (43 more)
+├── skills/                     # 28 specialized skills
+│   ├── why-driven-decision/    # Foundational - loads first
+│   ├── reflection/             # Quality Check + phase criteria
+│   ├── pipeline-orchestrator/  # 12-step machine + gate.mjs
+│   ├── autoresearch/           # Bounded keep/revert improvement loop
+│   ├── cucumber-bdd/           # Gherkin across 5 languages
+│   └── ... (23 more)
+├── agents/                     # 38 sub-agents - FLAT, one .md each, prompt inlined
+│   ├── reflection-agent.md
+│   ├── phase0-problem-validator.md
+│   └── ... (36 more)
+├── agent-assets/               # Calibration examples + AGENT-STANDARD.md (not scanned)
+├── rules/                      # 23 rule files, incl. the Data Science / ML track
+├── references/                 # Shared lookup data (role/phase terminology)
+├── hooks/                      # Phase gate, QA gate, pipeline enforcement
+├── .claude/
+│   └── settings.json           # Permissions + hooks for PROJECT mode (copied on link)
+├── testing/e2e/                # 228 tests covering AID itself
 ├── docs/
 │   ├── prd/                    # Phase 1 outputs
 │   ├── tech-spec/              # Phase 2 outputs
@@ -761,14 +787,32 @@ AID/
 └── CLAUDE.md                   # Critical instructions Claude loads every session
 ```
 
-Two things in this tree are load-bearing and easy to get wrong:
+### Why components sit at the root
 
-- **`.claude/agents/<name>.md` next to `.claude/agents/<name>/`.** The folder holds the
-  agent's prompt and templates; only the `.md` file with YAML frontmatter makes the agent
-  invocable by name. A folder on its own is silently inert.
-- **`settings.json` is copied, `hooks/` is linked.** The copied settings register hooks by
-  the relative path `.claude/hooks/*`, so a linked project that did not also link `hooks/`
-  registers hooks that do not exist.
+Claude Code reads a **plugin's** components from the plugin root, and a **project's**
+components from `.claude/`. AID has to satisfy both from one copy of the files, so the
+tracked files live at the root and `install.sh` mirrors them into `.claude/` as symlinks
+(macOS/Linux) or junctions (Windows, no admin needed).
+
+Those mirrors are gitignored on purpose. `core.symlinks` defaults to false on Windows, so
+a committed symlink checks out as a *text file containing a path* — a directory that isn't
+one, which git reports as perfectly clean.
+
+Three things here are load-bearing and easy to get wrong:
+
+- **`agents/` is flat.** Claude Code registers every `.md` under `agents/` as an agent,
+  recursively. Asset folders there produced ~71 agents, most of them prompt fragments and
+  calibration examples. Each agent is now one self-contained file with its prompt inlined,
+  because an agent's working directory is the *user's project* — an external asset path
+  resolves against their code, not the plugin.
+- **`.claude/settings.json` stays put.** It is project configuration, not a component, and
+  it is what `link-project` copies into a target. It names hooks as `.claude/hooks/*`,
+  which is correct in a linked project, where `.claude/hooks` points at AID's `hooks/`.
+- **Hook commands use `"${CLAUDE_PLUGIN_ROOT}"`, always quoted.** The likely install path
+  contains a space; unquoted, the hook splits into two arguments and dies.
+
+**Upgrading from a pre-3.0 clone:** run `./install.sh` once. It recreates `.claude/*`, so
+projects already linked to `.claude/<name>` keep working with no re-linking.
 
 ---
 
@@ -782,8 +826,8 @@ Two things in this tree are load-bearing and easy to get wrong:
 | [docs/MORNING-STARTUP.md](docs/MORNING-STARTUP.md) | Daily workflow guide |
 | [docs/WORK-CONTEXT-TRACKER.md](docs/WORK-CONTEXT-TRACKER.md) | Context tracking details |
 | [memory-system/docs/](memory-system/docs/) | Learning system documentation |
-| [.claude/agents/AGENT-STANDARD.md](.claude/agents/AGENT-STANDARD.md) | How to write a sub-agent |
-| [.claude/rules/](.claude/rules/) | Code standards, and the Data Science / ML phase rules |
+| [agent-assets/AGENT-STANDARD.md](agent-assets/AGENT-STANDARD.md) | How to write a sub-agent |
+| [rules/](rules/) | Code standards, and the Data Science / ML phase rules |
 
 ---
 

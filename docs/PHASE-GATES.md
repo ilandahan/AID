@@ -61,4 +61,4 @@ Phase state is tracked in `.aid/state.json`. Claude reads this file before every
 
 - Rules: `.claude/rules/general/phase-gates.md`
 - Skill: `.claude/skills/phase-enforcement/SKILL.md`
-- Agent: `.claude/agents/phase-review-agent/AGENT-PROMPT.md`
+- Agent: `.claude/agents/phase-review-agent.md`

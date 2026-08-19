@@ -1,0 +1,91 @@
+{
+  "name": "aid",
+  "version": "3.0.0",
+  "description": "AI Development Methodology: 6 phase gates from discovery to ship, 28 skills, 38 review sub-agents, and WHY-first enforcement hooks. Stops code being written before the problem is understood.",
+  "author": {
+    "name": "Ilan Dahan",
+    "url": "https://github.com/ilandahan/AID"
+  },
+  "homepage": "https://github.com/ilandahan/AID",
+  "license": "MIT",
+  "keywords": [
+    "methodology",
+    "phase-gates",
+    "prd",
+    "tech-spec",
+    "code-review",
+    "bdd",
+    "cucumber",
+    "tdd",
+    "data-science"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/aid_hooks.py\" --event SessionStart; else python \"${CLAUDE_PLUGIN_ROOT}/hooks/aid_hooks.py\" --event SessionStart; fi",
+            "timeout": 10,
+            "statusMessage": "Loading AID phase and context..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/aid_hooks.py\" --event PreToolUse --action phase_gate_write; else python \"${CLAUDE_PLUGIN_ROOT}/hooks/aid_hooks.py\" --event PreToolUse --action phase_gate_write; fi",
+            "timeout": 10,
+            "statusMessage": "AID phase gate (writes)..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/aid_hooks.py\" --event PreToolUse --action phase_gate_bash; else python \"${CLAUDE_PLUGIN_ROOT}/hooks/aid_hooks.py\" --event PreToolUse --action phase_gate_bash; fi",
+            "timeout": 10,
+            "statusMessage": "AID phase gate (commands)..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/plan-execution-pipeline.sh\"",
+            "timeout": 30,
+            "statusMessage": "Initializing dev pipeline for approved plan..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/dev-pipeline-gate.sh\"",
+            "timeout": 120,
+            "statusMessage": "Language checks + pipeline freshness..."
+          },
+          {
+            "type": "command",
+            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/validate-qa-gate.py\"; else python \"${CLAUDE_PLUGIN_ROOT}/hooks/validate-qa-gate.py\"; fi",
+            "timeout": 60,
+            "statusMessage": "QA gate validation (Phase 4 only)"
+          }
+        ]
+      }
+    ]
+  }
+}

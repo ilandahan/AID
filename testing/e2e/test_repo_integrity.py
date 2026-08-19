@@ -24,7 +24,8 @@ import pytest
 REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
-SKILLS = os.path.join(REPO_ROOT, '.claude', 'skills')
+# Components live at the repository root so Claude Code can load this repo as a plugin.
+SKILLS = os.path.join(REPO_ROOT, 'skills')
 
 
 def _run(cmd, cwd, timeout=120):
@@ -156,27 +157,66 @@ class TestSkillStructure:
         assert not dupes, f'byte-identical duplicates: {dupes}'
 
 
-class TestInstallersDoNotCopyFromDeletedPaths:
-    @pytest.mark.parametrize('installer', ['install.sh', 'install.bat'])
-    def test_no_copies_from_root_skills_dir(self, installer):
-        """Root skills/ was removed in v2.1; copies from it silently did nothing."""
+class TestInstallersVerifyRatherThanSilentlyCopy:
+    """
+    The original defect: install.sh ran 25 `cp -r skills/<name> .claude/skills/` lines
+    against a directory v2.1 had deleted, each ending `|| true`, and then reported
+    "Skills installed (24 skills)" from a hardcoded number. Every copy did nothing and
+    nothing failed.
+
+    A root skills/ now exists again, deliberately - it is where a plugin's components
+    must live. So the invariant worth pinning is not "no root skills/" (a shape) but
+    "the installer's component step can actually fail and its counts come from disk"
+    (the behaviour that was missing).
+    """
+
+    def _code_lines(self, installer):
         with open(os.path.join(REPO_ROOT, installer), encoding='utf-8',
                   errors='replace') as f:
             lines = f.read().splitlines()
-
-        # Comments are excluded: both installers now carry a comment EXPLAINING the old
+        # Comments are excluded: both installers carry a comment EXPLAINING the old
         # broken command, and matching that would fail on the fix's own documentation.
-        code = [ln for ln in lines
+        return [ln for ln in lines
                 if not ln.lstrip().startswith('#')
                 and not ln.lstrip().upper().startswith('REM ')]
-        text = '\n'.join(code)
 
-        assert not os.path.isdir(os.path.join(REPO_ROOT, 'skills')), \
-            'a root skills/ directory reappeared - update this test if that is intended'
-        for pattern in ('cp -r skills/', 'xcopy /E /I /Y "skills'):
-            assert pattern not in text, (
-                f'{installer} still copies from the removed root skills/ directory'
-            )
+    @pytest.mark.parametrize('installer', ['install.sh', 'install.bat'])
+    def test_no_failure_suppressed_component_copies(self, installer):
+        """`|| true` on a copy is how a no-op passes for a successful install."""
+        offenders = [
+            ln.strip() for ln in self._code_lines(installer)
+            if ('cp -r' in ln or 'xcopy' in ln)
+            and any(c in ln for c in ('skills', 'agents', 'commands', 'rules',
+                                      'references', 'hooks'))
+            and ('|| true' in ln or '2>/dev/null' in ln or '>nul 2>&1' in ln)
+        ]
+        assert not offenders, (
+            f'{installer} copies components while suppressing failure: {offenders}'
+        )
+
+    def test_install_sh_counts_come_from_the_filesystem(self):
+        """A hardcoded count cannot report a broken install."""
+        text = '\n'.join(self._code_lines('install.sh'))
+        assert 'skill_count=$(find skills' in text, (
+            'install.sh must count skills by looking at skills/, not by asserting a number'
+        )
+        assert 'agent_count=$(find agents' in text, (
+            'install.sh must count agents by looking at agents/'
+        )
+
+    def test_install_sh_reports_missing_components(self):
+        text = '\n'.join(self._code_lines('install.sh'))
+        assert 'is MISSING' in text, (
+            'install.sh has no failure path for a missing component directory'
+        )
+
+    @pytest.mark.parametrize('component', ['commands', 'skills', 'agents', 'rules',
+                                           'references', 'hooks'])
+    def test_component_exists_where_the_installer_looks(self, component):
+        assert os.path.isdir(os.path.join(REPO_ROOT, component)), (
+            f'{component}/ missing from the repository root, where both the installer '
+            f'and the plugin loader expect it'
+        )
 
 
 class TestPermissionDefaults:

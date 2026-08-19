@@ -203,3 +203,19 @@ generated/
 .generated/
 *.generated.*
 nul
+
+# ================== Plugin dual-layout mirror ==================
+# Components live at the repo root (commands/, skills/, agents/, ...) so Claude Code can
+# load this repo as a plugin. install.sh mirrors them into .claude/ as symlinks or
+# junctions so the repo also works as a plain project, and so projects already linked to
+# .claude/<name> keep working.
+#
+# These mirrors are per-machine and never committed: core.symlinks is false by default on
+# Windows, so a committed symlink checks out as a text file containing a path - a broken
+# directory that looks fine to git.
+/.claude/commands
+/.claude/skills
+/.claude/agents
+/.claude/rules
+/.claude/references
+/.claude/hooks

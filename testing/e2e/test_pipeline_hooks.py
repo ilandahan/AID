@@ -26,7 +26,7 @@ import pytest
 REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
-HOOKS = os.path.join(REPO_ROOT, '.claude', 'hooks')
+HOOKS = os.path.join(REPO_ROOT, 'hooks')
 PLAN_HOOK = os.path.join(HOOKS, 'plan-execution-pipeline.sh')
 GATE_HOOK = os.path.join(HOOKS, 'dev-pipeline-gate.sh')
 SETTINGS = os.path.join(REPO_ROOT, '.claude', 'settings.json')

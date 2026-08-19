@@ -116,8 +116,8 @@ REM source folder is missing, the delete removes the project's copy and puts
 REM nothing back. Fail before the first rmdir, not after.
 REM ============================================
 for %%D in (commands skills agents references rules hooks) do (
-    if not exist "!AID_PATH!\.claude\%%D" (
-        echo [ERROR] AID installation is incomplete - missing .claude\%%D
+    if not exist "!AID_PATH!\%%D" (
+        echo [ERROR] AID installation is incomplete - missing %%D\
         echo         Nothing was changed in "!TARGET_PATH!".
         echo         Restore the AID folder before linking.
         pause
@@ -152,7 +152,7 @@ if "!FORCE_MODE!"=="1" (
     if exist "!TARGET_PATH!\.claude\commands" rmdir /S /Q "!TARGET_PATH!\.claude\commands" 2>nul
 )
 if not exist "!TARGET_PATH!\.claude\commands" (
-    mklink /J "!TARGET_PATH!\.claude\commands" "!AID_PATH!\.claude\commands" >nul 2>&1
+    mklink /J "!TARGET_PATH!\.claude\commands" "!AID_PATH!\commands" >nul 2>&1
     if !ERRORLEVEL! EQU 0 (
         echo   [LINK] .claude\commands -^> AID
     ) else (
@@ -166,7 +166,7 @@ if "!FORCE_MODE!"=="1" (
     if exist "!TARGET_PATH!\.claude\skills" rmdir /S /Q "!TARGET_PATH!\.claude\skills" 2>nul
 )
 if not exist "!TARGET_PATH!\.claude\skills" (
-    mklink /J "!TARGET_PATH!\.claude\skills" "!AID_PATH!\.claude\skills" >nul 2>&1
+    mklink /J "!TARGET_PATH!\.claude\skills" "!AID_PATH!\skills" >nul 2>&1
     if !ERRORLEVEL! EQU 0 (
         echo   [LINK] .claude\skills -^> AID
     ) else (
@@ -180,7 +180,7 @@ if "!FORCE_MODE!"=="1" (
     if exist "!TARGET_PATH!\.claude\agents" rmdir /S /Q "!TARGET_PATH!\.claude\agents" 2>nul
 )
 if not exist "!TARGET_PATH!\.claude\agents" (
-    mklink /J "!TARGET_PATH!\.claude\agents" "!AID_PATH!\.claude\agents" >nul 2>&1
+    mklink /J "!TARGET_PATH!\.claude\agents" "!AID_PATH!\agents" >nul 2>&1
     if !ERRORLEVEL! EQU 0 (
         echo   [LINK] .claude\agents -^> AID
     ) else (
@@ -194,7 +194,7 @@ if "!FORCE_MODE!"=="1" (
     if exist "!TARGET_PATH!\.claude\references" rmdir /S /Q "!TARGET_PATH!\.claude\references" 2>nul
 )
 if not exist "!TARGET_PATH!\.claude\references" (
-    mklink /J "!TARGET_PATH!\.claude\references" "!AID_PATH!\.claude\references" >nul 2>&1
+    mklink /J "!TARGET_PATH!\.claude\references" "!AID_PATH!\references" >nul 2>&1
     if !ERRORLEVEL! EQU 0 (
         echo   [LINK] .claude\references -^> AID
     ) else (
@@ -208,7 +208,7 @@ if "!FORCE_MODE!"=="1" (
     if exist "!TARGET_PATH!\.claude\rules" rmdir /S /Q "!TARGET_PATH!\.claude\rules" 2>nul
 )
 if not exist "!TARGET_PATH!\.claude\rules" (
-    mklink /J "!TARGET_PATH!\.claude\rules" "!AID_PATH!\.claude\rules" >nul 2>&1
+    mklink /J "!TARGET_PATH!\.claude\rules" "!AID_PATH!\rules" >nul 2>&1
     if !ERRORLEVEL! EQU 0 (
         echo   [LINK] .claude\rules -^> AID
     ) else (
@@ -225,7 +225,7 @@ if "!FORCE_MODE!"=="1" (
     if exist "!TARGET_PATH!\.claude\hooks" rmdir /S /Q "!TARGET_PATH!\.claude\hooks" 2>nul
 )
 if not exist "!TARGET_PATH!\.claude\hooks" (
-    mklink /J "!TARGET_PATH!\.claude\hooks" "!AID_PATH!\.claude\hooks" >nul 2>&1
+    mklink /J "!TARGET_PATH!\.claude\hooks" "!AID_PATH!\hooks" >nul 2>&1
     if !ERRORLEVEL! EQU 0 (
         echo   [LINK] .claude\hooks -^> AID
     ) else (
@@ -265,7 +265,7 @@ if "!FORCE_MODE!"=="1" (
     if exist "!TARGET_PATH!\.claude\commands" rmdir /S /Q "!TARGET_PATH!\.claude\commands" 2>nul
 )
 if not exist "!TARGET_PATH!\.claude\commands" (
-    xcopy /E /I /Q "!AID_PATH!\.claude\commands" "!TARGET_PATH!\.claude\commands" >nul
+    xcopy /E /I /Q "!AID_PATH!\commands" "!TARGET_PATH!\.claude\commands" >nul
     echo   [COPY] .claude\commands
 ) else (
     echo   [SKIP] commands already exists
@@ -275,7 +275,7 @@ if "!FORCE_MODE!"=="1" (
     if exist "!TARGET_PATH!\.claude\skills" rmdir /S /Q "!TARGET_PATH!\.claude\skills" 2>nul
 )
 if not exist "!TARGET_PATH!\.claude\skills" (
-    xcopy /E /I /Q "!AID_PATH!\.claude\skills" "!TARGET_PATH!\.claude\skills" >nul
+    xcopy /E /I /Q "!AID_PATH!\skills" "!TARGET_PATH!\.claude\skills" >nul
     echo   [COPY] .claude\skills
 ) else (
     echo   [SKIP] skills already exists
@@ -285,7 +285,7 @@ if "!FORCE_MODE!"=="1" (
     if exist "!TARGET_PATH!\.claude\agents" rmdir /S /Q "!TARGET_PATH!\.claude\agents" 2>nul
 )
 if not exist "!TARGET_PATH!\.claude\agents" (
-    xcopy /E /I /Q "!AID_PATH!\.claude\agents" "!TARGET_PATH!\.claude\agents" >nul
+    xcopy /E /I /Q "!AID_PATH!\agents" "!TARGET_PATH!\.claude\agents" >nul
     echo   [COPY] .claude\agents
 ) else (
     echo   [SKIP] agents already exists
@@ -295,7 +295,7 @@ if "!FORCE_MODE!"=="1" (
     if exist "!TARGET_PATH!\.claude\references" rmdir /S /Q "!TARGET_PATH!\.claude\references" 2>nul
 )
 if not exist "!TARGET_PATH!\.claude\references" (
-    xcopy /E /I /Q "!AID_PATH!\.claude\references" "!TARGET_PATH!\.claude\references" >nul
+    xcopy /E /I /Q "!AID_PATH!\references" "!TARGET_PATH!\.claude\references" >nul
     echo   [COPY] .claude\references
 ) else (
     echo   [SKIP] references already exists
@@ -305,7 +305,7 @@ if "!FORCE_MODE!"=="1" (
     if exist "!TARGET_PATH!\.claude\rules" rmdir /S /Q "!TARGET_PATH!\.claude\rules" 2>nul
 )
 if not exist "!TARGET_PATH!\.claude\rules" (
-    xcopy /E /I /Q "!AID_PATH!\.claude\rules" "!TARGET_PATH!\.claude\rules" >nul
+    xcopy /E /I /Q "!AID_PATH!\rules" "!TARGET_PATH!\.claude\rules" >nul
     echo   [COPY] .claude\rules
 ) else (
     echo   [SKIP] rules already exists
@@ -315,7 +315,7 @@ if "!FORCE_MODE!"=="1" (
     if exist "!TARGET_PATH!\.claude\hooks" rmdir /S /Q "!TARGET_PATH!\.claude\hooks" 2>nul
 )
 if not exist "!TARGET_PATH!\.claude\hooks" (
-    xcopy /E /I /Q "!AID_PATH!\.claude\hooks" "!TARGET_PATH!\.claude\hooks" >nul
+    xcopy /E /I /Q "!AID_PATH!\hooks" "!TARGET_PATH!\.claude\hooks" >nul
     echo   [COPY] .claude\hooks
 ) else (
     echo   [SKIP] hooks already exists

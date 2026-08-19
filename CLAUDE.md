@@ -459,7 +459,7 @@ Sub-agents are spawned to perform isolated, specialized tasks. They receive NO c
 **Location:** `.claude/agents/` — single source of truth (official Claude Code location).
 Linked projects reach it through a symlink/junction, so editing here updates every project.
 
-**Documentation:** `.claude/agents/AGENT-STANDARD.md`
+**Documentation:** `.claude/agent-assets/AGENT-STANDARD.md`
 
 ---
 
@@ -478,12 +478,21 @@ docs/prd/            - Phase 1 outputs (Product requirements)
 docs/tech-spec/      - Phase 2 outputs (Technical specification)
 docs/implementation-plan/ - Phase 3 outputs (Task breakdown)
 
-# Skills & Agents (single source of truth - linked projects point here)
-.claude/skills/      - Skills (edit here; all linked projects see the change)
-.claude/agents/      - Sub-agents (official Claude Code location)
-.claude/commands/    - Slash commands
-.claude/rules/       - Rules loaded per skill
-.claude/hooks/       - QA gate enforcement (Phase 4 only)
+# Components - single source of truth. Edit HERE. The plugin loader and every linked
+# project read these same files.
+skills/              - 28 skills
+agents/              - 38 sub-agents. FLAT: one self-contained .md each, prompt inlined.
+                       Never add a subfolder - every .md under agents/ registers as an agent.
+agent-assets/        - Calibration examples + AGENT-STANDARD.md (not scanned as agents)
+commands/            - 45 slash commands
+rules/               - Rules loaded per skill
+references/          - Shared lookup data (role/phase terminology)
+hooks/               - Phase gate, QA gate, pipeline enforcement
+.claude-plugin/      - plugin.json (name, version, hook registration) + marketplace.json
+.claude/settings.json - Project-mode permissions/hooks; this is what link-project copies
+
+# .claude/{skills,agents,commands,rules,references,hooks} are per-machine MIRRORS of the
+# directories above, created by install.sh and gitignored. Never edit a mirror.
 
 # Test Outputs (gitignored)
 .aid/test-outputs/   - AID methodology test outputs (from /aid-test)

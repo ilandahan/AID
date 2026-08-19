@@ -68,33 +68,59 @@ class TestAIDInstallation:
         assert 'thresholds' in data
 
 
-class TestClaudeStructure:
-    """Verify .claude directory has required components."""
+class TestPluginStructure:
+    """
+    Components live at the repository root, which is where Claude Code looks when this
+    repo is loaded as a plugin (`claude plugin install aid@AID`).
 
-    def test_claude_directory_exists(self):
-        assert os.path.isdir(CLAUDE_DIR), ".claude directory not found"
+    .claude/ still holds settings.json, and install.sh mirrors the component dirs into
+    .claude/ as links so the repo also works as a plain project. Those mirrors are
+    per-machine and gitignored, so they are NOT asserted here - a fresh clone has none.
+    """
 
-    def test_commands_directory_exists(self):
-        cmd_dir = os.path.join(CLAUDE_DIR, 'commands')
-        assert os.path.isdir(cmd_dir), ".claude/commands not found"
+    def test_plugin_manifest_exists(self):
+        p = os.path.join(REPO_ROOT, '.claude-plugin', 'plugin.json')
+        assert os.path.isfile(p), '.claude-plugin/plugin.json missing - not a plugin'
+        with open(p, encoding='utf-8') as f:
+            manifest = json.load(f)
+        for key in ('name', 'version', 'description'):
+            assert manifest.get(key), f'plugin.json has no "{key}"'
 
-    def test_skills_directory_exists(self):
-        skills_dir = os.path.join(CLAUDE_DIR, 'skills')
-        assert os.path.isdir(skills_dir), ".claude/skills not found"
+    def test_marketplace_manifest_exists(self):
+        """Without this the repo cannot be added with `claude plugin marketplace add`."""
+        p = os.path.join(REPO_ROOT, '.claude-plugin', 'marketplace.json')
+        assert os.path.isfile(p), '.claude-plugin/marketplace.json missing'
+        with open(p, encoding='utf-8') as f:
+            mkt = json.load(f)
+        names = [e.get('name') for e in mkt.get('plugins', [])]
+        assert 'aid' in names, f'marketplace does not list the aid plugin: {names}'
 
-    def test_agents_directory_exists(self):
-        agents_dir = os.path.join(CLAUDE_DIR, 'agents')
-        assert os.path.isdir(agents_dir), ".claude/agents not found"
+    def test_settings_json_stays_under_claude(self):
+        """It is project config, and it is what link-project copies into a project."""
+        assert os.path.isfile(os.path.join(CLAUDE_DIR, 'settings.json'))
 
-    def test_all_agents_have_prompts(self):
-        agents_dir = os.path.join(CLAUDE_DIR, 'agents')
-        agent_names = [
-            d for d in os.listdir(agents_dir)
-            if os.path.isdir(os.path.join(agents_dir, d))
-        ]
-        for agent in agent_names:
-            prompt = os.path.join(agents_dir, agent, 'AGENT-PROMPT.md')
-            assert os.path.isfile(prompt), f"{agent} missing AGENT-PROMPT.md"
+    @pytest.mark.parametrize('component', ['commands', 'skills', 'agents', 'rules',
+                                           'references', 'hooks'])
+    def test_component_dir_is_at_repo_root(self, component):
+        d = os.path.join(REPO_ROOT, component)
+        assert os.path.isdir(d), f'{component}/ not found at the repository root'
+        assert os.listdir(d), f'{component}/ is empty'
+
+    def test_every_agent_definition_carries_its_prompt_inline(self):
+        """
+        AGENT-PROMPT.md files are gone: a plugin agent's cwd is the user's project, so an
+        external asset path resolves against their code. The prompt is inlined instead,
+        under an `## Agent prompt` heading.
+        """
+        agents_dir = os.path.join(REPO_ROOT, 'agents')
+        thin = []
+        for fn in sorted(os.listdir(agents_dir)):
+            if not fn.endswith('.md'):
+                continue
+            body = open(os.path.join(agents_dir, fn), encoding='utf-8').read()
+            if '## Agent prompt' not in body or len(body) < 1500:
+                thin.append(f'{fn} ({len(body)} bytes)')
+        assert not thin, f'agent definitions with no inlined prompt: {thin}'
 
 
 @needs_npm
