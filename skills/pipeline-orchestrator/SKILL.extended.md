@@ -46,11 +46,11 @@ Read EACH changed file's full content. Concatenate as:
 # Read the tech spec
 cat docs/tech-spec/*.md
 ```
-Extract the section relevant to the current task. If unclear, include the full spec.
+Extract the section relevant to the current task. If unclear, include the full spec. If `docs/tech-spec/` is absent or empty (non-AID project), fall back to the frozen `.aid/pipeline/<task_id>/brief.md` (ORIGINAL_REQUEST + STATED_WHY + DEVELOP plan) as the architectural reference and note in `{{TECH_SPEC_EXCERPT}}` that no formal tech-spec exists — never review architecture against nothing.
 
 **Step 4: Code Standards**
 ```bash
-cat ../../agents/code-review-agent.md
+cat agents/code-review-agent/references/review-rules.md
 ```
 Include verbatim — do not summarize.
 
@@ -186,6 +186,15 @@ Include full output (pass/fail counts, error messages, coverage if available).
 2. Display: "Phase 4 complete. Advancing to Phase 5: QA & Ship"
 3. Reset Phase 5 iteration counters
 
+### → DEVELOP (backward, on PHASE_GATE FAIL re-examine OR AR_ACCEPTANCE gap re-enter)
+
+**Trigger:** Transition INTO DEVELOP from PHASE_GATE (FAIL re-examine) OR AR_ACCEPTANCE (gap re-enter)
+
+**Actions:**
+1. Reset Phase 4/5 inner iteration counters: set `iterations.code_review`, `iterations.test_fix`, `iterations.test_review`, and `iterations.ar_design` to 0
+2. The OUTER counters `iterations.phase_gate_reexamine` and `iterations.ar_acceptance_rounds` PERSIST — they are the real loop bound that guarantees termination
+3. This mirrors the forward "Reset Phase 5 iteration counters" rule so the backward boundary is symmetric
+
 ### Phase 5 transitions follow the same PASS/FAIL pattern.
 
 ### CERTIFICATION
@@ -200,6 +209,11 @@ Include full output (pass/fail counts, error messages, coverage if available).
 3. Verify coverage >= `min_coverage_percent` threshold
 4. If all pass: set `pipeline_status: "completed"`, archive to `history.json`
 5. Generate certification report
+6. RETRO/SYNTHESIS (terminal, CERTIFICATION → DONE):
+   - Write `.aid/pipeline/<task_id>/retro.md` aggregating `step_summaries` + `final_scores` + AR gap reasons (AR_DESIGN/AR_FUNCTION/AR_ACCEPTANCE keep/revert reasons) into a short, human-readable narrative
+   - Invoke the existing user-level retro skill (`~/.claude/skills/retro`) to close the loop
+   - Optionally append a one-line learning to user memory `MEMORY.md`
+   - Report-only — NEVER auto-commits
 
 ---
 
@@ -262,7 +276,8 @@ When pipeline completes (CERTIFICATION passes), append to `.aid/pipeline/history
         "code_review": { "security": 9, "code_quality": 8, "documentation": 7, "architecture": 8, "overall": 8.1 },
         "test_review": { "test_quality": 8, "coverage": 7, "independence": 9, "alignment": 8, "production_safety": 10, "mock_analysis": 8, "overall": 8.2 }
       },
-      "step_history": [...]
+      "step_history": [...],
+      "narrative": "Short retro synthesis aggregating step_summaries + final_scores + AR gap reasons (mirrors .aid/pipeline/<task_id>/retro.md)."
     }
   ]
 }

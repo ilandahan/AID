@@ -28,7 +28,9 @@ Load role-specific phase names and descriptions from:
 
 ### Step 2: Check Existing Session
 
-Load `~/.aid/state.json`
+Load project-local `.aid/state.json` (NOT `~/.aid/state.json` — that file is global to the
+user and shared across every AID project on the machine; reading it here leaks another
+project's role/phase/session-count into this one).
 - If active session exists, ask to continue or start new
 
 ```
@@ -223,7 +225,7 @@ Read and apply guidelines from:
 
 ### Step 7: Update State
 
-Save session to `~/.aid/state.json`:
+Save session to project-local `.aid/state.json`:
 
 ```json
 {

@@ -1,11 +1,19 @@
 ---
 name: pipeline-orchestrator
-description: Automated development pipeline state machine for Phase 4-5. Enforces DEVELOP > CODE_REVIEW (<=2 cycles) > AR_DESIGN > TDD (<=2 cycles) > AR_FUNCTION > VISUAL_QA > TEST_REVIEW > PHASE_GATE > AR_ACCEPTANCE > REALITY_CHECK (AR-3b) > API_TESTS > E2E_TESTS > CERTIFICATION sequence with sub-agent reviews and bounded autoresearch (AR) keep/revert loops at each gate.
+description: "Drives the Phase 4-5 dev pipeline state machine with sub-agent reviews and bounded autoresearch gates. Use when running /pipeline or executing an approved plan."
 ---
+
+
+<!-- desc:full -->
+## Full description
+
+Automated development pipeline state machine for Phase 4-5. Enforces DEVELOP > CODE_REVIEW (<=5 cycles) > AR_DESIGN > TDD (<=5 cycles) > AR_FUNCTION > VISUAL_QA > TEST_REVIEW > PHASE_GATE > AR_ACCEPTANCE > API_TESTS > E2E_TESTS > CERTIFICATION sequence with sub-agent reviews and bounded autoresearch (AR) keep/revert loops at each gate.
 
 # Pipeline Orchestrator Skill
 
-Drives an automated state machine through Phase 4 (Development) and Phase 5 (QA & Ship). Augments the existing `aid-development` and `aid-qa-ship` skills — when active, it controls step sequence and sub-agent spawning. When inactive, manual flows still work.
+## Overview
+
+The pipeline orchestrator drives an automated state machine through Phase 4 (Development) and Phase 5 (QA & Ship). It augments existing `aid-development` and `aid-qa-ship` skills — when active, it controls step sequence and sub-agent spawning. When inactive, manual flows still work.
 
 ## Activation
 
@@ -21,76 +29,83 @@ The pipeline activates in two ways:
    rather than coding ad-hoc. This is why the brief must be frozen at kickoff: plan-approval is the
    last moment the original prompt is reliably in context before a long run or compaction.
 
-Also treat any request to *implement/execute an approved plan* as an automatic activation, even if
-the hook signal is absent (e.g. "implement the plan in X.md"). `/pipeline` remains the manual entry
-point, and the `dev-pipeline-gate.sh` Stop hook remains the turn-end safety net.
+Also treat any request to *implement/execute an approved plan* as an automatic activation when the
+hook signal is absent (e.g. "implement the plan in X.md") — but ONLY after verifying the plan is
+actually approved: an `ExitPlanMode` tool call exists in this session's transcript, OR a plan file
+exists under `.aid/plans/` and `.aid/state.json` shows `phase_approved: true`. Wording alone
+("make sure you use the pipeline", "go ahead") is NOT approval evidence — if neither check passes,
+stay in plan mode and ask for explicit approval before writing or running anything. `/pipeline`
+remains the manual entry point, and the `dev-pipeline-gate.sh` Stop hook remains the turn-end safety net.
 
 ## State Machine
 
 ### Phase 4: Development Loop
 
-Transitions (every edge; targets are exact step names):
-
 ```
-DEVELOP --> CODE_REVIEW
-CODE_REVIEW    PASS --> AR_DESIGN        FAIL --> FIX_CODE --> CODE_REVIEW (<=2 cycles)
-AR_DESIGN      PASS --> TDD
-TDD            PASS --> AR_FUNCTION      FAIL --> FIX_TESTS --> TDD (max 2)
-AR_FUNCTION    PASS --> VISUAL_QA
-VISUAL_QA      PASS --> TEST_REVIEW      FAIL --> FIX_VISUAL --> VISUAL_QA (until 7.0+)
-TEST_REVIEW    PASS --> PHASE_GATE       FAIL --> FIX_TEST_CODE --> TEST_REVIEW (until 7.0+, <=2 cycles)
-PHASE_GATE     PASS --> AR_ACCEPTANCE    FAIL --> DEVELOP (re-examine, bounded)
-AR_ACCEPTANCE  DONE --> REALITY_CHECK (AR-3b)   gap --> DEVELOP (re-enter, bounded)
-REALITY_CHECK  MATCH --> Phase 5         GAP --> DEVELOP (full traversal, bounded by max_reality_rounds)
+DEVELOP --> CODE_REVIEW --> AR_DESIGN --> TDD --> AR_FUNCTION --> VISUAL_QA --> TEST_REVIEW --> PHASE_GATE --> AR_ACCEPTANCE
+   ^            |              |           ^           |              |              |              |              |
+   |          [FAIL]        [PASS]         |        [PASS]         [FAIL]         [FAIL]         [FAIL]          [gap]
+   |            |              |           |           |              |              |              |              |
+   |        FIX_CODE          TDD      FIX_TESTS   VISUAL_QA      FIX_VISUAL   FIX_TEST_CODE      DEVELOP       DEVELOP
+   |            |                          |                          |              |        (re-examine)  (re-enter,
+   |            v                          |                          v              v              |        bounded)
+   |       CODE_REVIEW                     +                     VISUAL_QA     TEST_REVIEW         |              |
+   |       (<=5 cycles) (max 5)        (until 7.0+)  (until 9.5+)              |              |
+   +-------------------------------------------------------------------------------------------------------------+
+                    (re-examine on PHASE_GATE fail; re-enter on AR_ACCEPTANCE gap)
+
+         AR_ACCEPTANCE on DONE --> Phase 5
 
 Scored steps (CODE_REVIEW, VISUAL_QA, TEST_REVIEW): iterate until score threshold met
-  (CODE_REVIEW and TEST_REVIEW now HARD-CAPPED at 2 review->fix cycles, then ESCALATE).
+  (CODE_REVIEW and TEST_REVIEW HARD-CAPPED at 5 review->fix cycles, then ESCALATE via gate.mjs).
 PHASE_GATE FAIL->DEVELOP re-examine is HARD-CAPPED at config.max_iterations.phase_gate_reexamine
-  (default 2) rounds, then ESCALATE (DISTINCT from AR-3's max_acceptance_rounds).
+  (default 5) rounds, then ESCALATE (DISTINCT from AR-3's max_acceptance_rounds).
 Autoresearch steps (AR_DESIGN, AR_FUNCTION, AR_ACCEPTANCE): bounded keep/revert loops run by the
   shared autoresearch runner skill. Each is bounded by its own
   config.autoresearch.<pass> max_iterations / max_consecutive_reverts (+ AR_ACCEPTANCE max_acceptance_rounds).
-Unscored steps (TDD, API_TESTS, E2E_TESTS): iterate until pass, max iterations as safety net (TDD = max 2).
-REALITY_CHECK (AR-3b): outer reality-validation loop after AR_ACCEPTANCE — runs the eval harness
-  (smoke mode) and diffs its results against acceptance_record.md. Bounded by
-  config.autoresearch.ar_acceptance.max_reality_rounds (default 2); acceptance re-entries stay
-  bounded by max_acceptance_rounds (default 3).
-Cost limit ($50 default) is the universal safety brake for all steps — eval-harness spend during
-  REALITY_CHECK COUNTS against it.
+Unscored steps (TDD, API_TESTS, E2E_TESTS): iterate until pass, max iterations as safety net (TDD = max 5).
+Cost limit ($50 default) is the universal safety brake for all steps.
 ```
 
 ### Phase 5: QA Loop
 
 ```
-API_TESTS   PASS --> E2E_TESTS       FAIL --> FIX_API_TESTS --> API_TESTS (max 5)
-E2E_TESTS   PASS --> CERTIFICATION   FAIL --> FIX_E2E_TESTS --> E2E_TESTS (max 5)
-CERTIFICATION --> DONE
+API_TESTS --> E2E_TESTS --> CERTIFICATION
+    ^             ^
+  [FAIL]        [FAIL]
+    |             |
+FIX_API_TESTS FIX_E2E_TESTS
+    |             |
+    v             v
+API_TESTS     E2E_TESTS
+(max 5)       (max 5)
 ```
+
+---
 
 ## Step Definitions
 
 ### Phase 4 Steps
 
 | Step | Action | Sub-Agent | On PASS | On FAIL |
-|---|---|---|---|---|
-| DEVELOP | Implement feature per spec using TDD (RED-GREEN-REFACTOR) | No | CODE_REVIEW | N/A |
-| CODE_REVIEW | Spawn code-review-agent with changed files. **HARD CAP: 2 review->fix cycles** (`config.max_iterations.code_review`, default 2), then ESCALATE | Yes | AR_DESIGN | FIX_CODE |
+|------|--------|-----------|---------|---------|
+| DEVELOP | Implement per spec using TDD (RED-GREEN-REFACTOR), following the **TDD standard** (see "Best-practice standards"). Test source = PRD/spec if present, else the frozen `brief.md` | No | CODE_REVIEW | N/A |
+| CODE_REVIEW | Spawn code-review-agent with changed files. **HARD CAP: 5 review->fix cycles** (`config.max_iterations.code_review`, default 5), then ESCALATE | Yes | AR_DESIGN | FIX_CODE |
 | FIX_CODE | Apply fixes using full review feedback (scores + action_required) | No | CODE_REVIEW | N/A |
-| AR_DESIGN | **AR-1 (pre-TDD).** Invoke the autoresearch runner skill (the shared `autoresearch` skill) in `mode=design` with `program.ar-design.md`. Judge-only (reflection-agent + `phase-4a-code-design.yaml`); bounded keep/revert loop; **NO interface / public-API / data-shape changes**. Logs final scores to `step_history`; the `state.json` write is the step's FINAL action (hook-safety note below) | Yes (runner) | TDD | (bounded by max_iterations / max_consecutive_reverts) |
-| TDD | Write/run tests using test command from config. **Max 2 iterations** (`config.max_iterations.test_fix`, default 2) | No | AR_FUNCTION | FIX_TESTS |
+| AR_DESIGN | **AR-1 (pre-TDD).** Invoke the autoresearch runner skill (the shared `autoresearch` skill) in `mode=design` with `program.ar-design.md`. Judge-only (reflection-agent + `phase-4a-code-design.yaml`); bounded keep/revert loop; **NO interface / public-API / data-shape changes**. Logs final scores to `step_history` and writes `state.json` UNCONDITIONALLY as the final action of the step, after the last source mutation of any kind (kept edit or revert/restore) | Yes (runner) | TDD | (bounded by max_iterations / max_consecutive_reverts) |
+| TDD | Write/run tests using test command from config, following the **TDD standard** (anti-patterns, test-patterns, data-factories, minimal mocking, strong assertions — see "Best-practice standards"). **Max 5 iterations** (`config.max_iterations.test_fix`, default 5) | No | AR_FUNCTION | FIX_TESTS |
 | FIX_TESTS | Fix failing tests | No | TDD (re-run) | FIX_TESTS (loop) |
-| AR_FUNCTION | **AR-2 (post-TDD).** Invoke the autoresearch runner (`mode=function`, `program.ar-function.md`). Harness = frozen test suite (`{{TEST_COMMAND}}` + coverage) as a HARD Tier-1 gate × reflection quality (`phase-4b-code-function.yaml`). Composite = quality × (all Tier-1 gates pass ? 1 : 0); a test going red => automatic revert. Logs final scores to `step_history`; the `state.json` write is the step's FINAL action (hook-safety note below) | Yes (runner) | VISUAL_QA | (bounded by max_iterations / max_consecutive_reverts) |
+| AR_FUNCTION | **AR-2 (post-TDD).** Invoke the autoresearch runner (`mode=function`, `program.ar-function.md`). Harness = frozen test suite (`{{TEST_COMMAND}}` + coverage) as a HARD Tier-1 gate × reflection quality (`phase-4b-code-function.yaml`). Composite = quality × (all Tier-1 gates pass ? 1 : 0); a test going red => automatic revert. Logs final scores to `step_history` and writes `state.json` UNCONDITIONALLY as the final action of the step, after the last source mutation of any kind (kept edit or revert/restore) | Yes (runner) | VISUAL_QA | (bounded by max_iterations / max_consecutive_reverts) |
 | VISUAL_QA | Spawn visual-qa-agent with Chrome DevTools MCP | Yes | TEST_REVIEW | FIX_VISUAL |
 | FIX_VISUAL | Apply visual fixes using evaluator feedback (scores + screenshots) | No | VISUAL_QA | N/A |
-| TEST_REVIEW | Spawn test-review-agent with impl + test files. **HARD CAP: 2 review->fix cycles** (`config.max_iterations.test_review`, default 2), then ESCALATE (mirrors CODE_REVIEW) | Yes | PHASE_GATE | FIX_TEST_CODE |
+| TEST_REVIEW | Spawn test-review-agent with impl + test files. **HARD CAP: 5 review->fix cycles** (`config.max_iterations.test_review`, default 5), then ESCALATE (mirrors CODE_REVIEW) | Yes | PHASE_GATE | FIX_TEST_CODE |
 | FIX_TEST_CODE | Apply fixes using full review feedback (scores + action_required) | No | TEST_REVIEW | N/A |
-| PHASE_GATE | Spawn qa-validator-agent (existing). **FAIL->DEVELOP re-examine HARD CAP: `config.max_iterations.phase_gate_reexamine` rounds (default 2), then ESCALATE** (DISTINCT from AR-3's `max_acceptance_rounds`) | Yes | AR_ACCEPTANCE | DEVELOP (re-examine, bounded) |
-| AR_ACCEPTANCE | **AR-3a (post-QA).** Invoke the autoresearch runner (`mode=acceptance`, `program.ar-acceptance.md`). Validates the COMPLETE feature vs `ORIGINAL_REQUEST` + `STATED_WHY` (phase5-acceptance-validator + phase4-intent-validator + reflection `phase-5-qa-ship.yaml`). On **gap** -> re-enter DEVELOP (bounded by `max_acceptance_rounds`); on cap with open blockers ESCALATE. **REQUIRED: write `.aid/pipeline/{task_id}/acceptance_record.md`** (see AR_ACCEPTANCE Output below) BEFORE the state write. Logs final scores to `step_history`; the `state.json` write is the step's FINAL action (hook-safety note below) | Yes (runner) | REALITY_CHECK (on DONE) | DEVELOP (re-enter, bounded) |
-| REALITY_CHECK | **AR-3b (outer loop).** Run the eval harness in smoke mode with gates + machine-readable output into the task dir, then diff `acceptance_record.md` vs `eval_results.json` criterion-by-criterion. **GAP** -> compile gap items referencing criterion ids, re-enter DEVELOP (FULL traversal — existing counters bound the inner rings), bounded by `max_reality_rounds`. **MATCH** -> write `.aid/pipeline/{task_id}/delta_record.md`, then write `state.json` LAST. Exhausted -> ESCALATE. Eval spend COUNTS against the $50 cost brake | No (eval harness) | Phase 5 (on MATCH) | DEVELOP (re-enter, bounded) |
+| PHASE_GATE | Spawn qa-validator-agent (existing). **FAIL->DEVELOP re-examine HARD CAP: `config.max_iterations.phase_gate_reexamine` rounds (default 5), then ESCALATE** (DISTINCT from AR-3's `max_acceptance_rounds`) | Yes | AR_ACCEPTANCE | DEVELOP (re-examine, bounded) |
+| AR_ACCEPTANCE | **AR-3 (post-QA).** Invoke the autoresearch runner (`mode=acceptance`, `program.ar-acceptance.md`). Validates the COMPLETE feature vs `ORIGINAL_REQUEST` + `STATED_WHY` (phase5-acceptance-validator + phase4-intent-validator + reflection `phase-5-qa-ship.yaml`). On **gap** -> re-enter DEVELOP (bounded by `max_acceptance_rounds`); on cap with open blockers ESCALATE. Logs final scores to `step_history` and writes `state.json` UNCONDITIONALLY as the final action of the step, after the last source mutation of any kind (kept edit or revert/restore) | Yes (runner) | Phase 5 (on DONE) | DEVELOP (re-enter, bounded) |
 
 **Note:** VISUAL_QA requires a running dev server and Chrome DevTools MCP. If the dev server is not running or Chrome is not available, skip VISUAL_QA with a logged warning and proceed to TEST_REVIEW.
 
-**Note (autoresearch steps):** AR_DESIGN, AR_FUNCTION, and AR_ACCEPTANCE delegate to the shared autoresearch runner skill, which runs a bounded `snapshot -> one focused edit -> score -> keep-if-strictly-better-else-revert -> log` loop. Each appends rows to `.aid/pipeline/autoresearch/<task_id>/results.tsv`, is bounded by its own `config.autoresearch.<pass>` caps plus the existing `cost_limits.max_per_run_usd` brake, and NEVER auto-commits / NEVER runs destructive git (rollback is via snapshot copies only). For the mandatory `state.json`-last write order, see **CRITICAL — HOOK-SAFETY** under "After each AR step" below; it applies to all three AR steps without exception.
+**Note (autoresearch steps):** AR_DESIGN, AR_FUNCTION, and AR_ACCEPTANCE delegate to the shared autoresearch runner skill, which runs a bounded `snapshot -> one focused edit -> score -> keep-if-strictly-better-else-revert -> log` loop. Each appends rows to `.aid/pipeline/autoresearch/<task_id>/results.tsv`, is bounded by its own `config.autoresearch.<pass>` caps plus the existing `cost_limits.max_per_run_usd` brake, and NEVER auto-commits / NEVER runs destructive git (rollback is via snapshot copies). **CRITICAL — state.json freshness / HOOK-SAFETY:** the `dev-pipeline-gate.sh` Stop hook re-blocks when the newest source mtime > `state.json` mtime. A rollback via `cp <snapshot> <file>` sets the source mtime to NOW, and the plateau stop often fires right after a run of REVERTS — so the last disk write is frequently a revert, not a kept edit. THEREFORE on stop each AR step MUST: (1) FIRST restore the editable set to the best-kept version, (2) log its final scores to `step_history`, and (3) WRITE `state.json` **UNCONDITIONALLY as the FINAL action of the step — after the last source mutation of ANY kind (kept edit, revert/restore cp, or crash restore)**. If `state.json` is not the newest write, the hook will wrongly re-block the next turn.
 
 ### DEVELOP Step — Review Criteria Preview
 
@@ -99,7 +114,7 @@ Before implementing, display the review criteria so code passes on first attempt
 ```
 Your code will be reviewed by isolated sub-agents. Write code that PASSES on first attempt.
 
-CODE REVIEW CRITERIA (scored 1-10, need 7.0+ overall):
+CODE REVIEW CRITERIA (scored 1-10, need 8.0+ overall):
   Security (30%): OWASP Top 10 — any vulnerability = auto-FAIL
   Code Quality (30%): Single responsibility, proper types, no silent catches, no TODO
   Architecture (25%): Tech spec compliance, separation of concerns, dependency direction
@@ -113,7 +128,7 @@ VISUAL QA CRITERIA (scored 1-10, need 7.0+ overall — if UI changes):
   Note: A visual evaluator will NAVIGATE your running app, CLICK every element,
   and SCREENSHOT at desktop + mobile viewports. Build accordingly.
 
-TEST REVIEW CRITERIA (scored 1-10, need 7.0+ overall):
+TEST REVIEW CRITERIA (scored 1-10, need 8.0+ overall):
   Test Quality (25%): Strong assertions with exact values, not just toBeTruthy()
   Coverage (25%): Happy path + edge cases + error cases per public function
   Independence (15%): No shared state, tests run in any order
@@ -150,7 +165,7 @@ When entering FIX_CODE, provide the FULL review result (not just action_required
 ```
 ## Code Review Feedback (iteration N/max)
 
-Overall Score: X.X/10 (need 7.0+ to pass)
+Overall Score: X.X/10 (need 8.0+ to pass)
   Security:      X/10 — [reviewer note]
   Code Quality:  X/10 — [reviewer note]
   Architecture:  X/10 — [reviewer note]
@@ -172,7 +187,7 @@ Same pattern as FIX_CODE but with test review scores:
 ```
 ## Test Review Feedback (iteration N/max)
 
-Overall Score: X.X/10 (need 7.0+ to pass)
+Overall Score: X.X/10 (need 8.0+ to pass)
   Test Quality:      X/10 — [reviewer note]
   Coverage:          X/10 — [reviewer note]
   Independence:      X/10 — [reviewer note]
@@ -192,16 +207,25 @@ Focus on the lowest-scoring categories first.
 ### Phase 5 Steps
 
 | Step | Action | On PASS | On FAIL |
-|---|---|---|---|
+|------|--------|---------|---------|
 | API_TESTS | Run integration test command from config | E2E_TESTS | FIX_API_TESTS |
 | FIX_API_TESTS | Fix integration test failures | API_TESTS | loop |
 | E2E_TESTS | Run `npx playwright test` + `npm run cucumber` | CERTIFICATION | FIX_E2E_TESTS |
 | FIX_E2E_TESTS | Fix E2E/Cucumber failures | E2E_TESTS | loop |
-| CERTIFICATION | Run ALL tests (random order), verify coverage, generate report | DONE | N/A |
+| CERTIFICATION | Run ALL tests (random order), verify coverage, generate report. On CERTIFICATION → DONE, a terminal **RETRO/SYNTHESIS** step runs (detailed in `SKILL.extended.md`): it aggregates `step_summaries` + final scores + AR gap reasons into a short human-readable `.aid/pipeline/<task_id>/retro.md`, INVOKES the existing user-level retro skill (`~/.claude/skills/retro`) to close the loop, and may append a one-line learning to user memory `MEMORY.md`. Report-only — NEVER auto-commits. | DONE | N/A |
+
+---
 
 ## How to Spawn Sub-Agents
 
 **CRITICAL: Each sub-agent MUST be spawned as an isolated Agent (sub-agent) using the Agent tool. DO NOT evaluate the code yourself — the whole point is isolated, unbiased review.**
+
+**Path resolution (project → user fallback).** Every `.claude/agents/<name>/...` and `.claude/skills/reflection/criteria/...` path below is **resolved project-first, then user-level**: if `{{WORKSPACE}}/.claude/<path>` exists use it, else fall back to `~/.claude/<path>` (the user-level default engine). This is what lets the pipeline run in ANY project — the orchestrator, reflection criteria, and the `reflection-agent` / `code-review-agent` / `test-review-agent` prompts all ship at user level and are overridden per-project only when a project provides its own. If neither location has a required agent prompt, skip that step with a logged warning where the step is optional (e.g. VISUAL_QA), or fall back to the user-level `code-review` / `test-driven` skills for review guidance.
+
+**Best-practice standards (how the pipeline knows TDD / review rules).** The methodology the stages follow is resolved **project → engine**:
+- **DEVELOP / TDD** follow the TDD standard: prefer a project-level `test-driven` skill (`{{WORKSPACE}}/.claude/skills/test-driven/`) if present (AID projects ship one); else use the **engine-bundled AID standard** at `<this skill>/references/standards/test-driven/` (`SKILL.md` + `SKILL.extended.md` + `references/`: anti-patterns, test-patterns, test-data-factories, integration-testing, review-checklist, test-writing-guide, gui-testing). These cover RED-GREEN-REFACTOR, minimal mocking, realistic data, strong assertions, test independence.
+- **Test source:** in an AID project, tests are driven by the PRD / Tech-Spec / Impl-Plan (and Cucumber `.feature` files = acceptance criteria). In a non-AID project those don't exist — derive test targets from the **frozen `brief.md`** (original request + WHY + approved plan). Do NOT try to read `docs/prd/…` when it is absent.
+- **CODE_REVIEW** standards = `code-review-agent/references/review-rules.md` (promoted); **TEST_REVIEW** = `test-review-agent/references/quality-rules.md`; the engine also bundles the AID `code-review` skill at `references/standards/code-review/` as a fallback. **AR passes** use the reflection `criteria/*.yaml`. All of these ship with the engine, so the pipeline carries its own best-practice knowledge in any project.
 
 ### code-review-agent
 
@@ -209,9 +233,9 @@ Focus on the lowest-scoring categories first.
 
 1. Read `.aid/context.json` → extract task ID + description → this is `{{TASK_CONTEXT}}`
 2. Run `git diff --name-only HEAD` → read each changed file's full content → this is `{{CHANGED_FILES}}`
-3. Read relevant section from `docs/tech-spec/` → this is `{{TECH_SPEC_EXCERPT}}`
-4. Read `../../agents/code-review-agent.md` verbatim → this is `{{CODE_STANDARDS}}`
-5. Read `../../agents/code-review-agent.md`
+3. Read relevant section from `docs/tech-spec/` → this is `{{TECH_SPEC_EXCERPT}}`. **In a non-AID project `docs/tech-spec/` won't exist — if it is absent or empty, derive the architectural reference from the frozen `.aid/pipeline/<task_id>/brief.md` (ORIGINAL_REQUEST + STATED_WHY + DEVELOP plan), the same source AR_ACCEPTANCE and qa-validator use, and state in `{{TECH_SPEC_EXCERPT}}` that no formal tech-spec exists so the agent reviews the Architecture category against the brief rather than silently scoring it against nothing. Never review architecture against nothing.**
+4. Read `.claude/agents/code-review-agent/references/review-rules.md` verbatim → this is `{{CODE_STANDARDS}}`
+5. Read `.claude/agents/code-review-agent/AGENT-PROMPT.md`
 6. Replace all `{{VARIABLE}}` placeholders with extracted values
 7. Spawn the agent:
 
@@ -226,18 +250,37 @@ Agent(
 
 8. Parse the returned JSON response
 
-**Parse response:**
-- Extract `scores.overall` and compare against `config.thresholds.code_review_pass` (default: 7.0)
-- `scores.overall >= threshold` → advance to AR_DESIGN
-- `scores.overall < threshold` → enter FIX_CODE, then re-run CODE_REVIEW
-- **HARD CAP: 2 review→fix cycles** (`config.max_iterations.code_review`, default 2). The score
-  threshold is the pass gate, but iteration is now bounded — increment a `code_review` iteration
-  counter on each FIX_CODE→CODE_REVIEW cycle. After 2 cycles still below threshold → **ESCALATE**
-  to the user (escalation protocol) instead of looping indefinitely. The cost limit remains an
-  additional safety brake.
+**Parse response — the decision is NOT yours to make. Run the gate:**
+
+```bash
+node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" \
+  --step CODE_REVIEW --scores '<the agent's scores object, verbatim JSON>'
+```
+
+Act on the EXIT CODE, never on your own reading of the number:
+
+| Exit | Result | Do |
+|---|---|---|
+| 0 | PASS | advance to AR_DESIGN |
+| 1 | FIX | enter FIX_CODE, increment the `code_review` counter in `state.json`, re-run CODE_REVIEW |
+| 2 | ESCALATE | **STOP.** The gate wrote `.aid/pipeline/ESCALATION.json`. Present the decision to the user and wait. Do NOT resolve it yourself, do NOT advance, do NOT log a PASS |
+| 3 | ERROR | bad/missing score or config — fix the input; NEVER treat it as a pass |
+
+**Why this is a command and not a rule you follow:** it used to be prose ("compare against the
+threshold… after N cycles ESCALATE"), and it was not followed — this workspace's own `step_history`
+contains CODE_REVIEW logged `PASS` at **7.9** and **7.6** against a threshold of **8.0**, with no
+escalation. A gate an agent can talk itself past is not a gate. `gate.mjs` also enforces
+`auto_fail_on_critical_security` (a critical finding escalates regardless of the composite) and
+refuses to pass a missing score.
+
+The Stop hook (`dev-pipeline-gate.sh`) blocks every turn-end while an escalation is open, so an
+unresolved ESCALATE cannot be quietly skipped. Resolution is the user's decision, recorded with
+`gate.mjs --resolve "<reason>"`.
+
 - If cost limit hit during iteration → ESCALATE (user decides: continue or stop)
 - Store FULL response (including `scores`, `score_justification`, `biggest_gaps`) in `last_review_result`
-- Log scores to `step_history` entry: `{ "step": "CODE_REVIEW", "result": "PASS|FAIL", "scores": {...}, "timestamp": "..." }`
+- Log to `step_history`: `{ "step": "CODE_REVIEW", "result": "<the gate's result verbatim>", "scores": {...}, "timestamp": "..." }`.
+  Allowed values are `PASS`, `FIX`, `ESCALATE` — the gate's word, not a summary of it.
 
 ### test-review-agent
 
@@ -247,7 +290,7 @@ Agent(
 2. Read all production source files modified in current task → `{{IMPLEMENTATION_FILES}}`
 3. Read corresponding test files → `{{TEST_FILES}}`
 4. Run test command, capture output → `{{TEST_RESULTS}}`
-5. Read `../../agents/test-review-agent.md`, replace variables
+5. Read `.claude/agents/test-review-agent/AGENT-PROMPT.md`, replace variables
 6. Spawn:
 
 ```
@@ -261,15 +304,26 @@ Agent(
 
 7. Parse the returned JSON response
 
-**Parse response:**
-- Extract `scores.overall` and compare against `config.thresholds.test_review_pass` (default: 7.0)
-- `scores.overall >= threshold` → advance to PHASE_GATE
-- `scores.overall < threshold` → enter FIX_TEST_CODE, then re-run TEST_REVIEW
-- **HARD CAP: 2 review→fix cycles** (`config.max_iterations.test_review`, default 2). The score
-  threshold is the pass gate, but iteration is now bounded — increment a `test_review` iteration
-  counter on each FIX_TEST_CODE→TEST_REVIEW cycle. After 2 cycles still below threshold → **ESCALATE**
-  to the user (escalation protocol) instead of looping indefinitely (mirrors CODE_REVIEW). The cost
-  limit remains an additional safety brake.
+**Parse response — the decision is NOT yours to make. Run the gate:**
+
+```bash
+node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" \
+  --step TEST_REVIEW --scores '<the agent's scores object, verbatim JSON>'
+```
+
+Act on the EXIT CODE, never on your own reading of the number:
+
+| Exit | Result | Do |
+|---|---|---|
+| 0 | PASS | advance to PHASE_GATE |
+| 1 | FIX | enter FIX_TEST_CODE, increment the `test_review` counter in `state.json`, re-run TEST_REVIEW |
+| 2 | ESCALATE | **STOP.** The gate wrote `.aid/pipeline/ESCALATION.json`. Present the decision to the user and wait. Do NOT resolve it yourself, do NOT advance, do NOT log a PASS |
+| 3 | ERROR | bad/missing score or config — fix the input; NEVER treat it as a pass |
+
+The threshold is `config.thresholds.test_review_pass` and the cap is `config.max_iterations.test_review`
+— the gate reads both, so do not re-derive them here. Running it is also what puts this step's round,
+limit and mark to beat on the record: those columns in the Current Loops view are populated ONLY from
+the gate's event log, so a step judged by prose instead shows blanks forever afterwards.
 - If cost limit hit during iteration → ESCALATE (user decides: continue or stop)
 - Store FULL response (including `scores`, `score_justification`, `biggest_gaps`) in `last_review_result`
 - Log scores to `step_history` entry: `{ "step": "TEST_REVIEW", "result": "PASS|FAIL", "scores": {...}, "timestamp": "..." }`
@@ -277,9 +331,14 @@ Agent(
 ### visual-qa-agent
 
 **Prerequisites check (before spawning):**
-1. Verify dev server is running: `curl -s -o /dev/null -w "%{http_code}" {{TARGET_URL}}` → expect 200
-2. Verify Chrome DevTools MCP is available: check for `mcp__chrome-devtools__navigate_page` tool
-3. If either fails → skip VISUAL_QA with warning, advance to TEST_REVIEW
+1. Verify the agent prompt resolves: resolve `.claude/agents/visual-qa-agent/AGENT-PROMPT.md`
+   **project-first then user-level** (`{{WORKSPACE}}/.claude/agents/visual-qa-agent/AGENT-PROMPT.md`,
+   else `~/.claude/agents/visual-qa-agent/AGENT-PROMPT.md`). If it does NOT resolve in either location
+   → log a warning and SKIP VISUAL_QA → advance to TEST_REVIEW (consistent with the documented
+   optional-step behavior). Normally the path resolves (a real prompt ships at user level).
+2. Verify dev server is running: `curl -s -o /dev/null -w "%{http_code}" {{TARGET_URL}}` → expect 200
+3. Verify Chrome DevTools MCP is available: check for `mcp__chrome-devtools__navigate_page` tool
+4. If any of these fails → skip VISUAL_QA with warning, advance to TEST_REVIEW
 
 **Step-by-step execution:**
 
@@ -287,7 +346,7 @@ Agent(
 2. Read `config.visual_qa.dev_server_url` (default: `http://localhost:5173`) → `{{TARGET_URL}}`
 3. Read `step_summaries.DEVELOP` from state.json → `{{IMPLEMENTATION_SUMMARY}}`
 4. List routes/pages from changed files or tech spec → `{{PAGES_TO_TEST}}`
-5. Read `../../agents/visual-qa-agent.md`, replace variables
+5. Read `.claude/agents/visual-qa-agent/AGENT-PROMPT.md`, replace variables
 6. Spawn:
 
 ```
@@ -301,10 +360,27 @@ Agent(
 
 7. Parse the returned JSON response
 
-**Parse response:**
-- Extract `scores.overall` and compare against `config.thresholds.visual_qa_pass` (default: 7.0)
-- `verdict: "PASS"` AND `scores.overall >= threshold` → advance to TEST_REVIEW
-- `verdict: "FAIL"` OR `scores.overall < threshold` → enter FIX_VISUAL
+**Parse response — the decision is NOT yours to make. Run the gate:**
+
+```bash
+node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" \
+  --step VISUAL_QA --scores '<the agent's scores object, verbatim JSON>'
+```
+
+Act on the EXIT CODE, never on your own reading of the number:
+
+| Exit | Result | Do |
+|---|---|---|
+| 0 | PASS | advance to TEST_REVIEW |
+| 1 | FIX | enter FIX_VISUAL, increment the `visual_qa` counter in `state.json`, re-run VISUAL_QA |
+| 2 | ESCALATE | **STOP.** The gate wrote `.aid/pipeline/ESCALATION.json`. Present the decision to the user and wait. Do NOT resolve it yourself, do NOT advance, do NOT log a PASS |
+| 3 | ERROR | bad/missing score or config — fix the input; NEVER treat it as a pass |
+
+A `verdict: "FAIL"` with a passing number is still a FAIL: send it to FIX_VISUAL regardless of the exit
+code. The number is what the gate bounds; the verdict is the reviewer's own veto.
+The threshold is `config.thresholds.visual_qa_pass` and the cap is `config.max_iterations.visual_qa`.
+**Increment `iterations.visual_qa`** — without that counter the gate reads it as 0 forever, so the cap
+can never be reached and this step could return FIX indefinitely without ever escalating.
 - Store FULL response (including `scores`, `lighthouse`, `issues`, `testing_summary`) in `last_review_result`
 - Log scores to `step_history` entry: `{ "step": "VISUAL_QA", "result": "PASS|FAIL", "scores": {...}, "lighthouse": {...}, "timestamp": "..." }`
 
@@ -334,39 +410,77 @@ Action Items (priority order):
 Focus on functionality issues first, then craft, then design quality.
 ```
 
-### qa-validator-agent (existing)
+---
+
+### qa-validator-agent
+
+PHASE_GATE spawns the `qa-validator-agent` via its prompt file (NOT an inline hardcoded prompt),
+resolved **project-first then user-level** — the same resolution code-review-agent / test-review-agent
+use (see "Path resolution" above).
+
+**Step-by-step execution (follow exactly):**
+
+1. Read `.aid/context.json` → extract task ID + description → this is `{{TASK_CONTEXT}}`
+2. **Resolve the acceptance criteria (criteria source is DECOUPLED from AID):**
+   - If `.aid/qa/<task_id>.yaml` EXISTS (AID project) → read it verbatim → this is `{{ACCEPTANCE_CRITERIA}}`.
+   - If it is ABSENT (non-AID project) → derive the acceptance criteria from the frozen
+     `.aid/pipeline/<task_id>/brief.md` (`ORIGINAL_REQUEST` + `STATED_WHY` + DEVELOP plan — the SAME
+     source `AR_ACCEPTANCE` uses) → this is `{{ACCEPTANCE_CRITERIA}}`. Never validate against nothing.
+3. Run `git diff --name-only HEAD` → read each changed file's full content → this is `{{CHANGED_FILES}}`
+4. Resolve `.claude/agents/qa-validator-agent/AGENT-PROMPT.md` **project-first then user-level**
+   (`{{WORKSPACE}}/.claude/agents/qa-validator-agent/AGENT-PROMPT.md`, else
+   `~/.claude/agents/qa-validator-agent/AGENT-PROMPT.md`). Read it.
+5. Replace all `{{VARIABLE}}` placeholders — `{{TASK_CONTEXT}}`, `{{ACCEPTANCE_CRITERIA}}`,
+   `{{CHANGED_FILES}}` — with the extracted values.
+6. Spawn the agent:
 
 ```
-Task(
+Agent(
   subagent_type: "general-purpose",
-  prompt: "You are a QA Validator. Read .aid/qa/{TASK-ID}.yaml and review modified files. Return JSON with verdict: PASS or FAIL.",
-  description: "QA validation for {TASK-ID}"
+  prompt: [the rendered AGENT-PROMPT.md with all variables replaced],
+  description: "QA validation — pipeline PHASE_GATE",
+  model: "opus"
 )
 ```
 
-**Parse response:**
-- `verdict: "PASS"` → advance to AR_ACCEPTANCE (AR-3); AR_ACCEPTANCE on DONE → REALITY_CHECK (AR-3b); on MATCH → Phase 5 (API_TESTS)
-- `verdict: "FAIL"` → return to DEVELOP (re-examine approach)
-- **HARD CAP: `config.max_iterations.phase_gate_reexamine` rounds (default 2).** Increment a
-  `phase_gate_reexamine` counter on each PHASE_GATE-FAIL→DEVELOP re-examine round. After 2 rounds
-  still FAIL → **ESCALATE** to the user (escalation protocol) instead of looping indefinitely.
-  This re-examine cap is **DISTINCT** from AR-3's `max_acceptance_rounds`, which bounds only the
-  AR_ACCEPTANCE-gap re-entry into DEVELOP — not PHASE_GATE failures. The cost limit remains an
-  additional safety brake.
+7. Parse the returned JSON response.
+
+**Parse response — the decision is NOT yours to make. Run the gate:**
+
+```bash
+node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" \
+  --step PHASE_GATE --scores '<the validator's verdict object, verbatim JSON>'
+```
+
+PHASE_GATE is **pass/fail, not scored** — it has no threshold and no mark to beat. The gate accepts
+`{"verdict":"PASS"}`, `{"can_proceed":true}` or `{"passed":true}`; anything else is a fail.
+
+Act on the EXIT CODE:
+
+| Exit | Result | Do |
+|---|---|---|
+| 0 | PASS | advance to AR_ACCEPTANCE (AR-3); AR_ACCEPTANCE on DONE → Phase 5 (API_TESTS) |
+| 1 | FIX | return to DEVELOP (re-examine approach), incrementing `phase_gate_reexamine` in `state.json` |
+| 2 | ESCALATE | **STOP.** The gate wrote `.aid/pipeline/ESCALATION.json`. Present the decision to the user and wait |
+| 3 | ERROR | bad/missing verdict or config — fix the input; NEVER treat it as a pass |
+
+The cap is `config.max_iterations.phase_gate_reexamine`; the gate reads it. This re-examine cap is
+**DISTINCT** from AR-3's `max_acceptance_rounds`, which bounds only the AR_ACCEPTANCE-gap re-entry into
+DEVELOP — not PHASE_GATE failures. The cost limit remains an additional safety brake.
 
 ### autoresearch runner (AR_DESIGN / AR_FUNCTION / AR_ACCEPTANCE)
 
 These three steps do NOT spawn a review agent that returns a single JSON verdict. Instead they
 invoke the shared **autoresearch runner skill** in the matching mode, which runs the bounded
 keep/revert loop and itself spawns the harness agents — the subagent named `reflection-agent`
-(prompt loaded from `{{WORKSPACE}}/.claude/agents/reflection-agent.md`), and for AR-3
+(prompt loaded from `{{WORKSPACE}}/.claude/agents/reflection-agent/AGENT-PROMPT.md`), and for AR-3
 the phase5-acceptance-validator / phase4-intent-validator:
 
 | Step | Mode | Prompt file | On success | On gap/incomplete |
-|---|---|---|---|---|
+|------|------|-------------|------------|-------------------|
 | AR_DESIGN | `design` | `program.ar-design.md` | advance to TDD | (bounded loop; revert non-improving edits) |
 | AR_FUNCTION | `function` | `program.ar-function.md` | advance to VISUAL_QA | (bounded loop; test red => auto-revert) |
-| AR_ACCEPTANCE | `acceptance` | `program.ar-acceptance.md` | DONE → advance to REALITY_CHECK (AR-3b) | gap → re-enter DEVELOP (bounded by `max_acceptance_rounds`, else ESCALATE) |
+| AR_ACCEPTANCE | `acceptance` | `program.ar-acceptance.md` | DONE → advance to Phase 5 | gap → re-enter DEVELOP (bounded by `max_acceptance_rounds`, else ESCALATE) |
 
 **After each AR step:**
 - Read the runner's final composite scores from `.aid/pipeline/autoresearch/<task_id>/results.tsv`.
@@ -378,93 +492,10 @@ the phase5-acceptance-validator / phase4-intent-validator:
   best-kept version, then (2) WRITE `state.json` **UNCONDITIONALLY as the FINAL action — after the last
   source mutation of ANY kind (kept edit, revert/restore cp, or crash restore)**. Update `last_updated`
   and persist `state.json` as the final write of the step. If `state.json` is not the newest write, the
-  hook will wrongly re-block the next turn.
+  hook will wrongly re-block.
+- The runner never auto-commits and never runs destructive git; rollback is via snapshot copies only.
 
-### AR_ACCEPTANCE Output — acceptance_record.md (REQUIRED)
-
-On every AR_ACCEPTANCE verdict (DONE or gap), write `.aid/pipeline/{task_id}/acceptance_record.md`
-BEFORE the step's final `state.json` write. This is the durable AR-3a verdict that REALITY_CHECK
-(AR-3b) diffs against reality — without it AR-3b has nothing to validate. Overwrite on each round
-(latest round wins; prior rounds live in `step_history`).
-
-```markdown
 ---
-task_id: <id>
-round: <ar_acceptance_rounds counter at time of writing>
-written_at: <ISO-8601 now>
----
-
-## Acceptance Record (AR-3a)
-
-- pass_rate: <NN>%          # from the runner's final acceptance pass rate
-- why_alignment: <X.X>/10   # from reflection phase-5-qa-ship scoring
-- verdict: DONE | GAP
-
-### criteria_met
-- <criterion id> — <one-line evidence>
-
-### criteria_not_met
-- <criterion id> — <what is missing>
-```
-
-Criterion ids come from the brief's `EVAL_METRICS` section when present, else from
-`.aid/qa/<task_id>.yaml` criteria names. Use the SAME ids the eval harness reports
-(`eval_results.json`) so AR-3b can diff mechanically.
-
-### REALITY_CHECK Step — AR-3b Reality Validation (outer loop)
-
-WHY: AR-3a validates the feature against the frozen brief; AR-3b validates that verdict against
-reality — the eval harness run on a real corpus. An acceptance verdict that does not hold under
-the corpus is a gap, not a ship.
-
-Entry: AR_ACCEPTANCE verdict DONE (`acceptance_record.md` exists — if missing, ESCALATE; never
-diff against a paraphrase).
-
-1. **Run the eval harness (smoke mode, gates on, machine-readable output into the task dir):**
-
-   ```bash
-   cd e2e && RUN_PM_PIPELINE_EVAL=1 PM_EVAL_MODE=smoke PM_EVAL_GATES=1 \
-     PM_EVAL_OUT_DIR=../.aid/pipeline/{task_id} \
-     E2E_CLAUDE_API_KEY=... npm run test:pm-eval
-   ```
-
-   `PM_EVAL_OUT_DIR` makes `e2e/src/evaluation/report.ts` write
-   `.aid/pipeline/{task_id}/eval_results.json` (per-criterion `id`, `pass_rate`, `target`, `pass`)
-   alongside the normal report.
-2. **Count the cost:** add the eval run's token spend to `cost.*` — the $50 `max_per_run_usd`
-   brake COUNTS eval spend. Brake hit → ESCALATE (standard protocol).
-3. **Diff** `acceptance_record.md` vs `eval_results.json` criterion-by-criterion:
-   - **GAP** — any criterion claimed in `criteria_met` has `pass: false` in `eval_results.json`,
-     or the eval gate failed overall: compile gap items referencing the criterion ids, write them
-     to `step_summaries.REALITY_CHECK`, increment `iterations.reality_rounds`, and re-enter
-     DEVELOP for a **FULL traversal** (DEVELOP → … → AR_ACCEPTANCE → REALITY_CHECK). The existing
-     per-step counters bound the inner rings; no counter resets.
-   - **MATCH** — every claimed criterion holds and the gate passed: write the final delta record
-     `.aid/pipeline/{task_id}/delta_record.md`, then write `state.json` **LAST** (hook-safety:
-     `state.json` must be the newest write of the step).
-
-   ```markdown
-   ---
-   task_id: <id>
-   written_at: <ISO-8601 now>
-   ---
-
-   ## Delta Record (AR-3b final)
-
-   - acceptance_rounds_used: <n>/<max_acceptance_rounds>
-   - reality_rounds_used: <n>/<max_reality_rounds>
-
-   ### criteria deltas (acceptance vs eval)
-   <!-- SCALES DIFFER: acceptance pass_rate is a percent; eval pass_rate is the 0-10
-        judge-score scale. The delta column is PASS-AGREEMENT ONLY (both-pass /
-        acceptance-only / eval-only) — never numeric subtraction across scales. -->
-   | criterion id | acceptance | eval pass_rate | target | delta (pass agreement) |
-   |---|---|---|---|---|
-   ```
-
-4. **Bounds:** read `autoresearch.ar_acceptance.max_acceptance_rounds` (default 3) and
-   `autoresearch.ar_acceptance.max_reality_rounds` (default 2) from `.aid/pipeline/config.json`.
-   `reality_rounds` exhausted with GAP still open → existing escalation protocol.
 
 ## State Management
 
@@ -472,7 +503,8 @@ diff against a paraphrase).
 
 When `/pipeline` is invoked:
 
-1. Read `.aid/pipeline/config.json` for settings
+0. **Intent check (do this first).** Confirm this is an IMPLEMENTATION task with a code/test deliverable. If the approved plan / frozen `brief.md` describes pure analysis, research, investigation, or a report with NO code deliverable, do NOT initialize the pipeline — there is nothing for DEVELOP→CODE_REVIEW to act on. Stay advisory-only and set `SKIP_PIPELINE_GATE=1` for the turn. This backs the start-hook's advisory INTENT GATE with an orchestrator-side check.
+1. Read `.aid/pipeline/config.json` for settings. **If it does not exist (non-AID project, or first run): create `.aid/pipeline/` and copy the user-level default `~/.claude/skills/pipeline-orchestrator/config.default.json` into `.aid/pipeline/config.json`, then continue.** Do NOT escalate for a missing config — bootstrap it. (The default carries the caps + `autoresearch` block + thresholds; the project may edit it afterward.)
 2. Read `.aid/context.json` for current task
 3. Create `.aid/pipeline/state.json`:
 
@@ -488,14 +520,14 @@ When `/pipeline` is invoked:
   "iterations": {
     "code_review": 0,
     "test_review": 0,
+    "visual_qa": 0,
     "phase_gate_reexamine": 0,
     "test_fix": 0,
     "api_fix": 0,
     "e2e_fix": 0,
     "ar_design": 0,
     "ar_function": 0,
-    "ar_acceptance_rounds": 0,
-    "reality_rounds": 0
+    "ar_acceptance_rounds": 0
   },
   "cost": {
     "total_input_tokens": 0,
@@ -509,9 +541,24 @@ When `/pipeline` is invoked:
 }
 ```
 
-4. **Freeze the immutable Task Brief** (compaction-proofing — do this NOW, at kickoff, while the original prompt is still in context).
+4. **Freeze the config this run will be judged by.** Copy `.aid/pipeline/config.json` to
+   `.aid/pipeline/<task_id>/config.frozen.json` **once**, at kickoff. If it already exists (resume
+   case), DO NOT overwrite it.
+
+   Why: `config.json` is per repo ROOT and mutable, so it is not a record of how any past run was
+   judged. The escalation remedy in `gate.mjs` even tells the human to *lower the threshold in
+   config.json* and resume — after which the file no longer describes the rounds already scored. One
+   run's thresholds were rewritten two days after it finished, and its own history holds `PASS` at
+   **7.9** and **7.6** against a threshold of **8.0**. Because nothing froze the values, the Current
+   Loops view cannot show what those rows were judged against and correctly refuses to guess. A frozen
+   copy makes the mark and the cap run-local facts, so they can be displayed later without inventing
+   them.
+
+5. **Freeze the immutable Task Brief** (compaction-proofing — do this NOW, at kickoff, while the original prompt is still in context).
 
    Write `.aid/pipeline/<task_id>/brief.md` **once**. If the file already exists (resume case), DO NOT overwrite it — read it. This file is the durable source of intent that survives context compaction and long runs; every later step (especially **AR_ACCEPTANCE**) reads intent from here, never from conversation memory.
+
+   **Mechanical immutability:** `dev-pipeline-gate.sh` now records a SHA-256 of `brief.md` on first freeze and surfaces a loud warning if a later `brief.md` differs from the recorded hash.
 
    ```markdown
    ---
@@ -532,27 +579,14 @@ When `/pipeline` is invoked:
 
    ## DEVELOP PLAN (snapshot at kickoff)
    <the agreed implementation plan, or a link to docs/impl-plan; the WHAT/HOW the build follows>
-
-   ## EVAL_METRICS (frozen at plan time — never edit)
-   <measurable CORPUS-LEVEL metrics the delivered feature must hit, one row per criterion.
-    Use the SAME criterion ids the eval harness emits in eval_results.json so REALITY_CHECK
-    (AR-3b) can diff acceptance_record.md vs reality mechanically.>
-
-   | criterion_id | metric | target |
-   |---|---|---|
    ```
-
-   `EVAL_METRICS` authoring rules: freeze it WITH the brief at kickoff (plan-approval is the last
-   moment success metrics are honestly negotiable — after code exists, metrics drift toward what
-   was built). Briefs frozen before this section existed are **grandfathered**: REALITY_CHECK
-   falls back to the eval harness's default gate criteria.
 
    Capture order (never fabricate intent):
    - If `original_request` / `stated_why` are already persisted (existing `brief.md`, or an existing PRD's problem/why) → use those (`source: prd`).
    - Else capture them VERBATIM from the current conversation's first user message + the established WHY (`source: conversation`).
    - If neither is available (e.g. `/pipeline` invoked cold with no prompt and no PRD) → **ESCALATE: ask the user for the original request + WHY before proceeding.** A pipeline with no frozen intent cannot be accepted by AR-3.
 
-5. Also mirror the verbatim `original_request` and `stated_why` into `.aid/context.json` (so existing reflection tooling can read them from disk too), but `brief.md` is the authoritative immutable copy.
+6. Also mirror the verbatim `original_request` and `stated_why` into `.aid/context.json` (so existing reflection tooling can read them from disk too), but `brief.md` is the authoritative immutable copy.
 
 ### Update State on Transitions
 
@@ -560,6 +594,7 @@ After EACH step transition:
 
 1. Update `current_step` to new step
 2. Increment relevant iteration counter
+   - **RESET on DEVELOP re-entry (backward boundary).** On any transition INTO DEVELOP from PHASE_GATE (FAIL re-examine) OR AR_ACCEPTANCE (gap re-enter), reset the INNER Phase-5 counters `iterations.code_review`, `iterations.test_fix`, `iterations.test_review`, and `iterations.ar_design` to 0 (mirrors the forward "Reset Phase 5 iteration counters" rule in `SKILL.extended.md` ~line 188, so the boundary is symmetric). The OUTER counters `iterations.phase_gate_reexamine` and `iterations.ar_acceptance_rounds` **PERSIST** — they are the real loop bound that guarantees termination, and must NOT be reset here.
 3. Append to `step_history`: `{ "step": "...", "result": "PASS|FAIL", "scores": {...}, "timestamp": "..." }`
 4. Update `last_updated`
 5. If sub-agent ran, store result in `last_review_result`
@@ -573,12 +608,23 @@ When loading a project with an active pipeline:
 
 1. Read `.aid/pipeline/state.json`
 2. If `pipeline_status: "running"`, resume from `current_step`
-3. Read `step_summaries` to restore context without replaying full conversation
-4. Display: "Pipeline active — resuming from [current_step] for task [task_id] ($[cost] spent)"
+3. **Reconcile mtime vs content (avoid false re-block on resume).** If the newest source mtime
+   > `state.json` mtime BUT the on-disk content of the editable set EQUALS the best-kept / baseline
+   snapshot (a benign post-restore state — restores now use `cp -p`, so a stale-but-identical restore
+   can still bump mtime), treat the state as CLEAN: do NOT force a false re-block or re-enter the last
+   step. Otherwise (content differs from the best-kept snapshot) proceed normally and let the step /
+   Stop-hook freshness logic run as usual.
+4. Read `step_summaries` to restore context without replaying full conversation
+5. Display: "Pipeline active — resuming from [current_step] for task [task_id] ($[cost] spent)"
+
+**Note:** `dev-pipeline-gate.sh` records a SHA-256 of `brief.md` on first freeze and surfaces a loud warning on resume if the current `brief.md` differs from the recorded hash (mechanical immutability).
+
+---
 
 ## Cost Tracking
 
-Multi-agent runs can cost $50-200; without cost visibility, pipeline runs silently burn through budgets.
+### Why
+The article "Harness Design for Long-Running Apps" (Anthropic, March 2026) shows multi-agent runs can cost $50-200. Without cost visibility, pipeline runs can silently burn through budgets.
 
 ### How to Track
 
@@ -594,7 +640,7 @@ After EACH sub-agent call (CODE_REVIEW, TEST_REVIEW, PHASE_GATE), update cost:
 Read limits from `config.cost_limits`:
 
 | Threshold | Action |
-|---|---|
+|-----------|--------|
 | `cost >= warn_at_usd` | Display: "Cost warning: $X.XX spent (limit: $Y.YY)" |
 | `cost >= max_per_run_usd` | ESCALATE: "Pipeline cost limit reached ($X.XX / $Y.YY). Continue? (y/n)" |
 
@@ -609,9 +655,12 @@ Pipeline: [task_id] | Phase [4|5] | Cost: $X.XX / $Y.YY
 [=====>-----------] Step: CODE_REVIEW (iteration 2/3)
 ```
 
+---
+
 ## Context Management
 
-Long pipeline runs accumulate context, and the harness may **compact** the conversation mid-run, discarding the original prompt and WHY. Anything the pipeline needs later must live **on disk**, not in conversation memory.
+### Why
+Long pipeline runs accumulate context — after DEVELOP + CODE_REVIEW + FIX_CODE + CODE_REVIEW (retry) + TDD + TEST_REVIEW, the conversation is huge. The article calls this "context degradation" — models lose coherence as context fills. Worse, the harness may **compact** the conversation mid-run, discarding the original prompt and WHY. Anything the pipeline needs later must live **on disk**, not in conversation memory.
 
 ### Task Brief (immutable intent record)
 
@@ -645,19 +694,20 @@ After each step completes, write a structured summary to `state.step_summaries`:
 ### What Goes in a Summary
 
 | Step Type | Summary Contains |
-|---|---|
+|-----------|-----------------|
 | DEVELOP | Files created/modified, lines added, what was implemented |
-| CODE_REVIEW | PASS/FAIL, overall score, per-category scores, key issues, cycle count (max 2) |
+| CODE_REVIEW | PASS/FAIL, overall score, per-category scores, key issues, cycle count (max 5) |
 | FIX_CODE | What was fixed, which categories improved |
 | AR_DESIGN | Baseline→final composite, kept/reverted count, top kept edits, KPI dims (struct/loudness/naming/docs) |
-| TDD | Tests written, pass/fail count, coverage %, iteration count (max 2) |
+| TDD | Tests written, pass/fail count, coverage %, iteration count (max 5) |
 | TEST_REVIEW | PASS/FAIL, overall score, per-category scores, key issues |
 | FIX_TEST_CODE | What was fixed, which tests added/changed |
 | AR_FUNCTION | Baseline→final composite, Tier-1 gate status (tests/coverage/silent-paths), kept/reverted count |
 | PHASE_GATE | PASS/FAIL, which criteria passed/failed |
 | AR_ACCEPTANCE | Round count (max_acceptance_rounds), pass_rate, why_alignment, blockers, DONE or re-entered DEVELOP |
-| REALITY_CHECK | Round count (max_reality_rounds), MATCH or GAP, gap items (criterion ids), eval cost added |
 | API/E2E_TESTS | Pass/fail count, which tests failed |
+
+---
 
 ## Escalation Protocol
 
@@ -680,6 +730,8 @@ Options:
 
 3. Wait for user decision before proceeding
 
+---
+
 ## Pipeline Display
 
 Show pipeline progress at each step transition:
@@ -692,41 +744,47 @@ Last result: FAIL — 1 CRITICAL (SQL injection), 1 MAJOR (missing auth)
 Action: Fixing issues from code review...
 ```
 
+---
+
 ## Configuration
 
 Read from `.aid/pipeline/config.json`:
 
 | Setting | Default | Purpose |
-|---|---|---|
-| `max_iterations.code_review` | 2 | Max CODE_REVIEW→FIX_CODE cycles (HARD CAP — then ESCALATE) |
-| `max_iterations.test_review` | 2 | Max TEST_REVIEW→FIX_TEST_CODE cycles (HARD CAP — then ESCALATE, mirrors CODE_REVIEW) |
-| `max_iterations.phase_gate_reexamine` | 2 | Max PHASE_GATE-FAIL→DEVELOP re-examine rounds (HARD CAP — then ESCALATE; DISTINCT from AR-3 `max_acceptance_rounds`) |
-| `max_iterations.test_fix` | 2 | Max test fix attempts (unscored — needs hard limit) |
+|---------|---------|---------|
+| `max_iterations.code_review` | 5 | Max CODE_REVIEW→FIX_CODE cycles (HARD CAP — then ESCALATE) |
+| `max_iterations.test_review` | 5 | Max TEST_REVIEW→FIX_TEST_CODE cycles (HARD CAP — then ESCALATE, mirrors CODE_REVIEW) |
+| `max_iterations.phase_gate_reexamine` | 5 | Max PHASE_GATE-FAIL→DEVELOP re-examine rounds (HARD CAP — then ESCALATE; DISTINCT from AR-3 `max_acceptance_rounds`) |
+| `max_iterations.test_fix` | 5 | Max test fix attempts (unscored — needs hard limit) |
+| `max_iterations.visual_qa` | 5 | Max VISUAL_QA→FIX_VISUAL cycles (needs `iterations.visual_qa` to be incremented, or the cap is unreachable) |
 | `max_iterations.api_fix` | 5 | Max API test fix attempts (unscored) |
 | `max_iterations.e2e_fix` | 5 | Max E2E test fix attempts (unscored) |
 | `autoresearch.kpi_target` | 8.0 | AR quality-score target (0–10) for AR_DESIGN / AR_FUNCTION |
-| `autoresearch.ar_design.max_iterations` | (project) | AR-1 iteration cap |
-| `autoresearch.ar_design.max_consecutive_reverts` | (project) | AR-1 plateau cap |
-| `autoresearch.ar_function.max_iterations` | (project) | AR-2 iteration cap |
-| `autoresearch.ar_function.max_consecutive_reverts` | (project) | AR-2 plateau cap |
-| `autoresearch.ar_acceptance.max_acceptance_rounds` | 3 | AR-3a outer DEVELOP-re-entry round cap (then ESCALATE) |
-| `autoresearch.ar_acceptance.max_reality_rounds` | 2 | AR-3b REALITY_CHECK GAP→DEVELOP re-entry round cap (then ESCALATE) |
+| `autoresearch.ar_design.max_iterations` | 15 | AR-1 iteration cap (shipped default; overridable per project) |
+| `autoresearch.ar_design.max_consecutive_reverts` | 5 | AR-1 plateau cap (shipped default; overridable per project) |
+| `autoresearch.ar_function.max_iterations` | 15 | AR-2 iteration cap (shipped default; overridable per project) |
+| `autoresearch.ar_function.max_consecutive_reverts` | 5 | AR-2 plateau cap (shipped default; overridable per project) |
+| `autoresearch.ar_function.internal_rounds` | 2 | AR-2 internal refine rounds before official scoring |
+| `autoresearch.ar_acceptance.max_acceptance_rounds` | 2 | AR-3 outer DEVELOP-re-entry round cap (then ESCALATE) |
 | `autoresearch.ar_acceptance.pass_rate_target` | 90 | AR-3 acceptance pass-rate target (%) |
 | `test_commands.unit` | `npm test` | Unit test command |
 | `test_commands.integration` | `npm test -- --testPathPattern=integration` | Integration test command |
 | `test_commands.e2e` | `npx playwright test` | E2E test command |
 | `test_commands.cucumber` | `npm run cucumber` | Cucumber test command |
 | `test_commands.coverage` | `npm test -- --coverage` | Coverage report command |
-| `thresholds.code_review_pass` | 7.0 | Minimum code review score (1-10) |
-| `thresholds.test_review_pass` | 7.0 | Minimum test review score (1-10) |
+| `thresholds.code_review_pass` | 8.0 | Minimum code review score (1-10) |
+| `thresholds.test_review_pass` | 8.0 | Minimum test review score (1-10) |
 | `thresholds.visual_qa_pass` | 7.0 | Minimum visual QA score (1-10) |
 | `thresholds.auto_fail_on_critical_security` | true | Auto-fail on security issues |
-| `thresholds.min_coverage_percent` | 70 | Minimum test coverage % |
+| `thresholds.min_coverage_percent` | 80 | Minimum test coverage % |
 | `cost_limits.warn_at_usd` | 25.00 | Show warning when cost exceeds this |
 | `cost_limits.max_per_run_usd` | 50.00 | Escalate when cost exceeds this |
-| `cost_limits.pricing.input_per_mtok` | 15.00 | $/million input tokens (Opus 4.6) |
-| `cost_limits.pricing.output_per_mtok` | 75.00 | $/million output tokens (Opus 4.6) |
+| `cost_limits.pricing.model` | `claude-opus-4-8` | Model whose published rate the pricing reflects (provenance for the rates below) |
+| `cost_limits.pricing.input_per_mtok` | 5.00 | $/million input tokens (claude-opus-4-8 — verified from the Claude model catalog) |
+| `cost_limits.pricing.output_per_mtok` | 25.00 | $/million output tokens (claude-opus-4-8 — verified from the Claude model catalog) |
 | `visual_qa.dev_server_url` | `http://localhost:5173` | URL of running dev server for visual QA |
 | `visual_qa.enabled` | true | Enable/disable visual QA step |
 | `visual_qa.skip_if_no_ui_changes` | true | Skip if no JSX/TSX/CSS files changed |
 | `auto_advance_phase` | true | Auto-advance from Phase 4 to 5 |
+
+**Counter reset scoping.** The INNER Phase-4 counters (`code_review`, `test_fix`, `test_review`, `ar_design`) are reset to 0 on every entry INTO DEVELOP — both forward (kickoff) and backward (PHASE_GATE FAIL re-examine / AR_ACCEPTANCE gap re-enter, see "Update State on Transitions" and `SKILL.extended.md` ~line 188). The OUTER counters `phase_gate_reexamine` and `ar_acceptance_rounds` PERSIST across DEVELOP re-entries — they bound the backward loops and guarantee termination, so resetting them would break the termination guarantee.
