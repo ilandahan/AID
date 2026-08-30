@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/License-AID%20Community%20v1.0-blue.svg)](LICENSE)
 [![MCP Integrations](https://img.shields.io/badge/MCP-6%20Integrations-green)](#mcp-integrations)
 [![Skills](https://img.shields.io/badge/Skills-28%20Specialized-purple)](#skills-system)
-[![Sub-Agents](https://img.shields.io/badge/Sub--Agents-38-teal)](#sub-agents)
+[![Sub-Agents](https://img.shields.io/badge/Sub--Agents-39-teal)](#sub-agents)
 [![Tests](https://img.shields.io/badge/Tests-228-brightgreen)](#testing)
 [![Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet)](#install-as-a-plugin)
 
@@ -48,9 +48,9 @@
 |---------|-------------------|
 | **Data Science / ML track** | A full `role-data-scientist` skill plus 6 phase-specific rule sets — EDA, feasibility, experiment planning, ML architecture, development, production. Covers data pipelines, RAG/CAG, prompt engineering, bias auditing, model cards and monitoring. Phases are relabelled for the role (Phase 0 becomes *EDA — Data Gathering & Analysis*). |
 | **Cucumber / BDD** | `cucumber-bdd` skill with step-definition guides for **JS, Python, Java, Ruby and Go**. Phase 1 acceptance criteria are written as Gherkin, so the PRD and the test suite are the same artifact. Runs via `npm run cucumber`. |
-| **Automated dev pipeline** | `pipeline-orchestrator` drives a 12-step state machine: DEVELOP → CODE_REVIEW → AR_DESIGN → TDD → AR_FUNCTION → VISUAL_QA → TEST_REVIEW → PHASE_GATE → AR_ACCEPTANCE, with hard iteration caps and escalation instead of infinite retry loops. |
+| **Automated dev pipeline** | `pipeline-orchestrator` drives a 12-step state machine: DEVELOP → CODE_REVIEW → AR_DESIGN → TDD → AR_FUNCTION → VISUAL_QA → TEST_REVIEW → PHASE_GATE → AR_ACCEPTANCE → API_TESTS → E2E_TESTS → CERTIFICATION, with hard iteration caps and escalation instead of infinite retry loops. All scored review gates (code review, test review, autoresearch KPI) are unified at 9.5/10, and the E2E step pre-checks that E2E tests actually exist before claiming a pass — if none do, it asks you to create or explicitly skip them. |
 | **Autoresearch runner** | `autoresearch` performs bounded keep/revert improvement: snapshot → one focused edit → score → keep **only if strictly better**, else revert. Every edit is reversible and the loop always terminates. |
-| **38 registered sub-agents** | Independent, context-free specialists: 8 reviewers (code, tests, visual QA, phase gates, QA validation, reflection, feedback analysis) plus 30 phase specialists covering Phase 0 discovery, Phase 2 architecture, Phase 3 breakdown, Phase 4 sprint work, Phase 5 release and the PRD pipeline. All invocable by name. |
+| **39 registered sub-agents** | Independent, context-free specialists: 8 reviewers (code, tests, visual QA, phase gates, QA validation, reflection, feedback analysis), 2 builders (developer, test-engineer) and 29 phase specialists covering Phase 0 discovery, Phase 2 architecture, Phase 3 breakdown, Phase 4 sprint work, Phase 5 release and the PRD pipeline. All invocable by name. |
 | **Quality Check on every output** | The `reflection` skill scores WHY alignment, phase compliance, correctness, security and completeness before you see the result. |
 | **WHY-first foundation** | `why-driven-decision` loads before everything else — no implementation without an articulated purpose. |
 | **Learning system** | `memory-system` collects session feedback and turns recurring patterns into concrete skill improvements, with a Python CLI for analysis and dashboards. |
@@ -62,7 +62,7 @@
 | Area | Fix |
 |------|-----|
 | **`link-project` data loss** | Pointing the linker at the AID install itself deleted its own skills, agents and commands — and on Windows the fallback recreated the folders *empty* while reporting success. Both installers now refuse a self-target or a home-directory target, and never delete before confirming a source exists. |
-| **Sub-agents were not invocable** | Agents shipped as prompt folders with no definition files, so `subagent_type` could never resolve them. All 38 now have registered definitions - and because Claude Code registers every `.md` under `agents/` recursively, asset folders were moved out of it so no prompt fragment registers as an agent. |
+| **Sub-agents were not invocable** | Agents shipped as prompt folders with no definition files, so `subagent_type` could never resolve them. All 39 now have registered definitions - and because Claude Code registers every `.md` under `agents/` recursively, asset folders were moved out of it so no prompt fragment registers as an agent. |
 | **QA gate never fired** | The hook emitted a response shape Claude Code does not read, so it could not block, and it was only ever registered in a personal local settings file. Now it blocks correctly, is registered in `.claude/settings.json`, and carries a loop guard. |
 | **Hooks missing in linked projects** | `settings.json` was copied into linked projects while `hooks/` was not, leaving hooks pointing at absent scripts. `hooks/` is now linked. |
 | **Least-privilege permissions** | The shipped settings no longer pre-approve a bare `Bash`, which auto-approved *any* shell command. See [Permissions](INSTALLATION.md#permissions) to widen it deliberately. |
@@ -264,7 +264,11 @@ Before each phase transition, a **sub-agent must review** all deliverables:
 
 ## Sub-Agents
 
-AID ships **38 registered sub-agents**. Each runs with **no knowledge of the conversation
+AID ships **39 registered sub-agents**: 8 reviewers (below), 2 builders (`developer`,
+`test-engineer` - spawned by the pipeline DEVELOP and TDD steps) and 29 phase specialists
+(`phase0-*` discovery, `phase2-*` architecture, `phase3-*` breakdown, `phase4-*` sprint
+work, `phase5-*` release, and the `prd-*` pipeline) invocable by name for isolated
+clean-room work. Each runs with **no knowledge of the conversation
 that produced the work** - that isolation is the point. An agent with no attachment to the
 code being good is the only one that reliably finds what is wrong with it.
 
@@ -282,9 +286,9 @@ code being good is the only one that reliably finds what is wrong with it.
 Reviewer agents are **read-only by design** - a reviewer that can edit the code is no
 longer independent.
 
-Each agent is a definition file (`.claude/agents/<name>.md`) plus an asset folder holding
-its prompt, references, response templates and calibration examples. The definition is what
-makes it invocable by name; see `.claude/agent-assets/AGENT-STANDARD.md` to add your own.
+Each agent is one self-contained definition file (`agents/<name>.md`) with its prompt
+inlined - that file is what makes it invocable by name. Calibration examples and response
+templates live in `agent-assets/`; see `agent-assets/AGENT-STANDARD.md` to add your own.
 
 ---
 
@@ -646,7 +650,7 @@ claude plugin install aid@AID
 ```
 
 Restart Claude Code, then run `/aid-init` in any project. Every project gets the same 45
-commands, 28 skills and 38 sub-agents, and one command moves them all forward:
+commands, 28 skills and 39 sub-agents, and one command moves them all forward:
 
 ```bash
 claude plugin update aid
@@ -755,7 +759,7 @@ AID/
 │   ├── autoresearch/           # Bounded keep/revert improvement loop
 │   ├── cucumber-bdd/           # Gherkin across 5 languages
 │   └── ... (23 more)
-├── agents/                     # 38 sub-agents - FLAT, one .md each, prompt inlined
+├── agents/                     # 39 sub-agents - FLAT, one .md each, prompt inlined
 │   ├── reflection-agent.md
 │   ├── phase0-problem-validator.md
 │   └── ... (36 more)

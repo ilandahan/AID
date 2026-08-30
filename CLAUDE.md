@@ -481,7 +481,7 @@ docs/implementation-plan/ - Phase 3 outputs (Task breakdown)
 # Components - single source of truth. Edit HERE. The plugin loader and every linked
 # project read these same files.
 skills/              - 28 skills
-agents/              - 38 sub-agents. FLAT: one self-contained .md each, prompt inlined.
+agents/              - 39 sub-agents. FLAT: one self-contained .md each, prompt inlined.
                        Never add a subfolder - every .md under agents/ registers as an agent.
 agent-assets/        - Calibration examples + AGENT-STANDARD.md (not scanned as agents)
 commands/            - 45 slash commands
