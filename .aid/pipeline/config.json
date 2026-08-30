@@ -1,12 +1,13 @@
 {
-  "$schema": "aid-pipeline-config-v1",
-  "version": "1.0",
+  "$schema": "aid-pipeline-config-v2",
   "max_iterations": {
-    "code_review": 3,
     "test_fix": 5,
-    "test_review": 3,
     "api_fix": 5,
-    "e2e_fix": 5
+    "e2e_fix": 5,
+    "code_review": 5,
+    "test_review": 5,
+    "phase_gate_reexamine": 5,
+    "visual_qa": 5
   },
   "test_commands": {
     "unit": "npm test",
@@ -15,8 +16,30 @@
     "cucumber": "npm run cucumber",
     "coverage": "npm test -- --coverage"
   },
+  "thresholds": {
+    "code_review_pass": 9.5,
+    "visual_qa_pass": 7,
+    "test_review_pass": 9.5,
+    "auto_fail_on_critical_security": true,
+    "min_coverage_percent": 80
+  },
+  "visual_qa": {
+    "dev_server_url": "http://localhost:5173",
+    "enabled": true,
+    "skip_if_no_ui_changes": true
+  },
+  "cost_limits": {
+    "warn_at_usd": 25,
+    "max_per_run_usd": 50,
+    "pricing": {
+      "model": "claude-opus-4-8",
+      "input_per_mtok": 5,
+      "output_per_mtok": 25
+    }
+  },
+  "auto_advance_phase": true,
   "autoresearch": {
-    "kpi_target": 8,
+    "kpi_target": 9.5,
     "ar_design": {
       "max_iterations": 15,
       "max_consecutive_reverts": 5
@@ -28,18 +51,10 @@
     },
     "ar_acceptance": {
       "max_acceptance_rounds": 2,
-      "max_reality_rounds": 2,
       "pass_rate_target": 90
     },
     "bundle_dir": ".claude/skills/autoresearch",
     "criticality_profile": "standard business app",
     "safety_critical_flows": []
-  },
-  "thresholds": {
-    "code_review_pass": 7.0,
-    "test_review_min_quality": 80,
-    "auto_fail_on_critical_security": true,
-    "min_coverage_percent": 70
-  },
-  "auto_advance_phase": true
+  }
 }

@@ -12,7 +12,7 @@
   "test_commands": {
     "unit": "npm test",
     "integration": "npm test -- --testPathPattern=integration",
-    "e2e": "cd e2e && npx jest --testPathPattern=hooks",
+    "e2e": "npx playwright test",
     "cucumber": "npm run cucumber",
     "coverage": "npm test -- --coverage"
   },
@@ -39,7 +39,7 @@
   },
   "auto_advance_phase": true,
   "autoresearch": {
-    "kpi_target": 8,
+    "kpi_target": 9.5,
     "ar_design": {
       "max_iterations": 15,
       "max_consecutive_reverts": 5
@@ -53,7 +53,7 @@
       "max_acceptance_rounds": 2,
       "pass_rate_target": 90
     },
-    "bundle_dir": "C:/Users/Iland/.claude/skills/autoresearch",
+    "bundle_dir": ".claude/skills/autoresearch",
     "criticality_profile": "standard business app",
     "safety_critical_flows": []
   }

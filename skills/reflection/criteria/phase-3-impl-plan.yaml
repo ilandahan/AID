@@ -138,7 +138,7 @@ criteria:
       - "Unit test scope defined?"
       - "Integration test scope defined?"
       - "E2E test scenarios from user stories?"
-      - "Coverage target specified (minimum 70%)?"
+      - "Coverage target specified (minimum 80%)?"
       - "Test tasks included in breakdown?"
     scoring:
       excellent: "Complete test strategy with coverage targets"

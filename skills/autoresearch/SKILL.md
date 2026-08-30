@@ -84,7 +84,7 @@ which it uses; the runner only needs these for the loop spine:
 | `{{WORKSPACE}}` | context.json | Repo root path |
 | `{{TASK_ID}}` | context.json | Current task id; names the results dir |
 | `{{CRITICALITY_PROFILE}}` | context.json / config.json | Risk profile gating ASK-before-edit behavior |
-| `{{KPI_TARGET}}` | config.autoresearch.kpi_target (default 8.0) | Quality-score target (0–10) |
+| `{{KPI_TARGET}}` | config.autoresearch.kpi_target (default 9.5) | Quality-score target (0–10) |
 | `{{TEST_COMMAND}}` | config.test_commands.unit (+coverage) | Harness command (function mode) |
 | `{{MIN_COVERAGE}}` | config.thresholds.min_coverage_percent | Coverage gate (function mode) |
 | `{{SAFETY_CRITICAL_FLOWS}}` | context.json | Flows requiring ASK-before-edit |

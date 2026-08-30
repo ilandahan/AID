@@ -14,7 +14,7 @@ Visual state diagram and transition rules for the automated development pipeline
   │  │ DEVELOP │───>│ CODE_REVIEW │───>│ TDD │───>│ VISUAL_QA │─>│TEST_REVIEW│ │
   │  └─────────┘    └──────┬──────┘    └──┬──┘    └─────┬─────┘  └─────┬─────┘ │
   │       ^                │              │             │               │        │
-  │       │            [<8.0]          [FAIL]        [<7.0]          [<8.0]      │
+  │       │            [<9.5]          [FAIL]        [<7.0]          [<9.5]      │
   │       │                │              │             │               │        │
   │       │           ┌────┴────┐   ┌────┴─────┐ ┌────┴──────┐ ┌─────┴──────┐ │
   │       │           │FIX_CODE │   │FIX_TESTS │ │FIX_VISUAL │ │FIX_TEST_   │ │
@@ -22,7 +22,7 @@ Visual state diagram and transition rules for the automated development pipeline
   │       │                │              │            │        └─────┬──────┘ │
   │       │                v              v            v              v        │
   │       │          CODE_REVIEW        TDD       VISUAL_QA    TEST_REVIEW    │
-  │       │         (until ≥8.0)      (max 5)    (until ≥7.0)  (until ≥8.0)   │
+  │       │         (until ≥9.5)      (max 5)    (until ≥7.0)  (until ≥9.5)   │
   │       │                                                                   │
   │       │         ┌────────────┐                                            │
   │       +─[FAIL]──│ PHASE_GATE │                                            │
@@ -117,9 +117,9 @@ Any step hits max iterations
 
 | Step | Gate | Threshold | Escalation |
 |------|------|-----------|------------|
-| CODE_REVIEW | `scores.overall` | `config.thresholds.code_review_pass` (8.0) | Cost limit only |
+| CODE_REVIEW | `scores.overall` | `config.thresholds.code_review_pass` (9.5) | Cost limit only |
 | VISUAL_QA | `scores.overall` | `config.thresholds.visual_qa_pass` (7.0) | Cost limit only |
-| TEST_REVIEW | `scores.overall` | `config.thresholds.test_review_pass` (8.0) | Cost limit only |
+| TEST_REVIEW | `scores.overall` | `config.thresholds.test_review_pass` (9.5) | Cost limit only |
 
 These steps iterate until the score threshold is met. The cost limit (`max_per_run_usd`) is the safety brake — when hit, the pipeline escalates to the user.
 

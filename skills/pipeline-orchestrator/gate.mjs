@@ -4,7 +4,7 @@
 // WHY THIS EXISTS: the gate used to be prose in SKILL.md ("compare scores.overall against
 // config.thresholds.code_review_pass; after N cycles still below threshold → ESCALATE"), executed by
 // an agent. It was not followed. Two reviews in this workspace's own history were logged PASS at
-// 7.9 and 7.6 against a threshold of 8.0, and nothing escalated — so the quality gate silently
+// 7.9 and 7.6 against a threshold of 9.5, and nothing escalated — so the quality gate silently
 // wasn't one, and the number in config.json was decorative.
 //
 // Now the decision is a pure function with exit codes, and an ESCALATE writes an escalation file

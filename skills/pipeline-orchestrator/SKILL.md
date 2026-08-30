@@ -114,7 +114,7 @@ Before implementing, display the review criteria so code passes on first attempt
 ```
 Your code will be reviewed by isolated sub-agents. Write code that PASSES on first attempt.
 
-CODE REVIEW CRITERIA (scored 1-10, need 8.0+ overall):
+CODE REVIEW CRITERIA (scored 1-10, need 9.5+ overall):
   Security (30%): OWASP Top 10 — any vulnerability = auto-FAIL
   Code Quality (30%): Single responsibility, proper types, no silent catches, no TODO
   Architecture (25%): Tech spec compliance, separation of concerns, dependency direction
@@ -128,7 +128,7 @@ VISUAL QA CRITERIA (scored 1-10, need 7.0+ overall — if UI changes):
   Note: A visual evaluator will NAVIGATE your running app, CLICK every element,
   and SCREENSHOT at desktop + mobile viewports. Build accordingly.
 
-TEST REVIEW CRITERIA (scored 1-10, need 8.0+ overall):
+TEST REVIEW CRITERIA (scored 1-10, need 9.5+ overall):
   Test Quality (25%): Strong assertions with exact values, not just toBeTruthy()
   Coverage (25%): Happy path + edge cases + error cases per public function
   Independence (15%): No shared state, tests run in any order
@@ -136,7 +136,7 @@ TEST REVIEW CRITERIA (scored 1-10, need 8.0+ overall):
   Production Safety (10%): No test-specific code in production files
   Mock Analysis (10%): Mock ratio < 20%, only external boundaries mocked
 
-AUTORESEARCH AR-1 (DESIGN) KPIs (judge-only, pre-TDD — need each >= config.autoresearch.kpi_target, default 8.0):
+AUTORESEARCH AR-1 (DESIGN) KPIs (judge-only, pre-TDD — need each >= config.autoresearch.kpi_target, default 9.5):
   Structural health: Single responsibility, low coupling, no dead code, no duplicated logic
   Loudness of failures: NO silent catches / `|| DEFAULT` / `?? DEFAULT` / `.catch` swallows — fail loud, rethrow or surface
   Naming clarity: Intention-revealing names; no abbreviations that hide meaning
@@ -165,7 +165,7 @@ When entering FIX_CODE, provide the FULL review result (not just action_required
 ```
 ## Code Review Feedback (iteration N/max)
 
-Overall Score: X.X/10 (need 8.0+ to pass)
+Overall Score: X.X/10 (need 9.5+ to pass)
   Security:      X/10 — [reviewer note]
   Code Quality:  X/10 — [reviewer note]
   Architecture:  X/10 — [reviewer note]
@@ -187,7 +187,7 @@ Same pattern as FIX_CODE but with test review scores:
 ```
 ## Test Review Feedback (iteration N/max)
 
-Overall Score: X.X/10 (need 8.0+ to pass)
+Overall Score: X.X/10 (need 9.5+ to pass)
   Test Quality:      X/10 — [reviewer note]
   Coverage:          X/10 — [reviewer note]
   Independence:      X/10 — [reviewer note]
@@ -210,7 +210,7 @@ Focus on the lowest-scoring categories first.
 |------|--------|---------|---------|
 | API_TESTS | Run integration test command from config | E2E_TESTS | FIX_API_TESTS |
 | FIX_API_TESTS | Fix integration test failures | API_TESTS | loop |
-| E2E_TESTS | Run `npx playwright test` + `npm run cucumber` | CERTIFICATION | FIX_E2E_TESTS |
+| E2E_TESTS | **Pre-check:** if no E2E tests exist (no playwright config / `e2e/` / `tests/e2e/` / `features/*.feature`), STOP and ask the user via AskUserQuestion: create E2E tests now, or skip E2E for this task (record choice in `state.json` as `e2e_skipped: true`, log in step_summaries). Never run a test command against nothing and call it PASS. Otherwise run `config.test_commands.e2e` + `npm run cucumber` | CERTIFICATION | FIX_E2E_TESTS |
 | FIX_E2E_TESTS | Fix E2E/Cucumber failures | E2E_TESTS | loop |
 | CERTIFICATION | Run ALL tests (random order), verify coverage, generate report. On CERTIFICATION → DONE, a terminal **RETRO/SYNTHESIS** step runs (detailed in `SKILL.extended.md`): it aggregates `step_summaries` + final scores + AR gap reasons into a short human-readable `.aid/pipeline/<task_id>/retro.md`, INVOKES the existing user-level retro skill (`~/.claude/skills/retro`) to close the loop, and may append a one-line learning to user memory `MEMORY.md`. Report-only — NEVER auto-commits. | DONE | N/A |
 
@@ -268,7 +268,7 @@ Act on the EXIT CODE, never on your own reading of the number:
 
 **Why this is a command and not a rule you follow:** it used to be prose ("compare against the
 threshold… after N cycles ESCALATE"), and it was not followed — this workspace's own `step_history`
-contains CODE_REVIEW logged `PASS` at **7.9** and **7.6** against a threshold of **8.0**, with no
+contains CODE_REVIEW logged `PASS` at **7.9** and **7.6** against a threshold of **9.5**, with no
 escalation. A gate an agent can talk itself past is not a gate. `gate.mjs` also enforces
 `auto_fail_on_critical_security` (a critical finding escalates regardless of the composite) and
 refuses to pass a missing score.
@@ -549,7 +549,7 @@ When `/pipeline` is invoked:
    judged. The escalation remedy in `gate.mjs` even tells the human to *lower the threshold in
    config.json* and resume — after which the file no longer describes the rounds already scored. One
    run's thresholds were rewritten two days after it finished, and its own history holds `PASS` at
-   **7.9** and **7.6** against a threshold of **8.0**. Because nothing froze the values, the Current
+   **7.9** and **7.6** against a threshold of **9.5**. Because nothing froze the values, the Current
    Loops view cannot show what those rows were judged against and correctly refuses to guess. A frozen
    copy makes the mark and the cap run-local facts, so they can be displayed later without inventing
    them.
@@ -759,7 +759,7 @@ Read from `.aid/pipeline/config.json`:
 | `max_iterations.visual_qa` | 5 | Max VISUAL_QA→FIX_VISUAL cycles (needs `iterations.visual_qa` to be incremented, or the cap is unreachable) |
 | `max_iterations.api_fix` | 5 | Max API test fix attempts (unscored) |
 | `max_iterations.e2e_fix` | 5 | Max E2E test fix attempts (unscored) |
-| `autoresearch.kpi_target` | 8.0 | AR quality-score target (0–10) for AR_DESIGN / AR_FUNCTION |
+| `autoresearch.kpi_target` | 9.5 | AR quality-score target (0–10) for AR_DESIGN / AR_FUNCTION |
 | `autoresearch.ar_design.max_iterations` | 15 | AR-1 iteration cap (shipped default; overridable per project) |
 | `autoresearch.ar_design.max_consecutive_reverts` | 5 | AR-1 plateau cap (shipped default; overridable per project) |
 | `autoresearch.ar_function.max_iterations` | 15 | AR-2 iteration cap (shipped default; overridable per project) |
@@ -772,8 +772,8 @@ Read from `.aid/pipeline/config.json`:
 | `test_commands.e2e` | `npx playwright test` | E2E test command |
 | `test_commands.cucumber` | `npm run cucumber` | Cucumber test command |
 | `test_commands.coverage` | `npm test -- --coverage` | Coverage report command |
-| `thresholds.code_review_pass` | 8.0 | Minimum code review score (1-10) |
-| `thresholds.test_review_pass` | 8.0 | Minimum test review score (1-10) |
+| `thresholds.code_review_pass` | 9.5 | Minimum code review score (1-10) |
+| `thresholds.test_review_pass` | 9.5 | Minimum test review score (1-10) |
 | `thresholds.visual_qa_pass` | 7.0 | Minimum visual QA score (1-10) |
 | `thresholds.auto_fail_on_critical_security` | true | Auto-fail on security issues |
 | `thresholds.min_coverage_percent` | 80 | Minimum test coverage % |

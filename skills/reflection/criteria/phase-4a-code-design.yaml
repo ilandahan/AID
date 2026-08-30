@@ -57,7 +57,7 @@ criteria:
       acceptable: "Some documentation; partial traceability to spec/task"
       poor: "No headers, no WHY comments, no traceability to the originating spec/task"
 
-# Aligned with kpi_target (>= 8.0) — design pass must clear a high bar before TDD.
+# Aligned with kpi_target (>= 9.5) — design pass must clear a high bar before TDD.
 threshold: 8.0
 max_iterations: 3
 

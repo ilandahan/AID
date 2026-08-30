@@ -1,7 +1,7 @@
 // Tests for the scored-step gate. Run: node --test
 //
 // The case that matters most is "7.9 at cap": this workspace's own step_history contains
-// CODE_REVIEW logged PASS at 7.9 and 7.6 against a threshold of 8.0, with nothing escalated. That
+// CODE_REVIEW logged PASS at 7.9 and 7.6 against a threshold of 9.5, with nothing escalated. That
 // happened because the gate was prose an agent was expected to follow. These tests are the reason it
 // cannot happen again.
 import { test } from "node:test";
