@@ -30,13 +30,22 @@ Walk through the entire AID installation and configuration step-by-step.
    - Set initial phase (typically Phase 0: Discovery)
    - Create `.aid/state.json` with initial values
 
-4. **Verify installation**
+4. **Install breather** (session boundaries)
+   - Run `node integrations/breather/install.mjs` (works from the AID repo root;
+     in a linked project, run it from the AID install directory)
+   - Installs user-scope to `~/.claude`: presence tracking, break offers,
+     handoffs, and the rest/usage status line — active in every project
+   - Safe to re-run; it never replaces an existing custom statusLine
+     without `--force`
+   - Tell the user to restart Claude Code (or run `/hooks`) to activate it
+
+5. **Verify installation**
    - Check all skill files are present
    - Check all agent files are present
    - Check all command files are accessible
    - Run a quick sanity check
 
-5. **Show next steps**
+6. **Show next steps**
    - Recommend `/good-morning` for daily startup
    - Recommend `/aid-start` to begin first session
    - Show available commands for their role

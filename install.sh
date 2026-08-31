@@ -65,7 +65,7 @@ check_prerequisites() {
 # Step 1: Install npm dependencies
 install_npm_deps() {
     echo ""
-    echo "[STEP 1/9] Installing npm dependencies..."
+    echo "[STEP 1/10] Installing npm dependencies..."
     if npm install; then
         log_success "npm dependencies installed"
     else
@@ -76,7 +76,7 @@ install_npm_deps() {
 # Step 2: Setup Claude commands and skills
 setup_claude_commands_and_skills() {
     echo ""
-    echo "[STEP 2/9] Setting up Claude commands and skills..."
+    echo "[STEP 2/10] Setting up Claude commands and skills..."
 
     # Components ship in git at the REPOSITORY ROOT (commands/, skills/, agents/,
     # rules/, references/, hooks/) because that is where Claude Code looks when this
@@ -151,7 +151,7 @@ setup_claude_commands_and_skills() {
 # Step 3: Create project state directory
 create_aid_directory() {
     echo ""
-    echo "[STEP 3/9] Creating project state directory..."
+    echo "[STEP 3/10] Creating project state directory..."
     mkdir -p ".aid"
     log_success "Project state directory created"
 }
@@ -159,7 +159,7 @@ create_aid_directory() {
 # Step 4: Create state files
 create_state_files() {
     echo ""
-    echo "[STEP 4/9] Creating state files..."
+    echo "[STEP 4/10] Creating state files..."
 
     CURRENT_DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
@@ -231,7 +231,7 @@ EOF
 # Step 6: Setup global AID learning system
 setup_global_aid() {
     echo ""
-    echo "[STEP 5/9] Setting up global AID learning system..."
+    echo "[STEP 5/10] Setting up global AID learning system..."
 
     AID_HOME="$HOME/.aid"
     mkdir -p "$AID_HOME"
@@ -248,7 +248,7 @@ setup_global_aid() {
 # Step 7: Create MCP configuration (Mac template only - no inline defaults)
 setup_mcp_and_env() {
     echo ""
-    echo "[STEP 6/9] Creating MCP configuration (macOS/Linux)..."
+    echo "[STEP 6/10] Creating MCP configuration (macOS/Linux)..."
 
     # Create .mcp.json from Mac template ONLY - no inline defaults
     if [ ! -f ".mcp.json" ]; then
@@ -286,7 +286,7 @@ setup_mcp_and_env() {
 # Verify MCP configuration
 verify_mcp_config() {
     echo ""
-    echo "[STEP 7/9] Verifying MCP configuration..."
+    echo "[STEP 7/10] Verifying MCP configuration..."
 
     if [ -f ".mcp.json" ]; then
         # Check if it's using the Windows-only format (wrong for Mac)
@@ -313,7 +313,7 @@ verify_mcp_config() {
 # Step 8: Setup Storybook preview server
 setup_storybook() {
     echo ""
-    echo "[STEP 8/9] Setting up Storybook preview server..."
+    echo "[STEP 8/10] Setting up Storybook preview server..."
 
     if [ -d "storybook-preview" ]; then
         log_info "Installing Storybook dependencies (this may take a minute)..."
@@ -344,7 +344,7 @@ setup_storybook() {
 setup_cucumber() {
     echo ""
     echo "═══════════════════════════════════════════════════════"
-    echo "[STEP 9/9] Setting up Cucumber BDD..."
+    echo "[STEP 9/10] Setting up Cucumber BDD..."
     echo "═══════════════════════════════════════════════════════"
 
     # Create Cucumber directory structure
@@ -465,6 +465,20 @@ preinstall_mcp_servers() {
     log_success "MCP servers cached"
 }
 
+# Step 10: Install breather (session boundaries + status line, user-scope)
+setup_breather() {
+    echo ""
+    echo "═══════════════════════════════════════════════════════"
+    echo "[STEP 10/10] Installing breather (session break offers)..."
+    echo "═══════════════════════════════════════════════════════"
+
+    if node integrations/breather/install.mjs; then
+        log_success "breather installed to ~/.claude (all projects, active after Claude Code restart)"
+    else
+        log_warning "breather install failed - run manually: node integrations/breather/install.mjs"
+    fi
+}
+
 # Print next steps
 print_next_steps() {
     echo ""
@@ -526,6 +540,7 @@ main() {
     verify_mcp_config
     setup_storybook
     setup_cucumber
+    setup_breather
     preinstall_mcp_servers
     print_next_steps
 }

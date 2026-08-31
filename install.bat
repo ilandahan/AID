@@ -36,7 +36,7 @@ echo [OK] npm found
 
 REM Install npm dependencies
 echo.
-echo [STEP 1/9] Installing npm dependencies...
+echo [STEP 1/10] Installing npm dependencies...
 call npm install
 if %ERRORLEVEL% NEQ 0 (
     echo [WARNING] npm install had issues, continuing...
@@ -44,7 +44,7 @@ if %ERRORLEVEL% NEQ 0 (
 
 REM Create .claude directories
 echo.
-echo [STEP 2/9] Verifying Claude commands and skills...
+echo [STEP 2/10] Verifying Claude commands and skills...
 REM Skills, commands, agents, rules, references and hooks all ship in git under
 REM .claude\. There is NO copy step. This block used to run 25 xcopy lines against a
 REM root skills\ directory that v2.1 removed, with output suppressed, so every copy
@@ -66,11 +66,11 @@ if "!AID_MISSING!"=="0" (
 
 REM Create .aid directory
 echo.
-echo [STEP 3/9] Creating project state directory...
+echo [STEP 3/10] Creating project state directory...
 if not exist ".aid" mkdir ".aid"
 
 REM Create state.json if it doesn't exist
-echo [STEP 4/9] Creating state files...
+echo [STEP 4/10] Creating state files...
 if not exist ".aid\state.json" (
     (
     echo {
@@ -136,7 +136,7 @@ if not exist ".aid\context.json" (
 
 REM Create global ~/.aid directory for learning system
 echo.
-echo [STEP 5/9] Setting up global AID learning system...
+echo [STEP 5/10] Setting up global AID learning system...
 set "AID_HOME=%USERPROFILE%\.aid"
 if not exist "%AID_HOME%" mkdir "%AID_HOME%"
 if not exist "%AID_HOME%\feedback" mkdir "%AID_HOME%\feedback"
@@ -151,7 +151,7 @@ echo [OK] Global learning system initialized at %AID_HOME%
 
 REM Create .mcp.json from Windows template (no inline defaults)
 echo.
-echo [STEP 6/9] Creating MCP configuration (Windows)...
+echo [STEP 6/10] Creating MCP configuration (Windows)...
 if not exist ".mcp.json" (
     if exist ".mcp.json.windows" (
         copy ".mcp.json.windows" ".mcp.json" >nul
@@ -185,7 +185,7 @@ if not exist ".env" (
 
 REM Verify MCP configuration
 echo.
-echo [STEP 7/9] Verifying MCP configuration...
+echo [STEP 7/10] Verifying MCP configuration...
 if exist ".mcp.json" (
     echo [OK] MCP configuration found
 
@@ -201,7 +201,7 @@ if exist ".mcp.json" (
 
 REM Step 8: Setup Storybook preview server
 echo.
-echo [STEP 8/9] Setting up Storybook preview server...
+echo [STEP 8/10] Setting up Storybook preview server...
 if not exist "storybook-preview" (
     echo [WARNING] storybook-preview folder not found, skipping
     goto :after_storybook
@@ -228,7 +228,7 @@ echo [OK] Storybook ready - use /storybook command to preview components
 REM Step 9: Setup Cucumber BDD
 echo.
 echo ===============================================================
-echo [STEP 9/9] Setting up Cucumber BDD...
+echo [STEP 9/10] Setting up Cucumber BDD...
 echo ===============================================================
 
 REM Create Cucumber directory structure
@@ -293,6 +293,17 @@ if not exist "features\support\world.ts" (
 
 echo [OK] Cucumber BDD setup complete
 echo     Run "npm run cucumber" to execute feature files
+
+echo.
+echo ===============================================================
+echo [STEP 10/10] Installing breather (session break offers)...
+echo ===============================================================
+call node integrations\breather\install.mjs
+if %errorlevel% equ 0 (
+    echo [OK] breather installed to %USERPROFILE%\.claude - all projects, active after Claude Code restart
+) else (
+    echo [WARNING] breather install failed - run manually: node integrations\breather\install.mjs
+)
 
 REM Pre-install MCP servers for faster startup
 echo.
