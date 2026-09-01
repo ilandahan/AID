@@ -1,6 +1,6 @@
 {
   "name": "aid",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "AI Development Methodology: 6 phase gates from discovery to ship, 28 skills, 38 review sub-agents, and WHY-first enforcement hooks. Stops code being written before the problem is understood.",
   "author": {
     "name": "Ilan Dahan",

@@ -497,7 +497,7 @@ Pages (Complete screens)
 
 ## Commands Reference
 
-AID provides **45 slash commands** organized by workflow.
+AID provides **47 slash commands** organized by workflow.
 
 ### Setup & Initialization
 
@@ -555,6 +555,8 @@ AID provides **45 slash commands** organized by workflow.
 | `/reflect` | Detailed breakdown of the last Quality Check (`--history`, `--strict`, `--explain`) |
 | `/yolo` | Enable full automation (skip confirmations) |
 | `/yolo-off` | Disable full automation (restore confirmations) |
+| `/breather-start` | Enable breather (break offers, presence tracking, status line) |
+| `/breather-stop` | Snooze breather offers, skip today, or uninstall |
 
 ### Figma Integration
 
@@ -748,7 +750,7 @@ AID/
 ├── .claude-plugin/             # Plugin manifests
 │   ├── plugin.json             # Name, version, and the hooks AID registers
 │   └── marketplace.json        # Lets the repo host itself as a marketplace
-├── commands/                   # 45 slash commands
+├── commands/                   # 47 slash commands
 │   ├── good-morning.md
 │   ├── phase.md
 │   └── ... (43 more)

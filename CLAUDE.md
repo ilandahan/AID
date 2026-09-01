@@ -409,6 +409,12 @@ Review your own changes for:
 | `/yolo` | Enable full automation mode (skip confirmations) |
 | `/yolo-off` | Disable full automation mode (restore confirmations) |
 
+### Wellbeing
+| Command | Purpose |
+|---------|---------|
+| `/breather-start` | Enable breather (break offers, presence tracking, status line) |
+| `/breather-stop` | Snooze offers, skip today, or uninstall breather |
+
 ---
 
 ## Context Tracking
@@ -484,7 +490,7 @@ skills/              - 28 skills
 agents/              - 39 sub-agents. FLAT: one self-contained .md each, prompt inlined.
                        Never add a subfolder - every .md under agents/ registers as an agent.
 agent-assets/        - Calibration examples + AGENT-STANDARD.md (not scanned as agents)
-commands/            - 45 slash commands
+commands/            - 47 slash commands
 rules/               - Rules loaded per skill
 references/          - Shared lookup data (role/phase terminology)
 hooks/               - Phase gate, QA gate, pipeline enforcement
