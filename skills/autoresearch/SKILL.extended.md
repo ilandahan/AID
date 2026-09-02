@@ -65,7 +65,7 @@ All knobs live under `autoresearch` in `.aid/pipeline/config.json`:
 | `ar_function.internal_rounds` | Internal scoring rounds for AR-2 |
 | `ar_acceptance.max_acceptance_rounds` | Hard cap on re-entering DEVELOP |
 | `ar_acceptance.pass_rate_target` | Minimum acceptance-criteria pass rate (%) |
-| `bundle_dir` | Where this skill lives (`.claude/skills/autoresearch`) |
+| `bundle_dir` | Where this skill lives (`~/.claude/skills/autoresearch`; a project `.claude/skills/autoresearch` overrides) |
 | `criticality_profile` | Informs how strict the judging should be |
 
 `config.default.json` in the pipeline-orchestrator skill carries the shipped defaults.

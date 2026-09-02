@@ -10,26 +10,9 @@
     "deny": []
   },
   "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "ExitPlanMode",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .claude/hooks/plan-execution-pipeline.sh",
-            "statusMessage": "Initializing dev pipeline for approved plan..."
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "hooks": [
-          {
-            "type": "command",
-            "command": "bash .claude/hooks/dev-pipeline-gate.sh",
-            "statusMessage": "Language checks + pipeline freshness..."
-          },
           {
             "type": "command",
             "command": "if command -v python3 >/dev/null 2>&1; then python3 .claude/hooks/validate-qa-gate.py; else python .claude/hooks/validate-qa-gate.py; fi",

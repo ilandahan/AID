@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { decide, openEscalation } from "./gate.mjs";
+import { decide, openEscalation, recordDecision } from "./gate.mjs";
 
 const CONFIG = {
   max_iterations: { code_review: 5, test_review: 5, phase_gate_reexamine: 5, visual_qa: 5 },
@@ -113,5 +113,36 @@ test("an open escalation is detected, a resolved one is not, and a corrupt one c
     assert.equal(openEscalation(dir)?.corrupt, true);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the gate owns the counter: two consecutive FIX decisions consume two of the five cycles", () => {
+  // WHY: in demo/saas iterations.code_review stayed at 1 across two FIX verdicts because incrementing
+  // was left to the agent. With the gate writing state.json, round 2 must see one fewer cycle left.
+  const root = mkdtempSync(join(tmpdir(), "gate-counter-"));
+  try {
+    mkdirSync(join(root, ".aid/pipeline"), { recursive: true });
+    writeFileSync(join(root, ".aid/pipeline/state.json"), JSON.stringify({ current_task_id: "t1", iterations: { code_review: 0 } }));
+    const read = () => JSON.parse(readFileSync(join(root, ".aid/pipeline/state.json"), "utf8"));
+
+    const d1 = decide({ step: "CODE_REVIEW", scores: { overall: 6.0 }, config: CONFIG, iterationsUsed: read().iterations.code_review });
+    recordDecision(root, { step: "CODE_REVIEW", decision: d1, scores: { overall: 6.0 } });
+    assert.equal(read().iterations.code_review, 1);
+    assert.match(d1.why, /5 fix cycle\(s\) left/);
+
+    const d2 = decide({ step: "CODE_REVIEW", scores: { overall: 6.0 }, config: CONFIG, iterationsUsed: read().iterations.code_review });
+    recordDecision(root, { step: "CODE_REVIEW", decision: d2, scores: { overall: 6.0 } });
+    assert.equal(read().iterations.code_review, 2);
+    assert.match(d2.why, /4 fix cycle\(s\) left/);
+
+    const pass = decide({ step: "CODE_REVIEW", scores: { overall: 9.6 }, config: CONFIG, iterationsUsed: read().iterations.code_review });
+    recordDecision(root, { step: "CODE_REVIEW", decision: pass, scores: { overall: 9.6 } });
+    const s = read();
+    assert.equal(s.iterations.code_review, 2, "a PASS must not consume a fix cycle");
+    assert.equal(s.step_history.length, 3);
+    assert.deepEqual(s.step_history.map((h) => h.result), ["FIX", "FIX", "PASS"]);
+    assert.equal(s.step_history[1].iteration, 2);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

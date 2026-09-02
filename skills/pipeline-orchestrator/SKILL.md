@@ -220,12 +220,12 @@ Focus on the lowest-scoring categories first.
 
 **CRITICAL: Each sub-agent MUST be spawned as an isolated Agent (sub-agent) using the Agent tool. DO NOT evaluate the code yourself — the whole point is isolated, unbiased review.**
 
-**Path resolution (project → user fallback).** Every `.claude/agents/<name>/...` and `.claude/skills/reflection/criteria/...` path below is **resolved project-first, then user-level**: if `{{WORKSPACE}}/.claude/<path>` exists use it, else fall back to `~/.claude/<path>` (the user-level default engine). This is what lets the pipeline run in ANY project — the orchestrator, reflection criteria, and the `reflection-agent` / `code-review-agent` / `test-review-agent` prompts all ship at user level and are overridden per-project only when a project provides its own. If neither location has a required agent prompt, skip that step with a logged warning where the step is optional (e.g. VISUAL_QA), or fall back to the user-level `code-review` / `test-driven` skills for review guidance.
+**Path resolution (project → user fallback).** Every `.claude/agents/<name>.md` (agents are FLAT files, one `.md` per agent — there is no `<name>/AGENT-PROMPT.md` layout) and `.claude/skills/reflection/criteria/...` path below is **resolved project-first, then user-level**: if `{{WORKSPACE}}/.claude/<path>` exists use it, else fall back to `~/.claude/<path>` (the user-level default engine). This is what lets the pipeline run in ANY project — the orchestrator, reflection criteria, and the `reflection-agent` / `code-review-agent` / `test-review-agent` prompts all ship at user level and are overridden per-project only when a project provides its own. If neither location has a required agent prompt, skip that step with a logged warning where the step is optional (e.g. VISUAL_QA), or fall back to the user-level `code-review` / `test-driven` skills for review guidance.
 
 **Best-practice standards (how the pipeline knows TDD / review rules).** The methodology the stages follow is resolved **project → engine**:
 - **DEVELOP / TDD** follow the TDD standard: prefer a project-level `test-driven` skill (`{{WORKSPACE}}/.claude/skills/test-driven/`) if present (AID projects ship one); else use the **engine-bundled AID standard** at `<this skill>/references/standards/test-driven/` (`SKILL.md` + `SKILL.extended.md` + `references/`: anti-patterns, test-patterns, test-data-factories, integration-testing, review-checklist, test-writing-guide, gui-testing). These cover RED-GREEN-REFACTOR, minimal mocking, realistic data, strong assertions, test independence.
 - **Test source:** in an AID project, tests are driven by the PRD / Tech-Spec / Impl-Plan (and Cucumber `.feature` files = acceptance criteria). In a non-AID project those don't exist — derive test targets from the **frozen `brief.md`** (original request + WHY + approved plan). Do NOT try to read `docs/prd/…` when it is absent.
-- **CODE_REVIEW** standards = `code-review-agent/references/review-rules.md` (promoted); **TEST_REVIEW** = `test-review-agent/references/quality-rules.md`; the engine also bundles the AID `code-review` skill at `references/standards/code-review/` as a fallback. **AR passes** use the reflection `criteria/*.yaml`. All of these ship with the engine, so the pipeline carries its own best-practice knowledge in any project.
+- **CODE_REVIEW** standards = the engine-bundled AID `code-review` skill at `<this skill>/references/standards/code-review/` (a project-level `.claude/skills/code-review/` overrides it); **TEST_REVIEW** = `<this skill>/references/standards/test-driven/references/review-checklist.md` (project `test-driven` skill overrides). **AR passes** use the reflection `criteria/*.yaml`. All of these ship with the engine, so the pipeline carries its own best-practice knowledge in any project.
 
 ### code-review-agent
 
@@ -234,15 +234,15 @@ Focus on the lowest-scoring categories first.
 1. Read `.aid/context.json` → extract task ID + description → this is `{{TASK_CONTEXT}}`
 2. Run `git diff --name-only HEAD` → read each changed file's full content → this is `{{CHANGED_FILES}}`
 3. Read relevant section from `docs/tech-spec/` → this is `{{TECH_SPEC_EXCERPT}}`. **In a non-AID project `docs/tech-spec/` won't exist — if it is absent or empty, derive the architectural reference from the frozen `.aid/pipeline/<task_id>/brief.md` (ORIGINAL_REQUEST + STATED_WHY + DEVELOP plan), the same source AR_ACCEPTANCE and qa-validator use, and state in `{{TECH_SPEC_EXCERPT}}` that no formal tech-spec exists so the agent reviews the Architecture category against the brief rather than silently scoring it against nothing. Never review architecture against nothing.**
-4. Read `.claude/agents/code-review-agent/references/review-rules.md` verbatim → this is `{{CODE_STANDARDS}}`
-5. Read `.claude/agents/code-review-agent/AGENT-PROMPT.md`
+4. Read `<this skill>/references/standards/code-review/SKILL.md` verbatim (project `.claude/skills/code-review/SKILL.md` if present) → this is `{{CODE_STANDARDS}}`
+5. Read `.claude/agents/code-review-agent.md` (project-first, else `~/.claude/agents/code-review-agent.md`)
 6. Replace all `{{VARIABLE}}` placeholders with extracted values
 7. Spawn the agent:
 
 ```
 Agent(
   subagent_type: "general-purpose",
-  prompt: [the rendered AGENT-PROMPT.md with all variables replaced],
+  prompt: [the rendered agent .md with all variables replaced],
   description: "Isolated code review — pipeline step",
   model: "opus"
 )
@@ -262,7 +262,7 @@ Act on the EXIT CODE, never on your own reading of the number:
 | Exit | Result | Do |
 |---|---|---|
 | 0 | PASS | advance to AR_DESIGN |
-| 1 | FIX | enter FIX_CODE, increment the `code_review` counter in `state.json`, re-run CODE_REVIEW |
+| 1 | FIX | enter FIX_CODE, re-run CODE_REVIEW. The gate already incremented `iterations.code_review` and appended the `step_history` row — never touch counters yourself |
 | 2 | ESCALATE | **STOP.** The gate wrote `.aid/pipeline/ESCALATION.json`. Present the decision to the user and wait. Do NOT resolve it yourself, do NOT advance, do NOT log a PASS |
 | 3 | ERROR | bad/missing score or config — fix the input; NEVER treat it as a pass |
 
@@ -290,13 +290,13 @@ unresolved ESCALATE cannot be quietly skipped. Resolution is the user's decision
 2. Read all production source files modified in current task → `{{IMPLEMENTATION_FILES}}`
 3. Read corresponding test files → `{{TEST_FILES}}`
 4. Run test command, capture output → `{{TEST_RESULTS}}`
-5. Read `.claude/agents/test-review-agent/AGENT-PROMPT.md`, replace variables
+5. Read `.claude/agents/test-review-agent.md` (project-first, else `~/.claude/agents/test-review-agent.md`), replace variables
 6. Spawn:
 
 ```
 Agent(
   subagent_type: "general-purpose",
-  prompt: [rendered AGENT-PROMPT.md],
+  prompt: [rendered agent .md],
   description: "Isolated test review — pipeline step",
   model: "opus"
 )
@@ -316,7 +316,7 @@ Act on the EXIT CODE, never on your own reading of the number:
 | Exit | Result | Do |
 |---|---|---|
 | 0 | PASS | advance to PHASE_GATE |
-| 1 | FIX | enter FIX_TEST_CODE, increment the `test_review` counter in `state.json`, re-run TEST_REVIEW |
+| 1 | FIX | enter FIX_TEST_CODE, re-run TEST_REVIEW. The gate already incremented `iterations.test_review` and appended the `step_history` row |
 | 2 | ESCALATE | **STOP.** The gate wrote `.aid/pipeline/ESCALATION.json`. Present the decision to the user and wait. Do NOT resolve it yourself, do NOT advance, do NOT log a PASS |
 | 3 | ERROR | bad/missing score or config — fix the input; NEVER treat it as a pass |
 
@@ -331,9 +331,9 @@ the gate's event log, so a step judged by prose instead shows blanks forever aft
 ### visual-qa-agent
 
 **Prerequisites check (before spawning):**
-1. Verify the agent prompt resolves: resolve `.claude/agents/visual-qa-agent/AGENT-PROMPT.md`
-   **project-first then user-level** (`{{WORKSPACE}}/.claude/agents/visual-qa-agent/AGENT-PROMPT.md`,
-   else `~/.claude/agents/visual-qa-agent/AGENT-PROMPT.md`). If it does NOT resolve in either location
+1. Verify the agent prompt resolves: resolve `.claude/agents/visual-qa-agent.md`
+   **project-first then user-level** (`{{WORKSPACE}}/.claude/agents/visual-qa-agent.md`,
+   else `~/.claude/agents/visual-qa-agent.md`). If it does NOT resolve in either location
    → log a warning and SKIP VISUAL_QA → advance to TEST_REVIEW (consistent with the documented
    optional-step behavior). Normally the path resolves (a real prompt ships at user level).
 2. Verify dev server is running: `curl -s -o /dev/null -w "%{http_code}" {{TARGET_URL}}` → expect 200
@@ -346,13 +346,13 @@ the gate's event log, so a step judged by prose instead shows blanks forever aft
 2. Read `config.visual_qa.dev_server_url` (default: `http://localhost:5173`) → `{{TARGET_URL}}`
 3. Read `step_summaries.DEVELOP` from state.json → `{{IMPLEMENTATION_SUMMARY}}`
 4. List routes/pages from changed files or tech spec → `{{PAGES_TO_TEST}}`
-5. Read `.claude/agents/visual-qa-agent/AGENT-PROMPT.md`, replace variables
+5. Read the resolved `visual-qa-agent.md`, replace variables
 6. Spawn:
 
 ```
 Agent(
   subagent_type: "general-purpose",
-  prompt: [rendered AGENT-PROMPT.md],
+  prompt: [rendered agent .md],
   description: "Isolated visual QA — pipeline step",
   model: "opus"
 )
@@ -372,7 +372,7 @@ Act on the EXIT CODE, never on your own reading of the number:
 | Exit | Result | Do |
 |---|---|---|
 | 0 | PASS | advance to TEST_REVIEW |
-| 1 | FIX | enter FIX_VISUAL, increment the `visual_qa` counter in `state.json`, re-run VISUAL_QA |
+| 1 | FIX | enter FIX_VISUAL, re-run VISUAL_QA. The gate already incremented `iterations.visual_qa` |
 | 2 | ESCALATE | **STOP.** The gate wrote `.aid/pipeline/ESCALATION.json`. Present the decision to the user and wait. Do NOT resolve it yourself, do NOT advance, do NOT log a PASS |
 | 3 | ERROR | bad/missing score or config — fix the input; NEVER treat it as a pass |
 
@@ -427,9 +427,9 @@ use (see "Path resolution" above).
      `.aid/pipeline/<task_id>/brief.md` (`ORIGINAL_REQUEST` + `STATED_WHY` + DEVELOP plan — the SAME
      source `AR_ACCEPTANCE` uses) → this is `{{ACCEPTANCE_CRITERIA}}`. Never validate against nothing.
 3. Run `git diff --name-only HEAD` → read each changed file's full content → this is `{{CHANGED_FILES}}`
-4. Resolve `.claude/agents/qa-validator-agent/AGENT-PROMPT.md` **project-first then user-level**
-   (`{{WORKSPACE}}/.claude/agents/qa-validator-agent/AGENT-PROMPT.md`, else
-   `~/.claude/agents/qa-validator-agent/AGENT-PROMPT.md`). Read it.
+4. Resolve `.claude/agents/qa-validator-agent.md` **project-first then user-level**
+   (`{{WORKSPACE}}/.claude/agents/qa-validator-agent.md`, else
+   `~/.claude/agents/qa-validator-agent.md`). Read it.
 5. Replace all `{{VARIABLE}}` placeholders — `{{TASK_CONTEXT}}`, `{{ACCEPTANCE_CRITERIA}}`,
    `{{CHANGED_FILES}}` — with the extracted values.
 6. Spawn the agent:
@@ -437,7 +437,7 @@ use (see "Path resolution" above).
 ```
 Agent(
   subagent_type: "general-purpose",
-  prompt: [the rendered AGENT-PROMPT.md with all variables replaced],
+  prompt: [the rendered agent .md with all variables replaced],
   description: "QA validation — pipeline PHASE_GATE",
   model: "opus"
 )
@@ -460,7 +460,7 @@ Act on the EXIT CODE:
 | Exit | Result | Do |
 |---|---|---|
 | 0 | PASS | advance to AR_ACCEPTANCE (AR-3); AR_ACCEPTANCE on DONE → Phase 5 (API_TESTS) |
-| 1 | FIX | return to DEVELOP (re-examine approach), incrementing `phase_gate_reexamine` in `state.json` |
+| 1 | FIX | return to DEVELOP (re-examine approach). The gate already incremented `iterations.phase_gate_reexamine` |
 | 2 | ESCALATE | **STOP.** The gate wrote `.aid/pipeline/ESCALATION.json`. Present the decision to the user and wait |
 | 3 | ERROR | bad/missing verdict or config — fix the input; NEVER treat it as a pass |
 
@@ -473,7 +473,7 @@ DEVELOP — not PHASE_GATE failures. The cost limit remains an additional safety
 These three steps do NOT spawn a review agent that returns a single JSON verdict. Instead they
 invoke the shared **autoresearch runner skill** in the matching mode, which runs the bounded
 keep/revert loop and itself spawns the harness agents — the subagent named `reflection-agent`
-(prompt loaded from `{{WORKSPACE}}/.claude/agents/reflection-agent/AGENT-PROMPT.md`), and for AR-3
+(prompt loaded from `{{WORKSPACE}}/.claude/agents/reflection-agent.md`, else `~/.claude/agents/reflection-agent.md`), and for AR-3
 the phase5-acceptance-validator / phase4-intent-validator:
 
 | Step | Mode | Prompt file | On success | On gap/incomplete |
@@ -756,7 +756,7 @@ Read from `.aid/pipeline/config.json`:
 | `max_iterations.test_review` | 5 | Max TEST_REVIEW→FIX_TEST_CODE cycles (HARD CAP — then ESCALATE, mirrors CODE_REVIEW) |
 | `max_iterations.phase_gate_reexamine` | 5 | Max PHASE_GATE-FAIL→DEVELOP re-examine rounds (HARD CAP — then ESCALATE; DISTINCT from AR-3 `max_acceptance_rounds`) |
 | `max_iterations.test_fix` | 5 | Max test fix attempts (unscored — needs hard limit) |
-| `max_iterations.visual_qa` | 5 | Max VISUAL_QA→FIX_VISUAL cycles (needs `iterations.visual_qa` to be incremented, or the cap is unreachable) |
+| `max_iterations.visual_qa` | 5 | Max VISUAL_QA→FIX_VISUAL cycles (gate.mjs increments `iterations.visual_qa` on every FIX; the agent never touches counters) |
 | `max_iterations.api_fix` | 5 | Max API test fix attempts (unscored) |
 | `max_iterations.e2e_fix` | 5 | Max E2E test fix attempts (unscored) |
 | `autoresearch.kpi_target` | 9.5 | AR quality-score target (0–10) for AR_DESIGN / AR_FUNCTION |

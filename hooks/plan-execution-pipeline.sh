@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────
-# plan-execution-pipeline.sh  (ships with AID — PostToolUse on ExitPlanMode)
+# plan-execution-pipeline.sh  (ships with AID; registered by the plugin — PostToolUse on ExitPlanMode)
 #
 # WHY: the AID pipeline (DEVELOP → CODE_REVIEW → AR_DESIGN → TDD → AR_FUNCTION →
-# VISUAL_QA → TEST_REVIEW → PHASE_GATE → AR_ACCEPTANCE) otherwise starts ONLY when
-# the user types /pipeline. This makes it ALSO run automatically whenever an approved
-# plan begins execution. ExitPlanMode (plan approved → implementation begins) is the
+# VISUAL_QA → TEST_REVIEW → PHASE_GATE → AR_ACCEPTANCE) used to start ONLY when the
+# user typed /pipeline. The owner wants it to ALSO run automatically every time a
+# plan is executed. ExitPlanMode (plan approved → implementation begins) is the
 # deterministic signal, and it fires while the original request + WHY + the approved
 # plan are still in context — the correct moment to FREEZE THE TASK BRIEF.
 #
@@ -136,38 +136,69 @@ else
   [ -n "$plan_file" ] && plan_line="Best-effort plan-file guess: $plan_file (newest by mtime — NOT confirmed to be the plan you just approved). If this isn't the plan you just approved, IGNORE it and use the approved plan from your context. "
 fi
 
-# A private plan-snapshot/prediction integration was removed for the public release:
-# it POSTed the approved plan to a service on the author's own machine, which nobody
-# else runs. Nothing downstream depended on it; the brief is frozen from the plan text
-# captured above.
-# Report a failure to read the approved plan in BOTH channels: systemMessage so the human
-# sees it, and additionalContext so the model knows it must fall back to its own context
-# rather than assuming the plan text below is complete. Never blocks execution.
+# ── cc-loop: snapshot the plan + predict BEFORE implementation (approved 2026-07-29) ──
+# WHY here: this is the blueprint's step 1 ("EXTRACT FROM CURRENT PLAN") and its decision
+# arrow ("PLAN UNCLEAR → refine → re-approval"). It is also the only moment the approved
+# plan text is guaranteed present. The snapshot is immutable (content-addressed), which fixes
+# plan_ref pointing at ~/.claude/plans files that later get overwritten.
+# FAIL-OPEN by design: dashboard down / slow / absent → pred_line stays empty and this hook
+# behaves exactly as it did before. Never blocks plan execution.
+pred_line=""
+if [ -n "$plan_text" ] && [ -f "$_hk_dir/payload.json" ]; then
+  _cc_port="${CC_LOOP_PORT:-4664}"
+  # The payload was already assembled by the node step above, UTF-8, in a temp file. Plans run 30KB+,
+  # far past the shell argv limit, and only the temp-file path (no backslashes) crosses argv.
+  _cc_payload="$_hk_dir/payload.json"
+  if [ -s "$_cc_payload" ]; then
+    _cc_resp=$(curl -s --max-time 3 -X POST "http://127.0.0.1:${_cc_port}/api/plan/approved" \
+        -H "Host: 127.0.0.1:${_cc_port}" -H 'content-type: application/json' \
+        --data-binary "@$_cc_payload" 2>/dev/null)
+    _cc_hook_text=$(printf '%s' "$_cc_resp" | node -e '
+let b=[];process.stdin.on("data",c=>b.push(c));process.stdin.on("end",()=>{
+  try { process.stdout.write(String(JSON.parse(Buffer.concat(b).toString("utf8")).hook_text || "")); }
+  catch { /* not JSON: leave empty, the caller reports the failure */ }
+});' 2>/dev/null)
+    if [ -n "$_cc_hook_text" ]; then
+      pred_line="${_cc_hook_text}
+(plan snapshotted immutably; this prediction is recorded and will be scored against actual iterations)
+"
+    else
+      # NOT SILENT. This exact branch is what cost a week: curl -s plus 2>/dev/null plus a swallowed
+      # exception meant a dead snapshot path was indistinguishable from a healthy one. Still fail-OPEN
+      # — plan execution is never blocked — but the failure is now stated where it can be seen.
+      _hk_fail="the dashboard did not confirm the snapshot (no response from /api/plan/approved on port ${_cc_port})"
+    fi
+  else
+    _hk_fail="the request body could not be prepared"
+  fi
+fi
+# Announce a snapshot that did not happen, in BOTH channels: systemMessage so the human sees it, and
+# additionalContext so the model knows the audit trail has a hole and does not assume otherwise.
 fail_line=""
 if [ -n "$_hk_fail" ]; then
-  fail_line="WARNING: the approved plan could not be captured by this hook — ${_hk_fail}. Proceed with the work, but freeze the Task Brief from the approved plan in your own context, not from this hook's output.
+  fail_line="WARNING: this plan was NOT SAVED to the plan store — ${_hk_fail}. Proceed with the work, but the immutable snapshot and its prediction are missing for this task, so nothing downstream can score it. Worth fixing before the next plan.
 "
 fi
 rm -rf "$_hk_dir" 2>/dev/null
 
-# The engine ships with AID at project level (.claude/skills/), so it is available wherever
-# AID is installed or linked. .aid/ (PRD/qa/validators) is enrichment used when present.
+# The execution engine ships user-level, so the pipeline runs in EVERY project.
+# AID (.aid/ + PRD/qa/validators) is an optional enrichment used when present.
 if [ -d "$ROOT/.aid" ]; then
-  enrich="This project has AID state (.aid/ present): the pipeline will use its PRD/specs, .aid/qa/<task>.yaml acceptance criteria, and the phase4/5 validator agents as enrichment when available."
+  enrich="This project has AID (.aid/ present): the pipeline will use its PRD/specs, .aid/qa/<task>.yaml acceptance criteria, and the phase4/5 validator agents as enrichment when available."
 else
-  enrich="This project has no .aid/ yet: run /aid-init or ./link-project.sh to create it. AR_ACCEPTANCE derives acceptance from the frozen brief, so no PRD is required."
+  enrich="This project is NOT AID-enabled: the pipeline bootstraps its own .aid/pipeline/config.json from the user-level default and AR_ACCEPTANCE derives acceptance from the frozen brief. No PRD/AID setup is required."
 fi
-instr="A plan was just approved. The dev pipeline (pipeline-orchestrator + reflection + autoresearch) ships with AID in .claude/skills/ — BUT it must only drive IMPLEMENTATION plans.
-${fail_line}${plan_line}INTENT GATE — do this FIRST, before anything else:
+instr="A plan was just approved. The dev pipeline (pipeline-orchestrator + reflection + autoresearch) ships at USER LEVEL and is available in this project regardless of AID — BUT it must only drive IMPLEMENTATION plans.
+${fail_line}${pred_line}${plan_line}INTENT GATE — do this FIRST, before anything else:
 Classify the just-approved plan as either (a) IMPLEMENTATION (it will write/modify/delete code, config, or other project files) or (b) READ-ONLY (research, analysis, investigation, debugging-to-understand, audit, explanation — it produces findings/answers but makes no source changes).
 - If READ-ONLY: do NOT initialize or drive the dev pipeline. Do NOT freeze a brief, do NOT create/refresh .aid/pipeline/state.json, do NOT bootstrap config. Stay advisory-only and just carry out the approved plan. (Steps 1-3 below do not apply.) Set SKIP_PIPELINE_GATE=1 if a downstream gate still nags.
 - If IMPLEMENTATION: proceed with steps 1-3 below BEFORE writing implementation code.
-1. INITIALIZE the pipeline (pipeline-orchestrator skill): if .aid/pipeline/config.json is missing, BOOTSTRAP it by copying the one shipped with AID at .aid/pipeline/config.json in the AID install; then create/refresh .aid/pipeline/state.json (pipeline_status=running, current_step=DEVELOP, counters).
+1. INITIALIZE the pipeline (pipeline-orchestrator skill): if .aid/pipeline/config.json is missing, BOOTSTRAP it by copying ~/.claude/skills/pipeline-orchestrator/config.default.json; then create/refresh .aid/pipeline/state.json (pipeline_status=running, current_step=DEVELOP, counters).
 2. FREEZE THE TASK BRIEF now, while the original prompt is still in context: write .aid/pipeline/<task_id>/brief.md ONCE (never overwrite) with the VERBATIM original request, the STATED_WHY, and the approved plan above as the DEVELOP plan. Use the verbatim APPROVED_PLAN block when present; if only a best-effort plan-file guess was given, prefer the approved plan from your own context over that file on any mismatch. AR_ACCEPTANCE validates against this; it survives a later compaction.
-3. DRIVE all implementation through the orchestrator: DEVELOP → CODE_REVIEW (≤2) → AR_DESIGN → TDD (≤2) → AR_FUNCTION → VISUAL_QA → TEST_REVIEW → PHASE_GATE (≤2 re-examine) → AR_ACCEPTANCE. Resolve agents from .claude/agents/ and criteria from .claude/skills/reflection/criteria/. ${enrich} Do not finish the turn until the pipeline is satisfied (the dev-pipeline-gate Stop hook also enforces this).
+3. DRIVE all implementation through the orchestrator: DEVELOP → CODE_REVIEW (≤2) → AR_DESIGN → TDD (≤2) → AR_FUNCTION → VISUAL_QA → TEST_REVIEW → PHASE_GATE (≤2 re-examine) → AR_ACCEPTANCE. Resolve agents/criteria project-first, else user-level. ${enrich} Do not finish the turn until the pipeline is satisfied (the dev-pipeline-gate Stop hook also enforces this).
 Set SKIP_PIPELINE_GATE=1 to bypass for a one-off."
 msg="plan approved → classify intent: IMPLEMENTATION plans run the pipeline (freeze brief + DEVELOP→…→AR_ACCEPTANCE); read-only/research/analysis plans stay advisory-only. SKIP_PIPELINE_GATE=1 to bypass."
-[ -n "$_hk_fail" ] && msg="approved plan not captured by the hook — ${_hk_fail}. Execution continues; freeze the brief from the plan in context. ${msg}"
+[ -n "$_hk_fail" ] && msg="plan NOT SAVED to the plan store — ${_hk_fail}. Plan execution continues; the snapshot and prediction for this task are missing. ${msg}"
 
 ac=$(printf '%s' "$instr" | json_enc)
 sm=$(printf '%s' "$msg"  | json_enc)

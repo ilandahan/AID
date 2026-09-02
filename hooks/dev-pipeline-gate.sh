@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────
-# dev-pipeline-gate.sh  (ships with AID — runs in the project it is installed in)
+# dev-pipeline-gate.sh  (ships with AID; registered by the plugin, so it runs in every git repo)
 #
-# WHY: a Stop hook that makes the "don't finish a turn with broken/unvalidated code"
-# loop deterministic instead of relying on the agent to remember.
-#
-# Runs alongside validate-qa-gate.py, the other Stop hook. The two are orthogonal:
-# this one gates on code that does not compile, that one gates on missing QA
-# sign-off. Both honour stop_hook_active, so neither can loop and they cannot
-# deadlock against each other.
+# WHY: promoted to ~/.claude/hooks from the kuri trial. A Stop hook that makes the
+# "don't finish a turn with broken/unvalidated code" loop deterministic instead of
+# relying on the agent to remember. Owner chose repo-wide scope.
 #
 # Behaviour on Stop:
 #   0. Bypass if SKIP_PIPELINE_GATE=1, or if this stop was itself triggered by a
@@ -86,7 +82,7 @@ if [ -f "$ESC" ] && grep -q '"status"[[:space:]]*:[[:space:]]*"open"' "$ESC" 2>/
   esc_step=$(grep -o '"step"[[:space:]]*:[[:space:]]*"[^"]*"' "$ESC" 2>/dev/null | head -1 | sed 's/.*"step"[[:space:]]*:[[:space:]]*"//; s/"$//')
   reason="Stop blocked: the pipeline gate ESCALATED and it is UNRESOLVED (step: ${esc_step:-?}). ${esc_why:-below threshold with iterations exhausted}
 This is a decision only the human can make. Present it to them and let them choose: (a) keep working to clear the threshold, (b) lower it in .aid/pipeline/config.json, or (c) accept this result. Then record the choice:
-  node \".claude/skills/pipeline-orchestrator/gate.mjs\" --resolve \"<what was decided>\"
+  node \"\$HOME/.claude/skills/pipeline-orchestrator/gate.mjs\" --resolve \"<what was decided>\"
 Do NOT resolve it on the human's behalf. SKIP_PIPELINE_GATE=1 bypasses this gate entirely."
   printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$reason" | json_enc)"
   exit 0
@@ -396,7 +392,7 @@ fi
 # block, firing on ANY uncommitted file (including prior sessions' work), which
 # interrupted even read-only turns. Real failures (tsc/mypy/syntax/vet/cargo/javac)
 # still hard-block above; a clean pass is now a non-blocking notice.
-msg="dev-pipeline-gate: $count source file(s) changed, all language checks passed (TS: $tsc_status). NOT committed - review the diff and commit yourself.
+msg="dev-pipeline-gate: $count source file(s) changed, all language checks passed (TS: $tsc_status). NOT committed - review and commit yourself (see the dashboard's Start the Day view).
 Changed:
 $files"
 printf '{"systemMessage":%s}\n' "$(printf '%s' "$msg" | json_enc)"

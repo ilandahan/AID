@@ -120,6 +120,45 @@ export function logLoopEvent(payload, root = process.cwd()) {
   }
 }
 
+/**
+ * Record a gate decision in state.json so the round count is owned by the gate, not the agent.
+ *
+ * WHY: the SKILL.md prose told the agent to "increment the code_review counter on FIX". In demo/saas
+ * the counter stayed at 1 across two FIX verdicts, so gate.mjs kept reporting "4 fix cycle(s) left"
+ * and ESCALATE-by-exhaustion could never fire; step_history had zero entries for the task. A cap the
+ * agent must count toward is decorative. Now the gate increments on FIX and appends a step_history
+ * row for every non-ERROR decision. Never fatal: a bookkeeping failure must not change the exit code.
+ */
+export function recordDecision(root, { step, decision, scores }) {
+  try {
+    const statePath = join(root, ".aid/pipeline/state.json");
+    const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : {};
+    const counter = STEP_CONFIG[step]?.counter;
+    state.iterations ??= {};
+    if (decision.result === "FIX" && counter) {
+      state.iterations[counter] = Number(state.iterations[counter] ?? 0) + 1;
+    }
+    state.step_history ??= [];
+    state.step_history.push({
+      step,
+      result: decision.result,
+      scores: scores ?? {},
+      timestamp: new Date().toISOString(),
+      iteration: decision.result === "FIX" && counter ? state.iterations[counter] : (decision.iterationsUsed ?? null),
+      cap: decision.cap ?? null,
+      threshold: decision.threshold ?? null,
+      note: `gate.mjs: ${decision.why}`,
+    });
+    state.last_updated = new Date().toISOString();
+    mkdirSync(dirname(statePath), { recursive: true });
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}
+`);
+    return state;
+  } catch {
+    return null; // bookkeeping must never become a new failure mode for the gate
+  }
+}
+
 const ESCALATION_FILE = ".aid/pipeline/ESCALATION.json";
 
 export function escalationPath(root) {
@@ -226,6 +265,7 @@ function main() {
     problem: d.result === "PASS" ? null : d.why,
   }, root);
   if (d.result === "ERROR") process.exit(3);
+  if (!has("dry-run")) recordDecision(root, { step, decision: d, scores });
 
   if (d.result === "ESCALATE" && !has("dry-run")) {
     const p = writeEscalation(root, {
