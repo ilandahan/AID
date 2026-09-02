@@ -12,158 +12,118 @@ Complete the current phase with mandatory sub-agent review, then collect user fe
 
 ## Flow
 
-### Step 1: Sub-Agent Review (MANDATORY)
+Design rule: the user never waits on the sub-agent. The review starts first, runs in
+the background while feedback is collected, and its verdict gates only the phase
+transition (option 1 in Step 5). Saving feedback does not wait for it.
+
+### Step 1: Start the Phase Review Sub-Agent (MANDATORY, background)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  ⚠️  MANDATORY SUB-AGENT REVIEW BEFORE PHASE TRANSITION         │
+│  ⚠️  MANDATORY SUB-AGENT REVIEW - STARTED FIRST, RUNS IN BACKGROUND │
 │                                                                 │
-│  Claude MUST spawn a review sub-agent before proceeding.        │
-│  This step CANNOT be skipped.                                   │
+│  Claude MUST spawn the review before collecting feedback.       │
+│  This step CANNOT be skipped. It must not block Steps 2-3.      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Claude must:**
-1. Identify current phase from `~/.aid/state.json`
-2. Use Task tool to spawn review sub-agent with appropriate review prompt
-3. Wait for review result (PASS/PARTIAL/FAIL)
-4. If FAIL: Stop and address issues before retrying
-5. If PARTIAL: Show issues, allow override with reason
-6. If PASS: Proceed to feedback collection
+1. Read phase from project-local `.aid/state.json` (`current_phase`, `phase_display`).
+2. Locate the phase deliverable(s) so the reviewer gets exact paths, not a repo to explore:
+   - Phase 0: `docs/research/*.md`
+   - Phase 1: `docs/prd/*.md`
+   - Phase 2: `docs/tech-spec/*.md`
+   - Phase 3: `docs/implementation-plan/*.md`
+   - Phase 4-5: `.aid/context.json` current task + files listed there
+   (one Glob; if nothing exists, pass "no deliverable found" and let the reviewer say so)
+3. Spawn with the Agent tool. Do not wait on it yet.
 
-**Sub-Agent Invocation:**
 ```
-Task tool:
-- subagent_type: "general-purpose"
+Agent tool:
+- subagent_type: "aid:phase-review-agent"   (fallback: "phase-review-agent")
 - description: "Phase [N] gate review"
-- prompt: [Phase-specific review checklist from phase-enforcement skill]
+- prompt: "Phase [N] ([Phase Name]) gate review. Deliverables: [exact paths].
+           Checklist: [Review Prompt for this phase, below].
+           Return PASS | PARTIAL | FAIL, then issues with file:line."
 ```
 
-### Step 2: Review Result Handling
+Tell the user in one line: `Phase [N] review running in background - meanwhile, a few questions.`
+
+### Step 2: Summarize Work
+
+```
+Phase Summary: [Phase Name]
+
+Work completed:
+- [from .aid/context.json completed steps / this conversation]
+
+Duration: [from state.json session_start]
+```
+
+### Step 3: Collect Feedback (ONE prompt, three answers)
+
+Ask all three together; the user answers in one message:
+
+```
+Three quick questions (answer in one message):
+
+1. Rating 1-5?   (1 poor · 3 met expectations · 5 excellent)
+2. What worked well?
+3. What could be improved?
+```
+
+### Step 4: Collect the Review Verdict
+
+By now the sub-agent has usually finished. Take its result (wait for it only if it has
+not returned yet).
 
 **On PASS:**
 ```
-✅ SUB-AGENT REVIEW PASSED
-
-Phase: [N] [Phase Name]
-Result: PASS - All requirements verified
-
-Proceeding to feedback collection...
+✅ SUB-AGENT REVIEW PASSED - Phase [N] [Phase Name]
 ```
 
 **On PARTIAL:**
 ```
-⚠️ SUB-AGENT REVIEW: PARTIAL PASS
-
-Phase: [N] [Phase Name]
+⚠️ SUB-AGENT REVIEW: PARTIAL PASS - Phase [N] [Phase Name]
 Issues found:
 1. [Issue with location]
 2. [Issue with location]
 
-Options:
-1. Fix issues and re-run /aid end
-2. Override with reason: "override: [your reason]"
+Phase transition needs: fix and re-run /aid-end, or "override: [reason]".
+Ending the session is fine as-is.
 ```
 
 **On FAIL:**
 ```
-❌ SUB-AGENT REVIEW FAILED
-
-Phase: [N] [Phase Name]
+❌ SUB-AGENT REVIEW FAILED - Phase [N] [Phase Name]
 Critical issues:
 1. [Critical issue with location]
-2. [Critical issue with location]
 
-These MUST be fixed before phase transition.
-Cannot proceed. Fix issues and re-run /aid end.
+Phase transition blocked until fixed. Ending the session is fine as-is.
 ```
 
-### Step 3: Summarize Work (after review passes)
+### Step 5: Save Feedback + State (ONE Bash call)
 
-```
-Phase Summary: Development
-
-Work completed:
-- Implemented user authentication
-- Added API endpoints for login/logout
-- Created unit tests (85% coverage)
-
-Duration: 3h 20m
-Sub-Agent Review: PASSED
+```bash
+# Locate the script: this AID repo → project mirror → installed plugin (newest version)
+f=; for c in hooks/aid_session.py .claude/hooks/aid_session.py "$(ls -d "$HOME"/.claude/plugins/cache/AID/aid/*/ 2>/dev/null | sort -V | tail -1)hooks/aid_session.py"; do [ -f "$c" ] && f=$c && break; done
+python "$f" end \
+  --rating <1-5> --worked "<answer 2>" --improve "<answer 3>" \
+  --review <passed|partial|failed> [--review-note "<one-line issue summary>"]
 ```
 
-### Step 4: Ask for Rating
+Writes `~/.aid/feedback/pending/<timestamp>.json` (read by `/aid-improve`) and updates
+project-local `.aid/state.json`: `status: ended`, `subagent_review.phase_[N]`. Show its
+output verbatim, then:
 
 ```
-How would you rate this session? (1-5)
-
-1 = Poor - Many issues
-2 = Below average - Some problems
-3 = Average - Met basic expectations
-4 = Good - Exceeded expectations
-5 = Excellent - Outstanding results
-```
-
-### Step 5: Ask What Worked
-
-```
-What worked well in this session?
-(Examples: clear explanations, good code structure, helpful suggestions)
-```
-
-### Step 6: Ask What Could Improve
-
-```
-What could be improved?
-(Examples: more detail needed, different approach, missing context)
-```
-
-### Step 7: Save Feedback
-
-Save to `~/.aid/feedback/pending/{timestamp}.json`:
-```json
-{
-  "timestamp": "2024-01-15T12:20:00Z",
-  "role": "developer",
-  "phase": "development",
-  "rating": 4,
-  "worked_well": "Clear code structure, good test coverage",
-  "to_improve": "Could explain architectural decisions more",
-  "duration_minutes": 200,
-  "subagent_review": {
-    "status": "passed",
-    "timestamp": "2024-01-15T12:15:00Z"
-  }
-}
-```
-
-### Step 8: Update State
-
-Update `~/.aid/state.json` with review status:
-```json
-{
-  "subagent_review": {
-    "phase_[N]": {
-      "status": "passed",
-      "timestamp": "2024-01-15T12:15:00Z"
-    }
-  }
-}
-```
-
-### Step 9: Confirm & Next
-
-```
-✅ Phase Complete
-
-Sub-Agent Review: PASSED
-Feedback: Saved
-
 Options:
-1. Continue to next phase ([Current] → [Next])
+1. Continue to next phase ([Current] → [Next])   ← only if review PASSED (or overridden with reason)
 2. Start new session with different role/phase
 3. End for now
 ```
+
+Option 1 with PARTIAL/FAIL: refuse, point at the issues. `override: <reason>` records
+the reason in `--review-note` and allows it.
 
 ## Usage
 
@@ -228,7 +188,8 @@ Review implementation for:
 
 ## Notes
 
-- Sub-agent review is MANDATORY - cannot be skipped
+- Sub-agent review is MANDATORY - cannot be skipped; it runs in the background so the user never waits on it
+- Review verdict gates the phase transition only, never the feedback save
 - Feedback is stored locally, never sent externally
 - Need 3+ feedback items before `/aid improve` works
 - Feedback is anonymized before any analysis

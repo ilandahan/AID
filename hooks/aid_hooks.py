@@ -531,6 +531,11 @@ def handle_phase_gate_bash(input_data, config):
     # Normalize: lowercase for matching, strip leading whitespace
     cmd_lower = command.strip().lower()
 
+    # AID's own session writer must run in every phase (it is how /aid-start works).
+    if "aid_session.py" in cmd_lower:
+        output_allow()
+        return
+
     # Check allowed commands first (fail-open pattern)
     allowed = rules.get("allowed_bash_commands_all_phases", [])
     for allowed_cmd in allowed:

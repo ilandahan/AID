@@ -17,16 +17,7 @@ Load role-specific phase names and descriptions from:
 
 ## Flow
 
-### Step 1: Start Required Services (Optional)
-
-- Check if Figma MCP server is running: `curl -s http://localhost:3001/health`
-- If not running and needed, start it:
-  ```bash
-  cd server && npm run dev &
-  ```
-- Report server status to user
-
-### Step 2: Check Existing Session
+### Step 1: Check Existing Session
 
 Load project-local `.aid/state.json` (NOT `~/.aid/state.json` — that file is global to the
 user and shared across every AID project on the machine; reading it here leaks another
@@ -43,7 +34,7 @@ Last session:
 Continue this session? (y/n)
 ```
 
-### Step 3: Select Role (FIRST)
+### Step 2: Select Role (FIRST)
 
 Display the role options as plain text (do NOT use AskUserQuestion tool - it has a 4-option limit):
 
@@ -69,7 +60,9 @@ Enter role number (1-5):
 
 Wait for user to type their selection before proceeding to phase selection.
 
-### Step 4: Select Phase (SECOND - with Role-Specific Terminology)
+If the user passed role and phase as arguments (`/aid-start developer 4`), skip Steps 2-3 and go straight to Step 5.
+
+### Step 3: Select Phase (SECOND - with Role-Specific Terminology)
 
 After role is selected, display phases as plain text with **bold phase names** (do NOT use AskUserQuestion tool).
 
@@ -189,7 +182,7 @@ Enter phase number (0-6):
 
 Use Developer terminology as default, but record the custom role description.
 
-### Step 5: Handle "Other" Selections
+### Step 4: Handle "Other" Selections
 
 **If "Other" role selected:**
 - Ask: "Please describe your role for this session:"
@@ -199,77 +192,29 @@ Use Developer terminology as default, but record the custom role description.
 **If "Other" phase selected:**
 - Ask: "Please describe what you're working on:"
 - Record response in session state
-- Determine closest matching phase for skill loading
+- Determine closest matching phase number (0-5) for skill loading
 
-### Step 6: Load Skills
+### Step 5: Write State and Greet (ONE Bash call)
 
-Based on the selected role and phase, load skills from `references/role-phase-terminology.json`:
+Run the session writer. It resolves role + phase against
+`references/role-phase-terminology.json`, writes project-local `.aid/state.json`
+(role, phase, skills_loaded, session_start), and prints the greeting:
 
-1. **Role Skill**: Load from `roleSkillMapping[role]`
-   - pm → `role-product-manager`
-   - lead → `role-tech-lead`
-   - developer → `role-developer`
-   - qa → `role-qa-engineer`
-
-2. **Phase Skills**: Load from `phases[role][phase].skills`
-   - Example: Developer + Phase 4 → `["aid-development", "atomic-design", "atomic-page-builder", "test-driven", "code-review"]`
-
-3. **Common Skills**: Always load:
-   - `phase-enforcement`
-   - `context-tracking`
-   - `learning-mode`
-
-Read and apply guidelines from:
-- `skills/{role-skill}/SKILL.md`
-- `skills/{each-phase-skill}/SKILL.md`
-
-### Step 7: Update State
-
-Save session to project-local `.aid/state.json`:
-
-```json
-{
-  "role": "developer",
-  "role_display": "Developer",
-  "phase": 4,
-  "phase_display": "Implementation & Coding",
-  "phase_description": "Write production code with TDD, implement features, write unit/integration tests",
-  "session_start": "2024-01-15T09:00:00Z",
-  "status": "active",
-  "skills_loaded": [
-    "role-developer",
-    "aid-development",
-    "atomic-design",
-    "atomic-page-builder",
-    "test-driven",
-    "code-review",
-    "phase-enforcement",
-    "context-tracking",
-    "learning-mode"
-  ]
-}
+```bash
+# Locate the script: this AID repo → project mirror → installed plugin (newest version)
+f=; for c in hooks/aid_session.py .claude/hooks/aid_session.py "$(ls -d "$HOME"/.claude/plugins/cache/AID/aid/*/ 2>/dev/null | sort -V | tail -1)hooks/aid_session.py"; do [ -f "$c" ] && f=$c && break; done
+python "$f" start <role> <phase>
+# role:  pm | lead | developer | qa | data-scientist | other   (menu number 1-5 also works)
+# phase: 0-5
+# "Other" role/phase: add --role-desc "..." / --phase-desc "..." with the user's words
 ```
 
-### Step 8: Greet User
+Show its output to the user verbatim. That output is the greeting; do not compose another.
 
-```
-✅ Session started
-
-Role: Developer
-Phase: Implementation & Coding
-       Write production code with TDD, implement features, write unit/integration tests
-
-Skills loaded:
-  • role-developer
-  • aid-development
-  • atomic-design
-  • test-driven
-  • code-review
-  • phase-enforcement
-  • context-tracking
-
-Ready to work! Use /aid end when completing this phase.
-```
+**Do NOT read SKILL.md files here.** Skills are registered by the plugin and load on
+demand when the work calls for them. Reading 6-12 skill files up front is what made
+`/aid-start` take minutes: each Read was a model round trip before the state file
+was ever written. `skills_loaded` in state.json is the record of which skills apply.
 
 ## Usage
 
