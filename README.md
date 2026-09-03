@@ -30,6 +30,7 @@
 - [Sub-Agents](#sub-agents)
 - [MCP Integrations](#mcp-integrations)
 - [Nano Banana Pro (Visual AI)](#nano-banana-pro-visual-ai)
+- [Breather (Knowing When to Stop)](#breather-knowing-when-to-stop)
 - [Skills System (28 Skills)](#skills-system)
 - [Commands Reference (45 Commands)](#commands-reference)
 - [Quick Start](#quick-start)
@@ -41,6 +42,24 @@
 ---
 
 ## What's New
+
+### 3.0.5 — `/aid-start` and `/aid-end` in seconds
+
+Starting and ending a session used to take five to ten minutes before a single line of
+`.aid/state.json` was written. Both commands now do their bookkeeping in one call.
+
+| Was | Now |
+|-----|-----|
+| `/aid-start` read every `SKILL.md` for the chosen role and phase — up to 12 files, ~120 KB — before writing state. Each read was a round trip. | One call to `hooks/aid_session.py start <role> <phase>` resolves the terminology, writes `.aid/state.json` and prints the greeting. Skills are registered by the plugin and load on demand, so nothing is read up front. `skills_loaded` in state still records which ones apply. |
+| `/aid-start` probed the Figma MCP server on every launch, whether or not the session needed it. | Probe removed. Start Figma from `/aid-pair` when you actually want it. |
+| `/aid-end` blocked on a phase-review sub-agent before anything was saved. You watched a spinner. | The review starts **first** and runs in the background while you answer the feedback questions. Same agent, same mandatory review, no waiting. |
+| Rating, what-worked and what-to-improve were three separate prompts. | One prompt, three answers, one message. |
+| The review verdict gated everything. | It gates only the phase transition. Feedback saves regardless, so ending a session never blocks on a PARTIAL. |
+
+The review itself got sharper rather than weaker: it now runs as the purpose-built
+`aid:phase-review-agent` and receives exact deliverable paths, so it reads the PRD or the
+tech spec instead of exploring the repository to find them. PASS / PARTIAL / FAIL,
+override-with-reason and the `subagent_review` record in state are all unchanged.
 
 ### New capabilities
 
@@ -56,6 +75,7 @@
 | **Learning system** | `memory-system` collects session feedback and turns recurring patterns into concrete skill improvements, with a Python CLI for analysis and dashboards. |
 | **Enforcement hooks** | A QA gate that blocks task completion until acceptance criteria pass, a language-check gate that blocks a turn ending on code that does not compile, and automatic pipeline initialization when a plan is approved. |
 | **Figma design review** | `figma-design-review` audits components *before* extraction, so bad structure never reaches your codebase. |
+| **Breather** | Session-boundary tracking bundled into the plugin: presence across every session, break offers at safe moments, written handoffs, and a rest/usage status line. Activate with `/breather-start`. See [Breather](#breather-knowing-when-to-stop). |
 
 ### Reliability fixes in this release
 
@@ -173,7 +193,7 @@ Session Flow:
 1. /aid-init     > Initialize project
 2. /aid-start    > Select role (PM/Dev/QA/Lead) + phase
 3. Work          > Claude applies relevant skills
-4. /aid-end      > Rate session (1-5), describe what worked
+4. /aid-end      > Phase review runs in background; rate 1-5 in one prompt
 5. /aid-improve  > System learns and updates skills
 ```
 
@@ -389,6 +409,69 @@ if (isNanoBananaEnabled()) {
 
 ---
 
+## Breather (Knowing When to Stop)
+
+AID ships with [breather](https://github.com/ilandahan/breather) bundled. Claude's default
+answer to "what next?" is always another task. Breather adds a second legitimate answer:
+*now is a good time to stop.* It tracks how long you have actually been present, offers a
+break at a safe boundary, and writes a handoff so leaving costs you nothing.
+
+**Breather ships inside the AID plugin.** No separate repository, no extra clone, and
+`claude plugin update aid` updates it along with everything else.
+
+```bash
+claude plugin marketplace add ilandahan/AID
+claude plugin install aid@AID
+/breather-start          # one time, activates it
+```
+
+The plugin carries the installer; `/breather-start` runs it. The clone route is the one
+exception — `install.sh`, `install.bat` and `/setup` run it for you at step 10, so there is
+nothing to activate. Either way, restart Claude Code afterwards so the hooks register, then
+confirm with `/hooks`. A blank status line usually means the workspace trust dialog is still
+waiting.
+
+Breather installs to `~/.claude`, not to your project, so it is active in **every** project
+on the machine — not only AID ones.
+
+### Reading the status line
+
+One line appears above the prompt. It carries two clocks that have nothing to do with each
+other, so read them separately.
+
+```
+[breather] worked=2h40m rest_in=20m now=13:35 zone=offer cooldown=0m
+           sessions=3 busy=1 next_anchor=14:00 next_anchor_in=25m
+           usage=83% usage_resets_in=120m
+```
+
+| Field | Meaning |
+|-------|---------|
+| `worked` | Time you have been present today, **across every session**, with idle gaps over 20 minutes removed. Not session length. |
+| `rest_in` | Minutes until the next stopping point — whichever comes first of fatigue, your next meeting, or the end of your day. |
+| `zone` | `quiet` (nothing said) → `alert` (one line) → `offer` (three options) → `boundary` (handoff drafted). |
+| `cooldown` | Above zero means an offer was recently made or declined, so Claude stays quiet. |
+| `sessions` / `busy` | How many of your sessions are alive, and how many have Claude working right now. |
+| `next_anchor` | The next fixed point you told it about this morning — a meeting, lunch, end of day. |
+| `usage` / `usage_resets_in` | Your five-hour subscription window and its reset. **Nothing to do with fatigue** — this is billing, not tiredness. |
+
+The rule breather holds itself to: quota may be a reason to stop, never a reason to keep
+going. Low usage is never presented as headroom you should spend.
+
+### Turning it down
+
+| You want | Command |
+|----------|---------|
+| Quiet for 90 minutes | `/breather-stop` → snooze |
+| No more offers today | `/breather-stop` → skip today |
+| Remove it from the machine | `/breather-stop` → uninstall (affects every project, so it confirms first) |
+| Tell it you are back from a break | `node ~/.claude/hooks/breather/mark.mjs resumed` |
+
+Handoffs are written to `.aid/handoff/YYYY-MM-DD-HHMM.md`: where exactly you stopped, what
+you tried and rejected and why, open decisions, and the one concrete next step.
+
+---
+
 ## Skills System
 
 AID uses **28 specialized skills** - domain expertise organized by role and phase.
@@ -525,8 +608,8 @@ AID provides **47 slash commands** organized by workflow.
 | `/gate-check` | Check if ready to advance to next phase |
 | `/phase-approve` | Human sign-off for current phase |
 | `/phase-advance` | Move to next phase |
-| `/aid-start` | Start session - select role & phase, load skills |
-| `/aid-end` | End phase and provide feedback |
+| `/aid-start` | Start session - select role & phase, write state in one call |
+| `/aid-end` | End phase - background review + feedback in one prompt |
 | `/aid-status` | Show current state (phase + session) |
 
 ### Development
@@ -555,7 +638,7 @@ AID provides **47 slash commands** organized by workflow.
 | `/reflect` | Detailed breakdown of the last Quality Check (`--history`, `--strict`, `--explain`) |
 | `/yolo` | Enable full automation (skip confirmations) |
 | `/yolo-off` | Disable full automation (restore confirmations) |
-| `/breather-start` | Enable breather (break offers, presence tracking, status line) |
+| `/breather-start` | Enable [breather](#breather-knowing-when-to-stop) - break offers, presence tracking, status line |
 | `/breather-stop` | Snooze breather offers, skip today, or uninstall |
 
 ### Figma Integration
@@ -768,7 +851,8 @@ AID/
 ├── agent-assets/               # Calibration examples + AGENT-STANDARD.md (not scanned)
 ├── rules/                      # 23 rule files, incl. the Data Science / ML track
 ├── references/                 # Shared lookup data (role/phase terminology)
-├── hooks/                      # Phase gate, QA gate, pipeline enforcement
+├── hooks/                      # Phase gate, QA gate, pipeline enforcement,
+│                               # and aid_session.py (the /aid-start and /aid-end writer)
 ├── .claude/
 │   └── settings.json           # Permissions + hooks for PROJECT mode (copied on link)
 ├── testing/e2e/                # 228 tests covering AID itself
