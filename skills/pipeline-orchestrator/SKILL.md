@@ -91,7 +91,7 @@ API_TESTS     E2E_TESTS
 |------|--------|-----------|---------|---------|
 | DEVELOP | Implement per spec using TDD (RED-GREEN-REFACTOR), following the **TDD standard** (see "Best-practice standards"). Test source = PRD/spec if present, else the frozen `brief.md` | No | CODE_REVIEW | N/A |
 | CODE_REVIEW | Spawn code-review-agent with changed files. **HARD CAP: 5 review->fix cycles** (`config.max_iterations.code_review`, default 5), then ESCALATE | Yes | AR_DESIGN | FIX_CODE |
-| FIX_CODE | Apply fixes using full review feedback (scores + action_required) | No | CODE_REVIEW | N/A |
+| FIX_CODE | Apply fixes using full review feedback (scores + action_required), **at the level of the defect CLASS, not the one file the finding named**. NOT complete until `.aid/pipeline/<task_id>/fix-<n>.json` exists and every grep it records re-runs clean | No | CODE_REVIEW | N/A |
 | AR_DESIGN | **AR-1 (pre-TDD).** Invoke the autoresearch runner skill (the shared `autoresearch` skill) in `mode=design` with `program.ar-design.md`. Judge-only (reflection-agent + `phase-4a-code-design.yaml`); bounded keep/revert loop; **NO interface / public-API / data-shape changes**. Logs final scores to `step_history` and writes `state.json` UNCONDITIONALLY as the final action of the step, after the last source mutation of any kind (kept edit or revert/restore) | Yes (runner) | TDD | (bounded by max_iterations / max_consecutive_reverts) |
 | TDD | Write/run tests using test command from config, following the **TDD standard** (anti-patterns, test-patterns, data-factories, minimal mocking, strong assertions — see "Best-practice standards"). **Max 5 iterations** (`config.max_iterations.test_fix`, default 5) | No | AR_FUNCTION | FIX_TESTS |
 | FIX_TESTS | Fix failing tests | No | TDD (re-run) | FIX_TESTS (loop) |
@@ -99,7 +99,7 @@ API_TESTS     E2E_TESTS
 | VISUAL_QA | Spawn visual-qa-agent with Chrome DevTools MCP | Yes | TEST_REVIEW | FIX_VISUAL |
 | FIX_VISUAL | Apply visual fixes using evaluator feedback (scores + screenshots) | No | VISUAL_QA | N/A |
 | TEST_REVIEW | Spawn test-review-agent with impl + test files. **HARD CAP: 5 review->fix cycles** (`config.max_iterations.test_review`, default 5), then ESCALATE (mirrors CODE_REVIEW) | Yes | PHASE_GATE | FIX_TEST_CODE |
-| FIX_TEST_CODE | Apply fixes using full review feedback (scores + action_required) | No | TEST_REVIEW | N/A |
+| FIX_TEST_CODE | Apply fixes using full review feedback (scores + action_required), at the level of the defect CLASS. NOT complete until `.aid/pipeline/<task_id>/fix-<n>.json` exists and every grep it records re-runs clean | No | TEST_REVIEW | N/A |
 | PHASE_GATE | Spawn qa-validator-agent (existing). **FAIL->DEVELOP re-examine HARD CAP: `config.max_iterations.phase_gate_reexamine` rounds (default 5), then ESCALATE** (DISTINCT from AR-3's `max_acceptance_rounds`) | Yes | AR_ACCEPTANCE | DEVELOP (re-examine, bounded) |
 | AR_ACCEPTANCE | **AR-3 (post-QA).** Invoke the autoresearch runner (`mode=acceptance`, `program.ar-acceptance.md`). Validates the COMPLETE feature vs `ORIGINAL_REQUEST` + `STATED_WHY` (phase5-acceptance-validator + phase4-intent-validator + reflection `phase-5-qa-ship.yaml`). On **gap** -> re-enter DEVELOP (bounded by `max_acceptance_rounds`); on cap with open blockers ESCALATE. Logs final scores to `step_history` and writes `state.json` UNCONDITIONALLY as the final action of the step, after the last source mutation of any kind (kept edit or revert/restore) | Yes (runner) | Phase 5 (on DONE) | DEVELOP (re-enter, bounded) |
 
@@ -180,6 +180,41 @@ Action Items (priority order):
 Focus on the lowest-scoring categories first.
 ```
 
+**Grep BEFORE you edit, not after.** A finding names one file; the defect usually has siblings. The
+measured case ran six rounds, five of them the same shape, because each fix was scoped to the file
+the reviewer happened to point at. Search for the pattern first, then fix everything the search
+returns in one round.
+
+**Record what you searched, in `.aid/pipeline/<task_id>/fix-<n>.json`** where `<n>` is the fix round.
+"Also fix the siblings" is unenforceable advice; a re-runnable command with its recorded output is
+checkable. This applies to FIX_TEST_CODE identically.
+
+```json
+{
+  "round": 3,
+  "findings": [{
+    "finding_id": "cq-2",
+    "pattern": "guard evaluated at a different granularity than the DELETE",
+    "grep": "clearSession\(|DELETE FROM .* WHERE session_id",
+    "hits_before": ["src/repair.ts:88", "src/rewind.ts:140", "src/prune.ts:62"],
+    "fixed": ["src/repair.ts:88", "src/rewind.ts:140"],
+    "not_fixed_why": [{"at": "src/prune.ts:62", "why": "per-run table, different granularity by design"}]
+  }]
+}
+```
+
+Three rules make that record checkable rather than decorative:
+
+1. `grep` is non-empty and is **the regex you actually ran**, not a description of it.
+2. `hits_before` is that grep's real output, captured before any edit.
+3. After fixing, re-running the grep returns only entries that carry a `not_fixed_why`. Every
+   `hits_before` entry appears in `fixed` or in `not_fixed_why` — a hit in neither is an unfinished
+   round, and the nightly check `qa/pipeline-artifacts.mjs fix-records` fails on it.
+
+There is deliberately no config key for this. Class-level fixing is unconditional, and a
+`require_class_level_fix` boolean would be a config for a value that never changes plus an invitation
+to switch it off in the run where it matters.
+
 ### FIX_TEST_CODE Step — Full Review Context
 
 Same pattern as FIX_CODE but with test review scores:
@@ -226,6 +261,45 @@ Focus on the lowest-scoring categories first.
 - **DEVELOP / TDD** follow the TDD standard: prefer a project-level `test-driven` skill (`{{WORKSPACE}}/.claude/skills/test-driven/`) if present (AID projects ship one); else use the **engine-bundled AID standard** at `<this skill>/references/standards/test-driven/` (`SKILL.md` + `SKILL.extended.md` + `references/`: anti-patterns, test-patterns, test-data-factories, integration-testing, review-checklist, test-writing-guide, gui-testing). These cover RED-GREEN-REFACTOR, minimal mocking, realistic data, strong assertions, test independence.
 - **Test source:** in an AID project, tests are driven by the PRD / Tech-Spec / Impl-Plan (and Cucumber `.feature` files = acceptance criteria). In a non-AID project those don't exist — derive test targets from the **frozen `brief.md`** (original request + WHY + approved plan). Do NOT try to read `docs/prd/…` when it is absent.
 - **CODE_REVIEW** standards = the engine-bundled AID `code-review` skill at `<this skill>/references/standards/code-review/` (a project-level `.claude/skills/code-review/` overrides it); **TEST_REVIEW** = `<this skill>/references/standards/test-driven/references/review-checklist.md` (project `test-driven` skill overrides). **AR passes** use the reflection `criteria/*.yaml`. All of these ship with the engine, so the pipeline carries its own best-practice knowledge in any project.
+
+### When a spawned agent reports no result
+
+Written once because it applies to all five spawn sites: code-review, test-review, visual-qa,
+reflection and qa-validator. Added 2026-09-04.
+
+A spawned agent that returns nothing, returns prose instead of JSON, or reports itself idle has
+**not produced a bad review — it has produced no review.** Do not score it, do not treat it as FAIL,
+and do not enter a fix cycle. Doing so spends one of five cycles on a round that never happened and
+erases the delivery failure from the record.
+
+**1. Try to recover the verdict from the transcript before re-spawning.** It is usually on disk even
+when delivery failed. Layout, verified against real files:
+
+```
+~/.claude/projects/<project-slug>/<session-id>/subagents/
+    agent-a<hash>.jsonl        the transcript
+    agent-a<hash>.meta.json    {"agentType":..., "description":..., "model":..., "toolUseId":...}
+```
+
+`description` is how you tell two concurrent reviewers apart, because it carries the string you
+passed at spawn time. The verdict is the `text` block of the **last record with `type: "assistant"`**
+in the matching `.jsonl`.
+
+**2. Recovered scores go to `gate.mjs` verbatim.** Never edited, never rounded, never interpreted.
+If you had to reason about what a number should be, you did not recover a score — go to step 3.
+
+**3. If nothing is recoverable, record the failure and re-spawn once.**
+
+```
+node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" --step CODE_REVIEW --scores '{}'
+```
+
+That returns ERROR with exit 3 and appends one `result: "ERROR"` row to `step_history`. It consumes
+no fix cycle and, having no `overall` key, it cannot enter any score average. Re-spawn the agent
+once. If the second attempt also produces nothing, that is an infrastructure problem, not a quality
+problem: stop and say so rather than advancing the step.
+
+See also the table in `SKILL.extended.md` under **Sub-Agent Returned No Usable Result**.
 
 ### code-review-agent
 
@@ -279,8 +353,14 @@ unresolved ESCALATE cannot be quietly skipped. Resolution is the user's decision
 
 - If cost limit hit during iteration → ESCALATE (user decides: continue or stop)
 - Store FULL response (including `scores`, `score_justification`, `biggest_gaps`) in `last_review_result`
+- Add one key to the scores object handed to `gate.mjs`: `"top_finding": "<pattern of the highest-severity finding>"`.
+  A short phrase naming the defect SHAPE, not the file it was found in. `recordDecision` persists
+  `scores` verbatim into `pipeline_steps.scores_raw`, where `json_extract` can read it, so this one
+  string turns "the same defect class for six rounds running" from an anecdote into a query.
 - Log to `step_history`: `{ "step": "CODE_REVIEW", "result": "<the gate's result verbatim>", "scores": {...}, "timestamp": "..." }`.
-  Allowed values are `PASS`, `FIX`, `ESCALATE` — the gate's word, not a summary of it.
+  Allowed values are `PASS`, `FIX`, `ESCALATE`, `ERROR` — the gate's word, not a summary of it.
+  `ERROR` means the review did not run (no scores recovered); it consumes no fix cycle and carries no
+  `overall`, so it never lands in a score average. `FAIL` is not a value the gate emits.
 
 ### test-review-agent
 
@@ -326,7 +406,10 @@ limit and mark to beat on the record: those columns in the Current Loops view ar
 the gate's event log, so a step judged by prose instead shows blanks forever afterwards.
 - If cost limit hit during iteration → ESCALATE (user decides: continue or stop)
 - Store FULL response (including `scores`, `score_justification`, `biggest_gaps`) in `last_review_result`
-- Log scores to `step_history` entry: `{ "step": "TEST_REVIEW", "result": "PASS|FAIL", "scores": {...}, "timestamp": "..." }`
+- Add `"top_finding": "<pattern of the highest-severity finding>"` to the scores object handed to
+  `gate.mjs`, exactly as CODE_REVIEW does, so a repeated test defect class is queryable.
+- Log scores to `step_history` entry: `{ "step": "TEST_REVIEW", "result": "<the gate's result verbatim>", "scores": {...}, "timestamp": "..." }`.
+  Allowed values are `PASS`, `FIX`, `ESCALATE`, `ERROR`. `FAIL` is not one the gate emits.
 
 ### visual-qa-agent
 

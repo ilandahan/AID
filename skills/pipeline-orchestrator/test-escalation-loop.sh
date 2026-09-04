@@ -4,7 +4,24 @@
 #   gate.mjs --resolve         ->  Stop hook stops blocking
 # Nothing here touches a real project.
 set -u
-GATE="$HOME/.claude/skills/pipeline-orchestrator/gate.mjs"
+# TEST THE COPY THAT ACTUALLY RUNS (2026-09-04). Both GATE and the unit-test `cd` further down used
+# to hardcode $HOME/.claude/skills/pipeline-orchestrator, so this whole end-to-end test validated an
+# orphan copy that no session loads: Claude Code loads the skill from the AID plugin's versioned
+# install path, and dashboard/qa/aid-pipeline-gate-live.mjs deliberately spawns this script with cwd
+# set THERE — then line 49 cd'd away to the orphan anyway. A test pinned to the wrong artifact is a
+# test that cannot fail when the artifact in use breaks. Resolved from this script's own location,
+# captured BEFORE the `cd "$SANDBOX"` below, because $0 stops resolving once we leave this directory.
+# WINDOWS-FORM path, not the MSYS one (measured 2026-09-04). Plain `pwd` in Git Bash returns
+# /c/ilans' local files/... and MSYS only auto-converts such arguments for a native binary when they
+# contain no spaces. The plugin install path has none, so it converted and this script passed there;
+# the AID-clean source path has a space, so node received /c/ilans'... verbatim, resolved it against
+# the current drive as C:\c\ilans'..., and died MODULE_NOT_FOUND with exit 1. Every gate call then
+# scored a FAIL for a reason that had nothing to do with the gate. `pwd -W` yields C:/ilans' local
+# files/..., which node reads correctly; the fallback keeps this runnable on a real POSIX box.
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && { pwd -W 2>/dev/null || pwd; })"
+GATE="$SKILL_DIR/gate.mjs"
+# The hook stays at its installed path on purpose: that IS where Claude Code loads it from, so it is
+# the real artifact under test rather than a copy.
 HOOK="$HOME/.claude/hooks/dev-pipeline-gate.sh"
 
 # Preflight. Every assertion below that "passes" does so on output NOT containing "block" — which is
@@ -46,7 +63,7 @@ not_block() { # $1 = label, $2 = hook stdout, $3 = hook exit code
 cd "$SANDBOX" || exit 1
 
 echo "== 0) unit tests for the gate decision function"
-if unit=$( cd "$HOME/.claude/skills/pipeline-orchestrator" && node --test 2>&1 ); then
+if unit=$( cd "$SKILL_DIR" && node --test 2>&1 ); then
   ok "gate.test.mjs unit tests pass"
 else
   # Report the runner's own last lines, not a canned "go run it yourself". Discarding this output is
@@ -125,6 +142,23 @@ node "$GATE" --step CODE_REVIEW --scores '{"overall":9.7}' --root "$SANDBOX" >/d
 rc=$?
 { [ "$rc" = 0 ] && [ ! -f .aid/pipeline/ESCALATION.json ]; } \
   && ok "9.7 passes and writes no escalation" || bad "9.7 mishandled (exit $rc)" "$rc"
+
+echo "== 9) a dead agent leaves a record: --scores '{}' exits 3 AND grows step_history"
+# The unit tests call recordDecision directly, so they pass under either ordering inside main().
+# THIS is the assertion that pins the ordering: before 2026-09-04 the ERROR exit ran first, so a
+# reviewer that produced nothing wrote no step_history row at all and the round was invisible.
+# Relative to cwd, which IS $SANDBOX: an absolute MSYS /tmp/... path reaches Windows node verbatim
+# and fails to resolve, and the `|| echo 0` would then report 0 both times — a green-looking
+# no-change that proves nothing. hist() is the discriminator, so it must not be able to fail quietly.
+hist() { node -e 'const s=require("./.aid/pipeline/state.json");console.log((s.step_history||[]).length)'; }
+before=$(hist) || { echo "ABORT: cannot read step_history in $SANDBOX — case 9 cannot be scored"; exit 1; }
+node "$GATE" --step CODE_REVIEW --scores '{}' --root "$SANDBOX" >/dev/null 2>&1
+rc=$?
+after=$(hist) || { echo "ABORT: cannot read step_history after the gate call"; exit 1; }
+[ "$rc" = 3 ] && ok "a scoreless review exits 3 (ERROR), not 1 (FIX)" || bad "expected exit 3, got $rc" "$rc"
+[ "$after" = "$((before+1))" ] && ok "the ERROR appended exactly one step_history row"   || bad "step_history went $before -> $after (expected $((before+1)))" "$after"
+last=$(node -e 'const s=require("./.aid/pipeline/state.json");const h=s.step_history||[];console.log(h.length?h[h.length-1].result:"none")') || last=none
+[ "$last" = "ERROR" ] && ok "the recorded row says ERROR" || bad "last step_history row is $last, not ERROR" "$last"
 
 echo
 echo "RESULT: $pass passed, $fail failed"

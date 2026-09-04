@@ -32,6 +32,60 @@ export const STEP_CONFIG = {
 };
 
 /**
+ * Is there a CRITICAL security finding anywhere in this review?
+ *
+ * DERIVED, NOT TRUSTED (2026-09-04). decide() used to read `scores.critical_security` alone, and the
+ * reviewer agents' JSON contract never emits that key: code-review-agent.md returns
+ * {security, code_quality, documentation, architecture, overall} and nothing more. So the
+ * auto_fail_on_critical_security branch had NEVER fired in the life of this file, while reading in
+ * config.json as though it were an active control. One real transcript hand-added
+ * `"critical_security": false`, which is worse than the key being absent because it makes the flag
+ * look wired.
+ *
+ * So compute it from what reviewers DO report. An explicit boolean is still honoured for callers that
+ * set it deliberately; otherwise any issue marked CRITICAL in a security context counts. Shapes are
+ * accepted liberally because two agent definitions and several hand-written transcripts disagree
+ * about nesting, and a guard that only understands one of them is the same silent no-op again.
+ */
+export function hasCriticalSecurity(scores) {
+  if (typeof scores?.critical_security === "boolean") return scores.critical_security;
+
+  const isCritical = (sev) => String(sev ?? "").trim().toUpperCase() === "CRITICAL";
+  const inSecurity = (obj, inherited) => {
+    const cat = String(obj?.category ?? obj?.area ?? inherited ?? "").toLowerCase();
+    return cat.includes("security");
+  };
+
+  // Flat list: [{severity, category}, ...] under any of the names in use.
+  for (const key of ["issues", "findings", "critical", "criticals"]) {
+    const list = scores?.[key];
+    if (!Array.isArray(list)) continue;
+    for (const f of list) {
+      // A bare string inside a `critical` array is already a critical finding by position.
+      if (typeof f === "string") {
+        if (key === "critical" || key === "criticals") {
+          if (f.toLowerCase().includes("security")) return true;
+        }
+        continue;
+      }
+      if (isCritical(f?.severity) && inSecurity(f)) return true;
+    }
+  }
+
+  // Nested: categories.security.issues[] — the shape code-review-agent.md's response format uses.
+  const sec = scores?.categories?.security;
+  for (const key of ["issues", "findings"]) {
+    const list = sec?.[key];
+    if (!Array.isArray(list)) continue;
+    for (const f of list) {
+      if (typeof f === "string") continue;
+      if (isCritical(f?.severity)) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * The whole gate, as a pure function. No I/O, so a test can cover every branch.
  *
  * `iterationsUsed` counts review→fix cycles already spent on THIS step.
@@ -79,7 +133,7 @@ export function decide({ step, scores, config, iterationsUsed = 0 }) {
   }
 
   // Critical-security auto-fail outranks the composite: a 9.6 average cannot buy a critical finding.
-  if (config?.thresholds?.auto_fail_on_critical_security && scores?.critical_security === true) {
+  if (config?.thresholds?.auto_fail_on_critical_security && hasCriticalSecurity(scores)) {
     return { result: "ESCALATE", exit: 2, cap, iterationsUsed, overall, threshold,
       why: `critical security finding — auto_fail_on_critical_security is set, so this escalates regardless of the ${overall} composite` };
   }
@@ -264,8 +318,17 @@ function main() {
     cap: d.cap ?? null,
     problem: d.result === "PASS" ? null : d.why,
   }, root);
-  if (d.result === "ERROR") process.exit(3);
+  // RECORD FIRST, THEN EXIT (2026-09-04). These two lines used to be the other way round, so an
+  // ERROR left step_history untouched and a dead or malformed reviewer was invisible in the record:
+  // `SELECT count(*) FROM pipeline_steps WHERE result='ERROR'` returned 0 by construction, not by
+  // absence of the event. That is why "3 of 4 spawned agents produced nothing this session" could not
+  // be counted, and why those rounds were being charged to FIX_CODE instead.
+  //
+  // recordDecision is already correct for ERROR with no change: result !== "FIX" so no counter
+  // increments, and with no `overall` key the dashboard's pickScore yields NULL, so an ERROR row can
+  // never pollute a score average.
   if (!has("dry-run")) recordDecision(root, { step, decision: d, scores });
+  if (d.result === "ERROR") process.exit(3);
 
   if (d.result === "ESCALATE" && !has("dry-run")) {
     const p = writeEscalation(root, {

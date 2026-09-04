@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { decide, openEscalation, recordDecision } from "./gate.mjs";
+import { decide, openEscalation, recordDecision, hasCriticalSecurity } from "./gate.mjs";
 
 const CONFIG = {
   max_iterations: { code_review: 5, test_review: 5, phase_gate_reexamine: 5, visual_qa: 5 },
@@ -142,6 +142,111 @@ test("the gate owns the counter: two consecutive FIX decisions consume two of th
     assert.equal(s.step_history.length, 3);
     assert.deepEqual(s.step_history.map((h) => h.result), ["FIX", "FIX", "PASS"]);
     assert.equal(s.step_history[1].iteration, 2);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// critical_security is DERIVED (2026-09-04). The reviewer agents never emit the
+// `critical_security` key, so the auto-fail branch above was dead code from the day it shipped.
+// These cases pin the derivation from the findings reviewers DO emit; without them the branch can
+// silently return to being decorative.
+
+test("a CRITICAL security finding in the reviewer's own output escalates, with no critical_security key", () => {
+  const scores = {
+    overall: 9.9,
+    issues: [
+      { severity: "MINOR", category: "documentation", note: "missing jsdoc" },
+      { severity: "CRITICAL", category: "security", note: "token logged in plaintext" },
+    ],
+  };
+  assert.equal(hasCriticalSecurity(scores), true, "derivation must find the finding");
+  const d = decide({ step: "CODE_REVIEW", scores, config: CONFIG });
+  assert.equal(d.result, "ESCALATE", "9.9 composite must not buy a critical security finding");
+  assert.equal(d.exit, 2);
+  assert.match(d.why, /critical security/);
+});
+
+test("the nested categories.security shape the response format uses is read too", () => {
+  const scores = { overall: 9.8, categories: { security: { issues: [{ severity: "critical", note: "auth bypass" }] } } };
+  assert.equal(hasCriticalSecurity(scores), true);
+  assert.equal(decide({ step: "CODE_REVIEW", scores, config: CONFIG }).result, "ESCALATE");
+});
+
+test("a CRITICAL finding OUTSIDE security does not trip the security auto-fail", () => {
+  // The step function already caps a CRITICAL at 4, so this review fails on its composite anyway.
+  // What must not happen is it escalating as a SECURITY event and skipping its remaining fix cycles.
+  const scores = { overall: 4, issues: [{ severity: "CRITICAL", category: "code_quality", note: "data loss on retry" }] };
+  assert.equal(hasCriticalSecurity(scores), false);
+  assert.equal(decide({ step: "CODE_REVIEW", scores, config: CONFIG }).result, "FIX");
+});
+
+test("an explicit critical_security boolean still wins, in both directions", () => {
+  assert.equal(hasCriticalSecurity({ critical_security: true }), true);
+  // false must not be overridden by a derivation, or a caller that deliberately cleared the flag
+  // after review would be unable to.
+  assert.equal(hasCriticalSecurity({ critical_security: false, issues: [{ severity: "CRITICAL", category: "security" }] }), false);
+});
+
+test("a clean review derives false rather than throwing on any shape", () => {
+  for (const scores of [{ overall: 9.6 }, { overall: 9.6, issues: [] }, { overall: 9.6, issues: null },
+                        { overall: 9.6, categories: {} }, {}, null, undefined]) {
+    assert.equal(hasCriticalSecurity(scores), false, `shape ${JSON.stringify(scores)} must derive false`);
+  }
+  assert.equal(decide({ step: "CODE_REVIEW", scores: { overall: 9.6 }, config: CONFIG }).result, "PASS");
+});
+
+test("the auto-fail respects its config switch: unset means the composite decides", () => {
+  const scores = { overall: 9.9, issues: [{ severity: "CRITICAL", category: "security" }] };
+  const off = { ...CONFIG, thresholds: { ...CONFIG.thresholds, auto_fail_on_critical_security: false } };
+  assert.equal(decide({ step: "CODE_REVIEW", scores, config: off }).result, "PASS");
+});
+
+// ---------------------------------------------------------------------------
+// A dead agent must leave a record (2026-09-04). ERROR used to exit before recordDecision ran, so
+// a reviewer that produced nothing was absent from step_history entirely and the round got charged
+// to the next FIX_CODE. These pin both halves: the ERROR verdict, and the row it must leave behind.
+
+test("a review that produced no scores is ERROR, and still records exactly one row", () => {
+  const root = mkdtempSync(join(tmpdir(), "gate-error-"));
+  try {
+    mkdirSync(join(root, ".aid/pipeline"), { recursive: true });
+    writeFileSync(join(root, ".aid/pipeline/state.json"), JSON.stringify({ current_task_id: "t1", iterations: { code_review: 2 } }));
+    const read = () => JSON.parse(readFileSync(join(root, ".aid/pipeline/state.json"), "utf8"));
+
+    const d = decide({ step: "CODE_REVIEW", scores: {}, config: CONFIG, iterationsUsed: 2 });
+    assert.equal(d.result, "ERROR");
+    assert.equal(d.exit, 3);
+
+    recordDecision(root, { step: "CODE_REVIEW", decision: d, scores: {} });
+    const s = read();
+    assert.equal(s.step_history.length, 1, "a dead agent must be visible in the record");
+    assert.equal(s.step_history[0].result, "ERROR");
+    assert.equal(s.iterations.code_review, 2, "an ERROR is not a fix cycle — it must not consume one");
+    assert.equal(s.step_history[0].scores.overall, undefined,
+      "no overall key, so the dashboard's pickScore yields NULL and this row cannot pollute a score average");
+    assert.match(s.step_history[0].note, /^gate\.mjs: /);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an ERROR row never lands in the score series alongside real rounds", () => {
+  const root = mkdtempSync(join(tmpdir(), "gate-error-mix-"));
+  try {
+    mkdirSync(join(root, ".aid/pipeline"), { recursive: true });
+    writeFileSync(join(root, ".aid/pipeline/state.json"), JSON.stringify({ current_task_id: "t1", iterations: { code_review: 0 } }));
+    const read = () => JSON.parse(readFileSync(join(root, ".aid/pipeline/state.json"), "utf8"));
+
+    const fix = decide({ step: "CODE_REVIEW", scores: { overall: 6.0 }, config: CONFIG, iterationsUsed: 0 });
+    recordDecision(root, { step: "CODE_REVIEW", decision: fix, scores: { overall: 6.0 } });
+    const dead = decide({ step: "CODE_REVIEW", scores: {}, config: CONFIG, iterationsUsed: read().iterations.code_review });
+    recordDecision(root, { step: "CODE_REVIEW", decision: dead, scores: {} });
+
+    const s = read();
+    assert.deepEqual(s.step_history.map((h) => h.result), ["FIX", "ERROR"]);
+    assert.equal(s.iterations.code_review, 1, "the dead round cost no cycle; only the real FIX did");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

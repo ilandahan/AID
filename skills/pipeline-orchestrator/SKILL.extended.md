@@ -237,12 +237,27 @@ If `state.json` exists with `pipeline_status: "completed"`:
 - Display: "Previous pipeline completed for task [X]. Start new pipeline? (y/n)"
 - If yes, archive old state and initialize fresh
 
-### Sub-Agent Parse Error
+### Sub-Agent Returned No Usable Result
 
-If agent returns non-JSON or malformed response:
-- Log the raw response
-- Display: "Sub-agent returned unexpected format. Treating as FAIL."
-- Enter fix cycle as if FAIL
+CORRECTED 2026-09-04. This section used to say "Treating as FAIL" and enter a fix cycle. That is
+wrong, and it contradicted `gate.mjs`, whose own comment reads: *a review that produced no score has
+not scored badly — it has not run*. FAIL launders a delivery failure into a quality signal and spends
+one of five fix cycles on a review that scored nothing. It also hid the event from the record
+entirely, which is why "3 of 4 spawned agents produced nothing this session" was uncountable.
+
+Three different events were being conflated. Handle them apart:
+
+| What actually happened | Correct handling |
+|---|---|
+| Verdict is legible but not clean JSON | Recover the JSON from the transcript and run the gate on the recovered scores. This is a real round and it counts as one. |
+| Findings exist but there are no scores anywhere | ERROR. Re-spawn the agent once. Never invent a number. |
+| Agent idle, reports "available", produced no message | ERROR, plus a transcript recovery attempt — the verdict is usually on disk even when delivery failed. |
+
+`FAIL` is not one of the three, and it is not a value the gate emits. Run
+`gate.mjs --step <STEP> --scores '{}'`, which returns ERROR with exit 3 and records one
+`result: "ERROR"` row in `step_history` without consuming a fix cycle.
+
+Recovery procedure: see **When a spawned agent reports no result** in `SKILL.md`.
 
 ### Config File Missing
 
