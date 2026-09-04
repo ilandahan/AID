@@ -21,7 +21,8 @@
     "visual_qa_pass": 7,
     "test_review_pass": 9.5,
     "auto_fail_on_critical_security": true,
-    "min_coverage_percent": 80
+    "min_coverage_percent": 80,
+    "max_surfaces": 2
   },
   "visual_qa": {
     "dev_server_url": "http://localhost:5173",
@@ -56,5 +57,9 @@
     "bundle_dir": "~/.claude/skills/autoresearch",
     "criticality_profile": "standard business app",
     "safety_critical_flows": []
+  },
+  "reviewers": {
+    "count_first_round": 2,
+    "dual_within_of_threshold": 1.0
   }
 }

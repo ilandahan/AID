@@ -42,6 +42,12 @@ remains the manual entry point, and the `dev-pipeline-gate.sh` Stop hook remains
 ### Phase 4: Development Loop
 
 ```
+(brief freeze) --> [BRIEF_SCOPE gate] --> DESIGN_REVIEW (advisory) --> DEVELOP --> SELF_REVIEW (ungated) --> CODE_REVIEW
+                                                                                                              |
+                             the gated topology below is unchanged; the three steps above never block: --------+
+                             BRIEF_SCOPE escalates to the HUMAN before the brief is frozen, DESIGN_REVIEW
+                             and SELF_REVIEW have no fail branch and no counter at all.
+
 DEVELOP --> CODE_REVIEW --> AR_DESIGN --> TDD --> AR_FUNCTION --> VISUAL_QA --> TEST_REVIEW --> PHASE_GATE --> AR_ACCEPTANCE
    ^            |              |           ^           |              |              |              |              |
    |          [FAIL]        [PASS]         |        [PASS]         [FAIL]         [FAIL]         [FAIL]          [gap]
@@ -89,7 +95,9 @@ API_TESTS     E2E_TESTS
 
 | Step | Action | Sub-Agent | On PASS | On FAIL |
 |------|--------|-----------|---------|---------|
-| DEVELOP | Implement per spec using TDD (RED-GREEN-REFACTOR), following the **TDD standard** (see "Best-practice standards"). Test source = PRD/spec if present, else the frozen `brief.md` | No | CODE_REVIEW | N/A |
+| DESIGN_REVIEW | **ADVISORY, never blocking.** One reviewer reads the frozen brief and the code it will touch, and writes `.aid/pipeline/<task_id>/design.md` including the required `NON_DETERMINISTIC_INPUTS` table. Not in `STEP_CONFIG`: no threshold, no counter, cannot ESCALATE, cannot FIX. Writes one `step_history` row with **no `overall` key** | Yes (1) | DEVELOP | N/A — it has no fail branch |
+| DEVELOP | Implement per spec using TDD (RED-GREEN-REFACTOR), following the **TDD standard** (see "Best-practice standards"). Test source = PRD/spec if present, else the frozen `brief.md` | No | SELF_REVIEW | N/A |
+| SELF_REVIEW | **NOT GATED.** The implementer scores its own work against the same four-dimension rubric before any reviewer sees it, and names the single most likely MAJOR in advance. No sub-agent. Writes `.aid/pipeline/<task_id>/self-review-<n>.json` and one `step_history` row with `result: "SELF_SCORED"` and the key **`self_review_overall`, never `overall`** | No | CODE_REVIEW | N/A — it cannot fail |
 | CODE_REVIEW | Spawn code-review-agent with changed files. **HARD CAP: 5 review->fix cycles** (`config.max_iterations.code_review`, default 5), then ESCALATE | Yes | AR_DESIGN | FIX_CODE |
 | FIX_CODE | Apply fixes using full review feedback (scores + action_required), **at the level of the defect CLASS, not the one file the finding named**. NOT complete until `.aid/pipeline/<task_id>/fix-<n>.json` exists and every grep it records re-runs clean | No | CODE_REVIEW | N/A |
 | AR_DESIGN | **AR-1 (pre-TDD).** Invoke the autoresearch runner skill (the shared `autoresearch` skill) in `mode=design` with `program.ar-design.md`. Judge-only (reflection-agent + `phase-4a-code-design.yaml`); bounded keep/revert loop; **NO interface / public-API / data-shape changes**. Logs final scores to `step_history` and writes `state.json` UNCONDITIONALLY as the final action of the step, after the last source mutation of any kind (kept edit or revert/restore) | Yes (runner) | TDD | (bounded by max_iterations / max_consecutive_reverts) |
@@ -157,6 +165,133 @@ AUTORESEARCH AR-2 (FUNCTION) KPIs (post-TDD, composite — quality x Tier-1 gate
   Note: tests are FROZEN in AR-2 (they are the harness) — write them right in TDD, since AR-2
   cannot edit them to make code pass.
 ```
+
+### SELF_REVIEW Step — ungated, and why that is not a loophole
+
+Round-1 median is 6.1. That is a briefing gap, not a skill gap: the implementer stops when the code
+looks done rather than when it would survive a skeptical reader. This step makes it read its own diff
+the way the reviewer will, while the fix is still cheap.
+
+**Deliberately NOT in `STEP_CONFIG`. Two reasons, the first decisive:**
+
+1. **A gated self-score poisons the measurement.** `pipeline_steps` has no "who scored this" column.
+   A `SELF_REVIEW` entry in `STEP_CONFIG` would write `scores.overall` into `step_history`,
+   `loaders.js` lifts that into `pipeline_steps.score`, and every query used to judge this reform
+   would then silently mix self-scores with reviewer scores. You would be measuring the reform with
+   an instrument the reform broke.
+2. **It could escalate against itself.** A step in `STEP_CONFIG` can reach ESCALATE, letting the
+   implementer write `ESCALATION.json` and block its own turn-end with no reviewer involved.
+
+So it writes `step_history` directly with `result: "SELF_SCORED"` and uses `self_review_overall`.
+`pickScore` yields null for a row with no `overall`, so this row can never be read as a review round.
+There is precedent in the record: `result='SELF_PERFORMED_NO_SCORE'` already appears and
+`public/step-cells.js` already reasons about it.
+
+**Artifact:** `.aid/pipeline/<task_id>/self-review-<n>.json`, `<n>` matching the DEVELOP round.
+
+```json
+{
+  "round": 1,
+  "self_review_overall": 8.2,
+  "dimensions": {
+    "security":      { "score": 9,   "evidence": ["src/auth.ts:45", "src/auth.ts:88"] },
+    "code_quality":  { "score": 8,   "evidence": ["src/repair.ts:88"] },
+    "architecture":  { "score": 8.5, "evidence": ["src/tokens.js:308"] },
+    "documentation": { "score": 7,   "evidence": ["src/tokens.js:1"] }
+  },
+  "worst_finding": "the guard is evaluated at a different granularity than the DELETE it protects",
+  "blockers": [
+    { "what": "no seam for the clock in snapshot()", "why": "would need a signature change the brief does not cover" }
+  ]
+}
+```
+
+Score against the SAME rubric the reviewer uses, quoted rather than paraphrased:
+
+```
+  Security (30%): OWASP Top 10 — any vulnerability = auto-FAIL
+  Code Quality (30%): Single responsibility, proper types, no silent catches, no TODO
+  Architecture (25%): Tech spec compliance, separation of concerns, dependency direction
+  Documentation (15%): File headers, WHY comments, connection tags
+```
+
+**Exit condition, and it is NOT "claim 9.5".** Every dimension carries at least one `file:line` of
+evidence, `worst_finding` is named, and **either** `self_review_overall >= 9.5` **or** `blockers[]`
+is non-empty with a stated reason per blocker.
+
+Forcing the step to claim 9.5 before exiting was considered and rejected. Against measured reality —
+8 percent of real reviews clear 9.5, round-1 median 6.1 — a forced claim is a forced lie most of the
+time, and the pipeline's first act would be teaching the implementer that the rubric is a formality.
+A named gap is information. A coerced 9.5 is noise.
+
+**`worst_finding` does the real work.** Naming the single most likely MAJOR a skeptical reviewer will
+raise is the one part that cannot be produced by pattern-matching your own diff approvingly.
+
+**The bias cannot be removed, so measure it.** When CODE_REVIEW round 1 runs, the orchestrator adds
+`self_review_overall` to the scores object it hands `gate.mjs`. `recordDecision` persists it and
+`scores_raw` makes it queryable, so a rubber stamp becomes a number with a name: the calibration
+delta. An isolated agent doing the self-score would be unbiased, but it would simply be round 1 under
+another name — costing a full review and saving nothing. The value here is that the implementer holds
+information the reviewer does not; the risk is that it grades itself. Only the delta says which won.
+
+**Kill criterion, agreed up front.** Two weeks after this ships: if round-1 average has not moved
+materially above 6.1, or the median `self_review_overall - score` delta exceeds about 2.0, delete the
+step. It is then a ritual that costs a step and produces a lie.
+
+### DESIGN_REVIEW Step — advisory, and where injectability is decided
+
+**Advisory by explicit decision.** Architecture stays at 25% of the CODE_REVIEW composite and this
+step never blocks. Be straight about what that costs: an advisory review cannot stop a bad design
+reaching code, so the plateau from architecture findings persists. What it buys is that the
+implementer sees the structural problems before the reviewer does, and can fix them before round 1
+rather than in round 4.
+
+It also costs less than it looks. The MAJOR cap is weight-independent: an architecture MAJOR caps a
+review at 6 whatever architecture's percentage is, so a reweight would only ever have operated inside
+the already-clean band.
+
+**Reviewer resolution.** Resolve `configo:architecture-reviewer` if it is available, else
+`aid:phase2-techspec-pm-reviewer`. Both are plugin agents addressed by NAME — there is no
+`~/.claude/agents/phase2-techspec-pm-reviewer.md` file to fall back to. If neither resolves, log a
+warning and SKIP to DEVELOP. Skipping is legitimate here precisely because the step is advisory; a
+gated step may never be skipped for a missing reviewer.
+
+**One reviewer, one artifact.** The `phase2-*` designers are authors, not reviewers, and spawning
+five of them for a two-surface slice is the over-build this pipeline does not need.
+
+#### `design.md` and the `NON_DETERMINISTIC_INPUTS` table
+
+Injectability is a **design-time** property. No test-fix round can add a seam the design omitted, so
+this is the only step where it can still be cheap. `design.md` must carry one row per
+non-deterministic input the declared surfaces touch:
+
+```markdown
+## NON_DETERMINISTIC_INPUTS
+
+| Input | Kind | Injection seam | seam_token |
+|---|---|---|---|
+| current time | clock | `snapshot({ now })` takes the instant as a parameter | `now` |
+| retry jitter | random | `withRetry(fn, { rng })` | `rng` |
+| the verify child process | spawn | `runCheck(check, { spawn })` | `spawn` |
+| DB_PATH | env var | `openDb(path)` takes the path, never reads env | `dbPath` |
+```
+
+One row per clock, random source, spawned process, network call, filesystem path, environment
+variable and timezone. `seam_token` names the **literal parameter** a test will pass, for example
+`now` or `clock` — not a description of it, because the `seams` check greps for that token in the
+project's tests.
+
+**A clock seam's test set must include one boundary value** — a day boundary or a DST transition.
+Both measured bugs of this class were boundary cases: a 04:00 day-boundary failure, and a fixture
+that was green at night and red between 10:00 and 16:00. Neither was reachable without a seam, and
+neither would have been caught by a mid-afternoon test.
+
+Because this step is advisory, the requirement needs a **check** rather than a gate to have any
+force: `qa/pipeline-artifacts.mjs seams` fails when a declared `seam_token` appears in no test file.
+Stated ceiling, so nobody mistakes it for more than it is: writing the token in a test satisfies the
+grep without injecting anything. It is a low bar on purpose — the measured six-round case had no seam
+at all and fails it loudly. Tighten it only if it proves insufficient, and not with static analysis
+before then.
 
 ### FIX_CODE Step — Full Review Context
 
@@ -307,6 +442,13 @@ See also the table in `SKILL.extended.md` under **Sub-Agent Returned No Usable R
 
 1. Read `.aid/context.json` → extract task ID + description → this is `{{TASK_CONTEXT}}`
 2. Run `git diff --name-only HEAD` → read each changed file's full content → this is `{{CHANGED_FILES}}`
+
+   **Falsify the brief's surface count against this diff before spawning.** If the diff touches more
+   distinct top-level source directories than `brief.md` declares surfaces, the declaration was
+   false: stop, and re-run `gate.mjs --brief-check` against reality. This is what makes the
+   declaration a claim with a mechanical consequence instead of a guess, and it is what stops
+   "one surface: the dashboard" from being the cheap way past the cap. The command is already being
+   run here, so the falsifier costs nothing.
 3. Read relevant section from `docs/tech-spec/` → this is `{{TECH_SPEC_EXCERPT}}`. **In a non-AID project `docs/tech-spec/` won't exist — if it is absent or empty, derive the architectural reference from the frozen `.aid/pipeline/<task_id>/brief.md` (ORIGINAL_REQUEST + STATED_WHY + DEVELOP plan), the same source AR_ACCEPTANCE and qa-validator use, and state in `{{TECH_SPEC_EXCERPT}}` that no formal tech-spec exists so the agent reviews the Architecture category against the brief rather than silently scoring it against nothing. Never review architecture against nothing.**
 4. Read `<this skill>/references/standards/code-review/SKILL.md` verbatim (project `.claude/skills/code-review/SKILL.md` if present) → this is `{{CODE_STANDARDS}}`
 5. Read `.claude/agents/code-review-agent.md` (project-first, else `~/.claude/agents/code-review-agent.md`)
@@ -351,8 +493,55 @@ The Stop hook (`dev-pipeline-gate.sh`) blocks every turn-end while an escalation
 unresolved ESCALATE cannot be quietly skipped. Resolution is the user's decision, recorded with
 `gate.mjs --resolve "<reason>"`.
 
+#### Two reviewers, and exactly when
+
+Run **two** independent reviewers on **round 1**, where the defect set is largest, and on any
+**boundary round** where the previous score is within `reviewers.dual_within_of_threshold` (default
+1.0) of the threshold and a single noisy sample decides a gate. Run **one** everywhere else.
+
+The 6.7-to-8.8 middle band is cap-dominated — a second sample there changes nothing and costs double.
+
+**What two reviewers buy, and what they do not.** They do NOT make a 9.5 gate stable: averaging two
+samples of the same prompt cuts the standard deviation by only about 1 over root 2, so against the
+measured 1.5-point dimension spread the residual is still roughly 1.06. What they buy is the **union
+of defects in one round instead of across two.** That is the entire case for the change.
+
+**Cost, and why this is not for every round.** Review and fix steps are already 52 percent of all
+pipeline steps. On the six-surface task the hard numbers were `estimated_cost_usd: 20.88`, of which
+eight CODE_REVIEW rounds were $6.63 and six TEST_REVIEW rounds were $6.72 — review was $13.35 of
+$20.88. Doubling reviewer spend unrestricted would trip `cost_limits.max_per_run_usd` into ESCALATE
+more often, and a cost-brake escalation is a WORSE round than a review round because it needs a human.
+On the restriction above the arithmetic is favourable: two reviewers across three rounds is about six
+reviewer calls where one reviewer across eight rounds was eight.
+
+**Spawn shape.** Two `Agent(...)` calls with the **identical rendered prompt** and distinct
+`description` values — "Isolated code review A — pipeline step" and "… B …". Isolation is automatic:
+they are separate sub-agents with no shared context. The `.meta.json` beside each transcript carries
+`description`, which is how the recovery procedure tells them apart.
+
+**Two rules, both absolute.** Do not show A's output to B. Do not summarise, round or reconcile either
+one before merging — `mergeReviews` takes both **verbatim**:
+
+```bash
+node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" --step CODE_REVIEW   --scores   '<reviewer A's JSON, verbatim>'   --scores-b '<reviewer B's JSON, verbatim>'
+```
+
+The merge is in code, not in your judgement, because you are the party that wants to advance and
+arbitrating two disagreeing reviews is not a call the interested party gets to make. It takes the
+severity cap from the **union** of findings and the mean only underneath it, so a clean 9.6 merged
+with a 6.0 carrying one real MAJOR yields 6.0 and not 7.8. It also emits `reviewers`, `spread` and
+`reviewers_used`, so judge variance stops being an anecdote recoverable only from transcripts.
+
+**If one reviewer produces nothing**, the merge uses the survivor as-is with `reviewers_used: 1` and
+never averages against a phantom. If NEITHER produced a score, that is ERROR — see
+**When a spawned agent reports no result**.
+
 - If cost limit hit during iteration → ESCALATE (user decides: continue or stop)
 - Store FULL response (including `scores`, `score_justification`, `biggest_gaps`) in `last_review_result`
+- **On iteration 1 only**, also add `"self_review_overall": <the number SELF_REVIEW claimed>` to the
+  scores object. It carries no weight in any decision — `decide()` never reads it — and exists so the
+  calibration delta between what the implementer claimed and what the reviewer scored is queryable
+  from `scores_raw` instead of recoverable only from transcripts.
 - Add one key to the scores object handed to `gate.mjs`: `"top_finding": "<pattern of the highest-severity finding>"`.
   A short phrase naming the defect SHAPE, not the file it was found in. `recordDecision` persists
   `scores` verbatim into `pipeline_steps.scores_raw`, where `json_extract` can read it, so this one
@@ -652,6 +841,9 @@ When `/pipeline` is invoked:
    tech_spec_ref: <path to docs/tech-spec/… or "">
    impl_plan_ref: <path to docs/impl-plan/… or "">
    acceptance_criteria_ref: .aid/qa/<task_id>.yaml
+   surfaces:                        # REQUIRED. See "Declaring surfaces" below.
+     - name: <what a user can point at>
+       path: <the primary file or directory it lives in>
    ---
 
    ## ORIGINAL_REQUEST (verbatim — never edit)
@@ -668,6 +860,35 @@ When `/pipeline` is invoked:
    - If `original_request` / `stated_why` are already persisted (existing `brief.md`, or an existing PRD's problem/why) → use those (`source: prd`).
    - Else capture them VERBATIM from the current conversation's first user message + the established WHY (`source: conversation`).
    - If neither is available (e.g. `/pipeline` invoked cold with no prompt and no PRD) → **ESCALATE: ask the user for the original request + WHY before proceeding.** A pipeline with no frozen intent cannot be accepted by AR-3.
+
+5a. **Scope-check the brief BEFORE freezing it.** Draft to `brief.draft.md`, check it, and only on
+   exit 0 write `brief.md` and let the hook record the SHA. The order is load-bearing: the hook
+   records `brief.sha256` on first freeze, so a check that ran afterwards would be demanding edits to
+   an immutable, hash-pinned file.
+
+   ```bash
+   node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs"      --brief-check .aid/pipeline/<task_id>/brief.draft.md
+   ```
+
+   | Exit | Meaning | What to do |
+   |---|---|---|
+   | 0 | within `thresholds.max_surfaces` | rename the draft to `brief.md` and continue |
+   | 2 | too many surfaces — `ESCALATION.json` written, Stop hook blocks | split the task into one brief per surface, or `gate.mjs --resolve "<why it cannot be split>"` |
+   | 3 | no `surfaces:` block, an inline value, or a surface missing its `path` | fix the declaration — an undeclared brief has not been scope-checked, and that is not a pass |
+
+   **Declaring surfaces.** A surface is **one thing a user can point at and say "this changed"**: a
+   route, page or tab; a CLI command or flag; an API endpoint; a background job; an instrumentation
+   tier; a file format. Refactors, helpers, types, tests and config plumbing are **not** surfaces.
+
+   **Why the cap exists, and why it is not negotiable per-round.** Every task that has ever reached
+   9.5 was one surface. The two that never reached it carried six each. The mechanism is not
+   mysterious: any single MAJOR finding caps the whole review at 6, and MAJOR-eligible defect count
+   scales with how many surfaces the diff touches. A wide slice cannot pass a 9.5 gate however many
+   fix rounds it is given, and the rounds get spent proving that. Splitting is cheaper than iterating.
+
+   The declaration is **yours to make and the diff's to falsify** — see step 2 of the CODE_REVIEW
+   spawn. Do not ask a sub-agent to judge the width; width is the thing being policed, and the party
+   that wants to advance is the wrong one to rule on it.
 
 6. Also mirror the verbatim `original_request` and `stated_why` into `.aid/context.json` (so existing reflection tooling can read them from disk too), but `brief.md` is the authoritative immutable copy.
 
@@ -835,6 +1056,9 @@ Read from `.aid/pipeline/config.json`:
 
 | Setting | Default | Purpose |
 |---------|---------|---------|
+| `reviewers.count_first_round` | 2 | Independent reviewers to spawn on round 1, where the defect set is largest. Merged by `gate.mjs --scores-b`, cap from the union then mean underneath |
+| `reviewers.dual_within_of_threshold` | 1.0 | Also spawn two when the previous score is within this of the threshold, i.e. a boundary round where one noisy sample decides a gate. The cap-dominated middle band gets one reviewer |
+| `thresholds.max_surfaces` | 2 | Max surfaces one brief may declare, enforced by `gate.mjs --brief-check` before the freeze (ESCALATE above it). Frozen per-run into `config.frozen.json`, so a run's own scope bar is auditable |
 | `max_iterations.code_review` | 5 | Max CODE_REVIEW→FIX_CODE cycles (HARD CAP — then ESCALATE) |
 | `max_iterations.test_review` | 5 | Max TEST_REVIEW→FIX_TEST_CODE cycles (HARD CAP — then ESCALATE, mirrors CODE_REVIEW) |
 | `max_iterations.phase_gate_reexamine` | 5 | Max PHASE_GATE-FAIL→DEVELOP re-examine rounds (HARD CAP — then ESCALATE; DISTINCT from AR-3 `max_acceptance_rounds`) |

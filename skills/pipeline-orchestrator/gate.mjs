@@ -240,6 +240,257 @@ function writeEscalation(root, payload) {
   return p;
 }
 
+/**
+ * How many SURFACES does this brief declare, and is that within the run's cap?
+ *
+ * WHY THIS EXISTS. Every task that ever reached 9.5 was one surface. The two that never reached it
+ * carried six each. That is not a correlation to admire — there is a mechanism: one MAJOR finding
+ * anywhere caps the whole review at 6, and MAJOR-eligible defect count scales with the number of
+ * surfaces in the diff. So a wide slice cannot pass a 9.5 gate no matter how many fix rounds it is
+ * given, and the rounds get spent proving that.
+ *
+ * WHY IT IS A DECLARATION RATHER THAN A JUDGEMENT. Do not ask an agent to assess width; width is the
+ * thing being policed, and the party that wants to advance is the wrong one to rule on it. The brief
+ * DECLARES its surfaces, and step 2 of the CODE_REVIEW spawn falsifies the declaration against
+ * `git diff --name-only HEAD`. A claim with a mechanical consequence, not a guess.
+ *
+ * A surface is one thing a user can point at and say "this changed": a route, page or tab, a CLI
+ * command or flag, an API endpoint, a background job, an instrumentation tier, a file format.
+ * Refactors, helpers, types, tests and config plumbing are NOT surfaces.
+ *
+ * Pure, and separate from decide(): decide() correctly returns ERROR for a step it does not judge,
+ * and BRIEF_SCOPE is deliberately not in STEP_CONFIG (it is not scored, so it has no counter and no
+ * threshold key of the usual shape).
+ *
+ * An absent or empty `surfaces:` block is ERROR, not PASS. An undeclared brief has not been checked,
+ * and "cannot tell" is never a pass — the same rule as a missing score at line ~130.
+ */
+export function checkBriefScope({ text, config }) {
+  const max = config?.thresholds?.max_surfaces;
+  if (!Number.isFinite(max) || max < 1) {
+    return { result: "ERROR", exit: 3, surfaces: null, declared: [],
+      why: `config.thresholds.max_surfaces must be a number >= 1 (got ${JSON.stringify(max)})` };
+  }
+  if (typeof text !== "string" || !text.trim()) {
+    return { result: "ERROR", exit: 3, surfaces: null, declared: [], max,
+      why: "the brief is empty — there is nothing to check" };
+  }
+
+  // Deliberately a small parser rather than a YAML dependency: the gate has no node_modules and must
+  // run from any project. It reads exactly the shape the brief template writes.
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((l) => /^surfaces:\s*$/.test(l));
+  if (start === -1) {
+    // An inline `surfaces: []` or `surfaces: 3` is a declaration that skipped the naming, which is
+    // where the honesty lives. Name it as a distinct error rather than reporting "no block".
+    const inline = lines.find((l) => /^surfaces:\s*\S/.test(l));
+    return { result: "ERROR", exit: 3, surfaces: null, declared: [], max,
+      why: inline
+        ? `surfaces: must be a block list of named entries, not inline (${inline.trim()})`
+        : "the brief declares no `surfaces:` block — an undeclared brief has not been scope-checked" };
+  }
+
+  const declared = [];
+  const malformed = [];
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^\S/.test(line)) break; // next top-level key, or the front-matter terminator
+    const item = /^\s*-\s*(.*)$/.exec(line);
+    if (item) {
+      declared.push({ raw: item[1], name: null, path: null });
+      // `- name: x` on the item line itself
+      const inlineName = /^name:\s*(.+)$/.exec(item[1].trim());
+      if (inlineName) declared[declared.length - 1].name = inlineName[1].trim();
+      continue;
+    }
+    const kv = /^\s*(name|path):\s*(.+)$/.exec(line);
+    if (kv && declared.length) declared[declared.length - 1][kv[1]] = kv[2].trim();
+  }
+
+  if (declared.length === 0) {
+    return { result: "ERROR", exit: 3, surfaces: 0, declared, max,
+      why: "the `surfaces:` block is empty — an undeclared brief has not been scope-checked" };
+  }
+  for (const d of declared) {
+    if (!d.name || !d.path) malformed.push(d.name ?? d.path ?? d.raw ?? "<blank>");
+  }
+  if (malformed.length) {
+    // A surface with no path cannot be falsified against the diff, so it is not a declaration — it is
+    // a label. Refusing it here is what stops "one surface: the dashboard" from working.
+    return { result: "ERROR", exit: 3, surfaces: declared.length, declared, max,
+      why: `every surface needs both a name and a path; ${malformed.length} missing one: ${malformed.join(", ")}` };
+  }
+
+  // `raw` is parser scaffolding used only for the malformed-entry message; it must not reach the
+  // recorded artifact, where it would be a second, drifting copy of name.
+  const clean = declared.map(({ name, path }) => ({ name, path }));
+
+  if (declared.length > max) {
+    return { result: "ESCALATE", exit: 2, surfaces: declared.length, declared: clean, max,
+      why: `${declared.length} surfaces declared against a cap of ${max} — split the task, or resolve this ` +
+        `escalation with the reason the slice cannot be split` };
+  }
+  return { result: "PASS", exit: 0, surfaces: declared.length, declared: clean, max,
+    why: `${declared.length} surface(s) within the cap of ${max}` };
+}
+
+export const REVIEW_WEIGHTS = { security: 30, code_quality: 30, architecture: 25, documentation: 15 };
+
+/**
+ * Every finding a review reported, flattened, whatever shape it arrived in.
+ *
+ * Liberal on input for the same reason hasCriticalSecurity is: two agent definitions and several
+ * hand-written transcripts disagree about nesting, and a merge that understands one shape would
+ * silently drop the other reviewer's findings — which is exactly the failure the second reviewer was
+ * added to prevent.
+ */
+export function collectFindings(scores) {
+  const out = [];
+  const push = (f, inheritedCategory) => {
+    if (!f) return;
+    if (typeof f === "string") {
+      out.push({ file: "", pattern: f, severity: "", category: inheritedCategory ?? "" });
+      return;
+    }
+    out.push({
+      file: String(f.file ?? f.path ?? f.at ?? ""),
+      pattern: String(f.pattern ?? f.issue ?? f.note ?? f.title ?? f.description ?? ""),
+      severity: String(f.severity ?? ""),
+      category: String(f.category ?? f.area ?? inheritedCategory ?? ""),
+    });
+  };
+  for (const key of ["issues", "findings", "action_required"]) {
+    if (Array.isArray(scores?.[key])) for (const f of scores[key]) push(f);
+  }
+  const cats = scores?.categories;
+  if (cats && typeof cats === "object") {
+    for (const [name, cat] of Object.entries(cats)) {
+      for (const key of ["issues", "findings"]) {
+        if (Array.isArray(cat?.[key])) for (const f of cat[key]) push(f, name);
+      }
+    }
+  }
+  return out;
+}
+
+const severityRank = (sev) => {
+  const s = String(sev ?? "").trim().toUpperCase();
+  if (s === "CRITICAL") return 3;
+  if (s === "MAJOR") return 2;
+  if (s === "MINOR") return 1;
+  return 0;
+};
+
+/**
+ * Merge two independent reviews of the same diff.
+ *
+ * WHAT THIS IS FOR, and what it is NOT for. Two reviewers do NOT make a 9.5 gate stable: averaging
+ * two samples of the same prompt cuts the standard deviation by only about 1/sqrt(2), so against the
+ * measured 1.5-point dimension spread the residual is still roughly 1.06. What they buy is the UNION
+ * of defects in one round instead of across two. That is the whole case for the change, and stability
+ * is not part of it.
+ *
+ * MEAN-OF-OVERALLS ALONE WOULD BE A DEFECT-LAUNDERING MACHINE. `overall` is a step function of the
+ * worst severity found: any CRITICAL caps it at 4, any MAJOR at 6. So averaging a clean 9.6 with a
+ * 6.0 that carries one real MAJOR yields 7.8 — which is still FIX at a 9.5 bar today, and becomes a
+ * pass the moment anyone moves a threshold. Instead: take the cap from the UNION of findings, then
+ * take the mean only underneath it. The mean therefore operates only where nothing blocks, which is
+ * precisely where noise rather than a defect decides the outcome.
+ *
+ * MERGED IN CODE, NOT IN THE ORCHESTRATOR'S JUDGEMENT. The orchestrator is the party that wants to
+ * advance; asking it to arbitrate two disagreeing reviews is asking the interested party to rule.
+ */
+export function mergeReviews(reviews) {
+  const present = (Array.isArray(reviews) ? reviews : []).filter(
+    (r) => r && typeof r === "object" && typeof r.overall === "number" && Number.isFinite(r.overall),
+  );
+
+  if (present.length === 0) {
+    // Same principle as a missing score in decide(): a review that produced nothing has not scored
+    // badly, it has not run. Never average against a phantom.
+    return { overall: undefined, reviewers_used: 0, reviewers: [], spread: null, findings: [],
+      critical_security: false, cap: null,
+      merge_note: "no reviewer produced a score — this is ERROR, not a low score" };
+  }
+
+  if (present.length === 1) {
+    const only = present[0];
+    return { ...only, reviewers_used: 1, reviewers: [{ overall: only.overall }], spread: null,
+      findings: collectFindings(only), critical_security: hasCriticalSecurity(only),
+      cap: capFromFindings(collectFindings(only)),
+      merge_note: "one reviewer only — used as-is, never averaged against a phantom" };
+  }
+
+  const [a, b] = present;
+  const findings = unionFindings(collectFindings(a), collectFindings(b));
+  const cap = capFromFindings(findings);
+
+  const dims = {};
+  for (const d of Object.keys(REVIEW_WEIGHTS)) {
+    const av = Number(a?.[d]);
+    const bv = Number(b?.[d]);
+    const both = [av, bv].filter((v) => Number.isFinite(v));
+    if (both.length) dims[d] = Math.round((both.reduce((x, y) => x + y, 0) / both.length) * 100) / 100;
+  }
+
+  let weighted = 0;
+  let weightUsed = 0;
+  for (const [d, w] of Object.entries(REVIEW_WEIGHTS)) {
+    if (!Number.isFinite(dims[d])) continue;
+    weighted += dims[d] * w;
+    weightUsed += w;
+  }
+  // No per-dimension numbers at all: fall back to the mean of the two composites, which is the only
+  // thing actually reported. Still capped below.
+  const mean = weightUsed > 0
+    ? weighted / weightUsed
+    : (a.overall + b.overall) / 2;
+
+  const overall = Math.round(Math.min(mean, cap ?? 10) * 100) / 100;
+
+  return {
+    ...dims,
+    overall,
+    cap,
+    critical_security: hasCriticalSecurity(a) || hasCriticalSecurity(b),
+    findings,
+    reviewers_used: 2,
+    reviewers: [{ overall: a.overall }, { overall: b.overall }],
+    spread: Math.round(Math.abs(a.overall - b.overall) * 100) / 100,
+    merge_note: cap === null
+      ? "no blocking severity in the union; composite is the weighted mean of both reviewers"
+      : `capped at ${cap} by the UNION of findings — one reviewer's blocking finding caps the merged review`,
+  };
+}
+
+/** 4 if any CRITICAL anywhere, 6 if any MAJOR, else no cap. Same step function the rubric applies. */
+export function capFromFindings(findings) {
+  let worst = 0;
+  for (const f of findings ?? []) worst = Math.max(worst, severityRank(f?.severity));
+  if (worst === 3) return 4;
+  if (worst === 2) return 6;
+  return null;
+}
+
+/**
+ * Union of two finding lists, deduped on file + pattern and NEVER on line number.
+ *
+ * Measured: in the real incident the two reviewers reported the SAME defect at different lines. A
+ * line-keyed dedupe would have counted it twice, which inflates nothing important — but it would also
+ * have made the two reports look disjoint, hiding the agreement. The kept copy is the one with the
+ * higher severity, because a merge must never soften a severity either reviewer assigned.
+ */
+export function unionFindings(a, b) {
+  const key = (f) => `${String(f?.file ?? "").toLowerCase()}:${String(f?.pattern ?? "").toLowerCase().trim()}`;
+  const seen = new Map();
+  for (const f of [...(a ?? []), ...(b ?? [])]) {
+    const k = key(f);
+    const prev = seen.get(k);
+    if (!prev || severityRank(f?.severity) > severityRank(prev?.severity)) seen.set(k, f);
+  }
+  return [...seen.values()];
+}
+
 // ── CLI ──
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -258,6 +509,57 @@ function main() {
     }
     console.error(`gate: ESCALATION OPEN — ${e.step} ${e.overall ?? "?"} < ${e.threshold ?? "?"}: ${e.why}`);
     process.exit(2);
+  }
+
+  // C1: scope-check a brief BEFORE it is frozen. Deliberately its own verb rather than a --step, and
+  // deliberately not in STEP_CONFIG: BRIEF_SCOPE is not scored, so it has no counter and no threshold
+  // of the usual shape, and decide() correctly returns ERROR for a step it does not judge.
+  //
+  // Order matters upstream: draft to brief.draft.md, run this, and only on exit 0 write brief.md. The
+  // hook records brief.sha256 on first freeze, so a check that ran AFTER the freeze would be demanding
+  // edits to an immutable, hash-pinned file.
+  if (has("brief-check")) {
+    const briefPath = arg("brief-check");
+    if (!briefPath) {
+      console.error("gate: --brief-check needs a path to the draft brief");
+      process.exit(3);
+    }
+    if (!existsSync(briefPath)) {
+      console.error(`gate: no brief at ${briefPath} — nothing to scope-check`);
+      process.exit(3);
+    }
+    const cfgPath = join(root, ".aid/pipeline/config.json");
+    if (!existsSync(cfgPath)) {
+      console.error(`gate: no config at ${cfgPath}`);
+      process.exit(3);
+    }
+    const cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
+    const r = checkBriefScope({ text: readFileSync(briefPath, "utf8"), config: cfg });
+    console.log(`gate: BRIEF_SCOPE -> ${r.result} (${r.why})`);
+
+    // No `overall` key on purpose: the dashboard's pickScore yields NULL, so a scope row can never be
+    // read as a review score. gateKind("BRIEF_SCOPE") is null too, so it renders as an unscored step
+    // and needs no dashboard change.
+    const scopeScores = { surfaces: r.surfaces, max_surfaces: r.max ?? null, declared: r.declared ?? [] };
+    if (!has("dry-run")) recordDecision(root, { step: "BRIEF_SCOPE", decision: r, scores: scopeScores });
+    if (r.result === "ESCALATE" && !has("dry-run")) {
+      const p = writeEscalation(root, {
+        status: "open",
+        step: "BRIEF_SCOPE",
+        why: r.why,
+        surfaces: r.surfaces,
+        max_surfaces: r.max,
+        declared: r.declared,
+        opened_at: new Date().toISOString(),
+        how_to_resolve:
+          "Decide as the human: split the task into one brief per surface, raise " +
+          "thresholds.max_surfaces in .aid/pipeline/config.json, or accept this width. Then run: " +
+          'node ~/.claude/skills/pipeline-orchestrator/gate.mjs --resolve "<reason>". ' +
+          "The Stop hook blocks while this is open.",
+      });
+      console.error(`gate: wrote ${p} — the Stop hook will block until it is resolved.`);
+    }
+    process.exit(r.exit);
   }
 
   if (has("resolve")) {
@@ -289,6 +591,28 @@ function main() {
   } catch (err) {
     console.error(`gate: --scores is not JSON: ${err.message}`);
     process.exit(3);
+  }
+
+  // C5: a second independent review of the same diff. Merged HERE, in code, rather than by the
+  // orchestrator: the orchestrator is the party that wants to advance, so asking it to arbitrate two
+  // disagreeing reviews is asking the interested party to rule. It must pass both verbatim and must
+  // not show one reviewer's output to the other.
+  const rawScoresB = arg("scores-b");
+  if (rawScoresB !== undefined) {
+    let scoresB;
+    try {
+      scoresB = JSON.parse(rawScoresB);
+    } catch (err) {
+      console.error(`gate: --scores-b is not JSON: ${err.message}`);
+      process.exit(3);
+    }
+    const merged = mergeReviews([scores, scoresB]);
+    console.log(
+      `gate: merged ${merged.reviewers_used} reviewer(s)` +
+        (merged.spread === null ? "" : `, spread ${merged.spread}`) +
+        ` — ${merged.merge_note}`,
+    );
+    scores = merged;
   }
 
   const configPath = join(root, ".aid/pipeline/config.json");

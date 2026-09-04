@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { decide, openEscalation, recordDecision, hasCriticalSecurity } from "./gate.mjs";
+import { decide, openEscalation, recordDecision, hasCriticalSecurity, checkBriefScope, mergeReviews, unionFindings, capFromFindings, collectFindings } from "./gate.mjs";
 
 const CONFIG = {
   max_iterations: { code_review: 5, test_review: 5, phase_gate_reexamine: 5, visual_qa: 5 },
@@ -250,4 +250,171 @@ test("an ERROR row never lands in the score series alongside real rounds", () =>
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------
+// C1: the slice cap lives at the brief (2026-09-04). Every task that reached 9.5 was one surface;
+// the two that never did carried six each. One MAJOR anywhere caps a review at 6, and MAJOR-eligible
+// defect count scales with surface count, so a wide slice cannot pass a 9.5 gate however many rounds
+// it is given. These cases pin the cap, and pin that an UNDECLARED brief is an error rather than a pass.
+
+const SCOPE_CONFIG = { thresholds: { max_surfaces: 2 } };
+const brief = (surfacesBlock) =>
+  ["---", "task_id: t1", "frozen_at: 2026-09-04T00:00:00Z", surfacesBlock, "---", "", "## ORIGINAL_REQUEST", "do the thing", ""].join("\n");
+const SURFACE = (name, path) => `  - name: ${name}\n    path: ${path}`;
+
+test("two surfaces are within the cap of two", () => {
+  const r = checkBriefScope({ text: brief(["surfaces:", SURFACE("tokens tab", "dashboard/public/app.js"), SURFACE("tokens route", "dashboard/src/tokens.js")].join("\n")), config: SCOPE_CONFIG });
+  assert.equal(r.result, "PASS");
+  assert.equal(r.exit, 0);
+  assert.equal(r.surfaces, 2);
+});
+
+test("three surfaces escalate rather than quietly proceeding", () => {
+  const r = checkBriefScope({ text: brief(["surfaces:", SURFACE("a", "p1"), SURFACE("b", "p2"), SURFACE("c", "p3")].join("\n")), config: SCOPE_CONFIG });
+  assert.equal(r.result, "ESCALATE");
+  assert.equal(r.exit, 2);
+  assert.equal(r.surfaces, 3);
+  assert.match(r.why, /3 surfaces declared against a cap of 2/);
+});
+
+test("a brief with no surfaces block is ERROR, never a pass", () => {
+  // The whole point: an undeclared brief has not been scope-checked, and "cannot tell" must not
+  // advance. If this returned PASS, skipping the declaration would be the cheapest way past the cap.
+  const r = checkBriefScope({ text: brief("").trimEnd(), config: SCOPE_CONFIG });
+  assert.equal(r.result, "ERROR");
+  assert.equal(r.exit, 3);
+  assert.match(r.why, /no `surfaces:` block/);
+});
+
+test("an empty surfaces block is ERROR too", () => {
+  const r = checkBriefScope({ text: brief("surfaces:"), config: SCOPE_CONFIG });
+  assert.equal(r.result, "ERROR");
+  assert.equal(r.exit, 3);
+  assert.match(r.why, /empty/);
+});
+
+test("an inline surfaces value is refused, because it names nothing to falsify", () => {
+  for (const inline of ["surfaces: []", "surfaces: 2", "surfaces: the dashboard"]) {
+    const r = checkBriefScope({ text: brief(inline), config: SCOPE_CONFIG });
+    assert.equal(r.result, "ERROR", `${inline} must not pass`);
+    assert.match(r.why, /block list of named entries/);
+  }
+});
+
+test("a surface without a path is a label, not a declaration", () => {
+  // This is what stops "one surface: the dashboard" from being the way around the cap: with no path,
+  // the CODE_REVIEW diff falsifier has nothing to compare the claim against.
+  const r = checkBriefScope({ text: brief(["surfaces:", "  - name: the dashboard"].join("\n")), config: SCOPE_CONFIG });
+  assert.equal(r.result, "ERROR");
+  assert.equal(r.exit, 3);
+  assert.match(r.why, /needs both a name and a path/);
+});
+
+test("a missing or nonsensical max_surfaces is ERROR, not an unlimited cap", () => {
+  const text = brief(["surfaces:", SURFACE("a", "p1"), SURFACE("b", "p2"), SURFACE("c", "p3")].join("\n"));
+  for (const thresholds of [{}, { max_surfaces: 0 }, { max_surfaces: "two" }, { max_surfaces: null }]) {
+    const r = checkBriefScope({ text, config: { thresholds } });
+    assert.equal(r.result, "ERROR", `${JSON.stringify(thresholds)} must not silently allow 3 surfaces`);
+    assert.match(r.why, /max_surfaces/);
+  }
+});
+
+test("the surfaces block ends at the front-matter terminator, so body text cannot inflate the count", () => {
+  const text = ["---", "task_id: t1", "surfaces:", SURFACE("a", "p1"), "---", "", "## DEVELOP PLAN", "- step one", "- step two", "- step three", ""].join("\n");
+  const r = checkBriefScope({ text, config: SCOPE_CONFIG });
+  assert.equal(r.surfaces, 1, "the plan's bullet list must not be counted as surfaces");
+  assert.equal(r.result, "PASS");
+});
+
+// ---------------------------------------------------------------------------
+// C5: two reviewers, union of findings, mean ONLY inside the clean band (2026-09-04).
+// The second test here is the anti-laundering assertion and the reason this change is safe to ship:
+// a naive mean-of-overalls would average a real MAJOR away.
+
+const clean = (overall) => ({ overall, security: overall, code_quality: overall, architecture: overall, documentation: overall });
+
+test("two clean reviews merge to the mean and pass", () => {
+  const m = mergeReviews([clean(9.6), clean(9.4)]);
+  assert.equal(m.overall, 9.5);
+  assert.equal(m.cap, null);
+  assert.equal(m.reviewers_used, 2);
+  assert.equal(m.spread, 0.2);
+  assert.equal(decide({ step: "CODE_REVIEW", scores: m, config: CONFIG }).result, "PASS");
+});
+
+test("a clean 9.6 merged with a 6.0 carrying a MAJOR yields 6.0, NOT 7.8", () => {
+  // THE anti-laundering case. A mean-of-overalls would return 7.8, which is still FIX at 9.5 today
+  // and becomes a PASS the moment anyone moves a threshold. The cap comes from the UNION.
+  const flawed = { ...clean(6.0), issues: [{ severity: "MAJOR", category: "code_quality", file: "src/a.ts", pattern: "silent catch swallows the error" }] };
+  const m = mergeReviews([clean(9.6), flawed]);
+  assert.equal(m.cap, 6, "one reviewer's MAJOR must cap the merged review");
+  assert.ok(m.overall <= 6, `expected <= 6, got ${m.overall}`);
+  assert.notEqual(m.overall, 7.8);
+  assert.equal(decide({ step: "CODE_REVIEW", scores: m, config: CONFIG }).result, "FIX");
+});
+
+test("a CRITICAL from one reviewer alone escalates regardless of the composite", () => {
+  const withCritical = { ...clean(9.7), issues: [{ severity: "CRITICAL", category: "security", file: "src/auth.ts", pattern: "token logged in plaintext" }] };
+  const m = mergeReviews([clean(9.8), withCritical]);
+  assert.equal(m.cap, 4);
+  assert.equal(m.critical_security, true, "critical_security is the OR of both, derived not trusted");
+  const d = decide({ step: "CODE_REVIEW", scores: m, config: CONFIG });
+  assert.equal(d.result, "ESCALATE");
+  assert.match(d.why, /critical security/);
+});
+
+test("one missing review uses the survivor unchanged, with reviewers_used 1 and no averaging", () => {
+  const survivor = clean(9.6);
+  for (const partner of [null, undefined, {}, { overall: "n/a" }, { overall: NaN }]) {
+    const m = mergeReviews([survivor, partner]);
+    assert.equal(m.reviewers_used, 1, `partner ${JSON.stringify(partner)} must not count as a reviewer`);
+    assert.equal(m.overall, 9.6, "the survivor's score must not be diluted");
+    assert.equal(m.spread, null, "spread between one reviewer and nothing is not a number");
+  }
+});
+
+test("zero recoverable reviews is ERROR, never a low score", () => {
+  const m = mergeReviews([null, undefined]);
+  assert.equal(m.reviewers_used, 0);
+  assert.equal(m.overall, undefined);
+  assert.equal(decide({ step: "CODE_REVIEW", scores: m, config: CONFIG }).result, "ERROR");
+});
+
+test("the union dedupes on file and pattern, never on line number", () => {
+  // Measured: the two reviewers reported the SAME defect at different lines. Keying on the line
+  // would make two reports of one defect look like two disjoint findings.
+  const a = [{ file: "src/a.ts", line: 88, pattern: "Silent catch swallows the error", severity: "MINOR" }];
+  const b = [{ file: "src/a.ts", line: 140, pattern: "silent catch swallows the error", severity: "MAJOR" }];
+  const u = unionFindings(a, b);
+  assert.equal(u.length, 1, "one defect, reported twice");
+  assert.equal(u[0].severity, "MAJOR", "the merge must never soften a severity either reviewer assigned");
+  assert.equal(capFromFindings(u), 6);
+});
+
+test("disjoint findings compose to the union of caps", () => {
+  const a = { ...clean(8.0), issues: [{ severity: "MINOR", category: "documentation", file: "x.ts", pattern: "no header" }] };
+  const b = { ...clean(8.0), issues: [{ severity: "MAJOR", category: "security", file: "y.ts", pattern: "unparameterised query" }] };
+  const m = mergeReviews([a, b]);
+  assert.equal(m.findings.length, 2, "neither reviewer's finding may be dropped");
+  assert.equal(m.cap, 6);
+});
+
+test("findings are collected from every shape the agents actually emit", () => {
+  const nested = { overall: 7, categories: { security: { issues: [{ severity: "MAJOR", file: "s.ts", pattern: "leak" }] } } };
+  assert.equal(collectFindings(nested).length, 1);
+  assert.equal(collectFindings(nested)[0].category, "security", "the nesting must supply the category");
+  assert.equal(collectFindings({ overall: 7 }).length, 0);
+  assert.equal(collectFindings(null).length, 0);
+});
+
+test("per-dimension means are the mean of both, and the cap applies over them", () => {
+  const a = { overall: 9.0, security: 10, code_quality: 9, architecture: 8, documentation: 9 };
+  const b = { overall: 8.0, security: 8, code_quality: 8, architecture: 8, documentation: 7 };
+  const m = mergeReviews([a, b]);
+  assert.equal(m.security, 9);
+  assert.equal(m.documentation, 8);
+  // weighted: 9*30 + 8.5*30 + 8*25 + 8*15 = 270 + 255 + 200 + 120 = 845 / 100 = 8.45
+  assert.equal(m.overall, 8.45);
+  assert.equal(m.cap, null, "no severities reported, so nothing caps this");
 });

@@ -160,6 +160,72 @@ after=$(hist) || { echo "ABORT: cannot read step_history after the gate call"; e
 last=$(node -e 'const s=require("./.aid/pipeline/state.json");const h=s.step_history||[];console.log(h.length?h[h.length-1].result:"none")') || last=none
 [ "$last" = "ERROR" ] && ok "the recorded row says ERROR" || bad "last step_history row is $last, not ERROR" "$last"
 
+echo "== 10) --scores-b: the union caps the merged review, so a MAJOR cannot be averaged away"
+# The pure-function tests cover mergeReviews. THIS covers the CLI path that reaches it, which is the
+# part an orchestrator actually calls. A naive mean-of-overalls would report 7.8 and exit 1 for the
+# WRONG reason, so assert the printed composite as well as the exit code.
+rm -f .aid/pipeline/ESCALATION.json
+cat > .aid/pipeline/state.json <<'JSON'
+{ "pipeline_status": "running", "current_step": "CODE_REVIEW",
+  "iterations": { "code_review": 0, "test_review": 0, "phase_gate_reexamine": 0 } }
+JSON
+CLEAN='{"overall":9.6,"security":9.6,"code_quality":9.6,"architecture":9.6,"documentation":9.6}'
+FLAWED='{"overall":6.0,"security":6,"code_quality":6,"architecture":6,"documentation":6,"issues":[{"severity":"MAJOR","category":"code_quality","file":"a.ts","pattern":"silent catch"}]}'
+out=$(node "$GATE" --step CODE_REVIEW --scores "$CLEAN" --scores-b "$FLAWED" --root "$SANDBOX" 2>&1); rc=$?
+[ "$rc" = 1 ] && ok "one reviewer's MAJOR keeps the merged review in FIX" || bad "expected exit 1, got $rc" "$out"
+case "$out" in
+  *"capped at 6 by the UNION"*) ok "the cap came from the union, not from an average" ;;
+  *)                            bad "no union cap in the output" "$out" ;;
+esac
+case "$out" in
+  *7.8*) bad "the composite was averaged to 7.8 — a MAJOR was laundered" "$out" ;;
+  *)     ok "the composite was not averaged past the cap" ;;
+esac
+out=$(node "$GATE" --step CODE_REVIEW --scores "$CLEAN" --scores-b '{"overall":9.4,"security":9.4,"code_quality":9.4,"architecture":9.4,"documentation":9.4}' --root "$SANDBOX" 2>&1); rc=$?
+[ "$rc" = 0 ] && ok "two clean reviews merge to 9.5 and PASS" || bad "expected exit 0, got $rc" "$out"
+
+echo "== 11) --brief-check refuses a brief wider than the cap, and refuses an undeclared one"
+cat > .aid/pipeline/config.json <<'JSON'
+{ "max_iterations": { "code_review": 5, "test_review": 5, "phase_gate_reexamine": 5, "visual_qa": 5 },
+  "thresholds": { "code_review_pass": 9.5, "test_review_pass": 9.5, "visual_qa_pass": 7,
+                  "auto_fail_on_critical_security": true, "max_surfaces": 2 } }
+JSON
+rm -f .aid/pipeline/ESCALATION.json
+printf -- '---
+task_id: t1
+surfaces:
+  - name: a
+    path: p1
+  - name: b
+    path: p2
+---
+' > brief.ok.md
+node "$GATE" --brief-check brief.ok.md --root "$SANDBOX" >/dev/null 2>&1; rc=$?
+[ "$rc" = 0 ] && ok "two surfaces pass the cap" || bad "expected exit 0, got $rc" "$rc"
+printf -- '---
+task_id: t1
+surfaces:
+  - name: a
+    path: p1
+  - name: b
+    path: p2
+  - name: c
+    path: p3
+---
+' > brief.wide.md
+node "$GATE" --brief-check brief.wide.md --root "$SANDBOX" >/dev/null 2>&1; rc=$?
+[ "$rc" = 2 ] && ok "three surfaces ESCALATE (exit 2)" || bad "expected exit 2, got $rc" "$rc"
+[ -f .aid/pipeline/ESCALATION.json ] && ok "the width escalation reached the human" || bad "no escalation file" "missing"
+printf -- '---
+task_id: t1
+---
+' > brief.bare.md
+node "$GATE" --brief-check brief.bare.md --root "$SANDBOX" >/dev/null 2>&1; rc=$?
+# The load-bearing one: if an undeclared brief PASSED, skipping the declaration would be the cheapest
+# way past the cap and the whole check would be decorative.
+[ "$rc" = 3 ] && ok "an undeclared brief is ERROR (exit 3), not a pass" || bad "expected exit 3, got $rc" "$rc"
+node "$GATE" --resolve "test cleanup" --root "$SANDBOX" >/dev/null 2>&1
+
 echo
 echo "RESULT: $pass passed, $fail failed"
 cd /; rm -rf "$SANDBOX" 2>/dev/null
