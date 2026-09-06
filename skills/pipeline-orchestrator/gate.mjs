@@ -195,10 +195,27 @@ export function recordDecision(root, { step, decision, scores }) {
     state.step_history ??= [];
     state.step_history.push({
       step,
+      // WHICH TASK PRODUCED THIS (2026-09-06). step_history is one accumulating array per project and
+      // carried no per-entry identity, so the dashboard loader could only attribute the WHOLE array to
+      // whatever task_id state.json named at ingest time. Measured consequence: demo/saas's 36 entries
+      // were rewritten under each new task in turn, leaving 259 surplus rows — 34% of pipeline_steps —
+      // with four task_ids holding the identical series at identical timestamps. Same expression main()
+      // already passes to logLoopEvent, deliberately, so there is one source of identity and not two.
+      task_id: state.current_task_id ?? state.task_id ?? null,
       result: decision.result,
       scores: scores ?? {},
       timestamp: new Date().toISOString(),
-      iteration: decision.result === "FIX" && counter ? state.iterations[counter] : (decision.iterationsUsed ?? null),
+      // ONE MEANING, ALL RESULTS: the 1-based number of the review this row records. iterationsUsed
+      // rounds were spent BEFORE it, so this one is the next.
+      //
+      // It used to be the post-increment counter on FIX and the pre-increment iterationsUsed on
+      // everything else, which is two different numbers under one name. Measured in breather's live
+      // state.json: a CODE_REVIEW PASS carried iteration 1 and so did the FIRST CODE_REVIEW FIX. So
+      // `iteration = 1` never meant "round 1", and a round-1 PASS — the runs that went WELL — could not
+      // be selected at all. On FIX rows the value here is byte-identical to the old rule
+      // (iterationsUsed + 1 === state.iterations[counter] after the increment above), so no row already
+      // on disk changes meaning; only PASS and ESCALATE move, and they move to the truth.
+      iteration: (decision.iterationsUsed ?? 0) + 1,
       cap: decision.cap ?? null,
       threshold: decision.threshold ?? null,
       note: `gate.mjs: ${decision.why}`,
@@ -638,7 +655,11 @@ function main() {
     result: d.result,
     score: d.overall ?? null,
     threshold: d.threshold ?? null,
-    iteration: d.iterationsUsed ?? null,
+    // Same expression recordDecision uses, so the two records of one decision stop disagreeing.
+    // Measured before the fix: the event said iteration 1 and the step_history entry said 2 for the
+    // same FIX, written 1 ms apart. Historical loop_events rows are 0-based; rows from here on are
+    // 1-based and match step_history.
+    iteration: (d.iterationsUsed ?? 0) + 1,
     cap: d.cap ?? null,
     problem: d.result === "PASS" ? null : d.why,
   }, root);

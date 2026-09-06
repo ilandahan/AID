@@ -546,8 +546,13 @@ never averages against a phantom. If NEITHER produced a score, that is ERROR —
   A short phrase naming the defect SHAPE, not the file it was found in. `recordDecision` persists
   `scores` verbatim into `pipeline_steps.scores_raw`, where `json_extract` can read it, so this one
   string turns "the same defect class for six rounds running" from an anecdote into a query.
-- Log to `step_history`: `{ "step": "CODE_REVIEW", "result": "<the gate's result verbatim>", "scores": {...}, "timestamp": "..." }`.
-  Allowed values are `PASS`, `FIX`, `ESCALATE`, `ERROR` — the gate's word, not a summary of it.
+- **Do NOT append to `step_history` yourself. `gate.mjs --step` has already written this row**, with
+  the round number, the cap, the threshold, the scores you passed it, and a `gate.mjs: ` note. A second
+  append double-counts the round: measured on `status-safety-cues`, every round produced two rows ~120 ms
+  apart and the series read as 12 rounds where 6 happened. Worse, rewriting the whole file from a stale
+  in-memory copy can DROP the gate's append — saas TEST_REVIEW round 1 exists in the gate's event log and
+  is absent from `state.json`.
+  The gate's allowed values are `PASS`, `FIX`, `ESCALATE`, `ERROR` — its word, not a summary of it.
   `ERROR` means the review did not run (no scores recovered); it consumes no fix cycle and carries no
   `overall`, so it never lands in a score average. `FAIL` is not a value the gate emits.
 
@@ -591,14 +596,22 @@ Act on the EXIT CODE, never on your own reading of the number:
 
 The threshold is `config.thresholds.test_review_pass` and the cap is `config.max_iterations.test_review`
 — the gate reads both, so do not re-derive them here. Running it is also what puts this step's round,
-limit and mark to beat on the record: those columns in the Current Loops view are populated ONLY from
-the gate's event log, so a step judged by prose instead shows blanks forever afterwards.
+limit and mark to beat on the record: nothing else writes them, so a step judged by prose instead shows
+blanks forever afterwards. (Corrected 2026-09-06: they used to reach the Current Loops view ONLY via the
+gate's event log, because the dashboard loader discarded the round, cap and threshold the gate had
+already written into `step_history`. It now reads them from the entry, so both paths carry the same
+numbers and neither invents one from today's config.)
 - If cost limit hit during iteration → ESCALATE (user decides: continue or stop)
 - Store FULL response (including `scores`, `score_justification`, `biggest_gaps`) in `last_review_result`
 - Add `"top_finding": "<pattern of the highest-severity finding>"` to the scores object handed to
   `gate.mjs`, exactly as CODE_REVIEW does, so a repeated test defect class is queryable.
-- Log scores to `step_history` entry: `{ "step": "TEST_REVIEW", "result": "<the gate's result verbatim>", "scores": {...}, "timestamp": "..." }`.
-  Allowed values are `PASS`, `FIX`, `ESCALATE`, `ERROR`. `FAIL` is not one the gate emits.
+- **Do NOT append to `step_history` yourself. `gate.mjs --step` has already written this row**, with
+  the round number, the cap, the threshold, the scores you passed it, and a `gate.mjs: ` note. A second
+  append double-counts the round: measured on `status-safety-cues`, every round produced two rows ~120 ms
+  apart and the series read as 12 rounds where 6 happened. Worse, rewriting the whole file from a stale
+  in-memory copy can DROP the gate's append — saas TEST_REVIEW round 1 exists in the gate's event log and
+  is absent from `state.json`.
+  The gate's allowed values are `PASS`, `FIX`, `ESCALATE`, `ERROR` — its word, not a summary of it.
 
 ### visual-qa-agent
 
@@ -654,7 +667,10 @@ The threshold is `config.thresholds.visual_qa_pass` and the cap is `config.max_i
 **Increment `iterations.visual_qa`** — without that counter the gate reads it as 0 forever, so the cap
 can never be reached and this step could return FIX indefinitely without ever escalating.
 - Store FULL response (including `scores`, `lighthouse`, `issues`, `testing_summary`) in `last_review_result`
-- Log scores to `step_history` entry: `{ "step": "VISUAL_QA", "result": "PASS|FAIL", "scores": {...}, "lighthouse": {...}, "timestamp": "..." }`
+- **Do NOT append to `step_history` yourself** — VISUAL_QA is a gated step, so `gate.mjs --step VISUAL_QA`
+  has already written the row. Pass `lighthouse` inside `--scores` if you want it on the record; the gate
+  persists the scores object verbatim. `PASS|FAIL` is also not the gate's vocabulary: it emits `PASS`,
+  `FIX`, `ESCALATE`, `ERROR`.
 
 ### FIX_VISUAL Step — Full Review Context
 
@@ -756,7 +772,11 @@ the phase5-acceptance-validator / phase4-intent-validator:
 
 **After each AR step:**
 - Read the runner's final composite scores from `.aid/pipeline/autoresearch/<task_id>/results.tsv`.
-- Log to `step_history`: `{ "step": "AR_DESIGN|AR_FUNCTION|AR_ACCEPTANCE", "result": "PASS|GAP", "scores": {...}, "timestamp": "..." }`.
+- Log to `step_history`: `{ "step": "AR_DESIGN|AR_FUNCTION|AR_ACCEPTANCE", "task_id": "<this run's task_id>", "result": "PASS|GAP", "scores": {...}, "timestamp": "..." }`.
+  The AR steps are NOT in `STEP_CONFIG`, so the gate never records them and this append is correct — it is
+  the one place the orchestrator still writes the array. **`task_id` is required**: without it the dashboard
+  loader can only attribute the whole accumulated array to whatever task is current at ingest time, which
+  is what produced 259 surplus rows (34% of `pipeline_steps`) before 2026-09-06.
 - **CRITICAL — HOOK-SAFETY.** The `dev-pipeline-gate.sh` Stop hook re-blocks when the newest source
   mtime > `state.json` mtime. A rollback via `cp <snapshot> <file>` sets the source mtime to NOW, and
   the plateau stop often fires right after a run of REVERTS — so the last disk write is frequently a

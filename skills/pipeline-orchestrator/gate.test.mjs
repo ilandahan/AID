@@ -418,3 +418,33 @@ test("per-dimension means are the mean of both, and the cap applies over them", 
   assert.equal(m.overall, 8.45);
   assert.equal(m.cap, null, "no severities reported, so nothing caps this");
 });
+
+test("iteration means the same thing on every result, so round 1 is selectable", () => {
+  // WHY: it used to be the post-increment counter on FIX and the pre-increment iterationsUsed on
+  // everything else. Measured in breather's live state.json, a CODE_REVIEW PASS carried iteration 1
+  // and so did the FIRST FIX — so `iteration = 1` could not distinguish a round-1 PASS from the first
+  // fix round, and qa/pipeline-artifacts.mjs's self-review mode was blind to exactly the runs that
+  // went well. This pins one meaning: the 1-based number of the review the row records.
+  const root = mkdtempSync(join(tmpdir(), "gate-iter-"));
+  try {
+    mkdirSync(join(root, ".aid/pipeline"), { recursive: true });
+    writeFileSync(join(root, ".aid/pipeline/state.json"), JSON.stringify({ current_task_id: "t1", iterations: { code_review: 0 } }));
+    const read = () => JSON.parse(readFileSync(join(root, ".aid/pipeline/state.json"), "utf8"));
+
+    for (const overall of [6.0, 6.5]) {
+      const d = decide({ step: "CODE_REVIEW", scores: { overall }, config: CONFIG, iterationsUsed: read().iterations.code_review });
+      recordDecision(root, { step: "CODE_REVIEW", decision: d, scores: { overall } });
+    }
+    const pass = decide({ step: "CODE_REVIEW", scores: { overall: 9.6 }, config: CONFIG, iterationsUsed: read().iterations.code_review });
+    recordDecision(root, { step: "CODE_REVIEW", decision: pass, scores: { overall: 9.6 } });
+
+    const h = read().step_history;
+    assert.deepEqual(h.map((x) => x.result), ["FIX", "FIX", "PASS"]);
+    // Consecutive across results. The PASS is round 3, not round 2 (its pre-increment iterationsUsed).
+    assert.deepEqual(h.map((x) => x.iteration), [1, 2, 3], "iteration must be a consecutive 1-based round number");
+    assert.equal(h[0].task_id, "t1", "every entry names the task that produced it");
+    assert.ok(h.every((x) => x.task_id === "t1"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
