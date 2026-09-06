@@ -36,151 +36,36 @@ Continue this session? (y/n)
 
 ### Step 2: Select Role (FIRST)
 
-Display the role options as plain text (do NOT use AskUserQuestion tool - it has a 4-option limit):
+Print the role menu. Do not type it from memory and do not use AskUserQuestion (it caps at
+4 options; there are more roles than that):
 
-```
-What is your role today?
-
-1. **Product Manager**
-   Focuses on user value, requirements, and business outcomes
-
-2. **Tech Lead**
-   Focuses on architecture, technical decisions, and team guidance
-
-3. **Developer**
-   Focuses on implementation, code quality, and TDD
-
-4. **QA Engineer**
-   Focuses on testing, validation, and quality assurance
-
-5. **Other** (describe your role)
-
-Enter role number (1-5):
+```bash
+# Resolve the script path (repo → project mirror → installed plugin). Repeated in each
+# step on purpose: every Bash call is a fresh shell, so $f does not survive between them.
+f=; for c in hooks/aid_session.py .claude/hooks/aid_session.py "$(ls -d "$HOME"/.claude/plugins/cache/AID/aid/*/ 2>/dev/null | sort -V | tail -1)hooks/aid_session.py"; do [ -f "$c" ] && f=$c && break; done
+python "$f" roles
 ```
 
-Wait for user to type their selection before proceeding to phase selection.
-
-If the user passed role and phase as arguments (`/aid-start developer 4`), skip Steps 2-3 and go straight to Step 5.
+Show the output verbatim and wait for the user's number.
 
 ### Step 3: Select Phase (SECOND - with Role-Specific Terminology)
 
-After role is selected, display phases as plain text with **bold phase names** (do NOT use AskUserQuestion tool).
+Print that role's phases. Phase names and descriptions differ per role, and the script
+supplies the right set:
 
-#### If Role = Product Manager:
-
-```
-What phase are you working on? (Product Manager)
-
-0. **Market & Competitive Research**
-   Research competitors, market trends, and validate the problem space with stakeholders
-
-1. **Product Requirements (PRD)**
-   Define what we're building, user stories, acceptance criteria, and scope boundaries
-
-2. **Solution Review**
-   Review technical approach, ensure it aligns with product vision and user needs
-
-3. **Roadmap & Prioritization**
-   Prioritize features, define milestones, coordinate with stakeholders on timeline
-
-4. **Feature Validation & UAT**
-   Validate implemented features against requirements, conduct user acceptance testing
-
-5. **Launch & Go-to-Market**
-   Prepare release communications, coordinate launch, gather initial user feedback
-
-6. **Other** (describe your work)
-
-Enter phase number (0-6):
+```bash
+f=; for c in hooks/aid_session.py .claude/hooks/aid_session.py "$(ls -d "$HOME"/.claude/plugins/cache/AID/aid/*/ 2>/dev/null | sort -V | tail -1)hooks/aid_session.py"; do [ -f "$c" ] && f=$c && break; done
+python "$f" phases <role>     # role name, or the number the user just picked
 ```
 
-#### If Role = Tech Lead:
+Show the output verbatim and wait for the user's number.
 
-```
-What phase are you working on? (Tech Lead)
-
-0. **Technology & Architecture Research**
-   Evaluate technologies, assess technical feasibility, research architectural patterns
-
-1. **Technical Requirements Report**
-   Translate business needs into technical requirements, identify constraints and risks
-
-2. **System Architecture Design**
-   Design system architecture, define APIs, data models, and integration patterns
-
-3. **Sprint Planning & Task Breakdown**
-   Break down work into epics/stories/tasks, estimate effort, assign to team members
-
-4. **Code Review & Architecture Oversight**
-   Review code quality, ensure architectural compliance, mentor developers
-
-5. **Release Engineering & Deployment**
-   Oversee deployment process, ensure operational readiness, manage release risks
-
-6. **Other** (describe your work)
-
-Enter phase number (0-6):
-```
-
-#### If Role = Developer:
-
-```
-What phase are you working on? (Developer)
-
-0. **Technical Spike & Research**
-   Prototype solutions, research libraries/frameworks, validate technical approaches
-
-1. **Feature Specification**
-   Understand requirements deeply, clarify edge cases, document technical assumptions
-
-2. **Technical Design**
-   Design component structure, plan implementation approach, identify dependencies
-
-3. **Task Breakdown & Estimation**
-   Break features into coding tasks, estimate complexity, identify blockers
-
-4. **Implementation & Coding**
-   Write production code with TDD, implement features, write unit/integration tests
-
-5. **Bug Fixes & Polish**
-   Fix bugs from QA, optimize performance, clean up code, update documentation
-
-6. **Other** (describe your work)
-
-Enter phase number (0-6):
-```
-
-#### If Role = QA Engineer:
-
-```
-What phase are you working on? (QA Engineer)
-
-0. **Test Strategy Research**
-   Research testing approaches, evaluate tools, understand system testability
-
-1. **Test Requirements & Coverage Plan**
-   Derive test requirements from PRD, plan coverage, identify risk areas
-
-2. **Test Architecture & Framework**
-   Design test framework, set up automation infrastructure, define test patterns
-
-3. **Test Plan & Case Design**
-   Write detailed test cases, design test data, plan regression suite
-
-4. **Test Execution & Automation**
-   Execute tests, automate test cases, report bugs, verify fixes
-
-5. **Release Certification & Sign-off**
-   Final regression, performance testing, sign off on release quality
-
-6. **Other** (describe your work)
-
-Enter phase number (0-6):
-```
-
-#### If Role = Other:
-
-Use Developer terminology as default, but record the custom role description.
+**Why both menus are generated, never written here:** they used to be hand-copied into this
+file, one block per role. The copy drifted from
+`references/role-phase-terminology.json` - `data-scientist` was a fully defined role with
+six phases and its own skills, yet no menu offered it, and slot 5 selected "Other" instead.
+Generating both menus means every role and phase in the terminology file is always on offer,
+and the number the user types selects exactly what the menu showed.
 
 ### Step 4: Handle "Other" Selections
 
@@ -201,10 +86,9 @@ Run the session writer. It resolves role + phase against
 (role, phase, skills_loaded, session_start), and prints the greeting:
 
 ```bash
-# Locate the script: this AID repo → project mirror → installed plugin (newest version)
 f=; for c in hooks/aid_session.py .claude/hooks/aid_session.py "$(ls -d "$HOME"/.claude/plugins/cache/AID/aid/*/ 2>/dev/null | sort -V | tail -1)hooks/aid_session.py"; do [ -f "$c" ] && f=$c && break; done
 python "$f" start <role> <phase>
-# role:  pm | lead | developer | qa | data-scientist | other   (menu number 1-5 also works)
+# role:  pm | lead | developer | qa | data-scientist | other, or the menu number
 # phase: 0-5
 # "Other" role/phase: add --role-desc "..." / --phase-desc "..." with the user's words
 ```
@@ -236,11 +120,16 @@ Or with parameters (using role-specific phase names or numbers):
 | Lead | Tech Research | Tech Requirements | Architecture | Sprint Planning | Code Review | Deployment |
 | Dev | Spike & Research | Feature Spec | Technical Design | Task Breakdown | Coding | Bug Fixes |
 | QA | Test Strategy | Coverage Plan | Test Framework | Test Cases | Execution | Certification |
+| Data Scientist | EDA | Feasibility | Experiment Planning | ML Arch & Pipeline | Development & Validation | Deploy & Monitoring |
+
+Generated from `references/role-phase-terminology.json`; run `aid_session.py roles` for the
+authoritative list.
 
 ## Notes
 
 - Role is selected FIRST, then phase (allows terminology to be customized)
-- All 6 phases (0-5) are shown, plus "Other" option
+- Every role and every phase in the terminology file is offered - the menus are generated from it, so nothing can be silently missing
+- All 6 phases (0-5) are shown, plus an "Other" option
 - Phase names and descriptions are role-specific
 - Skills are loaded based on role+phase combination
 - Session state persists across conversations

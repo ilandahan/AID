@@ -191,7 +191,7 @@ AID gets smarter over time by learning from your feedback:
 ```
 Session Flow:
 1. /aid-init     > Initialize project
-2. /aid-start    > Select role (PM/Dev/QA/Lead) + phase
+2. /aid-start    > Select role (PM/Lead/Dev/QA/Data Scientist) + phase
 3. Work          > Claude applies relevant skills
 4. /aid-end      > Phase review runs in background; rate 1-5 in one prompt
 5. /aid-improve  > System learns and updates skills

@@ -16,9 +16,13 @@ CONNECTIONS:
 - WRITES: .aid/state.json (project-local), ~/.aid/feedback/pending/<ts>.json
 
 Usage:
+  aid_session.py roles                  print the role menu
+  aid_session.py phases <role>          print that role's phase menu
   aid_session.py start <role> <phase> [--role-desc TEXT] [--phase-desc TEXT]
-      role:  pm | lead | developer | qa | data-scientist | other  (or menu number 1-5)
+      role:  pm | lead | developer | qa | data-scientist | other, or a menu number
       phase: 0-5
+  Menus and numbering come from references/role-phase-terminology.json, so every
+  role and phase defined there is offered - nothing is hardcoded here.
   aid_session.py end --rating N [--worked TEXT] [--improve TEXT]
       [--review passed|partial|failed|skipped] [--review-note TEXT]
 """
@@ -38,8 +42,11 @@ TERMS_FILE = HERE.parent / "references" / "role-phase-terminology.json"
 STATE_FILE = Path.cwd() / ".aid" / "state.json"
 FEEDBACK_DIR = Path.home() / ".aid" / "feedback" / "pending"
 
-# Menu numbers from the /aid-start prompt. 5 = "Other" -> developer terminology.
-ROLE_MENU = {"1": "pm", "2": "lead", "3": "developer", "4": "qa", "5": "other"}
+# Menu numbers are DERIVED from the terminology file, never hardcoded. The menus used to be
+# hand-copied into commands/aid-start.md, and the copy drifted: data-scientist was a fully
+# defined role with six phases and its own skills, yet no menu ever offered it, and slot 5
+# showed "Other" instead. Deriving the numbering here keeps what is printed and what is
+# parsed in step by construction, so a role added to the JSON appears in the menu.
 ROLE_ALIASES = {
     "product-manager": "pm", "product_manager": "pm", "pm": "pm",
     "tech-lead": "lead", "techlead": "lead", "lead": "lead",
@@ -66,20 +73,73 @@ def save_json(path, data):
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def cmd_start(args):
+def load_terms():
     terms = load_json(TERMS_FILE)
     if not terms:
         sys.exit(f"cannot read {TERMS_FILE}")
+    return terms
 
-    raw = args.role.strip().lower()
-    role = ROLE_MENU.get(raw) or ROLE_ALIASES.get(raw)
+
+def role_order(terms):
+    """Role ids in menu order. 'Other' is always the slot after the last real role."""
+    return list(terms["roles"].keys())
+
+
+def resolve_role(raw, terms):
+    """Menu number or name -> role id. None if unrecognised."""
+    raw = str(raw).strip().lower()
+    order = role_order(terms)
+    if raw.isdigit():
+        n = int(raw)
+        if 1 <= n <= len(order):
+            return order[n - 1]
+        return "other" if n == len(order) + 1 else None
+    return ROLE_ALIASES.get(raw)
+
+
+def cmd_roles(args):
+    terms = load_terms()
+    order = role_order(terms)
+    print("What is your role today?\n")
+    for i, rid in enumerate(order, 1):
+        r = terms["roles"][rid]
+        print(f"{i}. **{r['name']}**\n   {r['description']}\n")
+    print(f"{len(order) + 1}. **Other** (describe your role)\n")
+    print(f"Enter role number (1-{len(order) + 1}):")
+
+
+def cmd_phases(args):
+    terms = load_terms()
+    role = resolve_role(args.role, terms)
     if not role:
-        sys.exit(f"unknown role '{args.role}' (use pm|lead|developer|qa|data-scientist|other or 1-5)")
+        sys.exit(f"unknown role '{args.role}'")
+    term_role = "developer" if role == "other" else role
+    phases = terms["phases"][term_role]
+    label = terms["roles"][term_role]["name"]
+    if role == "other":
+        label += " terminology"
+    print(f"What phase are you working on? ({label})\n")
+    for key in sorted(phases, key=int):
+        p = phases[key]
+        print(f"{key}. **{p['name']}**\n   {p['description']}\n")
+    other = len(phases)
+    print(f"{other}. **Other** (describe your work)\n")
+    print(f"Enter phase number (0-{other}):")
+
+
+def cmd_start(args):
+    terms = load_terms()
+
+    role = resolve_role(args.role, terms)
+    if not role:
+        names = "|".join(role_order(terms))
+        sys.exit(f"unknown role '{args.role}' (use {names}|other, or a menu number)")
     term_role = "developer" if role == "other" else role
 
     phase_key = str(args.phase).strip()
     if phase_key not in terms["phases"][term_role]:
-        sys.exit(f"unknown phase '{args.phase}' (use 0-5)")
+        valid = ", ".join(sorted(terms["phases"][term_role], key=int))
+        sys.exit(f"unknown phase '{args.phase}' (use {valid})")
     phase = terms["phases"][term_role][phase_key]
 
     role_info = terms["roles"][term_role]
@@ -165,6 +225,13 @@ def cmd_end(args):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
+
+    r = sub.add_parser("roles", help="print the role menu (from the terminology file)")
+    r.set_defaults(fn=cmd_roles)
+
+    ph = sub.add_parser("phases", help="print the phase menu for a role")
+    ph.add_argument("role")
+    ph.set_defaults(fn=cmd_phases)
 
     s = sub.add_parser("start")
     s.add_argument("role")
