@@ -11,13 +11,15 @@ set -u
 # set THERE — then line 49 cd'd away to the orphan anyway. A test pinned to the wrong artifact is a
 # test that cannot fail when the artifact in use breaks. Resolved from this script's own location,
 # captured BEFORE the `cd "$SANDBOX"` below, because $0 stops resolving once we leave this directory.
-# WINDOWS-FORM path, not the MSYS one (measured 2026-09-04). Plain `pwd` in Git Bash returns
-# /c/ilans' local files/... and MSYS only auto-converts such arguments for a native binary when they
-# contain no spaces. The plugin install path has none, so it converted and this script passed there;
-# the AID-clean source path has a space, so node received /c/ilans'... verbatim, resolved it against
-# the current drive as C:\c\ilans'..., and died MODULE_NOT_FOUND with exit 1. Every gate call then
-# scored a FAIL for a reason that had nothing to do with the gate. `pwd -W` yields C:/ilans' local
-# files/..., which node reads correctly; the fallback keeps this runnable on a real POSIX box.
+# WINDOWS-FORM path, not the MSYS one (measured 2026-09-04). Plain `pwd` in Git Bash returns a
+# POSIX-style path like /c/dev's workspace/AID-clean/... and MSYS only auto-converts such arguments
+# for a native binary when they contain no spaces. The plugin install path has none, so it converted
+# and this script passed there; a source checkout under a directory with a space in its name (e.g.
+# "dev's workspace") does not convert, so node received the POSIX path verbatim, resolved it against
+# the current drive as C:\c\dev's..., and died MODULE_NOT_FOUND with exit 1. Every gate call then
+# scored a FAIL for a reason that had nothing to do with the gate. `pwd -W` yields the native form
+# (C:/dev's workspace/AID-clean/...), which node reads correctly; the fallback keeps this runnable
+# on a real POSIX box.
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && { pwd -W 2>/dev/null || pwd; })"
 GATE="$SKILL_DIR/gate.mjs"
 # The hook stays at its installed path on purpose: that IS where Claude Code loads it from, so it is

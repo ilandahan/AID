@@ -1,13 +1,13 @@
 {
   "name": "aid",
   "version": "3.0.7",
-  "description": "AI Development Methodology: 6 phase gates from discovery to ship, 28 skills, 38 review sub-agents, and WHY-first enforcement hooks. Stops code being written before the problem is understood.",
+  "description": "AI Development Methodology: 6 phase gates from discovery to ship, 28 skills, 39 review sub-agents, and WHY-first enforcement hooks. Stops code being written before the problem is understood.",
   "author": {
     "name": "Ilan Dahan",
     "url": "https://github.com/ilandahan/AID"
   },
   "homepage": "https://github.com/ilandahan/AID",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "keywords": [
     "methodology",
     "phase-gates",

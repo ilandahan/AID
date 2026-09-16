@@ -136,47 +136,12 @@ else
   [ -n "$plan_file" ] && plan_line="Best-effort plan-file guess: $plan_file (newest by mtime — NOT confirmed to be the plan you just approved). If this isn't the plan you just approved, IGNORE it and use the approved plan from your context. "
 fi
 
-# ── cc-loop: snapshot the plan + predict BEFORE implementation (approved 2026-07-29) ──
-# WHY here: this is the blueprint's step 1 ("EXTRACT FROM CURRENT PLAN") and its decision
-# arrow ("PLAN UNCLEAR → refine → re-approval"). It is also the only moment the approved
-# plan text is guaranteed present. The snapshot is immutable (content-addressed), which fixes
-# plan_ref pointing at ~/.claude/plans files that later get overwritten.
-# FAIL-OPEN by design: dashboard down / slow / absent → pred_line stays empty and this hook
-# behaves exactly as it did before. Never blocks plan execution.
-pred_line=""
-if [ -n "$plan_text" ] && [ -f "$_hk_dir/payload.json" ]; then
-  _cc_port="${CC_LOOP_PORT:-4664}"
-  # The payload was already assembled by the node step above, UTF-8, in a temp file. Plans run 30KB+,
-  # far past the shell argv limit, and only the temp-file path (no backslashes) crosses argv.
-  _cc_payload="$_hk_dir/payload.json"
-  if [ -s "$_cc_payload" ]; then
-    _cc_resp=$(curl -s --max-time 3 -X POST "http://127.0.0.1:${_cc_port}/api/plan/approved" \
-        -H "Host: 127.0.0.1:${_cc_port}" -H 'content-type: application/json' \
-        --data-binary "@$_cc_payload" 2>/dev/null)
-    _cc_hook_text=$(printf '%s' "$_cc_resp" | node -e '
-let b=[];process.stdin.on("data",c=>b.push(c));process.stdin.on("end",()=>{
-  try { process.stdout.write(String(JSON.parse(Buffer.concat(b).toString("utf8")).hook_text || "")); }
-  catch { /* not JSON: leave empty, the caller reports the failure */ }
-});' 2>/dev/null)
-    if [ -n "$_cc_hook_text" ]; then
-      pred_line="${_cc_hook_text}
-(plan snapshotted immutably; this prediction is recorded and will be scored against actual iterations)
-"
-    else
-      # NOT SILENT. This exact branch is what cost a week: curl -s plus 2>/dev/null plus a swallowed
-      # exception meant a dead snapshot path was indistinguishable from a healthy one. Still fail-OPEN
-      # — plan execution is never blocked — but the failure is now stated where it can be seen.
-      _hk_fail="the dashboard did not confirm the snapshot (no response from /api/plan/approved on port ${_cc_port})"
-    fi
-  else
-    _hk_fail="the request body could not be prepared"
-  fi
-fi
-# Announce a snapshot that did not happen, in BOTH channels: systemMessage so the human sees it, and
-# additionalContext so the model knows the audit trail has a hole and does not assume otherwise.
+# Announce a payload extraction failure, in BOTH channels: systemMessage so the human sees it, and
+# additionalContext so the model knows the brief may be missing the verbatim plan and does not assume
+# otherwise.
 fail_line=""
 if [ -n "$_hk_fail" ]; then
-  fail_line="WARNING: this plan was NOT SAVED to the plan store — ${_hk_fail}. Proceed with the work, but the immutable snapshot and its prediction are missing for this task, so nothing downstream can score it. Worth fixing before the next plan.
+  fail_line="WARNING: the approved plan text could not be extracted — ${_hk_fail}. Proceed with the work; the brief-freeze step below will fall back to the plan already in your context.
 "
 fi
 rm -rf "$_hk_dir" 2>/dev/null
@@ -189,7 +154,7 @@ else
   enrich="This project is NOT AID-enabled: the pipeline bootstraps its own .aid/pipeline/config.json from the user-level default and AR_ACCEPTANCE derives acceptance from the frozen brief. No PRD/AID setup is required."
 fi
 instr="A plan was just approved. The dev pipeline (pipeline-orchestrator + reflection + autoresearch) ships at USER LEVEL and is available in this project regardless of AID — BUT it must only drive IMPLEMENTATION plans.
-${fail_line}${pred_line}${plan_line}INTENT GATE — do this FIRST, before anything else:
+${fail_line}${plan_line}INTENT GATE — do this FIRST, before anything else:
 Classify the just-approved plan as either (a) IMPLEMENTATION (it will write/modify/delete code, config, or other project files) or (b) READ-ONLY (research, analysis, investigation, debugging-to-understand, audit, explanation — it produces findings/answers but makes no source changes).
 - If READ-ONLY: do NOT initialize or drive the dev pipeline. Do NOT freeze a brief, do NOT create/refresh .aid/pipeline/state.json, do NOT bootstrap config. Stay advisory-only and just carry out the approved plan. (Steps 1-3 below do not apply.) Set SKIP_PIPELINE_GATE=1 if a downstream gate still nags.
 - If IMPLEMENTATION: proceed with steps 1-3 below BEFORE writing implementation code.
@@ -198,7 +163,7 @@ Classify the just-approved plan as either (a) IMPLEMENTATION (it will write/modi
 3. DRIVE all implementation through the orchestrator: DEVELOP → CODE_REVIEW (≤2) → AR_DESIGN → TDD (≤2) → AR_FUNCTION → VISUAL_QA → TEST_REVIEW → PHASE_GATE (≤2 re-examine) → AR_ACCEPTANCE. Resolve agents/criteria project-first, else user-level. ${enrich} Do not finish the turn until the pipeline is satisfied (the dev-pipeline-gate Stop hook also enforces this).
 Set SKIP_PIPELINE_GATE=1 to bypass for a one-off."
 msg="plan approved → classify intent: IMPLEMENTATION plans run the pipeline (freeze brief + DEVELOP→…→AR_ACCEPTANCE); read-only/research/analysis plans stay advisory-only. SKIP_PIPELINE_GATE=1 to bypass."
-[ -n "$_hk_fail" ] && msg="plan NOT SAVED to the plan store — ${_hk_fail}. Plan execution continues; the snapshot and prediction for this task are missing. ${msg}"
+[ -n "$_hk_fail" ] && msg="approved plan text could not be extracted — ${_hk_fail}. Plan execution continues; the brief-freeze step falls back to the plan already in context. ${msg}"
 
 ac=$(printf '%s' "$instr" | json_enc)
 sm=$(printf '%s' "$msg"  | json_enc)

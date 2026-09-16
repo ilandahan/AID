@@ -146,6 +146,9 @@ lerna-debug.log*
 .aid/pipeline/*
 !.aid/pipeline/config.json
 
+# Plan snapshots (per-session runtime artifact from ExitPlanMode tooling)
+.aid/plans/
+
 # Demo/scratch files (not part of AID framework)
 churn_*.py
 clean_churn.py

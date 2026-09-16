@@ -392,7 +392,7 @@ fi
 # block, firing on ANY uncommitted file (including prior sessions' work), which
 # interrupted even read-only turns. Real failures (tsc/mypy/syntax/vet/cargo/javac)
 # still hard-block above; a clean pass is now a non-blocking notice.
-msg="dev-pipeline-gate: $count source file(s) changed, all language checks passed (TS: $tsc_status). NOT committed - review and commit yourself (see the dashboard's Start the Day view).
+msg="dev-pipeline-gate: $count source file(s) changed, all language checks passed (TS: $tsc_status). NOT committed - review and commit yourself.
 Changed:
 $files"
 printf '{"systemMessage":%s}\n' "$(printf '%s' "$msg" | json_enc)"
