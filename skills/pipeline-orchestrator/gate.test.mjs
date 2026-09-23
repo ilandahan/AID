@@ -9,7 +9,11 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { decide, openEscalation, recordDecision, hasCriticalSecurity, checkBriefScope, mergeReviews, unionFindings, capFromFindings, collectFindings } from "./gate.mjs";
+import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+import { decide, openEscalation, recordDecision, hasCriticalSecurity, checkBriefScope, mergeReviews, unionFindings, capFromFindings, collectFindings, shouldSpawnDual, mostRecentScore } from "./gate.mjs";
+
+const GATE_MJS = fileURLToPath(new URL("./gate.mjs", import.meta.url));
 
 const CONFIG = {
   max_iterations: { code_review: 5, test_review: 5, phase_gate_reexamine: 5, visual_qa: 5 },
@@ -444,6 +448,152 @@ test("iteration means the same thing on every result, so round 1 is selectable",
     assert.deepEqual(h.map((x) => x.iteration), [1, 2, 3], "iteration must be a consecutive 1-based round number");
     assert.equal(h[0].task_id, "t1", "every entry names the task that produced it");
     assert.ok(h.every((x) => x.task_id === "t1"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── shouldSpawnDual: pure arithmetic, deliberately NOT a classifier call ──
+
+test("round 1 always spawns dual, regardless of prevScore/threshold", () => {
+  const r = shouldSpawnDual({ round: 1, prevScore: undefined, threshold: undefined, config: CONFIG });
+  assert.equal(r.dual, true);
+  assert.match(r.why, /round 1/);
+});
+
+test("a later round within dual_within_of_threshold of the bar is a boundary round — dual", () => {
+  const config = { ...CONFIG, reviewers: { dual_within_of_threshold: 1.0 } };
+  const r = shouldSpawnDual({ round: 3, prevScore: 8.8, threshold: 9.5, config });
+  assert.equal(r.dual, true);
+  assert.match(r.why, /boundary round/);
+});
+
+test("a later round in the cap-dominated mid-band is single, not dual", () => {
+  const config = { ...CONFIG, reviewers: { dual_within_of_threshold: 1.0 } };
+  const r = shouldSpawnDual({ round: 2, prevScore: 6.7, threshold: 9.5, config });
+  assert.equal(r.dual, false);
+  assert.match(r.why, /mid-band/);
+});
+
+test("dual_within_of_threshold defaults to 1.0 when config omits it", () => {
+  const r = shouldSpawnDual({ round: 2, prevScore: 8.6, threshold: 9.5, config: CONFIG });
+  assert.equal(r.dual, true); // |8.6 - 9.5| = 0.9 <= default 1.0
+});
+
+test("no previous score on a later round defaults to single, never a phantom dual", () => {
+  const r = shouldSpawnDual({ round: 2, prevScore: undefined, threshold: 9.5, config: CONFIG });
+  assert.equal(r.dual, false);
+  assert.match(r.why, /no previous score/);
+});
+
+test("an invalid round is refused, not silently coerced", () => {
+  assert.equal(shouldSpawnDual({ round: 0, prevScore: 9, threshold: 9.5, config: CONFIG }).dual, false);
+  assert.equal(shouldSpawnDual({ round: NaN, prevScore: 9, threshold: 9.5, config: CONFIG }).dual, false);
+});
+
+// ── mostRecentScore: task-scoped, so a stale/foreign task_id never leaks in ──
+
+test("mostRecentScore: picks the most recent entry for the given step AND task", () => {
+  const stepHistory = [
+    { step: "CODE_REVIEW", task_id: "t1", scores: { overall: 7.0 } },
+    { step: "CODE_REVIEW", task_id: "t1", scores: { overall: 8.5 } },
+  ];
+  assert.equal(mostRecentScore({ stepHistory, step: "CODE_REVIEW", taskId: "t1" }), 8.5);
+});
+
+test("mostRecentScore: a later round of a NEW task does NOT pick up an unrelated task's score (CODE_REVIEW cr-20260923-gate-should-spawn-dual MAJOR)", () => {
+  // WHY: recordDecision's own doc comment records a REAL, reproduced failure where step_history
+  // was NOT reset per task — four task_ids held the identical series at identical timestamps.
+  // Filtering only by step name would let task t2's round 2 silently read t1's leftover score.
+  const stepHistory = [
+    { step: "CODE_REVIEW", task_id: "t1", scores: { overall: 6.0 } },
+    { step: "CODE_REVIEW", task_id: "t1", scores: { overall: 6.5 } },
+  ];
+  assert.equal(mostRecentScore({ stepHistory, step: "CODE_REVIEW", taskId: "t2" }), undefined);
+});
+
+test("mostRecentScore: interleaved task_ids at identical timestamps still resolve to the right task", () => {
+  const stepHistory = [
+    { step: "CODE_REVIEW", task_id: "t1", scores: { overall: 7.0 } },
+    { step: "CODE_REVIEW", task_id: "t2", scores: { overall: 9.0 } },
+    { step: "CODE_REVIEW", task_id: "t1", scores: { overall: 7.4 } },
+    { step: "CODE_REVIEW", task_id: "t2", scores: { overall: 9.2 } },
+  ];
+  assert.equal(mostRecentScore({ stepHistory, step: "CODE_REVIEW", taskId: "t1" }), 7.4);
+  assert.equal(mostRecentScore({ stepHistory, step: "CODE_REVIEW", taskId: "t2" }), 9.2);
+});
+
+test("mostRecentScore: no matching entry returns undefined, never a phantom score", () => {
+  assert.equal(mostRecentScore({ stepHistory: [], step: "CODE_REVIEW", taskId: "t1" }), undefined);
+  assert.equal(
+    mostRecentScore({
+      stepHistory: [{ step: "TEST_REVIEW", task_id: "t1", scores: { overall: 9 } }],
+      step: "CODE_REVIEW",
+      taskId: "t1",
+    }),
+    undefined,
+  );
+});
+
+// ── --should-spawn-dual CLI: corrupt input and malformed usage exit 3, never a silent decision ──
+
+function runGate(args, root) {
+  try {
+    const out = execFileSync(process.execPath, [GATE_MJS, ...args, "--root", root], { encoding: "utf8" });
+    return { status: 0, out };
+  } catch (err) {
+    return { status: err.status, out: (err.stdout ?? "") + (err.stderr ?? "") };
+  }
+}
+
+test("--should-spawn-dual: corrupt config.json exits 3, not a silent 'spawn one' (CODE_REVIEW MAJOR)", () => {
+  const root = mkdtempSync(join(tmpdir(), "gate-cli-corrupt-config-"));
+  try {
+    mkdirSync(join(root, ".aid/pipeline"), { recursive: true });
+    writeFileSync(join(root, ".aid/pipeline/config.json"), "{ not valid json");
+    const r = runGate(["--should-spawn-dual", "--step", "CODE_REVIEW"], root);
+    assert.equal(r.status, 3);
+    assert.match(r.out, /not valid JSON/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("--should-spawn-dual: corrupt state.json exits 3, not a silent 'spawn one'", () => {
+  const root = mkdtempSync(join(tmpdir(), "gate-cli-corrupt-state-"));
+  try {
+    mkdirSync(join(root, ".aid/pipeline"), { recursive: true });
+    writeFileSync(join(root, ".aid/pipeline/config.json"), JSON.stringify(CONFIG));
+    writeFileSync(join(root, ".aid/pipeline/state.json"), "not json at all");
+    const r = runGate(["--should-spawn-dual", "--step", "CODE_REVIEW"], root);
+    assert.equal(r.status, 3);
+    assert.match(r.out, /not valid JSON/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("--should-spawn-dual: a malformed --round exits 3 (usage error), never folds into exit 1", () => {
+  const root = mkdtempSync(join(tmpdir(), "gate-cli-bad-round-"));
+  try {
+    mkdirSync(join(root, ".aid/pipeline"), { recursive: true });
+    writeFileSync(join(root, ".aid/pipeline/config.json"), JSON.stringify(CONFIG));
+    const r = runGate(["--should-spawn-dual", "--step", "CODE_REVIEW", "--round", "not-a-number"], root);
+    assert.equal(r.status, 3);
+    assert.match(r.out, /--round must be a number/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("--should-spawn-dual: round 1 with valid config exits 0 (DUAL), proving the happy path still works end to end", () => {
+  const root = mkdtempSync(join(tmpdir(), "gate-cli-happy-"));
+  try {
+    mkdirSync(join(root, ".aid/pipeline"), { recursive: true });
+    writeFileSync(join(root, ".aid/pipeline/config.json"), JSON.stringify(CONFIG));
+    const r = runGate(["--should-spawn-dual", "--step", "CODE_REVIEW", "--round", "1"], root);
+    assert.equal(r.status, 0);
+    assert.match(r.out, /DUAL/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

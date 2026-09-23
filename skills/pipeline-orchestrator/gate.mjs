@@ -15,12 +15,16 @@
 //   node gate.mjs --step CODE_REVIEW --scores '{"overall":9.6,...}' [--root <repo>] [--dry-run]
 //   node gate.mjs --check-escalation [--root <repo>]     # exit 2 if one is open
 //   node gate.mjs --resolve "<how it was resolved>" [--root <repo>]
+//   node gate.mjs --should-spawn-dual --step CODE_REVIEW [--round N] [--prev-score X] [--root <repo>]
 //
 // Exit codes (the contract the orchestrator and the hook rely on):
 //   0 = PASS      advance to the next step
 //   1 = FIX       below threshold, iterations remain → run the fix step and re-review
 //   2 = ESCALATE  below threshold with iterations exhausted → STOP and ask the human
 //   3 = usage/data error (never silently treated as a pass)
+//
+// --should-spawn-dual has its OWN exit contract (0 = spawn two reviewers, 1 = spawn one, 3 = usage
+// error) — never conflate with the PASS/FIX/ESCALATE/ERROR contract above.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 
@@ -351,6 +355,58 @@ export function checkBriefScope({ text, config }) {
     why: `${declared.length} surface(s) within the cap of ${max}` };
 }
 
+/**
+ * Round 1, or a previous score within `reviewers.dual_within_of_threshold` of the step's threshold →
+ * spawn two independent reviewers instead of one (SKILL.md "Two reviewers, and exactly when").
+ *
+ * PURE ARITHMETIC ON PURPOSE, NOT A CLASSIFIER CALL. The rule this replaces was already fully
+ * deterministic prose (round === 1, or |prevScore - threshold| <= dual_within_of_threshold) — there is
+ * no judgement here for a model to make, only a comparison the orchestrator already has every input
+ * for. This file's whole reason to exist is turning a prose decision an agent could talk itself past
+ * into "a pure function with exit codes" (see the file header) — routing an already-deterministic
+ * decision through a network call would trade a zero-dependency, zero-latency, testable answer for a
+ * slower and non-deterministic one, in the one file that explicitly has no node_modules and no I/O in
+ * its decision functions. So: no classifier here, by design.
+ */
+/**
+ * Most recent recorded score for `step`, scoped to the CURRENT task only.
+ *
+ * WHY task-scoped (CODE_REVIEW cr-20260923-gate-should-spawn-dual MAJOR): step_history is meant to
+ * reset per task at pipeline init, but recordDecision's own doc comment above records a REAL,
+ * REPRODUCED failure where that reset did not happen — one project's 36 entries were rewritten under
+ * four different task_ids at identical timestamps. Filtering only by step name would let a later
+ * round of a NEW task silently pick up an unrelated task's score, with no error surfaced anywhere.
+ */
+export function mostRecentScore({ stepHistory, step, taskId }) {
+  const match = [...(stepHistory ?? [])].reverse().find(
+    (h) => h.step === step && (h.task_id ?? null) === (taskId ?? null) && typeof h.scores?.overall === "number",
+  );
+  return match?.scores?.overall;
+}
+
+export function shouldSpawnDual({ round, prevScore, threshold, config }) {
+  if (!Number.isFinite(round) || round < 1) {
+    return { dual: false, why: `invalid round (${JSON.stringify(round)})` };
+  }
+  if (round === 1) return { dual: true, why: "round 1 — defect set is largest" };
+
+  const within = config?.reviewers?.dual_within_of_threshold ?? 1.0;
+  if (
+    typeof prevScore !== "number" || !Number.isFinite(prevScore) ||
+    typeof threshold !== "number" || !Number.isFinite(threshold)
+  ) {
+    return { dual: false, why: "no previous score to compare against — not round 1, defaulting to single" };
+  }
+  const spread = Math.abs(prevScore - threshold);
+  const boundary = spread <= within;
+  return {
+    dual: boundary,
+    why: boundary
+      ? `boundary round: |${prevScore} - ${threshold}| = ${spread} <= ${within}`
+      : `mid-band: |${prevScore} - ${threshold}| = ${spread} > ${within} — cap-dominated, a second sample changes nothing`,
+  };
+}
+
 export const REVIEW_WEIGHTS = { security: 30, code_quality: 30, architecture: 25, documentation: 15 };
 
 /**
@@ -577,6 +633,67 @@ function main() {
       console.error(`gate: wrote ${p} — the Stop hook will block until it is resolved.`);
     }
     process.exit(r.exit);
+  }
+
+  // C: "should this round spawn one reviewer or two?" — see shouldSpawnDual's own doc comment for
+  // why this is arithmetic, not a classifier call. Exit 0 = dual, 1 = single, 3 = usage error — a
+  // distinct contract from decide()'s PASS/FIX/ESCALATE/ERROR, so it never gets read as a score gate.
+  if (has("should-spawn-dual")) {
+    const step = arg("step");
+    const spec = STEP_CONFIG[step];
+    if (!step || !spec || spec.threshold === null) {
+      console.error("gate: --should-spawn-dual needs --step <a scored step: CODE_REVIEW | TEST_REVIEW | VISUAL_QA>");
+      process.exit(3);
+    }
+    const configPath = join(root, ".aid/pipeline/config.json");
+    if (!existsSync(configPath)) {
+      console.error(`gate: no config at ${configPath}`);
+      process.exit(3);
+    }
+    // Unguarded JSON.parse here would let a corrupt file throw uncaught -> Node's default exit
+    // code 1, which THIS verb's own contract reads as "spawn one reviewer" (a normal decision),
+    // silently downgrading review rigor on a data-corruption event instead of hitting exit 3 —
+    // exactly the failure the --scores/--scores-b parsing below already guards against.
+    let config;
+    try {
+      config = JSON.parse(readFileSync(configPath, "utf8"));
+    } catch (err) {
+      console.error(`gate: config.json is not valid JSON: ${err.message}`);
+      process.exit(3);
+    }
+    const statePath = join(root, ".aid/pipeline/state.json");
+    let state = {};
+    if (existsSync(statePath)) {
+      try {
+        state = JSON.parse(readFileSync(statePath, "utf8"));
+      } catch (err) {
+        console.error(`gate: state.json is not valid JSON: ${err.message}`);
+        process.exit(3);
+      }
+    }
+    const iterationsUsed = Number(state?.iterations?.[spec.counter] ?? 0);
+    const roundArg = arg("round");
+    // An explicitly-supplied, malformed --round is a usage error, not "invalid round -> spawn
+    // one" — those must stay distinguishable so `$?` alone tells a caller which one happened.
+    if (roundArg !== undefined && !Number.isFinite(Number(roundArg))) {
+      console.error(`gate: --round must be a number (got ${JSON.stringify(roundArg)})`);
+      process.exit(3);
+    }
+    const round = roundArg !== undefined ? Number(roundArg) : iterationsUsed + 1;
+    // Explicit --prev-score wins; otherwise the most recently recorded score for this step,
+    // scoped to THIS task (see mostRecentScore's own doc comment for why that scoping matters).
+    const prevScoreArg = arg("prev-score");
+    const prevScore = prevScoreArg !== undefined
+      ? Number(prevScoreArg)
+      : mostRecentScore({
+          stepHistory: state.step_history,
+          step,
+          taskId: state?.current_task_id ?? state?.task_id ?? null,
+        });
+    const threshold = config?.thresholds?.[spec.threshold];
+    const r = shouldSpawnDual({ round, prevScore, threshold, config });
+    console.log(`gate: ${step} round ${round} -> ${r.dual ? "DUAL" : "SINGLE"} (${r.why})`);
+    process.exit(r.dual ? 0 : 1);
   }
 
   if (has("resolve")) {

@@ -495,9 +495,20 @@ unresolved ESCALATE cannot be quietly skipped. Resolution is the user's decision
 
 #### Two reviewers, and exactly when
 
-Run **two** independent reviewers on **round 1**, where the defect set is largest, and on any
-**boundary round** where the previous score is within `reviewers.dual_within_of_threshold` (default
-1.0) of the threshold and a single noisy sample decides a gate. Run **one** everywhere else.
+**Run the command, never eyeball the numbers yourself** — the same "prose an agent could talk itself
+past" failure this whole gate exists to prevent:
+
+```bash
+node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" \
+  --should-spawn-dual --step CODE_REVIEW
+```
+
+Exit 0 → spawn **two** independent reviewers. Exit 1 → spawn **one**. Exit 3 → usage/data error, fix
+the input, never guess. The command reads the round and previous score from `state.json` itself
+(`--round`/`--prev-score` override only when you have a reason to). This is `shouldSpawnDual` in
+`gate.mjs` — plain arithmetic, not a model call: round 1, or any **boundary round** where the previous
+score is within `reviewers.dual_within_of_threshold` (default 1.0) of the threshold and a single noisy
+sample would decide the gate. Run **one** everywhere else.
 
 The 6.7-to-8.8 middle band is cap-dominated — a second sample there changes nothing and costs double.
 
