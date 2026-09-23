@@ -36,7 +36,14 @@ case "$_sha_probe" in *'"stop_hook_active":true'*) exit 0 ;; esac
 # cwd from the payload is the third fallback: outside a git repo `rev-parse` prints nothing, and
 # without this the hook exited before doing anything at all in exactly the directories that have no
 # other safety net.
-ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}"
+#
+# CLAUDE_PROJECT_DIR is trusted first but validated: on Windows/git-bash it has been observed
+# malformed (an extra drive-letter segment, e.g. "C:\c\..." instead of "C:\..."), which made
+# every later `cd`/`npx` call fail with a bogus "Cannot find module tsc" instead of a real type
+# error. A path that doesn't exist is never a directory to cd into — fall through instead.
+ROOT="${CLAUDE_PROJECT_DIR:-}"
+[ -n "$ROOT" ] && [ ! -d "$ROOT" ] && ROOT=""
+[ -z "$ROOT" ] && ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 [ -z "$ROOT" ] && ROOT=$(printf '%s' "$input" | python -c 'import json,sys
 try: print((json.load(sys.stdin).get("cwd") or ""))
 except Exception: print("")' 2>/dev/null)
@@ -182,26 +189,75 @@ changed_all=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \
 [ -z "$changed_all" ] && exit 0
 
 # ── 1) TypeScript — tsc --noEmit ──
-# WHY the probe: `out=$(npx tsc --noEmit 2>&1)` captures ANY output, so a shell where
-# node is not on PATH produced "exec: node: not found" and the gate blocked the turn
-# reporting "tsc failed on changed TypeScript" — a type error that did not exist.
-# Tool availability is a distinct state from tool failure; never infer one from the other.
+# WHY a bounded filesystem check, never npx and never an unbounded node_modules walk-up:
+# `npx tsc` silently substitutes an unrelated npm package also published under the bare name
+# "tsc" when local resolution fails (verified 2026-09-16: with no local/global typescript
+# installed but network reachable, `npx tsc --version` prints a real-looking version banner
+# for a DIFFERENT compiler, and `npx tsc --noEmit` even flags real type errors — a Stop gate
+# meant to prove "the real compiler passed" was actually only proving "something reachable had
+# a plausible name"). An unbounded walk (e.g. `require.resolve` with Node's default upward
+# search) has its own failure mode, also verified 2026-09-16: a project directory under the
+# user's home (as any OS temp dir typically is) can walk all the way up to an UNRELATED
+# `~/node_modules/typescript` left by some other tool, and silently run that instead — the
+# gate reading ambient machine state rather than the project's own install. Checking only the
+# project directory itself (and $PWD as the one intentional fallback, for a monorepo where
+# typescript is hoisted to the root and functions/<name> has no node_modules of its own) never
+# touches the registry and never reads state outside this project tree.
 errs=""
 ran_tsc=0
 tsc_runnable=0
-if [ -n "$changed_ts" ] && npx tsc --version >/dev/null 2>&1; then
-  tsc_runnable=1
+_resolve_tsc() {
+  # $1 = directory to check for a locally installed typescript.
+  for base in "$1" "$PWD"; do
+    bin="$base/node_modules/typescript/bin/tsc"
+    if [ -f "$base/node_modules/typescript/package.json" ] && [ -f "$bin" ]; then
+      printf '%s' "$bin"
+      return
+    fi
+  done
+}
+if [ -n "$changed_ts" ] && command -v node >/dev/null 2>&1; then
+  root_tsc=$(_resolve_tsc "$PWD")
+  [ -n "$root_tsc" ] && tsc_runnable=1
 fi
+tsc_timed_out=0
 if [ -n "$changed_ts" ] && [ "$tsc_runnable" = 1 ]; then
   funcs=$(printf '%s\n' "$changed_ts" | grep -oE '^functions/[^/]+' | sort -u | sed 's#functions/##')
   for f in $funcs; do
     [ -f "functions/$f/tsconfig.json" ] || continue
     ran_tsc=1
-    out=$(cd "functions/$f" && npx tsc --noEmit 2>&1)
+    f_tsc=$(_resolve_tsc "$PWD/functions/$f")
+    if [ -n "$f_tsc" ]; then
+      # Invoke with a path RELATIVE to the post-`cd` cwd, never the absolute one
+      # `_resolve_tsc` returns. Verified 2026-09-23: an absolute path here (e.g.
+      # ".../ilans' local files/demo/saas/functions/chat/node_modules/typescript/bin/tsc")
+      # gets handed to node.exe (a native Windows binary) as a bash argv string; git-bash's
+      # MSYS layer auto-converts absolute-looking POSIX paths for native-binary args, and
+      # for this project's path (apostrophe + spaces) that conversion inserts a bogus extra
+      # drive-letter segment ("C:\c\..." instead of "C:\..."), so node reports "Cannot find
+      # module" even though the file exists. A relative argv string never matches that
+      # conversion heuristic, so it is never mangled.
+      if [ -f "functions/$f/node_modules/typescript/bin/tsc" ]; then
+        rel_tsc="node_modules/typescript/bin/tsc"
+      else
+        rel_tsc="../../node_modules/typescript/bin/tsc"
+      fi
+      # WHY `timeout 30`: a Stop hook that can hang forever is a worse failure than any type
+      # error it might miss. Verified 2026-09-16: this exact `node <tsc> --noEmit` invocation
+      # completes in ~4s run directly, but hung indefinitely nested three processes deep
+      # (pytest -> bash -> this script -> node) on this machine — a Windows pipe/handle
+      # inheritance quirk, not a tsc or logic bug. A timeout is inconclusive, not a failure:
+      # never block on it, only warn.
+      out=$(cd "functions/$f" && timeout 30 node "$rel_tsc" --noEmit 2>&1)
+      [ $? -eq 124 ] && { tsc_timed_out=1; out=""; }
+    else
+      out="typescript not resolvable from functions/$f via node module resolution"
+    fi
     [ -n "$out" ] && errs="$errs [$f] $(printf '%s' "$out" | head -6 | tr '\n' ' ')"
   done
   if [ "$ran_tsc" = 0 ] && [ -f "tsconfig.json" ]; then
-    out=$(npx tsc --noEmit 2>&1)
+    out=$(timeout 30 node "node_modules/typescript/bin/tsc" --noEmit 2>&1)
+    [ $? -eq 124 ] && { tsc_timed_out=1; out=""; }
     [ -n "$out" ] && errs="$errs $(printf '%s' "$out" | head -8 | tr '\n' ' ')"
     ran_tsc=1
   fi
@@ -211,12 +267,14 @@ if [ -n "$changed_ts" ] && [ "$tsc_runnable" = 1 ]; then
     exit 0
   fi
 fi
-if [ "$ran_tsc" = 1 ]; then
+if [ "$tsc_timed_out" = 1 ]; then
+  tsc_status="WARN: tsc TIMED OUT (30s) - not blocked, result inconclusive"
+elif [ "$ran_tsc" = 1 ]; then
   tsc_status="tsc --noEmit clean"
 elif [ -n "$changed_ts" ] && [ "$tsc_runnable" = 0 ]; then
   # Stated, not silent: the turn is NOT blocked, but the human must know the type
   # check did not actually run rather than assuming a clean pass.
-  tsc_status="WARN: tsc NOT RUN (node/typescript not runnable from this shell)"
+  tsc_status="WARN: tsc NOT RUN (no local typescript install found in node_modules)"
 elif [ -n "$changed_ts" ]; then
   tsc_status="WARN: tsc SKIPPED (no applicable tsconfig.json found)"
 else
