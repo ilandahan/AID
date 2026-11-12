@@ -36,7 +36,7 @@ from raw requirements to deployment through:
 - Context tracking that maintains continuity across sessions
 - Skills system that auto-loads relevant expertise by role and phase
 - Memory system that learns from feedback and improves over time
-- MCP integrations with industry tools (Jira, GitHub, Figma, etc.)
+- MCP integrations with industry tools (Jira, GitHub, etc.)
 
 TARGET USERS
 - Solo developers building with Claude Code
@@ -173,7 +173,7 @@ PHASE 4: DEVELOPMENT
 
 Entry Criteria:
 - Phase 3 complete (Breakdown approved)
-- MCPs configured (Figma for design, Jira for tasks)
+- Approved local design specifications available; Jira configured for tasks
 - TDD understanding (must write tests first)
 
 Required Work:
@@ -201,7 +201,7 @@ Blocked Actions:
 
 Phase Gates Commands:
 /write-tests - Write tests for feature
-/design-system - Build design system from Figma
+/design-system - Build design system from design spec
 /build-page - Compose pages from components
 /code-review - Review code quality
 
@@ -363,7 +363,7 @@ SKILL CATEGORIES
    - system-architect: Architecture design, tech specs, API patterns
 
 3. PHASE 4 (Development)
-   - atomic-design: Design system from Figma, design tokens
+   - atomic-design: Design system from design spec, design tokens
    - atomic-page-builder: Compose pages from components
    - code-review: Code quality (self-review)
    - test-driven: TDD methodology
@@ -466,7 +466,6 @@ OVERVIEW
 MCP (Model Context Protocol) servers extend Claude with tool access:
 - Jira/Atlassian: Project management, issue tracking
 - GitHub: Repository operations, version control
-- Figma: Design token extraction, component documentation
 - Chrome DevTools: Browser automation, testing
 - PostgreSQL: Direct database access
 - Filesystem: Project file operations
@@ -494,15 +493,6 @@ When Used:
 - Commit changes during development
 - Create PRs for code review
 - Manage branches for features
-
-FIGMA
-
-Environment Variables:
-- FIGMA_API_KEY: figd_xxxxx
-
-When Used:
-- Phase 4 (Development): Extract design tokens
-- Build design system from Figma components
 
 CHROME DEVTOOLS
 
@@ -551,7 +541,7 @@ DEVELOPMENT COMMANDS
 /prd [feature-name] - Generate PRD (Phase 1)
 /tech-spec [feature-name] - Create Tech Spec (Phase 2)
 /jira-breakdown - Break spec into Jira issues (Phase 3)
-/design-system - Build design system from Figma (Phase 4)
+/design-system - Build design system from design spec (Phase 4)
 /build-page [page-name] - Compose pages from components (Phase 4)
 /write-tests - Write tests for feature (Phase 4)
 /code-review [path] - Review code quality (Phase 4-5)
@@ -713,7 +703,6 @@ ATLASSIAN_SITE_URL=https://your-domain.atlassian.net
 ATLASSIAN_USER_EMAIL=your-email@company.com
 ATLASSIAN_API_TOKEN=your-api-token
 GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxx
-FIGMA_API_KEY=figd_xxxxx
 
 ================================================================================
 11. TROUBLESHOOTING
