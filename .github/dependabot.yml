@@ -1,0 +1,13 @@
+# Dependabot configuration for AID.
+# Keeps npm dependencies and GitHub Actions pinned SHAs up to date.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
