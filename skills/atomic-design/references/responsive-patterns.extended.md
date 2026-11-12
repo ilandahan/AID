@@ -2,45 +2,45 @@
 
 Mobile-first responsive patterns for Atomic Design components.
 
-## ⚠️ CRITICAL: Extract Responsive Values from Figma Frames
+## ⚠️ CRITICAL: Extract Responsive Values from design spec Frames
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │  🚨 BEFORE IMPLEMENTING RESPONSIVE STYLES:                          │
 │                                                                      │
-│  1. Check Figma for ALL frame variations:                           │
+│  1. Check design spec for ALL frame variations:                           │
 │     • Mobile frame (320px - 480px)                                  │
 │     • Tablet frame (768px - 1024px)                                 │
 │     • Desktop frame (1280px+)                                       │
 │                                                                      │
 │  2. Extract EXACT values from each frame                            │
-│  3. DO NOT invent breakpoint behavior - use Figma frames            │
+│  3. DO NOT invent breakpoint behavior - use design spec frames            │
 │                                                                      │
 │  ❌ "במובייל זה ייראה יותר טוב עם padding קטן יותר" = FORBIDDEN      │
-│  ✅ "ב-Figma Mobile frame ה-padding הוא 16px" = CORRECT              │
+│  ✅ "ב-design spec Mobile frame ה-padding הוא 16px" = CORRECT              │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 **Related documents:**
-- `figma-design-fidelity.md` - Complete extraction workflow
+- `design-deviation-rules.md` - Complete extraction workflow
 - `design-deviation-rules.md` - Zero deviation policy
-- `figma-mcp-integration.md` - MCP commands for extraction
+- `design-deviation-rules.md` - Specification fidelity rules
 
 ## Breakpoint System
 
 **Standard breakpoints (mobile-first):**
 
-⚠️ **IMPORTANT:** Check your Figma Style Guide for the actual breakpoints used. The values below are examples - replace with your Figma values.
+⚠️ **IMPORTANT:** Check your design spec Style Guide for the actual breakpoints used. The values below are examples - replace with your design spec values.
 
-| Name | Size | Target Device | Figma Frame |
+| Name | Size | Target Device | design spec Frame |
 |------|------|---------------|-------------|
-| `xs` | 320px | Small mobile (iPhone SE) | Check Figma |
-| `sm` | 480px | Mobile landscape | Check Figma |
-| `md` | 768px | Tablet portrait (iPad) | Check Figma |
-| `lg` | 1024px | Tablet landscape / Small laptop | Check Figma |
-| `xl` | 1280px | Desktop | Check Figma |
-| `2xl` | 1440px | Large desktop | Check Figma |
-| `3xl` | 1920px | Full HD / Wide screens | Check Figma |
+| `xs` | 320px | Small mobile (iPhone SE) | Check design spec |
+| `sm` | 480px | Mobile landscape | Check design spec |
+| `md` | 768px | Tablet portrait (iPad) | Check design spec |
+| `lg` | 1024px | Tablet landscape / Small laptop | Check design spec |
+| `xl` | 1280px | Desktop | Check design spec |
+| `2xl` | 1440px | Large desktop | Check design spec |
+| `3xl` | 1920px | Full HD / Wide screens | Check design spec |
 
 ```css
 /* CSS Custom Properties for breakpoints */
@@ -72,35 +72,35 @@ const breakpoints = {
 
 **Always start with mobile styles, then enhance for larger screens.**
 
-⚠️ **CRITICAL:** The values in each breakpoint must come from the corresponding Figma frame.
+⚠️ **CRITICAL:** The values in each breakpoint must come from the corresponding design spec frame.
 
 ```css
 /**
  * Responsive Button Example
  *
- * ⚠️ ALL values from Figma frames - DO NOT INVENT
- * Mobile: Figma Mobile frame
- * Tablet: Figma Tablet frame
- * Desktop: Figma Desktop frame
+ * ⚠️ ALL values from design spec frames - DO NOT INVENT
+ * Mobile: design spec Mobile frame
+ * Tablet: design spec Tablet frame
+ * Desktop: desktop design frame
  */
 
-/* CORRECT - Mobile first with Figma values */
+/* CORRECT - Mobile first with design spec values */
 .button {
-  width: 100%;                              /* From Figma Mobile */
-  padding: var(--spacing-3) var(--spacing-4); /* From Figma Mobile */
-  font-size: var(--font-size-sm);            /* From Figma Mobile */
+  width: 100%;                              /* From design spec Mobile */
+  padding: var(--spacing-3) var(--spacing-4); /* From design spec Mobile */
+  font-size: var(--font-size-sm);            /* From design spec Mobile */
 }
 
 @media (min-width: 480px) {
   .button {
-    width: auto;  /* From Figma Mobile Landscape */
+    width: auto;  /* From design spec Mobile Landscape */
   }
 }
 
 @media (min-width: 768px) {
   .button {
-    padding: var(--spacing-3) var(--spacing-6); /* From Figma Tablet */
-    font-size: var(--font-size-base);           /* From Figma Tablet */
+    padding: var(--spacing-3) var(--spacing-6); /* From design spec Tablet */
+    font-size: var(--font-size-base);           /* From design spec Tablet */
   }
 }
 
@@ -122,19 +122,19 @@ const breakpoints = {
 
 ### Container Width
 
-⚠️ **Extract from Figma:** Check container padding at each breakpoint in your Figma frames.
+⚠️ **Extract from design spec:** Check container padding at each breakpoint in your design spec frames.
 
 ```css
 /**
  * Container - Responsive Padding
  *
- * ⚠️ ALL values from Figma frames
- * Extract container padding from each Figma breakpoint frame
+ * ⚠️ ALL values from design spec frames
+ * Extract container padding from each design spec breakpoint frame
  */
 
 .container {
   width: 100%;
-  padding-inline: var(--spacing-4);  /* From Figma Mobile */
+  padding-inline: var(--spacing-4);  /* From design spec Mobile */
   margin-inline: auto;
 }
 
@@ -178,48 +178,48 @@ const breakpoints = {
 
 ### Typography Scale
 
-⚠️ **Extract from Figma:** Check heading sizes in each Figma breakpoint frame.
+⚠️ **Extract from design spec:** Check heading sizes in each design spec breakpoint frame.
 
 ```css
 /**
  * Typography - Responsive Sizes
  *
- * ⚠️ ALL font-size values from Figma frames
+ * ⚠️ ALL font-size values from design spec frames
  * Check: Mobile frame, Tablet frame, Desktop frame
  */
 
 /* Heading scales down on mobile */
 .h1 {
-  font-size: var(--font-size-2xl);  /* From Figma Mobile */
+  font-size: var(--font-size-2xl);  /* From design spec Mobile */
   line-height: var(--line-height-tight);
 }
 
 @media (min-width: 480px) {
   .h1 {
-    font-size: var(--font-size-3xl);  /* From Figma Mobile Landscape */
+    font-size: var(--font-size-3xl);  /* From design spec Mobile Landscape */
   }
 }
 
 @media (min-width: 1024px) {
   .h1 {
-    font-size: var(--font-size-4xl);  /* From Figma Desktop */
+    font-size: var(--font-size-4xl);  /* From desktop design */
   }
 }
 
 @media (min-width: 1440px) {
   .h1 {
-    font-size: var(--font-size-5xl);  /* From Figma Large Desktop */
+    font-size: var(--font-size-5xl);  /* From design spec Large Desktop */
   }
 }
 
 /* Body text slightly smaller on mobile */
 .body {
-  font-size: var(--font-size-sm);  /* From Figma Mobile */
+  font-size: var(--font-size-sm);  /* From design spec Mobile */
 }
 
 @media (min-width: 768px) {
   .body {
-    font-size: var(--font-size-base);  /* From Figma Tablet */
+    font-size: var(--font-size-base);  /* From design spec Tablet */
   }
 }
 ```
@@ -228,20 +228,20 @@ const breakpoints = {
 
 ### Button
 
-⚠️ **Check Figma:** Verify button sizing at each breakpoint in your Figma frames.
+⚠️ **Check design spec:** Verify button sizing at each breakpoint in your design spec frames.
 
 ```css
 /**
  * Button - Responsive Sizing
  *
- * ⚠️ ALL values from Figma frames
- * Mobile: Check Figma Mobile frame for button specs
- * Tablet: Check Figma Tablet frame for button specs
- * Desktop: Check Figma Desktop frame for button specs
+ * ⚠️ ALL values from design spec frames
+ * Mobile: Check design spec Mobile frame for button specs
+ * Tablet: Check design spec Tablet frame for button specs
+ * Desktop: Check desktop design frame for button specs
  */
 
 .button {
-  /* Mobile: Full width, stacked - FROM FIGMA MOBILE */
+  /* Mobile: Full width, stacked - FROM design spec MOBILE */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -291,21 +291,21 @@ const breakpoints = {
 
 ### Card Grid
 
-⚠️ **Check Figma:** Verify grid columns and gap at each breakpoint in your Figma frames.
+⚠️ **Check design spec:** Verify grid columns and gap at each breakpoint in your design spec frames.
 
 ```css
 /**
  * Card Grid - Responsive Layout
  *
- * ⚠️ ALL column and gap values from Figma frames
- * Check each Figma breakpoint frame for grid layout
+ * ⚠️ ALL column and gap values from design spec frames
+ * Check each design spec breakpoint frame for grid layout
  */
 
 .cardGrid {
   display: grid;
-  gap: var(--spacing-4);  /* From Figma Mobile */
+  gap: var(--spacing-4);  /* From design spec Mobile */
 
-  /* Mobile: Single column - FROM FIGMA MOBILE */
+  /* Mobile: Single column - FROM design spec MOBILE */
   grid-template-columns: 1fr;
 }
 
