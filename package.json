@@ -23,12 +23,11 @@
     "test:mcp": "python -m pytest testing/e2e/test_mcp_sanity.py -v",
     "test:memory": "python -m pytest testing/e2e/test_memory_system_sanity.py -v",
     "test:all": "python -m pytest testing/e2e/ -v",
-    "install:mcp": "npm run install:mcp:filesystem && npm run install:mcp:jira && npm run install:mcp:confluence && npm run install:mcp:github && npm run install:mcp:figma && npm run install:mcp:chrome",
+    "install:mcp": "npm run install:mcp:filesystem && npm run install:mcp:jira && npm run install:mcp:confluence && npm run install:mcp:github && npm run install:mcp:chrome",
     "install:mcp:filesystem": "npx -y @modelcontextprotocol/server-filesystem --help || true",
     "install:mcp:jira": "npx -y @aashari/mcp-server-atlassian-jira --help || true",
     "install:mcp:confluence": "npx -y @aashari/mcp-server-atlassian-confluence --help || true",
     "install:mcp:github": "npx -y @modelcontextprotocol/server-github --help || true",
-    "install:mcp:figma": "npx -y figma-developer-mcp --help || true",
     "install:mcp:chrome": "npx -y chrome-devtools-mcp@latest --help || true",
     "security:audit": "npm audit"
   },
@@ -43,7 +42,6 @@
     "mcp",
     "ai-development",
     "methodology",
-    "figma",
     "jira",
     "atomic-design"
   ],
