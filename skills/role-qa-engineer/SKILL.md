@@ -163,14 +163,15 @@ test('should_return_error_when_email_invalid', () => {});
 
 ### IRON RULE: NO HARDCODED CREDENTIALS
 
-```typescript
-// ❌ NEVER
-const user = { email: 'admin@real.com', password: '<test-password>' };
+Real test-account credentials must be supplied through secure test runtime configuration,
+never committed to source. The following values are fake documentation fixtures only,
+not credentials for a real service. Use fake-data factories for isolated tests; do not
+use these placeholders to authenticate to a live environment.
 
-// ✅ ALWAYS
-const user = {
-  email: process.env.TEST_EMAIL || 'test@example.com',
-  password: process.env.TEST_PASSWORD || 'test-only-pwd'
+```typescript
+const exampleUser = {
+  email: 'test@example.com',
+  password: 'YOUR_TEST_PASSWORD' // explicit fake documentation placeholder
 };
 ```
 
