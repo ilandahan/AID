@@ -71,8 +71,9 @@ fixed harness, rubric/KPIs, composite formula, and hard constraints**:
    defaults noted in the per-pass file and state the assumption in chat.
 
 > **Order matters and is enforced upstream:** `function` mode requires a green test suite to
-> exist (TDD produced it); `acceptance` mode requires QA to have run. Do not invent a harness
-> a pass does not yet have — that is precisely why the passes are split.
+> exist (TDD produced it); `acceptance` mode requires QA to have run. Do not invent an
+> evaluation harness before its prerequisite stage has produced it. These dependencies
+> are the reason for separate stages.
 
 ---
 
