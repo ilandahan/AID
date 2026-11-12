@@ -1,11 +1,11 @@
 # Responsive Design Patterns
 
-Mobile-first responsive patterns. Extract ALL responsive values from Figma frames.
+Mobile-first responsive patterns. Extract ALL responsive values from design spec frames.
 
-## Critical: Extract from Figma Frames
+## Critical: Extract from design spec Frames
 
-Check Figma for ALL frame variations: Mobile (320-480px), Tablet (768-1024px), Desktop (1280px+).
-Do NOT invent breakpoint behavior - use Figma frames.
+Check design spec for ALL frame variations: Mobile (320-480px), Tablet (768-1024px), Desktop (1280px+).
+Do NOT invent breakpoint behavior - use design spec frames.
 
 ## Breakpoint System
 
@@ -34,13 +34,13 @@ Do NOT invent breakpoint behavior - use Figma frames.
 ## Mobile-First Pattern
 
 ```css
-/* Mobile base - from Figma Mobile */
+/* Mobile base - from design spec Mobile */
 .button { width: 100%; padding: var(--spacing-3) var(--spacing-4); font-size: var(--font-size-sm); }
 
-/* Landscape - from Figma */
+/* Landscape - from design spec */
 @media (min-width: 480px) { .button { width: auto; } }
 
-/* Tablet - from Figma Tablet */
+/* Tablet - from design spec Tablet */
 @media (min-width: 768px) { .button { padding: var(--spacing-3) var(--spacing-6); font-size: var(--font-size-base); } }
 ```
 
