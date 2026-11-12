@@ -1,3 +1,8 @@
+---
+name: memory-system-data-scientist
+description: Reference for the Data Scientist role in the AID lifecycle.
+---
+
 # Data Scientist Role Skill
 
 > **Source**: `../role-data-scientist/SKILL.md`
