@@ -42,7 +42,7 @@ NEXT UP:
 ### 3. System Checks (if available)
 
 - Check if Docker is running (for database)
-- Check MCP connections (Jira, GitHub, Figma)
+- Check MCP connections (Jira, GitHub)
 - Report any issues
 
 ### 4. Ask User
