@@ -159,7 +159,6 @@ if not exist ".mcp.json" (
         echo.
         echo   NOTE: Edit .mcp.json to add your API tokens:
         echo     - ATLASSIAN_API_TOKEN (for Jira/Confluence^)
-        echo     - FIGMA_API_KEY (for Figma^)
         echo     - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub^)
     ) else (
         echo [ERROR] .mcp.json.windows template not found!
@@ -318,8 +317,6 @@ echo   Caching: @aashari/mcp-server-atlassian-jira...
 call npm cache add @aashari/mcp-server-atlassian-jira >nul 2>nul
 echo   Caching: @aashari/mcp-server-atlassian-confluence...
 call npm cache add @aashari/mcp-server-atlassian-confluence >nul 2>nul
-echo   Caching: figma-developer-mcp...
-call npm cache add figma-developer-mcp >nul 2>nul
 echo   Caching: @modelcontextprotocol/server-github...
 call npm cache add @modelcontextprotocol/server-github >nul 2>nul
 echo [OK] MCP server packages cached
@@ -339,7 +336,6 @@ echo Next steps:
 echo.
 echo 1. Edit .mcp.json with your API tokens:
 echo    - ATLASSIAN_API_TOKEN (for Jira/Confluence)
-echo    - FIGMA_API_KEY (for Figma)
 echo    - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)
 echo.
 echo 2. Start Claude Code FROM THIS FOLDER:
@@ -357,8 +353,8 @@ echo    npm run test:bdd        - Run tests and generate HTML report
 echo    npm run test:smoke      - Run @smoke tagged tests only
 echo    npm run test:critical   - Run @critical tagged tests only
 echo.
-echo 6. (OPTIONAL^) Preview Figma components in Storybook:
-echo    - Extract component from Figma plugin
+echo 6. (OPTIONAL^) Preview design spec components in Storybook:
+echo    - Implement a component from the approved design specification
 echo    - Tell Claude: "Add ComponentName to Storybook"
 echo    - Or use: /storybook add .\path\to\Component
 echo    - View at http://localhost:6006
