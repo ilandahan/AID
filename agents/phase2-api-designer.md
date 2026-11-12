@@ -1,6 +1,6 @@
 ---
 name: phase2-api-designer
-description: Designs the API layer of a tech spec: RESTful contract-first design and integration patterns, building on data models, security and NFRs. Use in Phase 2.
+description: "Designs the API layer of a tech spec: RESTful contract-first design and integration patterns, building on data models, security and NFRs. Use in Phase 2."
 tools: Read, Grep, Glob
 model: inherit
 ---
