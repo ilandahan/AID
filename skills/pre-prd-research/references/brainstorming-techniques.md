@@ -547,7 +547,7 @@ Next step: We'll cluster and prioritize these ideas."
 | Tool | Best For | Features |
 |------|----------|----------|
 | Miro | Visual collaboration | Infinite canvas, templates, voting |
-| FigJam | Design teams | Figma integration, stamps |
+| FigJam | Design teams | design spec integration, stamps |
 | Mural | Enterprise | Facilitation features, security |
 | Notion | Async brainstorming | Database, comments |
 | Google Jamboard | Quick sessions | Simple, free |
