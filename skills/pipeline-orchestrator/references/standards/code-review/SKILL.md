@@ -52,10 +52,10 @@ fs.readdir(userPath);
 
 // CRITICAL: Hardcoded secrets
 // BAD:
-const apiKey = 'sk-1234567890';
+// Do not embed real credentials in source code.
 
 // GOOD:
-const apiKey = process.env.API_KEY;
+const exampleCredential = "YOUR_API_KEY"; // fake documentation value only
 ```
 
 ### Security Review Questions
