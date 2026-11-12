@@ -632,7 +632,7 @@ numbers and neither invents one from today's config.)
    else `~/.claude/agents/visual-qa-agent.md`). If it does NOT resolve in either location
    → log a warning and SKIP VISUAL_QA → advance to TEST_REVIEW (consistent with the documented
    optional-step behavior). Normally the path resolves (a real prompt ships at user level).
-2. Verify dev server is running: `curl -s -o /dev/null -w "%{http_code}" {{TARGET_URL}}` → expect 200
+2. Verify the configured dev server is running: navigate to `{{TARGET_URL}}` with the available browser tooling and inspect the main-document response status. Expect HTTP 200; if navigation fails or the status cannot be verified, treat this prerequisite as unmet. This is a readiness check, not a data-upload step.
 3. Verify Chrome DevTools MCP is available: check for `mcp__chrome-devtools__navigate_page` tool
 4. If any of these fails → skip VISUAL_QA with warning, advance to TEST_REVIEW
 
