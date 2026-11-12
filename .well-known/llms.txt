@@ -32,7 +32,7 @@
 # Key Features
 > - Phase gate enforcement (prevents premature coding)
 > - Context tracking (session continuity)
-> - MCP integrations (Jira, Figma, GitHub, Chrome)
+> - MCP integrations (Jira, GitHub, Chrome)
 > - Specialized skills (atomic-design, TDD, code-review)
 > - 21 slash commands
 
@@ -54,7 +54,7 @@
 - phase-enforcement: Blocks future phase work
 - context-tracking: Work continuity
 - system-architect: Architecture design
-- atomic-design: Figma to components
+- atomic-design: design spec to components
 - atomic-page-builder: Page composition
 - code-review: Quality review
 - test-driven: TDD methodology
@@ -62,7 +62,6 @@
 ## MCP Servers
 - Atlassian (Jira/Confluence)
 - GitHub
-- Figma
 - Chrome DevTools
 - PostgreSQL
 - Filesystem
