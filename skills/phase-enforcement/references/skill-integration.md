@@ -277,7 +277,7 @@ PRIORITY 2: ISO 27001 Compliance
 
 **Capabilities:**
 - Atom/Molecule/Organism creation
-- Design token extraction (via Figma MCP)
+- Design token extraction (from local design specifications)
 - Component documentation
 - Storybook integration
 
