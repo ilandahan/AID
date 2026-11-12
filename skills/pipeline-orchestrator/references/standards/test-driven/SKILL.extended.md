@@ -121,7 +121,7 @@ describe('POST /api/auth/login', () => {
       .post('/api/auth/login')
       .send({
         email: 'user@example.com',
-        password: 'SecurePass123!'
+        password: '<test-password>'
       })
       .expect(200);
 
@@ -189,7 +189,7 @@ describe('UserRepository', () => {
     const user = await userRepository.create({
       email: 'new@example.com',
       name: 'New User',
-      password: 'SecurePass123!'
+      password: '<test-password>'
     });
 
     // Verify in database
