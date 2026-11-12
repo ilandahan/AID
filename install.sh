@@ -258,7 +258,6 @@ setup_mcp_and_env() {
             echo ""
             echo "  NOTE: Edit .mcp.json to add your API tokens:"
             echo "    - ATLASSIAN_API_TOKEN (for Jira/Confluence)"
-            echo "    - FIGMA_API_KEY (for Figma)"
             echo "    - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)"
         else
             log_error ".mcp.json.mac template not found!"
@@ -456,8 +455,6 @@ preinstall_mcp_servers() {
     echo "  - Confluence server..."
     npm pack @aashari/mcp-server-atlassian-confluence --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
 
-    echo "  - Figma server..."
-    npm pack figma-developer-mcp --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
 
     echo "  - GitHub server..."
     npm pack @modelcontextprotocol/server-github --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
@@ -495,7 +492,6 @@ print_next_steps() {
     echo ""
     echo "1. Edit .mcp.json with your API tokens:"
     echo "   - ATLASSIAN_API_TOKEN (for Jira/Confluence)"
-    echo "   - FIGMA_API_KEY (for Figma)"
     echo "   - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)"
     echo ""
     echo "2. Start Claude Code FROM THIS FOLDER:"
@@ -513,8 +509,8 @@ print_next_steps() {
     echo "   npm run test:smoke      - Run @smoke tagged tests only"
     echo "   npm run test:critical   - Run @critical tagged tests only"
     echo ""
-    echo "6. (OPTIONAL) Preview Figma components in Storybook:"
-    echo "   - Extract component from Figma plugin"
+    echo "6. (OPTIONAL) Preview design spec components in Storybook:"
+    echo "   - Implement a component from the approved design specification"
     echo "   - Tell Claude: 'Add ComponentName to Storybook'"
     echo "   - Or use: /storybook add ./path/to/Component"
     echo "   - View at http://localhost:6006"
