@@ -121,6 +121,8 @@ Epic: User Authentication System
 
 ## Jira MCP Integration
 
+Illustrative configuration only: `YOUR_API_KEY` is a fake placeholder, not a lookup of an existing machine credential. Supply your own Atlassian token securely for the Atlassian server; never commit it.
+
 If Atlassian MCP is configured in `.mcp.json`:
 
 ```json
@@ -132,7 +134,7 @@ If Atlassian MCP is configured in `.mcp.json`:
       "env": {
         "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL}",
         "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL}",
-        "ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN}"
+        "ATLASSIAN_API_TOKEN": "YOUR_API_KEY"
       }
     }
   }
