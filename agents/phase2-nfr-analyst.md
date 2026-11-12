@@ -1,6 +1,6 @@
 ---
 name: phase2-nfr-analyst
-description: Defines non-functional requirements: performance, scalability, reliability and operational readiness. Use in Phase 2.
+description: "Defines non-functional requirements: performance, scalability, reliability and operational readiness. Use in Phase 2."
 tools: Read, Grep, Glob
 model: inherit
 ---
