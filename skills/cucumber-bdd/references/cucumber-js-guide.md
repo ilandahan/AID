@@ -313,7 +313,7 @@ Given('a user exists with email {string}', async function(email: string) {
   this.testUser = await this.db.user.create({
     data: {
       email,
-      password: 'hashed_password',
+      password: '<hashed-password>',
       name: 'Test User'
     }
   });
