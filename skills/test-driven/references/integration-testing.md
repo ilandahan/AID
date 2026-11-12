@@ -1,5 +1,7 @@
 # Integration Testing Guide
 
+Authentication headers below use the fake fixture value `YOUR_API_KEY`. Inject test-only credentials in real tests; these examples do not read an existing machine credential.
+
 Real integration testing for databases, APIs, and external services.
 
 ---
@@ -251,7 +253,7 @@ describe('Users API', () => {
   test('POST /users creates user', async () => {
     const response = await request(app)
       .post('/api/users')
-      .set('Authorization', `Bearer ${adminToken}`)
+      .set('Authorization', 'Bearer YOUR_API_KEY')
       .send({
         email: 'new@example.com',
         name: 'New User'
@@ -264,7 +266,7 @@ describe('Users API', () => {
   test('POST /users validates input', async () => {
     const response = await request(app)
       .post('/api/users')
-      .set('Authorization', `Bearer ${adminToken}`)
+      .set('Authorization', 'Bearer YOUR_API_KEY')
       .send({
         email: 'invalid-email' // Invalid
       })
@@ -305,7 +307,7 @@ describe('/api/users', () => {
   test('POST creates user', async () => {
     const { req, res } = createMocks({
       method: 'POST',
-      headers: { authorization: `Bearer ${adminToken}` },
+      headers: { authorization: 'Bearer YOUR_API_KEY' },
       body: {
         email: 'new@example.com',
         name: 'New User'
