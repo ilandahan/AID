@@ -1,37 +1,37 @@
 ---
 name: atomic-design
-description: Expert-level Atomic Design System development from Figma style guides. Use this skill when building a design system from Figma designs, creating reusable component libraries with atoms, molecules, organisms, templates, and pages, extracting design tokens from Figma via MCP, developing responsive React/Vue/HTML component systems, or ensuring design consistency across an application.
+description: Expert-level Atomic Design System development from design spec style guides. Use this skill when building a design system from design spec designs, creating reusable component libraries with atoms, molecules, organisms, templates, and pages, extracting design tokens from approved local design specifications, developing responsive React/Vue/HTML component systems, or ensuring design consistency across an application.
 ---
 
 # Atomic Design System
 
 Build production-ready design systems using Atomic Design methodology.
 
-## ⚠️ CRITICAL RULE: Figma Is The Source of Truth
+## ⚠️ CRITICAL RULE: design spec Is The Source of Truth
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  🚨 MANDATORY: ALWAYS EXTRACT AND IMPLEMENT FROM FIGMA EXACTLY      │
+│  🚨 MANDATORY: ALWAYS EXTRACT AND IMPLEMENT FROM design spec EXACTLY      │
 │                                                                      │
 │  1. NEVER guess or assume design values                             │
-│  2. ALWAYS use Figma MCP to extract EXACT specs before coding       │
-│  3. Download code/CSS from Figma Dev Mode when available            │
-│  4. If Figma shows different values than existing tokens → UPDATE   │
-│  5. Implementation MUST match Figma pixel-perfect                   │
+│  2. ALWAYS use local design specifications to extract EXACT specs before coding       │
+│  3. Download code/CSS from local design exports when available            │
+│  4. If design spec shows different values than existing tokens → UPDATE   │
+│  5. Implementation MUST match design spec pixel-perfect                   │
 │                                                                      │
 │  ❌ "אני חושב שזה ייראה יותר טוב ככה" = FORBIDDEN                    │
-│  ✅ "Figma מראה X, אז הקוד יהיה X" = CORRECT                         │
+│  ✅ "design spec מראה X, אז הקוד יהיה X" = CORRECT                         │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Figma-First Workflow (REQUIRED)
+### design spec-First Workflow (REQUIRED)
 
 ```
 BEFORE writing ANY component or style code:
 
-1. EXTRACT FROM FIGMA (MANDATORY - NO EXCEPTIONS)
+1. EXTRACT FROM design spec (MANDATORY - NO EXCEPTIONS)
    │
-   ├─► Use Figma MCP: get_code_connect_map / get_node
+Read the approved local design specification and token files.
    ├─► Copy specs: colors, spacing, typography, effects
    ├─► Download generated code if available
    ├─► Document ALL extracted values
@@ -39,12 +39,12 @@ BEFORE writing ANY component or style code:
 2. COMPARE WITH EXISTING
    │
    ├─► Check current tokens/*.json
-   ├─► If Figma differs → UPDATE tokens (Figma wins ALWAYS)
+   ├─► If design spec differs → UPDATE tokens (design spec wins ALWAYS)
    ├─► Document changes in commit message
    │
 3. IMPLEMENT EXACTLY
    │
-   └─► Match Figma specs 1:1 - NO interpretation
+   └─► Match design spec specs 1:1 - NO interpretation
        NO rounding, NO "improvements", NO creative freedom
 ```
 
@@ -54,9 +54,9 @@ BEFORE writing ANY component or style code:
 |------------------|----------------|----------------|
 | Round `13px` to `12px` | Unauthorized change | Use exact `13px` |
 | Change `#3B82F6` to `#3F85F7` | Designer chose that color | Use exact `#3B82F6` |
-| Add shadow not in Figma | Creative decision | No shadow if not designed |
-| "Improve" spacing | Not your role | Exact spacing from Figma |
-| Use different font | Breaking brand | Exact font from Figma |
+| Add shadow not in design spec | Creative decision | No shadow if not designed |
+| "Improve" spacing | Not your role | Exact spacing from design spec |
+| Use different font | Breaking brand | Exact font from design spec |
 
 **Read:** `references/design-deviation-rules.md` for complete deviation policy.
 
@@ -66,11 +66,11 @@ BEFORE writing ANY component or style code:
 
 | Trigger | Action |
 |---------|--------|
-| "Create a Button component" | FIRST: Extract from Figma → THEN: Build |
-| "Style this element" | FIRST: Check Figma specs → THEN: Apply |
+| "Create a Button component" | FIRST: Extract from design spec → THEN: Build |
+| "Style this element" | FIRST: Check design spec specs → THEN: Apply |
 | "Build a page/form/layout" | Switch to atomic-page-builder skill |
-| "Extract tokens from Figma" | Use this skill |
-| "What color should I use?" | Extract from Figma → Read `tokens/colors.json` |
+| "Extract tokens from design spec" | Use this skill |
+| "What color should I use?" | Extract from design spec → Read `tokens/colors.json` |
 
 ---
 
@@ -81,73 +81,41 @@ User Request
      │
      ├─► "Create new component"
      │        │
-     │        ├─► STEP 1: Extract from Figma MCP (MANDATORY)
-     │        │        └─► get_node / get_code_connect_map
+     │        ├─► STEP 1: Extract from local design specifications (MANDATORY)
+     │        │        └─► read source files and token definitions
      │        │        └─► Document ALL values extracted
      │        │
      │        ├─► STEP 2: Verify/Update tokens if needed
-     │        │        └─► Figma values ALWAYS win
+     │        │        └─► design spec values ALWAYS win
      │        │
      │        ├─► Is it an Atom? (Button, Input, Icon)
-     │        │        └─► Build from Figma specs + tokens
+     │        │        └─► Build from design spec specs + tokens
      │        │
      │        ├─► Is it a Molecule? (FormField, Card)
-     │        │        └─► Use existing Atoms → Compose per Figma
+     │        │        └─► Use existing Atoms → Compose per design spec
      │        │
      │        └─► Is it an Organism? (Header, Form)
-     │                 └─► Use existing Molecules + Atoms → Match Figma layout
+     │                 └─► Use existing Molecules + Atoms → Match design spec layout
      │
      ├─► "Build a page"
      │        └─► Switch to atomic-page-builder skill
-     │            (Extract page specs from Figma FIRST)
+     │            (Extract page specs from design spec FIRST)
      │
-     ├─► "Extract from Figma"
-     │        └─► Read references/figma-mcp-integration.md
-     │            Use Figma MCP to extract tokens
+     ├─► "Extract from design spec"
+     │        └─► Read references/design-deviation-rules.md
+     │            Use local design specifications to extract tokens
      │
      └─► "Style something"
-              └─► Extract exact values from Figma
+              └─► Extract exact values from design spec
                   Update tokens if different
                   Apply semantic token names
 ```
 
 ---
 
-## Figma MCP Commands (Use These FIRST)
+## Design input
 
-```typescript
-// ALWAYS START WITH THESE BEFORE CODING
-
-// 1. Get component specs
-figma.get_node(file_key, node_id)
-
-// 2. Get code snippets (if available)
-figma.get_code_connect_map(file_key, node_id)
-
-// 3. Get styles from selection
-figma.get_styles(file_key, style_type)
-
-// 4. Get local variables (design tokens)
-figma.get_local_variables(file_key)
-```
-
-### Example: Creating a Button
-
-```
-❌ WRONG: Start coding with assumptions
-const Button = () => <button className="...">  // Guessing styles
-
-✅ CORRECT: Extract first, then implement
-1. figma.get_node("file_key", "button_node_id")
-2. Extract: padding: 12px 24px, radius: 8px, bg: #3B82F6
-3. Compare with tokens/components.json
-4. Update tokens if different
-5. Implement EXACTLY as Figma shows - NO changes
-```
-
-**Read:** `references/figma-design-fidelity.md` for complete extraction workflow.
-
----
+Read the approved local specification, token files and exported assets. Document their paths and exact values. Ask for missing measurements before coding.
 
 ## Design Tokens (Read On-Demand)
 
@@ -161,7 +129,7 @@ const Button = () => <button className="...">  // Guessing styles
 
 ### Token Usage Pattern
 ```css
-/* DO: Use semantic names (extracted from Figma) */
+/* DO: Use semantic names (extracted from design spec) */
 color: var(--color-primary);
 padding: var(--spacing-component-padding);
 
@@ -186,7 +154,7 @@ padding: 16px;           /* Wrong - use token */
 │       ↑                                                         │
 │  ATOMS        Button, Input, Typography, Icon                   │
 │       ↑                                                         │
-│  TOKENS       colors, typography, spacing (FROM FIGMA)          │
+│  TOKENS       colors, typography, spacing (FROM design spec)          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -202,13 +170,13 @@ padding: 16px;           /* Wrong - use token */
 
 ## Core Rules
 
-### 1. Figma Specs Are Mandatory
+### 1. design spec Specs Are Mandatory
 ```css
-/* ✅ CORRECT - Values from Figma extraction */
+/* ✅ CORRECT - Values from design spec extraction */
 .button {
-  padding: 12px 24px;      /* Extracted from Figma - EXACT */
-  border-radius: 8px;       /* Extracted from Figma - EXACT */
-  background: #3B82F6;      /* Extracted from Figma - EXACT */
+  padding: 12px 24px;      /* Extracted from design spec - EXACT */
+  border-radius: 8px;       /* Extracted from design spec - EXACT */
+  background: #3B82F6;      /* Extracted from design spec - EXACT */
 }
 
 /* ❌ WRONG - Guessed or "improved" values */
@@ -225,7 +193,7 @@ padding: 16px;           /* Wrong - use token */
 interface ButtonProps {
   children: ReactNode;      // Content
   onClick: () => void;      // Behavior
-  variant?: 'primary' | 'secondary';  // Predefined visual (from Figma)
+  variant?: 'primary' | 'secondary';  // Predefined visual (from design spec)
   disabled?: boolean;       // State
 }
 
@@ -240,7 +208,7 @@ interface ButtonProps {
 ### 3. All Styles Encapsulated
 ```css
 /* Component handles ALL its visual styles internally */
-/* Read tokens/components.json for specs (extracted from Figma) */
+/* Read tokens/components.json for specs (extracted from design spec) */
 .button {
   background: var(--color-primary);
   padding: var(--spacing-button-padding-y) var(--spacing-button-padding-x);
@@ -252,17 +220,17 @@ interface ButtonProps {
 ### 4. Responsive Built-In
 ```css
 /* Mobile-first: Start small, add breakpoints up */
-/* ALL breakpoint values from Figma frames */
+/* ALL breakpoint values from design spec frames */
 .card {
-  padding: var(--spacing-4);        /* Mobile - from Figma Mobile frame */
+  padding: var(--spacing-4);        /* Mobile - from design spec Mobile frame */
 }
 
 @media (min-width: 768px) {
-  .card { padding: var(--spacing-6); }  /* Tablet - from Figma Tablet frame */
+  .card { padding: var(--spacing-6); }  /* Tablet - from design spec Tablet frame */
 }
 
 @media (min-width: 1024px) {
-  .card { padding: var(--spacing-8); }  /* Desktop - from Figma Desktop frame */
+  .card { padding: var(--spacing-8); }  /* Desktop - from desktop design frame */
 }
 ```
 
@@ -284,23 +252,23 @@ interface ButtonProps {
 
 | Anti-Pattern | Problem | Fix |
 |--------------|---------|-----|
-| Coding without Figma extraction | Values will be wrong | ALWAYS extract first |
+| Coding without design spec extraction | Values will be wrong | ALWAYS extract first |
 | `style={{ color: '#3B82F6' }}` | Hardcoded color | Use `var(--color-primary)` |
-| Guessing spacing values | Won't match design | Extract from Figma |
-| Rounding `13px` to `12px` | Unauthorized change | Use exact Figma value |
-| "Improving" colors | Not developer's role | Use exact Figma value |
+| Guessing spacing values | Won't match design | Extract from design spec |
+| Rounding `13px` to `12px` | Unauthorized change | Use exact design spec value |
+| "Improving" colors | Not developer's role | Use exact design spec value |
 | `className="p-4 text-sm"` | Tailwind in design system | Use CSS Modules + tokens |
 | `<Button fontSize="14px">` | Visual prop exposed | Remove prop, encapsulate |
 | Creating Atom inside Organism | Wrong hierarchy | Create Atom separately first |
-| Ignoring Figma changes | Design drift | Always sync with Figma |
+| Ignoring design spec changes | Design drift | Always sync with design spec |
 
 ---
 
 ## Workflow: Create New Component
 
-### Step 0: EXTRACT FROM FIGMA (MANDATORY)
+### Step 0: EXTRACT FROM design spec (MANDATORY)
 ```
-1. Open Figma Dev Mode (Shift+D)
+1. Open the approved local design specification
 2. Select the component
 3. Use MCP to extract:
    - Dimensions, padding, margins
@@ -310,7 +278,7 @@ interface ButtonProps {
    - Border radius
 4. Document ALL extracted values
 5. Compare with existing tokens
-6. Update tokens if Figma differs (Figma WINS)
+6. Update tokens if design spec differs (design spec WINS)
 ```
 
 ### Step 1: Classify Level
@@ -325,7 +293,7 @@ Is this component breakable into smaller parts?
 ### Step 2: Read/Update Required Tokens
 ```
 For Button (Atom):
-1. FIRST: Extract from Figma via MCP
+1. FIRST: Extract from approved local design specifications
 2. Compare with tokens/components.json → Update if different
 3. Read tokens/colors.json → Update if different
 4. Read tokens/spacing.json → Update if different
@@ -336,7 +304,7 @@ For Button (Atom):
 ```
 src/design-system/atoms/Button/
 ├── Button.tsx           # Component + Props
-├── Button.module.css    # All styles (tokens only, from Figma)
+├── Button.module.css    # All styles (tokens only, from design spec)
 ├── Button.test.tsx      # Tests
 └── index.ts             # Export
 ```
@@ -346,10 +314,10 @@ src/design-system/atoms/Button/
 /**
  * Button Component
  *
- * @figma https://figma.com/file/xxx/Design-System?node-id=123
+ * @design-source ./design-spec.md
  * @extracted 2024-01-15
  *
- * All values from Figma - DO NOT MODIFY without designer approval.
+ * All values from design spec - DO NOT MODIFY without designer approval.
  */
 
 import styles from './Button.module.css';
@@ -384,7 +352,7 @@ export const Button = ({
 
 ## Handling Design Discrepancies
 
-### When Something Looks "Wrong" in Figma
+### When Something Looks "Wrong" in design spec
 
 ```
 DO NOT: "Fix" it yourself
@@ -408,18 +376,18 @@ DO: Implement exactly what designer confirms
 
 ## Checklist Before Delivery
 
-- [ ] ⚠️ Specs extracted from Figma (not guessed)
-- [ ] ⚠️ Tokens updated if Figma values differ
+- [ ] ⚠️ Specs extracted from design spec (not guessed)
+- [ ] ⚠️ Tokens updated if design spec values differ
 - [ ] ⚠️ NO values rounded or "improved"
-- [ ] ⚠️ Visual comparison shows 0% difference from Figma
+- [ ] ⚠️ Visual comparison shows 0% difference from design spec
 - [ ] Correct atomic level (atom/molecule/organism)
 - [ ] Uses ONLY semantic tokens (no hardcoded values)
 - [ ] Props are content/behavior only (no visual props)
-- [ ] Responsive at all breakpoints (per Figma frames)
+- [ ] Responsive at all breakpoints (per design spec frames)
 - [ ] TypeScript interfaces complete
 - [ ] Accessibility attributes (ARIA, keyboard)
 - [ ] CSS Module file with token-based styles
-- [ ] Figma link documented in component
+- [ ] design spec link documented in component
 
 ---
 
@@ -432,9 +400,9 @@ DO: Implement exactly what designer confirms
 | `tokens/spacing.json` | Need spacing/shadows |
 | `tokens/components.json` | Building Button/Input/Card |
 | `tokens/breakpoints.json` | Adding responsive styles |
-| `references/figma-design-fidelity.md` | **Complete Figma extraction guide** |
+| `references/design-deviation-rules.md` | **Complete design spec extraction guide** |
 | `references/design-deviation-rules.md` | **Zero deviation policy** |
 | `references/atomic-hierarchy.md` | Full component examples |
 | `references/component-templates.md` | Copy-paste templates |
-| `references/figma-mcp-integration.md` | Extracting from Figma |
+| `references/design-deviation-rules.md` | Extracting from design spec |
 | `references/responsive-patterns.md` | Responsive patterns |
