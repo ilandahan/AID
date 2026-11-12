@@ -220,7 +220,7 @@ def process_user_input(text: str) -> dict:
 ### ❌ BAD - Shared state and dependencies
 
 ```python
-class TestConfigManagement:
+class TestCondesign specnagement:
     config = None  # Shared class variable - BAD!
     
     def test_01_create(self):
