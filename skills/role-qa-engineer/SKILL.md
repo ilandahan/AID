@@ -165,7 +165,7 @@ test('should_return_error_when_email_invalid', () => {});
 
 ```typescript
 // ❌ NEVER
-const user = { email: 'admin@real.com', password: 'secret123' };
+const user = { email: 'admin@real.com', password: '<test-password>' };
 
 // ✅ ALWAYS
 const user = {
