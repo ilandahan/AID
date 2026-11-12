@@ -915,6 +915,7 @@ projects already linked to `.claude/<name>` keep working with no re-linking.
 | [docs/PHASE-GATES.md](docs/PHASE-GATES.md) | Phase system details |
 | [docs/MORNING-STARTUP.md](docs/MORNING-STARTUP.md) | Daily workflow guide |
 | [docs/WORK-CONTEXT-TRACKER.md](docs/WORK-CONTEXT-TRACKER.md) | Context tracking details |
+| [Current Labs architecture map](https://currentlabs.dev/current-full-design/#start) | Interactive map of the Current Labs architecture, including the AID pipeline and role flows. |
 | [memory-system/docs/](memory-system/docs/) | Learning system documentation |
 | [agent-assets/AGENT-STANDARD.md](agent-assets/AGENT-STANDARD.md) | How to write a sub-agent |
 | [rules/](rules/) | Code standards, and the Data Science / ML phase rules |
