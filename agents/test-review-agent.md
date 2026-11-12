@@ -263,7 +263,7 @@ Return ONLY this JSON structure. No other text.
     "mock_ratio_percent": 0,
     "mocked_items": [
       {
-        "what": "HttpClient",
+        "what": "ExternalServiceClient",
         "why": "External API boundary",
         "acceptable": true
       }
