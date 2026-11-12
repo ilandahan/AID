@@ -190,4 +190,4 @@ npm run dev
 
 ## 📝 License
 
-MIT
+[AID Community License v1.0](../../LICENSE) - free to use, adapt, and share. Cannot be sold.
