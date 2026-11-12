@@ -1,3 +1,8 @@
+---
+name: memory-system-qa-ship
+description: Reference for the QA & Ship phase: quality gates and release workflow.
+---
+
 # QA & Ship Phase Skill
 
 > **Source**: `../aid-qa-ship/SKILL.md`
