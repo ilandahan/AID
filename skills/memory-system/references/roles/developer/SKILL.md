@@ -1,3 +1,8 @@
+---
+name: memory-system-developer
+description: Reference for the Developer role in the AID lifecycle.
+---
+
 # Developer Role Skill
 
 > **Source**: `../role-developer/SKILL.md`
