@@ -6,12 +6,14 @@ hooks:
     - matcher: "Write"
       hooks:
         - type: command
-          command: "bash ${CLAUDE_SKILL_DIR}/bin/check-harness-immutable.sh"
+          command: "node"
+          args: ["${CLAUDE_PLUGIN_ROOT}/skills/autoresearch/bin/check-harness-immutable.mjs"]
           statusMessage: "Checking harness immutability..."
     - matcher: "Edit"
       hooks:
         - type: command
-          command: "bash ${CLAUDE_SKILL_DIR}/bin/check-harness-immutable.sh"
+          command: "node"
+          args: ["${CLAUDE_PLUGIN_ROOT}/skills/autoresearch/bin/check-harness-immutable.mjs"]
           statusMessage: "Checking harness immutability..."
 ---
 
