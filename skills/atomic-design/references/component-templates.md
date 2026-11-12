@@ -1,6 +1,6 @@
 # Component Templates
 
-Production-ready templates. Replace ALL placeholder values with EXACT Figma values.
+Production-ready templates. Replace ALL placeholder values with EXACT design spec values.
 
 ## Button Atom
 
@@ -38,7 +38,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 ```
 
 ```css
-/* Button.module.css - All values from Figma */
+/* Button.module.css - All values from design spec */
 .button {
   display: inline-flex; align-items: center; justify-content: center;
   gap: var(--spacing-2); border: none; border-radius: var(--radius-md);
@@ -57,7 +57,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 .ghost:hover:not(:disabled) { background: var(--color-background-muted); }
 .danger { background: var(--color-error); color: var(--color-text-inverse); }
 
-/* Sizes - from Figma */
+/* Sizes - from design spec */
 .sm { min-height: 36px; padding: var(--spacing-2) var(--spacing-3); font-size: var(--font-size-sm); }
 .md { min-height: 44px; padding: var(--spacing-2) var(--spacing-4); font-size: var(--font-size-sm); }
 .lg { min-height: 52px; padding: var(--spacing-3) var(--spacing-5); font-size: var(--font-size-base); }
@@ -187,7 +187,7 @@ export const Header = ({ logo, navItems, onLogoClick, actions }: HeaderProps) =>
 ## CSS Variables Template
 
 ```css
-/* tokens/variables.css - ALL from Figma */
+/* tokens/variables.css - ALL from design spec */
 :root {
   /* Colors */
   --color-primary: #3b82f6;
