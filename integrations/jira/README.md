@@ -17,10 +17,12 @@ Add to your `.env` file:
 ```bash
 ATLASSIAN_SITE_URL=https://your-domain.atlassian.net
 ATLASSIAN_USER_EMAIL=your-email@company.com
-ATLASSIAN_API_TOKEN=your-api-token
+ATLASSIAN_API_TOKEN=YOUR_API_KEY
 ```
 
 ### 2. MCP Configuration
+
+Illustrative configuration only: `YOUR_API_KEY` is a fake placeholder, not a lookup of an existing machine credential. Supply your own Atlassian token securely for the Atlassian server; never commit it.
 
 Add to your `.mcp.json`:
 
@@ -33,7 +35,7 @@ Add to your `.mcp.json`:
       "env": {
         "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL}",
         "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL}",
-        "ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN}"
+        "ATLASSIAN_API_TOKEN": "YOUR_API_KEY"
       }
     }
   }
