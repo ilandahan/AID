@@ -318,8 +318,21 @@ templates live in `agent-assets/`; see `agent-assets/AGENT-STANDARD.md` to add y
   locally in `~/.aid/`; see [memory-system privacy](memory-system/README.md#privacy).
 - No AID-hosted collection service is configured by this plugin. Local artifacts remain until
   the user removes them; this repository does not enforce a local retention period.
-- Other integrations send data to their configured services when used. Review their setup
-  guides and the data involved before enabling them.
+- External services used by the remaining optional workflows are listed below. These setup
+  templates are not connectors declared in the plugin manifest. They run only when configured
+  and used; review the destination and content before enabling them.
+
+| Service or destination | Data involved and when |
+|---|---|
+| GitHub | Repository content, commits, issues and pull requests used by the configured GitHub MCP workflows. See [GitHub setup](integrations/github/README.md). |
+| Atlassian Jira and Confluence | Issue, project and documentation content sent to the configured Atlassian site when those workflows run. See [Jira setup](integrations/jira/README.md) and the MCP templates. |
+| Google AI Studio / Google Vertex AI, or AI/ML API (AIMLAPI) | The optional visual-generation skill describes sending generation prompts, source images or sketches and edit instructions to the selected provider. See [visual-generation setup](skills/nano-banana-visual/SKILL.extended.md). |
+| Claude Memory | The learning workflow can promote anonymized patterns with manual user approval. Its documented privacy rules exclude project names, file paths and specific project content. See [memory privacy](memory-system/README.md#privacy). |
+| User-selected websites and application endpoints | Chrome DevTools workflows navigate and test the configured target; browser requests and form submissions reach that target. See [browser-testing setup](integrations/chrome-devtools/README.md). |
+
+AID does not set the retention policy for these third-party services. Their own account
+settings and terms apply. Local files under `.aid/` and `~/.aid/` are also retained separately
+from any server-side data.
 
 ---
 
