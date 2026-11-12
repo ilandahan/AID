@@ -66,7 +66,7 @@ Then {error handling outcome}
 ```
 
 ## Design References
-- Figma: {Link to designs if available}
+- design spec: {Link to designs if available}
 - Wireframe: {Link or description}
 - UI Components: {List of components needed}
 
