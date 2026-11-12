@@ -1,6 +1,6 @@
 ---
 name: memory-system-prd
-description: Reference for the PRD phase: product requirements document authoring.
+description: "Reference for the PRD phase: product requirements document authoring."
 ---
 
 # PRD Phase Skill
