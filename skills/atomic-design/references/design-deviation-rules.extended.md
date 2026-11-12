@@ -11,7 +11,7 @@
 │   תפקיד המפתח הוא לתרגם את העיצוב לקוד - לא לשפר אותו.                  │
 │                                                                         │
 │   "אני חושב שזה ייראה יותר טוב ככה" = ❌ FORBIDDEN                       │
-│   "Figma מראה X, אז הקוד יהיה X" = ✅ CORRECT                            │
+│   "design spec מראה X, אז הקוד יהיה X" = ✅ CORRECT                            │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -42,9 +42,9 @@
 
 | פעולה אסורה | דוגמה | הפתרון הנכון |
 |-------------|-------|--------------|
-| המצאת breakpoints | הוספת breakpoint ב-480px | בדוק אילו breakpoints מוגדרים ב-Figma |
-| "התאמות הגיוניות" | הקטנת padding במובייל | חלץ ערכים מ-Figma Mobile frame |
-| שינוי layout | שינוי מ-grid ל-flex | ממש את ה-layout כפי שנראה ב-Figma |
+| המצאת breakpoints | הוספת breakpoint ב-480px | בדוק אילו breakpoints מוגדרים ב-design spec |
+| "התאמות הגיוניות" | הקטנת padding במובייל | חלץ ערכים מ-design spec Mobile frame |
+| שינוי layout | שינוי מ-grid ל-flex | ממש את ה-layout כפי שנראה ב-design spec |
 
 ---
 
@@ -52,7 +52,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  WORKFLOW: כאשר נראה לך שמשהו "שגוי" ב-Figma                     │
+│  WORKFLOW: כאשר נראה לך שמשהו "שגוי" ב-design spec                     │
 │                                                                 │
 │  1. STOP - אל תשנה שום דבר                                      │
 │        │                                                        │
@@ -81,7 +81,7 @@
 ## Design Clarification Request
 
 **Component:** [Button/Primary]
-**Figma Frame:** [link]
+**design spec Frame:** [link]
 **Property:** padding-top
 **Current Value:** 13px
 **Expected Value (Grid-aligned):** 12px
@@ -89,7 +89,7 @@
 **Question:**
 האם ה-13px מכוון או שמדובר בטעות?
 אם מכוון - אוודא שהטוקן יהיה 13px.
-אם טעות - אעדכן את הקוד אחרי שתתקן ב-Figma.
+אם טעות - אעדכן את הקוד אחרי שתתקן ב-design spec.
 
 **Screenshot:** [attached]
 ```
@@ -105,7 +105,7 @@
 #### 1. Bug טכני בפלטפורמה
 
 ```css
-/* Figma shows: backdrop-filter: blur(10px) */
+/* design spec shows: backdrop-filter: blur(10px) */
 /* Safari bug: requires -webkit- prefix */
 
 /* ✅ ALLOWED - תוספת טכנית לא ויזואלית */
@@ -118,7 +118,7 @@
 #### 2. Accessibility Override (נדיר מאוד)
 
 ```css
-/* Figma shows: color contrast 3.5:1 */
+/* design spec shows: color contrast 3.5:1 */
 /* WCAG AA requires: 4.5:1 minimum */
 
 /* ❌ WRONG - לשנות לבד */
@@ -127,18 +127,18 @@ color: #000;  /* "Fixed" contrast */
 /* ✅ CORRECT - לדווח למעצב */
 /*
  * ACCESSIBILITY ISSUE REPORTED
- * Figma contrast: 3.5:1
+ * design spec contrast: 3.5:1
  * Required: 4.5:1
  * Awaiting designer update
  * Jira: DESIGN-123
  */
-color: var(--color-text-secondary);  /* Current Figma value */
+color: var(--color-text-secondary);  /* Current design spec value */
 ```
 
-#### 3. Missing State ב-Figma
+#### 3. Missing State ב-design spec
 
 ```tsx
-/* Figma shows: Button without focus state */
+/* design spec shows: Button without focus state */
 
 /* ❌ WRONG - להמציא focus state */
 &:focus {
@@ -147,7 +147,7 @@ color: var(--color-text-secondary);  /* Current Figma value */
 
 /* ✅ CORRECT - בקש מהמעצב להוסיף */
 /*
- * TODO: Focus state not defined in Figma
+ * TODO: Focus state not defined in design spec
  * Requested from designer - Jira: DESIGN-124
  * Using browser default until designed
  */
@@ -163,7 +163,7 @@ color: var(--color-text-secondary);  /* Current Figma value */
 /**
  * Button Component
  *
- * @figma https://figma.com/file/xxx/Design-System?node-id=123
+ * @design-source ./design-spec.md
  * @extracted 2024-01-15
  * @designer Sarah Cohen
  *
@@ -173,7 +173,7 @@ color: var(--color-text-secondary);  /* Current Figma value */
  * - Border-radius: 8px
  * - Font: Inter 16px/500
  *
- * All values extracted from Figma - DO NOT MODIFY without designer approval.
+ * All values extracted from design spec - DO NOT MODIFY without designer approval.
  */
 ```
 
@@ -183,23 +183,23 @@ color: var(--color-text-secondary);  /* Current Figma value */
 /**
  * Button Styles
  *
- * Source: Figma Design System v2.1
+ * Source: design spec Design System v2.1
  * Frame: Components/Button/Primary
  * Last synced: 2024-01-15
  *
- * ⚠️ WARNING: All values are from Figma.
- * Do not modify without updating Figma first.
+ * ⚠️ WARNING: All values are from design spec.
+ * Do not modify without updating design spec first.
  */
 
 .button {
-  /* From Figma: padding */
-  padding: 12px 24px;  /* Figma: paddingTop/Bottom: 12, paddingLeft/Right: 24 */
+  /* From design spec: padding */
+  padding: 12px 24px;  /* design spec: paddingTop/Bottom: 12, paddingLeft/Right: 24 */
 
-  /* From Figma: background */
-  background: var(--color-primary);  /* Figma: fill #3B82F6 */
+  /* From design spec: background */
+  background: var(--color-primary);  /* design spec: fill #3B82F6 */
 
-  /* From Figma: border-radius */
-  border-radius: 8px;  /* Figma: cornerRadius: 8 */
+  /* From design spec: border-radius */
+  border-radius: 8px;  /* design spec: cornerRadius: 8 */
 }
 ```
 
@@ -214,17 +214,17 @@ color: var(--color-text-secondary);  /* Current Figma value */
 
 ### Pre-merge Checklist:
 
-1. **Figma Link Verification**
-   - [ ] Figma link exists in component documentation
+1. **design spec Link Verification**
+   - [ ] design spec link exists in component documentation
    - [ ] Link is accessible and correct
 
 2. **Value Extraction**
-   - [ ] All CSS values have Figma source comment
+   - [ ] All CSS values have design spec source comment
    - [ ] No "magic numbers" without source
 
 3. **Token Usage**
    - [ ] Uses design tokens (not hardcoded values)
-   - [ ] Token values match current Figma
+   - [ ] Token values match current design spec
 
 4. **Visual Comparison**
    - [ ] Screenshot comparison shows match
@@ -234,14 +234,14 @@ color: var(--color-text-secondary);  /* Current Figma value */
 5. **No Unauthorized Changes**
    - [ ] No "improved" colors
    - [ ] No "rounded" values
-   - [ ] No added effects not in Figma
-   - [ ] No removed properties from Figma
+   - [ ] No added effects not in design spec
+   - [ ] No removed properties from design spec
 
 ### Red Flags to Block PR:
 
 ❌ Hardcoded color: `color: #3B82F6;` instead of `var(--color-primary)`
-❌ Rounded value: `padding: 12px` when Figma shows `13px`
-❌ Missing Figma reference
+❌ Rounded value: `padding: 12px` when design spec shows `13px`
+❌ Missing design spec reference
 ❌ "Looks better this way" in commit message
 ❌ Unexplained deviation from design system
 ```
@@ -260,7 +260,7 @@ color: var(--color-text-secondary);  /* Current Figma value */
    └─► המעצב צריך לסמוך שמה שהוא מעצב - יופיע בפרודקשן
 
 3. MAINTENANCE
-   └─► כאשר כולם מממשים בדיוק מ-Figma, קל לעדכן
+   └─► כאשר כולם מממשים בדיוק מ-design spec, קל לעדכן
 
 4. SCALABILITY
    └─► מערכת עיצוב עובדת רק כשכולם מקפידים עליה
@@ -271,7 +271,7 @@ color: var(--color-text-secondary);  /* Current Figma value */
 ```
 Developer A: שינה padding מ-12px ל-10px כי "נראה צפוף"
 Developer B: שינה את אותו כפתור ל-14px כי "צריך יותר מרווח"
-Developer C: השאיר 12px כמו ב-Figma
+Developer C: השאיר 12px כמו ב-design spec
 
 תוצאה: 3 גרסאות שונות של אותו כפתור באפליקציה
 ```
@@ -285,7 +285,7 @@ Developer C: השאיר 12px כמו ב-Figma
 │                                                                 │
 │   THE DEVIATION RULES                                           │
 │                                                                 │
-│   1. אל תשנה - ממש בדיוק מה ש-Figma מראה                        │
+│   1. אל תשנה - ממש בדיוק מה ש-design spec מראה                        │
 │                                                                 │
 │   2. אל תשפר - "שיפורים" הם סטיות                               │
 │                                                                 │
@@ -293,9 +293,9 @@ Developer C: השאיר 12px כמו ב-Figma
 │                                                                 │
 │   4. אל תעגל - 13px זה 13px, לא 12px                            │
 │                                                                 │
-│   5. אל תוסיף - אם זה לא ב-Figma, זה לא בקוד                    │
+│   5. אל תוסיף - אם זה לא ב-design spec, זה לא בקוד                    │
 │                                                                 │
-│   6. תעד - כל ערך צריך מקור מ-Figma                             │
+│   6. תעד - כל ערך צריך מקור מ-design spec                             │
 │                                                                 │
 │   7. אמת - בדוק ויזואלית לפני delivery                          │
 │                                                                 │
@@ -309,8 +309,8 @@ Developer C: השאיר 12px כמו ב-Figma
 | מצב | פעולה |
 |-----|-------|
 | "הערך נראה לי מוזר" | שאל את המעצב |
-| "אני חושב שזה ייראה יותר טוב" | לא רלוונטי - ממש מ-Figma |
+| "אני חושב שזה ייראה יותר טוב" | לא רלוונטי - ממש מ-design spec |
 | "המעצב טעה" | דווח - אל תתקן לבד |
-| "חסר state ב-Figma" | בקש מהמעצב להוסיף |
+| "חסר state ב-design spec" | בקש מהמעצב להוסיף |
 | "לא בטוח איזה ערך לקחת" | שאל את המעצב |
-| "רוצה לשנות משהו" | פתח בקשה למעצב לעדכן ב-Figma קודם |
+| "רוצה לשנות משהו" | פתח בקשה למעצב לעדכן ב-design spec קודם |
