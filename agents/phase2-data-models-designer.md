@@ -1,6 +1,6 @@
 ---
 name: phase2-data-models-designer
-description: Designs the data model layer of a tech spec: entity-relationship design, schema normalization, data integrity. Use in Phase 2.
+description: "Designs the data model layer of a tech spec: entity-relationship design, schema normalization, data integrity. Use in Phase 2."
 tools: Read, Grep, Glob
 model: inherit
 ---
