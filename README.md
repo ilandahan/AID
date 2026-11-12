@@ -31,7 +31,7 @@
 - [MCP Integrations](#mcp-integrations)
 - [Nano Banana Pro (Visual AI)](#nano-banana-pro-visual-ai)
 - [Breather (Knowing When to Stop)](#breather-knowing-when-to-stop)
-- [Skills System (28 Skills)](#skills-system)
+- [Skills System (27 Skills)](#skills-system)
 - [Commands Reference (45 Commands)](#commands-reference)
 - [Quick Start](#quick-start)
 - [Tech Stack](#tech-stack)
@@ -482,7 +482,7 @@ you tried and rejected and why, open decisions, and the one concrete next step.
 
 ## Skills System
 
-AID uses **28 specialized skills** - domain expertise organized by role and phase.
+AID uses **27 specialized skills** - domain expertise organized by role and phase.
 
 Each skill ships as a pair: `SKILL.md` is the compact version the model loads, and
 `SKILL.extended.md` is the human-readable companion. Keeping them separate means the model
@@ -733,8 +733,8 @@ claude plugin marketplace add ilandahan/AID
 claude plugin install aid@AID
 ```
 
-Restart Claude Code, then run `/aid-init` in any project. Every project gets the same 45
-commands, 28 skills and 39 sub-agents, and one command moves them all forward:
+Restart Claude Code, then run `/aid-init` in any project. Every project gets the same 44
+commands, 27 skills and 39 sub-agents, and one command moves them all forward:
 
 ```bash
 claude plugin update aid
@@ -832,11 +832,11 @@ AID/
 ├── .claude-plugin/             # Plugin manifests
 │   ├── plugin.json             # Name, version, and the hooks AID registers
 │   └── marketplace.json        # Lets the repo host itself as a marketplace
-├── commands/                   # 47 slash commands
+├── commands/                   # 44 slash commands
 │   ├── good-morning.md
 │   ├── phase.md
 │   └── ... (43 more)
-├── skills/                     # 28 specialized skills
+├── skills/                     # 27 specialized skills
 │   ├── why-driven-decision/    # Foundational - loads first
 │   ├── reflection/             # Quality Check + phase criteria
 │   ├── pipeline-orchestrator/  # 12-step machine + gate.mjs
