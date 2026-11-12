@@ -51,7 +51,6 @@ Starting and ending a session used to take five to ten minutes before a single l
 | Was | Now |
 |-----|-----|
 | `/aid-start` read every `SKILL.md` for the chosen role and phase — up to 12 files, ~120 KB — before writing state. Each read was a round trip. | One call to `hooks/aid_session.py start <role> <phase>` resolves the terminology, writes `.aid/state.json` and prints the greeting. Skills are registered by the plugin and load on demand, so nothing is read up front. `skills_loaded` in state still records which ones apply. |
-| `/aid-start` probed the Figma MCP server on every launch, whether or not the session needed it. | Probe removed. Start Figma from `/aid-pair` when you actually want it. |
 | `/aid-end` blocked on a phase-review sub-agent before anything was saved. You watched a spinner. | The review starts **first** and runs in the background while you answer the feedback questions. Same agent, same mandatory review, no waiting. |
 | Rating, what-worked and what-to-improve were three separate prompts. | One prompt, three answers, one message. |
 | The review verdict gated everything. | It gates only the phase transition. Feedback saves regardless, so ending a session never blocks on a PARTIAL. |
@@ -74,7 +73,6 @@ override-with-reason and the `subagent_review` record in state are all unchanged
 | **WHY-first foundation** | `why-driven-decision` loads before everything else — no implementation without an articulated purpose. |
 | **Learning system** | `memory-system` collects session feedback and turns recurring patterns into concrete skill improvements, with a Python CLI for analysis and dashboards. |
 | **Enforcement hooks** | A QA gate that blocks task completion until acceptance criteria pass, a language-check gate that blocks a turn ending on code that does not compile, and automatic pipeline initialization when a plan is approved. |
-| **Figma design review** | `figma-design-review` audits components *before* extraction, so bad structure never reaches your codebase. |
 | **Breather** | Session-boundary tracking bundled into the plugin: presence across every session, break offers at safe moments, written handoffs, and a rest/usage status line. Activate with `/breather-start`. See [Breather](#breather-knowing-when-to-stop). |
 
 ### Reliability fixes in this release
@@ -108,7 +106,7 @@ AID (AI Development Methodology) is a comprehensive framework that guides you th
 | AI generates code without context | Phase gates enforce requirements before code |
 | Losing track across sessions | Context tracking remembers everything |
 | Inconsistent code quality | Enforced TDD and mandatory code review |
-| Design-dev mismatch | Figma integration with design tokens |
+| Design-dev mismatch | Approved design specifications and design tokens |
 | No learning from mistakes | Feedback system improves over time |
 | Scope creep | Phase gates and approved PRDs prevent expansion |
 | Skipping important steps | Mandatory phase transitions with sub-agent review |
@@ -142,7 +140,7 @@ AID enforces a **structured, phase-gated methodology** inspired by proven softwa
 | **Requirements First** | No code until PRD is approved |
 | **Security by Design** | OWASP Top 10 and ISO 27001 built into architecture phase |
 | **Test-Driven Development** | Write tests before implementation |
-| **Design System Fidelity** | Figma is source of truth - zero deviation |
+| **Design System Fidelity** | design spec is source of truth - zero deviation |
 | **Traceability** | Every decision links to research and requirements |
 | **Transparency** | All decisions documented with reasoning |
 
@@ -318,15 +316,8 @@ templates live in `agent-assets/`; see `agent-assets/AGENT-STANDARD.md` to add y
   error logs, session markers and pipeline artifacts under the project's `.aid/` directory.
   Project content and paths may contain personal data. The learning system stores feedback
   locally in `~/.aid/`; see [memory-system privacy](memory-system/README.md#privacy).
-- The optional `/aid-pair` command sends `tenantId`, `projectPath` and `source` to the
-  AID-hosted pairing service at
-  https://figma-plugin-server-983606191500.us-central1.run.app/auth/generate-pairing.
-  This is an AID service hosted on Google Cloud Run, not a Figma-operated endpoint.
-  It is used to pair the Figma plugin with the project. See
-  [the pairing command](commands/aid-pair.md) for the request and authentication flow.
-- The bundled pairing server keeps pairing/session metadata in memory and emits operational
-  logs. This repository does not establish a production retention period for sessions or
-  hosting-provider logs; pairing-code expiry is not a data-deletion guarantee.
+- No AID-hosted collection service is configured by this plugin. Local artifacts remain until
+  the user removes them; this repository does not enforce a local retention period.
 - Other integrations send data to their configured services when used. Review their setup
   guides and the data involved before enabling them.
 
@@ -334,7 +325,7 @@ templates live in `agent-assets/`; see `agent-assets/AGENT-STANDARD.md` to add y
 
 ## MCP Integrations
 
-AID integrates with 6 Model Context Protocol (MCP) servers for seamless tool connectivity:
+AID integrates with 5 Model Context Protocol (MCP) servers for seamless tool connectivity:
 
 ### Configured MCPs
 
@@ -344,7 +335,6 @@ AID integrates with 6 Model Context Protocol (MCP) servers for seamless tool con
 | **Chrome DevTools** | Frontend testing | E2E testing, visual testing, performance audits |
 | **Jira** | Task management | Create epics/stories/tasks, manage sprints, query issues |
 | **Confluence** | Documentation | Create/update pages, manage spaces, organize docs |
-| **Figma** | Design system | Extract tokens, component specs, download assets |
 | **GitHub** | Source control | Repos, PRs, issues, code search, reviews |
 
 ### Environment Variables Required
@@ -358,8 +348,6 @@ ATLASSIAN_API_TOKEN=your-api-token
 # GitHub
 GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
 
-# Figma
-FIGMA_API_KEY=figd_...
 ```
 
 ### MCP Configuration
@@ -537,9 +525,8 @@ spends its context on instructions rather than on formatting.
 
 | Skill | Purpose |
 |-------|---------|
-| `atomic-design` | Figma-to-code component system (atoms, molecules, organisms) |
+| `atomic-design` | Specification-to-code component system (atoms, molecules, organisms) |
 | `atomic-page-builder` | Compose pages from existing components only |
-| `figma-design-review` | Audit Figma components **before** extraction, with a scoring rubric |
 | `system-architect` | Security-first architecture (ISO 27001, OWASP Top 10) |
 | `test-driven` | TDD methodology, test patterns, coverage requirements |
 | `cucumber-bdd` | Gherkin acceptance criteria + step definitions for JS, Python, Java, Ruby, Go |
@@ -573,7 +560,7 @@ testing patterns, model card template, bias audit checklist and monitoring setup
 ### Design System (Atomic Design)
 
 ```
-Figma (Source of Truth)
+design spec (Source of Truth)
     |
     v
 Design Tokens (colors, spacing, typography)
@@ -594,13 +581,13 @@ Templates (Page layouts)
 Pages (Complete screens)
 ```
 
-**Critical Rule**: Figma values are source of truth - zero deviation, no "improvements".
+**Critical Rule**: design spec values are source of truth - zero deviation, no "improvements".
 
 ---
 
 ## Commands Reference
 
-AID provides **47 slash commands** organized by workflow.
+AID provides **44 slash commands** organized by workflow.
 
 ### Setup & Initialization
 
@@ -639,8 +626,7 @@ AID provides **47 slash commands** organized by workflow.
 | `/prd` | aid-prd | Create Product Requirements Document |
 | `/tech-spec` | aid-tech-spec | Create Technical Specification |
 | `/jira-breakdown` | - | Break spec into Jira issues |
-| `/design-system` | atomic-design | Build design system from Figma |
-| `/design-review` | figma-design-review | Review Figma components before extraction |
+| `/design-system` | atomic-design | Build design system from design spec |
 | `/build-page` | atomic-page-builder | Compose pages from components |
 | `/storybook` | atomic-design | Manage Storybook component previews |
 | `/architecture` | system-architect | System architecture design |
@@ -660,13 +646,6 @@ AID provides **47 slash commands** organized by workflow.
 | `/yolo-off` | Disable full automation (restore confirmations) |
 | `/breather-start` | Enable [breather](#breather-knowing-when-to-stop) - break offers, presence tracking, status line |
 | `/breather-stop` | Snooze breather offers, skip today, or uninstall |
-
-### Figma Integration
-
-| Command | Description |
-|---------|-------------|
-| `/aid-pair` | Pair with the Figma plugin (auth code) |
-| `/figma-relay` | Process Figma plugin server requests |
 
 ### Learning & Improvement
 
@@ -887,8 +866,7 @@ AID/
 │   ├── memory_system/          # Python package: python -m memory_system
 │   └── docs/
 ├── storybook-preview/          # Component preview workspace
-├── integrations/               # MCP setup guides (jira, figma, github, chrome-devtools)
-│   └── figma-plugin/           # Figma plugin for /aid-pair
+├── integrations/               # MCP setup guides (jira, github, chrome-devtools)
 ├── scripts/init-project.sh     # New-project scaffolding
 ├── install.sh / install.bat    # Installers
 ├── link-project.sh / .bat      # Link an existing project (one source of truth)
@@ -958,7 +936,7 @@ projects already linked to `.claude/<name>` keep working with no re-linking.
 7. /aid-start                 # Select Tech Lead role, Phase 2
 8. /tech-spec                 # Create technical specification
 9. /architecture              # Design system architecture
-10. /design-system            # Extract Figma tokens
+10. /design-system            # Extract design spec tokens
 11. /phase-approve            # Human approval
 12. /phase-advance            # Move to Phase 3
 
