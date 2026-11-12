@@ -1,6 +1,6 @@
 ---
 name: phase0-business-analyst
-description: Assesses business viability of a problem: market analysis, value proposition, business model. Use in Phase 0 discovery.
+description: "Assesses business viability of a problem: market analysis, value proposition, business model. Use in Phase 0 discovery."
 tools: Read, Grep, Glob
 model: inherit
 ---
