@@ -128,7 +128,7 @@ All AID commands are now available:
 | All Skills | atomic-design, system-architect, test-driven, etc. |
 | Phase Enforcement | PRD -> Tech Spec -> Development -> QA flow |
 | Context Tracking | Automatic progress tracking |
-| MCP Servers | Jira, Figma, GitHub integration (after token setup) |
+| MCP Servers | Jira, GitHub integration (after token setup) |
 
 ## Troubleshooting
 
