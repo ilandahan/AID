@@ -10,8 +10,8 @@ KEY FEATURES
 - Phase Gates (6 phases, 0-5): Discovery -> PRD -> Tech Spec -> Breakdown -> Development -> QA & Ship
 - Phase Enforcement: Work is blocked out-of-order by hooks, critical rule enforced
 - 39 Registered Sub-Agents: 8 reviewers, 2 builders, 29 phase specialists
-- 28 Skills: Automatic skill loading based on role and phase
-- 47 Slash Commands: Full workflow management
+- 27 Skills: Automatic skill loading based on role and phase
+- 44 Slash Commands: Full workflow management
 - 12-Step Dev Pipeline: Automated pipeline with a hard QA gate
 - Context Tracking: Real-time tracking of tasks/steps in .aid/context.json
 - Memory System: Learning-based improvements through feedback loops
@@ -50,7 +50,7 @@ Memory System (learning-based improvements)
 - Updates skills based on patterns
 - Promotes insights to Claude Memory for cross-session learning
 
-SLASH COMMANDS (47)
+SLASH COMMANDS (44)
 
 Daily Workflow:
   /good-morning - Morning startup, load context, check systems
@@ -105,7 +105,7 @@ Setup & Testing:
   /link-project - Link an existing project to AID
   /aid-test, /test-all-agents, /test-phase-review, /test-qa-validator, /test-reflection - Self-tests
 
-SKILLS (28)
+SKILLS (27)
 Loaded automatically by role and phase. Highlights:
 - why-driven-decision: Foundational - loads first
 - phase-enforcement: Gate checking and phase validation
@@ -173,10 +173,10 @@ Components ship at the repository ROOT (Claude Code loads a plugin's components 
 the plugin root); install.sh mirrors them into .claude/ as symlinks (macOS/Linux) or
 junctions (Windows). The mirrors are gitignored - edit the root copies only.
 .claude-plugin/    - plugin.json (name, version, hooks) + marketplace.json
-skills/            - 28 skills
+skills/            - 27 skills
 agents/            - 39 sub-agents (FLAT - every .md here registers as an agent)
 agent-assets/      - Calibration examples + AGENT-STANDARD.md (not scanned as agents)
-commands/          - 47 slash commands
+commands/          - 44 slash commands
 rules/             - 23 rule files, incl. the Data Science / ML track
 references/        - Shared lookup data (role/phase terminology)
 hooks/             - Phase gate, QA gate, pipeline enforcement, session writer
