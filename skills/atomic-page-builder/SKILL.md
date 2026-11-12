@@ -5,17 +5,17 @@ description: Build pages using ONLY existing atomic-design components. REQUIRES 
 
 # Atomic Page Builder
 
-Critical rule: Figma is source of truth. NEVER guess layout. ALWAYS extract EXACT page specs from Figma first.
+Critical rule: design spec is source of truth. NEVER guess layout. ALWAYS extract EXACT page specs from design spec first.
 
 ## Rules
 
 | Forbidden | Required |
 |---|---|
 | Creating new atoms/molecules/organisms | Use existing components only |
-| Guessing layout values | Extract from Figma |
+| Guessing layout values | Extract from design spec |
 | External UI libs (MUI, Chakra) | Design system imports only |
 | Hardcoded values (#333, 24px) | CSS Modules + tokens |
-| Rounding values | Exact Figma values |
+| Rounding values | Exact design spec values |
 
 ## Skill Switching
 
@@ -23,24 +23,24 @@ Critical rule: Figma is source of truth. NEVER guess layout. ALWAYS extract EXAC
 |---|---|
 | Missing atom/molecule/organism | -> atomic-design |
 | Need new tokens | -> atomic-design |
-| Token value changed in Figma | -> atomic-design (update first) |
+| Token value changed in design spec | -> atomic-design (update first) |
 | Composing from existing | Stay here |
 
 ## Workflow
 
-Step 0: EXTRACT FROM FIGMA (mandatory)
-- Use Figma MCP: get_node
+Step 0: EXTRACT FROM design spec (mandatory)
+- Read the approved local specification, exported assets and token files
 - Extract: grid, gaps, padding, margins
 - Identify components used
 - Note page-specific overrides
-- Compare with tokens: check spacing tokens match Figma; if different -> UPDATE tokens (Figma wins)
+- Compare with tokens: check spacing tokens match design spec; if different -> UPDATE tokens (design spec wins)
 
 Step 1: INVENTORY (scan existing components)
 
 Step 2: GAP ANALYSIS (map requirements to components)
 
 Step 3: BUILD OR STOP
-- All exist? -> Compose page, matching Figma layout 1:1, NO "improvements"
+- All exist? -> Compose page, matching design spec layout 1:1, NO "improvements"
 - Missing? -> STOP, report gaps, switch to atomic-design
 
 ## Page Composition
@@ -48,9 +48,9 @@ Step 3: BUILD OR STOP
 ```tsx
 /**
  * Dashboard Page
- * @figma https://figma.com/file/xxx?node-id=123
+ * @design-source ./design-spec.md
  * @extracted 2024-01-15
- * Layout specs from Figma - DO NOT MODIFY
+ * Layout specs from design spec - DO NOT MODIFY
  */
 
 import { DashboardLayout } from '@/templates/DashboardLayout';
@@ -69,16 +69,16 @@ export const Dashboard = () => (
 ```
 
 ```css
-/* Dashboard.module.css - ALL values from Figma */
+/* Dashboard.module.css - ALL values from design spec */
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);  /* From Figma */
-  gap: var(--spacing-6);                   /* From Figma */
+  grid-template-columns: repeat(3, 1fr);  /* From design spec */
+  gap: var(--spacing-6);                   /* From design spec */
 }
 
 @media (max-width: 768px) {
   .statsGrid {
-    grid-template-columns: 1fr;            /* Figma mobile */
+    grid-template-columns: 1fr;            /* design spec mobile */
     gap: var(--spacing-4);
   }
 }
@@ -95,17 +95,17 @@ import { DashboardLayout } from '@/design-system/templates/DashboardLayout';
 
 ## Details
 
-- Figma extraction steps: references/figma-extraction-guide.md
+- design spec extraction steps: references/component-inventory-template.md
 - Component inventory format: references/component-inventory-template.md
 - Layout/composition patterns: references/page-composition-patterns.md
 
 ## Output Checklist
 
-- [ ] Page specs extracted from Figma
-- [ ] Layout values match Figma exactly
-- [ ] Responsive matches Figma
+- [ ] Page specs extracted from design spec
+- [ ] Layout values match design spec exactly
+- [ ] Responsive matches design spec
 - [ ] Visual comparison 0% difference
-- [ ] Figma link documented
+- [ ] design spec link documented
 - [ ] All imports from design system
 - [ ] Zero hardcoded values
 - [ ] Zero new components
