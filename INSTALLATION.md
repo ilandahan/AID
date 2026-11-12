@@ -389,19 +389,6 @@ MCP (Model Context Protocol) connects Claude to external tools.
 }
 ```
 
-### Figma Setup
-
-1. Open Figma → Settings → Account
-2. Scroll to "Personal access tokens"
-3. Generate new token
-4. In `.mcp.json`, find the `figma` section and update:
-
-```json
-"env": {
-  "FIGMA_API_KEY": "figd_xxxxxxxxxxxx"
-}
-```
-
 ### Chrome DevTools Setup
 
 Start Chrome with debug port before using:
@@ -432,11 +419,6 @@ Start Chrome with debug port before using:
 2. Check no extra spaces or quotes in token values
 3. Restart Claude Code after changing `.mcp.json`
 4. Run `claude mcp list` to see loaded servers
-
-#### "Figma MCP not connecting"
-
-1. Make sure Figma Desktop is open (not web)
-2. Test: `curl http://127.0.0.1:3845/mcp`
 
 #### "Phase gate violation"
 
