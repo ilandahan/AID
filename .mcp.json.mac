@@ -30,14 +30,6 @@
         "ATLASSIAN_API_TOKEN": "YOUR_ATLASSIAN_API_TOKEN"
       }
     },
-    "figma": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "figma-developer-mcp", "--stdio"],
-      "env": {
-        "FIGMA_API_KEY": "YOUR_FIGMA_API_KEY"
-      }
-    },
     "github": {
       "type": "stdio",
       "command": "npx",
