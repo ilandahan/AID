@@ -28,9 +28,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/aid_hooks.py\" --event SessionStart; else python \"${CLAUDE_PLUGIN_ROOT}/hooks/aid_hooks.py\" --event SessionStart; fi",
+            "command": "node",
             "timeout": 10,
-            "statusMessage": "Loading AID phase and context..."
+            "statusMessage": "Loading AID phase and context...",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook-runner.mjs",
+              "session-start"
+            ]
           }
         ]
       }
@@ -41,9 +45,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/aid_hooks.py\" --event PreToolUse --action phase_gate_write; else python \"${CLAUDE_PLUGIN_ROOT}/hooks/aid_hooks.py\" --event PreToolUse --action phase_gate_write; fi",
+            "command": "node",
             "timeout": 10,
-            "statusMessage": "AID phase gate (writes)..."
+            "statusMessage": "AID phase gate (writes)...",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook-runner.mjs",
+              "phase-gate-write"
+            ]
           }
         ]
       },
@@ -52,9 +60,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/aid_hooks.py\" --event PreToolUse --action phase_gate_bash; else python \"${CLAUDE_PLUGIN_ROOT}/hooks/aid_hooks.py\" --event PreToolUse --action phase_gate_bash; fi",
+            "command": "node",
             "timeout": 10,
-            "statusMessage": "AID phase gate (commands)..."
+            "statusMessage": "AID phase gate (commands)...",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook-runner.mjs",
+              "phase-gate-bash"
+            ]
           }
         ]
       }
@@ -65,9 +77,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/plan-execution-pipeline.sh\"",
+            "command": "node",
             "timeout": 30,
-            "statusMessage": "Initializing dev pipeline for approved plan..."
+            "statusMessage": "Initializing dev pipeline for approved plan...",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook-runner.mjs",
+              "plan-approved"
+            ]
           }
         ]
       }
@@ -77,15 +93,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/dev-pipeline-gate.sh\"",
+            "command": "node",
             "timeout": 120,
-            "statusMessage": "Language checks + pipeline freshness..."
+            "statusMessage": "Language checks + pipeline freshness...",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook-runner.mjs",
+              "stop-pipeline"
+            ]
           },
           {
             "type": "command",
-            "command": "if command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/validate-qa-gate.py\"; else python \"${CLAUDE_PLUGIN_ROOT}/hooks/validate-qa-gate.py\"; fi",
+            "command": "node",
             "timeout": 60,
-            "statusMessage": "QA gate validation (Phase 4 only)"
+            "statusMessage": "QA gate validation (Phase 4 only)",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/hooks/hook-runner.mjs",
+              "stop-qa"
+            ]
           }
         ]
       }
