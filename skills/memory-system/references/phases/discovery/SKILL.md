@@ -1,3 +1,8 @@
+---
+name: memory-system-discovery
+description: Reference for the Discovery phase: requirements discovery and scoping.
+---
+
 # Discovery Phase Skill
 
 > **Source**: `../pre-prd-research/SKILL.md`, `../aid-discovery/SKILL.md`
