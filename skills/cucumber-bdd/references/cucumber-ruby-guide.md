@@ -111,7 +111,7 @@ end
 Given('I have a registered account with email {string}') do |email|
   @test_user = User.create!(
     email: email,
-    password: 'SecurePass123!'
+    password: '<test-password>'
   )
 end
 
@@ -191,7 +191,7 @@ end
 # features/support/world_extensions.rb
 
 module AuthHelpers
-  def login_as(email, password = 'password')
+  def login_as(email, password = '<test-password>')
     visit '/login'
     fill_in 'Email', with: email
     fill_in 'Password', with: password
