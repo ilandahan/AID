@@ -1,15 +1,15 @@
 ---
-description: "Build a complete design system from Figma using Atomic Design methodology"
+description: "Build a complete design system from design spec using Atomic Design methodology"
 ---
 
 # /design-system Command
 
-Build a complete design system from Figma using Atomic Design methodology.
+Build a complete design system from design spec using Atomic Design methodology.
 
 ## Usage
 
 ```
-/design-system [figma-link]
+/design-system [design spec-link]
 ```
 
 ## What It Does
@@ -30,22 +30,13 @@ Build a complete design system from Figma using Atomic Design methodology.
 
 ## Prerequisites
 
-- Figma Desktop with Dev Mode enabled, OR
-- Figma API key configured
+An approved local design specification, exported assets or token files with exact measurements and states. Ask for missing values before implementation.
 
 ## Examples
 
-```bash
-# From Figma selection (Dev Mode MCP)
-/design-system
-
-# From Figma link
-/design-system https://figma.com/file/xxx
-
-# Extract only tokens
+```text
+/design-system ./design-spec.md
 /design-system --tokens-only
-
-# Generate specific component level
 /design-system --level atoms
 ```
 
@@ -79,8 +70,8 @@ design-system/
 ## Workflow
 
 1. Read `skills/atomic-design/SKILL.md`
-2. Read `skills/atomic-design/references/figma-mcp-integration.md`
-3. Connect to Figma (MCP or link)
+2. Read `skills/atomic-design/references/design-deviation-rules.md`
+3. Read the approved local design specification
 4. Extract design tokens
 5. Generate CSS variables
 6. Build atoms first
@@ -122,16 +113,16 @@ Every component includes:
 ## Prompt
 
 ```markdown
-**Role**: You are an expert UI engineer specializing in design systems, Atomic Design methodology, and Figma-to-code workflows.
+**Role**: You are an expert UI engineer specializing in design systems, Atomic Design methodology, and Specification-to-code workflows.
 
-**Task**: Build a complete design system from the provided Figma style guide using Atomic Design principles.
+**Task**: Build a complete design system from the provided design spec style guide using Atomic Design principles.
 
 **Context**:
-- Figma source: [FIGMA LINK OR SELECTION]
+- design spec source: [design spec LINK OR SELECTION]
 - Framework: React with TypeScript
 - Styling: CSS Modules with CSS custom properties
 - Read: `skills/atomic-design/SKILL.md`
-- Read: `skills/atomic-design/references/figma-mcp-integration.md`
+- Read: `skills/atomic-design/references/design-deviation-rules.md`
 
 **Reasoning**:
 - Extract ALL visual properties into design tokens first
@@ -148,7 +139,7 @@ Every component includes:
 5. Usage examples
 
 **Stopping Condition**:
-- All tokens extracted from Figma
+- All tokens extracted from design spec
 - Complete atom set created
 - At least 3 molecules composed
 - At least 2 organisms composed
@@ -156,7 +147,7 @@ Every component includes:
 - No hardcoded values
 
 **Steps**:
-1. Connect to Figma via MCP or link
+1. Read the approved local design specification
 2. Extract color tokens
 3. Extract typography tokens
 4. Extract spacing scale
@@ -170,6 +161,6 @@ Every component includes:
 12. Audit accessibility
 
 ---
-[FIGMA LINK OR DESCRIPTION]
+[design spec LINK OR DESCRIPTION]
 ---
 ```
