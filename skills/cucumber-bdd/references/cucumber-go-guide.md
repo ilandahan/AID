@@ -201,7 +201,7 @@ func (tc *TestContext) iEnterPassword(password string) error {
 
 func (tc *TestContext) iClickTheLoginButton() error {
     // Perform login
-    tc.AuthToken = "test-token"
+    tc.AuthToken = "<test-token>"
     return nil
 }
 
@@ -376,7 +376,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
     ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
         for _, tag := range sc.Tags {
             if tag.Name == "@auth" {
-                testCtx.AuthToken = "test-auth-token"
+                testCtx.AuthToken = "<test-auth-token>"
             }
             if tag.Name == "@database" {
                 // Start transaction
