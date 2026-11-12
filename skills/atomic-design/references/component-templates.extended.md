@@ -8,20 +8,20 @@ Production-ready templates for common design system components.
 ┌─────────────────────────────────────────────────────────────────────┐
 │  🚨 BEFORE USING THESE TEMPLATES:                                    │
 │                                                                      │
-│  1. Extract specs from Figma using MCP                              │
-│  2. Replace ALL placeholder values with EXACT Figma values          │
-│  3. Add @figma JSDoc tag with actual Figma link                     │
+│  1. Extract specs from local design specifications                              │
+│  2. Replace ALL placeholder values with EXACT design spec values          │
+│  3. Add @design-source JSDoc tag with actual design spec link                     │
 │  4. Document extraction date                                         │
 │                                                                      │
 │  These templates show STRUCTURE and PATTERNS.                       │
-│  The actual VALUES must come from YOUR Figma design system.         │
+│  The actual VALUES must come from YOUR design spec design system.         │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 **Related documents:**
-- `figma-design-fidelity.md` - Complete extraction workflow
+- `design-deviation-rules.md` - Complete extraction workflow
 - `design-deviation-rules.md` - Zero deviation policy
-- `figma-mcp-integration.md` - MCP commands for extraction
+- `design-deviation-rules.md` - Specification fidelity rules
 
 ## Complete Atom: Button
 
@@ -29,11 +29,11 @@ Production-ready templates for common design system components.
 /**
  * Button Atom
  *
- * @figma [REPLACE: https://figma.com/file/xxx/Design-System?node-id=button]
+ * @design-source [REPLACE: ./design-spec.md
  * @extracted [REPLACE: YYYY-MM-DD]
  * @designer [REPLACE: Designer Name]
  *
- * ⚠️ Replace ALL values below with EXACT values from Figma extraction
+ * ⚠️ Replace ALL values below with EXACT values from design spec extraction
  */
 
 // atoms/Button/Button.tsx
@@ -125,12 +125,12 @@ export default Button;
 /**
  * Button Styles
  *
- * Source: Figma Design System
+ * Source: design spec Design System
  * Frame: Components/Button
  * Extracted: [REPLACE: YYYY-MM-DD]
  *
- * ⚠️ ALL values must be EXACT from Figma - DO NOT MODIFY
- * Replace placeholder values with your Figma values
+ * ⚠️ ALL values must be EXACT from design spec - DO NOT MODIFY
+ * Replace placeholder values with your design spec values
  */
 
 /* atoms/Button/Button.module.css */
@@ -197,36 +197,36 @@ export default Button;
 }
 
 /* Sizes - Mobile first */
-/* ⚠️ ALL values from Figma - check each size variant in Figma */
+/* ⚠️ ALL values from design spec - check each size variant in design spec */
 .sm {
-  min-height: 36px;                          /* From Figma: Button/Small */
-  padding: var(--spacing-2) var(--spacing-3); /* From Figma */
-  font-size: var(--font-size-sm);             /* From Figma */
+  min-height: 36px;                          /* From design spec: Button/Small */
+  padding: var(--spacing-2) var(--spacing-3); /* From design spec */
+  font-size: var(--font-size-sm);             /* From design spec */
 }
 
 .md {
-  min-height: 44px;                          /* From Figma: Button/Medium */
-  padding: var(--spacing-2) var(--spacing-4); /* From Figma */
-  font-size: var(--font-size-sm);             /* From Figma */
+  min-height: 44px;                          /* From design spec: Button/Medium */
+  padding: var(--spacing-2) var(--spacing-4); /* From design spec */
+  font-size: var(--font-size-sm);             /* From design spec */
 }
 
 .lg {
-  min-height: 52px;                          /* From Figma: Button/Large */
-  padding: var(--spacing-3) var(--spacing-5); /* From Figma */
-  font-size: var(--font-size-base);           /* From Figma */
+  min-height: 52px;                          /* From design spec: Button/Large */
+  padding: var(--spacing-3) var(--spacing-5); /* From design spec */
+  font-size: var(--font-size-base);           /* From design spec */
 }
 
-/* Responsive: Check Figma Desktop frame for these values */
+/* Responsive: Check desktop design frame for these values */
 @media (min-width: 768px) {
   .sm {
-    min-height: 32px;  /* From Figma Desktop: Button/Small */
+    min-height: 32px;  /* From desktop design: Button/Small */
   }
   .md {
-    min-height: 40px;  /* From Figma Desktop: Button/Medium */
+    min-height: 40px;  /* From desktop design: Button/Medium */
     font-size: var(--font-size-base);
   }
   .lg {
-    min-height: 48px;  /* From Figma Desktop: Button/Large */
+    min-height: 48px;  /* From desktop design: Button/Large */
   }
 }
 
@@ -276,10 +276,10 @@ export default Button;
 /**
  * Input Atom
  *
- * @figma [REPLACE: https://figma.com/file/xxx/Design-System?node-id=input]
+ * @design-source [REPLACE: ./design-spec.md
  * @extracted [REPLACE: YYYY-MM-DD]
  *
- * ⚠️ Replace ALL values below with EXACT values from Figma extraction
+ * ⚠️ Replace ALL values below with EXACT values from design spec extraction
  */
 
 // atoms/Input/Input.tsx
@@ -351,11 +351,11 @@ export default Input;
 /**
  * Input Styles
  *
- * Source: Figma Design System
+ * Source: design spec Design System
  * Frame: Components/Input
  * Extracted: [REPLACE: YYYY-MM-DD]
  *
- * ⚠️ ALL values must be EXACT from Figma - DO NOT MODIFY
+ * ⚠️ ALL values must be EXACT from design spec - DO NOT MODIFY
  */
 
 /* atoms/Input/Input.module.css */
@@ -453,11 +453,11 @@ export default Input;
 /**
  * FormField Molecule
  *
- * @figma [REPLACE: https://figma.com/file/xxx/Design-System?node-id=formfield]
+ * @design-source [REPLACE: ./design-spec.md
  * @extracted [REPLACE: YYYY-MM-DD]
  *
  * Composes: Typography (label) + Input + Typography (error/hint)
- * ⚠️ Replace ALL spacing values with EXACT values from Figma
+ * ⚠️ Replace ALL spacing values with EXACT values from design spec
  */
 
 // molecules/FormField/FormField.tsx
@@ -543,32 +543,32 @@ export default FormField;
 /**
  * FormField Styles
  *
- * Source: Figma Design System
+ * Source: design spec Design System
  * Frame: Components/FormField
  * Extracted: [REPLACE: YYYY-MM-DD]
  *
- * ⚠️ ALL gap/margin values from Figma - DO NOT MODIFY
+ * ⚠️ ALL gap/margin values from design spec - DO NOT MODIFY
  */
 
 /* molecules/FormField/FormField.module.css */
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-1);  /* From Figma: gap between label and input */
+  gap: var(--spacing-1);  /* From design spec: gap between label and input */
 }
 
 .label {
   display: flex;
   align-items: center;
-  gap: var(--spacing-1);  /* From Figma: gap between label text and asterisk */
+  gap: var(--spacing-1);  /* From design spec: gap between label text and asterisk */
 }
 
 .required {
-  color: var(--color-error);  /* From Figma: required indicator color */
+  color: var(--color-error);  /* From design spec: required indicator color */
 }
 
 .message {
-  margin-top: var(--spacing-1);  /* From Figma: gap between input and message */
+  margin-top: var(--spacing-1);  /* From design spec: gap between input and message */
 }
 ```
 
@@ -580,12 +580,12 @@ export default FormField;
 /**
  * Header Organism
  *
- * @figma [REPLACE: https://figma.com/file/xxx/Design-System?node-id=header]
+ * @design-source [REPLACE: ./design-spec.md
  * @extracted [REPLACE: YYYY-MM-DD]
  *
  * Composes: Logo + NavItems + Actions + MobileMenu
- * ⚠️ Check Figma for Desktop, Tablet, Mobile variations
- * ⚠️ Replace ALL height, padding, breakpoint values with EXACT Figma values
+ * ⚠️ Check design spec for Desktop, Tablet, Mobile variations
+ * ⚠️ Replace ALL height, padding, breakpoint values with EXACT design spec values
  */
 
 // organisms/Header/Header.tsx
@@ -714,11 +714,11 @@ export default Header;
 /**
  * Header Styles
  *
- * Source: Figma Design System
+ * Source: design spec Design System
  * Frame: Components/Header
  * Extracted: [REPLACE: YYYY-MM-DD]
  *
- * ⚠️ ALL values from Figma - check Desktop, Tablet, Mobile frames
+ * ⚠️ ALL values from design spec - check Desktop, Tablet, Mobile frames
  */
 
 /* organisms/Header/Header.module.css */
@@ -726,8 +726,8 @@ export default Header;
   position: sticky;
   top: 0;
   z-index: 100;
-  background: var(--color-surface);        /* From Figma */
-  border-bottom: 1px solid var(--color-border); /* From Figma */
+  background: var(--color-surface);        /* From design spec */
+  border-bottom: 1px solid var(--color-border); /* From design spec */
 }
 
 .container {
@@ -866,16 +866,16 @@ export default Header;
 /**
  * Design Tokens - CSS Variables
  *
- * Source: Figma Style Guide
+ * Source: design spec Style Guide
  * Extracted: [REPLACE: YYYY-MM-DD]
  *
- * ⚠️ CRITICAL: ALL values MUST be extracted from Figma
- * DO NOT use these placeholder values - replace with your Figma values
+ * ⚠️ CRITICAL: ALL values MUST be extracted from design spec
+ * DO NOT use these placeholder values - replace with your design spec values
  *
  * To extract:
- * 1. Open Figma Style Guide
- * 2. Use MCP: figma.get_local_variables(file_key)
- * 3. Replace all values below with EXACT Figma values
+ * 1. Open the approved design specification Style Guide
+Read the approved local design specification and token files.
+ * 3. Replace all values below with EXACT design spec values
  */
 
 /* tokens/variables.css */
