@@ -1,6 +1,6 @@
 ---
 name: memory-system-tech-spec
-description: Reference for the Tech Spec phase: technical specification authoring.
+description: "Reference for the Tech Spec phase: technical specification authoring."
 ---
 
 # Tech Spec Phase Skill
