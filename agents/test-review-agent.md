@@ -123,7 +123,7 @@ Any test-specific logic in production code is CRITICAL.
 ### 6. Mock Analysis
 
 - **Mock ratio**: Count mocked vs. real dependencies. Target: < 20% mocking
-- **Mock boundaries**: Only external services (HTTP APIs, third-party SDKs) should be mocked
+- **Mock boundaries**: Only external service boundaries (remote application interfaces and third-party SDKs) should be mocked. This is a rule for reviewing existing tests, not an instruction to contact a service
 - **Mock accuracy**: Mock return values must match actual API responses
 - **No internal mocking**: Mocking internal functions suggests tight coupling — flag as MAJOR
 - **Integration alternatives**: For each mock, note whether a test database/container could replace it
