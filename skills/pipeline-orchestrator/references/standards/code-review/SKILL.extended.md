@@ -75,10 +75,10 @@ exec(`ls ${userPath}`);
 fs.readdir(userPath);
 
 // ❌ CRITICAL: Hardcoded secrets
-const apiKey = 'sk-1234567890';
+// Do not embed real credentials in source code.
 
-// ✅ SAFE: Environment variables
-const apiKey = process.env.API_KEY;
+// Documentation placeholder only. In production, use securely supplied runtime configuration, never a committed secret.
+const exampleCredential = "YOUR_API_KEY"; // fake documentation value only
 ```
 
 ### Security Review Questions
