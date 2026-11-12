@@ -1,6 +1,6 @@
 ---
 name: phase0-competitive-researcher
-description: Maps the competitive terrain: market landscape, competitor profiles, strategic positioning and gaps. Use in Phase 0 discovery.
+description: "Maps the competitive terrain: market landscape, competitor profiles, strategic positioning and gaps. Use in Phase 0 discovery."
 tools: Read, Grep, Glob
 model: inherit
 ---
