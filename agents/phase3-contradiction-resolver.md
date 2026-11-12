@@ -85,7 +85,7 @@ Use a **section-by-section cross-reference** approach. Do not read one document 
 3. Compare claims, constraints, and assumptions between the paired sections.
 4. Record any discrepancy, no matter how minor — classification comes later.
 
-This systematic pairing prevents the common failure mode of reading both documents, forming a mental model, and missing contradictions that "feel" consistent but are textually inconsistent.
+This systematic comparison prevents the common failure mode of reading both documents, forming a mental model, and missing contradictions that "feel" consistent but are textually inconsistent.
 
 ### Decision Criteria
 
