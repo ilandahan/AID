@@ -28,8 +28,8 @@ This includes:
 | API Keys | `sk_live_xxx`, `AKIA...` | Service abuse/billing |
 | Tokens | `ghp_xxx`, `xoxb-xxx` | API access |
 | Connection strings | `postgresql://user:pass@host` | Database access |
-| Private keys | `-----BEGIN RSA PRIVATE KEY-----` | Full compromise |
-| Secrets | `JWT_SECRET=abc123` | Token forgery |
+| Private keys | `-----BEGIN [RSA] PRIVATE KEY-----` | Full compromise |
+| Secrets | `JWT_SECRET=<token-value>` | Token forgery |
 
 ---
 
@@ -41,7 +41,7 @@ This includes:
 // BAD - Real-looking credentials
 const testUser = {
   email: 'admin@company.com',
-  password: 'CompanyPass123!'
+  password: '<example-password>'
 };
 
 // BAD - API keys that look real
@@ -56,8 +56,8 @@ const config = {
 ```typescript
 // tests/fixtures/users.ts - BAD
 export const testUsers = [
-  { email: 'john@company.com', password: 'JohnPass123' },
-  { email: 'admin@company.com', password: 'AdminPass!' }
+  { email: 'john@company.com', password: '<test-password>' },
+  { email: 'admin@company.com', password: '<test-password>' }
 ];
 ```
 
@@ -116,7 +116,7 @@ export function createTestUser(overrides = {}) {
   return {
     id: faker.string.uuid(),
     email: faker.internet.email({ provider: 'test-example.com' }),
-    password: 'TestOnlyPassword-' + faker.string.alphanumeric(8),
+    password: 'pw-' + faker.string.alphanumeric(16),
     name: faker.person.fullName(),
     ...overrides
   };
