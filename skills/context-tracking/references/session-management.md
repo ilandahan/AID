@@ -65,7 +65,7 @@ function generateSessionId() {
 │                                                              │
 │  1. Check Infrastructure                                     │
 │     ├── Docker status                                        │
-│     ├── MCP connections (Jira, Figma, GitHub)                │
+│     ├── MCP connections (Jira, GitHub)                │
 │     └── Database connectivity                                │
 │                                                              │
 │  2. Load Context                                             │
