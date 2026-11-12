@@ -25,8 +25,8 @@ Security requirements for all code in this project.
 
 ```typescript
 // NEVER
-const apiKey = 'sk-live-abc123xyz';
-const password = 'secretpassword';
+const apiKey = '<your-api-key>'; // e.g. process.env.API_KEY
+const password = '<your-password>'; // e.g. process.env.DB_PASSWORD
 
 // ALWAYS
 const apiKey = process.env.API_KEY;
