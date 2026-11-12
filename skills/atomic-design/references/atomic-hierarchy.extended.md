@@ -2,25 +2,25 @@
 
 Complete breakdown of component levels with implementation patterns.
 
-## ⚠️ CRITICAL: Extract from Figma First
+## ⚠️ CRITICAL: Extract from design spec First
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │  🚨 BEFORE CREATING ANY COMPONENT:                                   │
 │                                                                      │
-│  1. Extract specs from Figma using MCP                              │
-│  2. Document the Figma link in your component                       │
+│  1. Extract specs from local design specifications                              │
+│  2. Document the design spec link in your component                       │
 │  3. Use EXACT values - no rounding or "improving"                   │
 │                                                                      │
 │  The examples below show STRUCTURE, not actual values.              │
-│  Your values MUST come from your Figma design system.               │
+│  Your values MUST come from your design spec design system.               │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 **Related documents:**
-- `figma-design-fidelity.md` - Complete extraction workflow
+- `design-deviation-rules.md` - Complete extraction workflow
 - `design-deviation-rules.md` - Zero deviation policy
-- `figma-mcp-integration.md` - MCP commands for extraction
+- `design-deviation-rules.md` - Specification fidelity rules
 
 ## Level 1: Atoms
 
@@ -32,10 +32,10 @@ Complete breakdown of component levels with implementation patterns.
 /**
  * Typography Atom
  *
- * @figma https://figma.com/file/xxx/Design-System?node-id=typography
+ * @design-source ./design-spec.md
  * @extracted [DATE]
  *
- * ⚠️ All font sizes, weights, and line-heights from Figma - DO NOT MODIFY
+ * ⚠️ All font sizes, weights, and line-heights from design spec - DO NOT MODIFY
  */
 
 // atoms/Typography/Typography.tsx
@@ -69,21 +69,21 @@ export const Typography = ({
 };
 
 /* Typography.module.css - ALL styles encapsulated */
-/* ⚠️ ALL values EXACT from Figma - verify before using */
+/* ⚠️ ALL values EXACT from design spec - verify before using */
 
 .h1 {
-  font-family: var(--font-heading);      /* From Figma */
-  font-size: var(--font-size-4xl);       /* From Figma */
-  font-weight: var(--font-weight-bold);  /* From Figma */
-  line-height: var(--line-height-tight); /* From Figma */
-  letter-spacing: var(--letter-spacing-tight); /* From Figma */
+  font-family: var(--font-heading);      /* From design spec */
+  font-size: var(--font-size-4xl);       /* From design spec */
+  font-weight: var(--font-weight-bold);  /* From design spec */
+  line-height: var(--line-height-tight); /* From design spec */
+  letter-spacing: var(--letter-spacing-tight); /* From design spec */
 }
 
-/* Responsive: Check Figma Mobile frame for these values */
+/* Responsive: Check design spec Mobile frame for these values */
 @media (max-width: 768px) {
-  .h1 { font-size: var(--font-size-2xl); } /* From Figma Mobile */
+  .h1 { font-size: var(--font-size-2xl); } /* From design spec Mobile */
 }
-/* ... all variants defined - ALL from Figma */
+/* ... all variants defined - ALL from design spec */
 ```
 
 ### Button Atom
@@ -92,10 +92,10 @@ export const Typography = ({
 /**
  * Button Atom
  *
- * @figma https://figma.com/file/xxx/Design-System?node-id=button
+ * @design-source ./design-spec.md
  * @extracted [DATE]
  *
- * ⚠️ All sizes, padding, colors from Figma - DO NOT MODIFY
+ * ⚠️ All sizes, padding, colors from design spec - DO NOT MODIFY
  */
 
 // atoms/Button/Button.tsx
@@ -155,10 +155,10 @@ export const Button = ({
 /**
  * Input Atom
  *
- * @figma https://figma.com/file/xxx/Design-System?node-id=input
+ * @design-source ./design-spec.md
  * @extracted [DATE]
  *
- * ⚠️ All sizes, padding, border styles from Figma - DO NOT MODIFY
+ * ⚠️ All sizes, padding, border styles from design spec - DO NOT MODIFY
  */
 
 // atoms/Input/Input.tsx
@@ -221,11 +221,11 @@ export const Input = ({
 /**
  * FormField Molecule
  *
- * @figma https://figma.com/file/xxx/Design-System?node-id=formfield
+ * @design-source ./design-spec.md
  * @extracted [DATE]
  *
  * Composes: Typography (label) + Input + Typography (error/hint)
- * ⚠️ Layout spacing from Figma - DO NOT MODIFY
+ * ⚠️ Layout spacing from design spec - DO NOT MODIFY
  */
 
 // molecules/FormField/FormField.tsx
@@ -300,10 +300,10 @@ export const FormField = ({
 /**
  * Card Molecule
  *
- * @figma https://figma.com/file/xxx/Design-System?node-id=card
+ * @design-source ./design-spec.md
  * @extracted [DATE]
  *
- * ⚠️ All padding, shadows, border-radius from Figma - DO NOT MODIFY
+ * ⚠️ All padding, shadows, border-radius from design spec - DO NOT MODIFY
  */
 
 // molecules/Card/Card.tsx
@@ -370,11 +370,11 @@ export const Card = ({
 /**
  * Header Organism
  *
- * @figma https://figma.com/file/xxx/Design-System?node-id=header
+ * @design-source ./design-spec.md
  * @extracted [DATE]
  *
  * Composes: Logo + NavItems + UserMenu + MobileMenu
- * ⚠️ All heights, spacing, responsive behavior from Figma - DO NOT MODIFY
+ * ⚠️ All heights, spacing, responsive behavior from design spec - DO NOT MODIFY
  */
 
 // organisms/Header/Header.tsx
@@ -464,11 +464,11 @@ export const Header = ({
 /**
  * Form Organism
  *
- * @figma https://figma.com/file/xxx/Design-System?node-id=form
+ * @design-source ./design-spec.md
  * @extracted [DATE]
  *
  * Composes: FormFields + Buttons
- * ⚠️ All field gaps, button alignment from Figma - DO NOT MODIFY
+ * ⚠️ All field gaps, button alignment from design spec - DO NOT MODIFY
  */
 
 // organisms/Form/Form.tsx
@@ -559,11 +559,11 @@ export const Form = ({
 /**
  * DashboardLayout Template
  *
- * @figma https://figma.com/file/xxx/Design-System?node-id=dashboard-layout
+ * @design-source ./design-spec.md
  * @extracted [DATE]
  *
- * ⚠️ All grid columns, sidebar width, main area padding from Figma
- * Check Figma for Desktop, Tablet, Mobile frame variations
+ * ⚠️ All grid columns, sidebar width, main area padding from design spec
+ * Check design spec for Desktop, Tablet, Mobile frame variations
  */
 
 // templates/DashboardLayout/DashboardLayout.tsx
@@ -605,11 +605,11 @@ export const DashboardLayout = ({
 /**
  * Dashboard Page
  *
- * @figma https://figma.com/file/xxx/App?node-id=dashboard-page
+ * @design-source ./design-spec.md
  * @extracted [DATE]
  *
  * Uses: DashboardLayout template + real content
- * ⚠️ All layout, spacing, responsive behavior from Figma page frames
+ * ⚠️ All layout, spacing, responsive behavior from design spec page frames
  */
 
 // pages/Dashboard/Dashboard.tsx
