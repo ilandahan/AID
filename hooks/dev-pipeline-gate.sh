@@ -228,27 +228,15 @@ if [ -n "$changed_ts" ] && [ "$tsc_runnable" = 1 ]; then
     ran_tsc=1
     f_tsc=$(_resolve_tsc "$PWD/functions/$f")
     if [ -n "$f_tsc" ]; then
-      # Invoke with a path RELATIVE to the post-`cd` cwd, never the absolute one
-      # `_resolve_tsc` returns. Verified 2026-09-23: an absolute path here (e.g.
-      # ".../ilans' local files/demo/saas/functions/chat/node_modules/typescript/bin/tsc")
-      # gets handed to node.exe (a native Windows binary) as a bash argv string; git-bash's
-      # MSYS layer auto-converts absolute-looking POSIX paths for native-binary args, and
-      # for this project's path (apostrophe + spaces) that conversion inserts a bogus extra
-      # drive-letter segment ("C:\c\..." instead of "C:\..."), so node reports "Cannot find
-      # module" even though the file exists. A relative argv string never matches that
-      # conversion heuristic, so it is never mangled.
+      # Keep the compiler invocation inside the selected project directory.
+      # Run hoisted TypeScript from the project root and select the function's
+      # tsconfig explicitly, instead of climbing above a function with ../.
+      # Relative arguments avoid Git Bash/native Windows path conversion bugs.
       if [ -f "functions/$f/node_modules/typescript/bin/tsc" ]; then
-        rel_tsc="node_modules/typescript/bin/tsc"
+        out=$(cd "functions/$f" && timeout 30 node "node_modules/typescript/bin/tsc" --noEmit 2>&1)
       else
-        rel_tsc="../../node_modules/typescript/bin/tsc"
+        out=$(timeout 30 node "node_modules/typescript/bin/tsc" --project "functions/$f/tsconfig.json" --noEmit 2>&1)
       fi
-      # WHY `timeout 30`: a Stop hook that can hang forever is a worse failure than any type
-      # error it might miss. Verified 2026-09-16: this exact `node <tsc> --noEmit` invocation
-      # completes in ~4s run directly, but hung indefinitely nested three processes deep
-      # (pytest -> bash -> this script -> node) on this machine — a Windows pipe/handle
-      # inheritance quirk, not a tsc or logic bug. A timeout is inconclusive, not a failure:
-      # never block on it, only warn.
-      out=$(cd "functions/$f" && timeout 30 node "$rel_tsc" --noEmit 2>&1)
       [ $? -eq 124 ] && { tsc_timed_out=1; out=""; }
     else
       out="typescript not resolvable from functions/$f via node module resolution"
