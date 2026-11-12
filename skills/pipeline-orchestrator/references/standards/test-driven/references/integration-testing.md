@@ -238,7 +238,7 @@ describe('Users API', () => {
   test('GET /users returns list', async () => {
     const response = await request(app)
       .get('/api/users')
-      .set('Authorization', `Bearer ${testToken}`)
+      .set('Authorization', 'Bearer YOUR_API_KEY')
       .expect('Content-Type', /json/)
       .expect(200);
 
@@ -295,7 +295,7 @@ describe('/api/users', () => {
   test('GET returns users', async () => {
     const { req, res } = createMocks({
       method: 'GET',
-      headers: { authorization: `Bearer ${testToken}` }
+      headers: { authorization: 'Bearer YOUR_API_KEY' }
     });
 
     await handler(req, res);
