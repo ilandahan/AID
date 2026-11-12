@@ -1,6 +1,6 @@
 ---
 name: memory-system-development
-description: Reference for the Development phase: TDD implementation workflow.
+description: "Reference for the Development phase: TDD implementation workflow."
 ---
 
 # Development Phase Skill
