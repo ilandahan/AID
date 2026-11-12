@@ -1,3 +1,8 @@
+---
+name: memory-system-breakdown
+description: Reference for the Breakdown phase: work breakdown generation (see /jira-breakdown command).
+---
+
 # Breakdown Phase Skill
 
 > **Source**: `../../commands/jira-breakdown.md`
