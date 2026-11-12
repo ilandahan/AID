@@ -312,6 +312,26 @@ templates live in `agent-assets/`; see `agent-assets/AGENT-STANDARD.md` to add y
 
 ---
 
+## Data handling and privacy
+
+- AID's hooks read project state and tool-call inputs locally. They can write audit logs,
+  error logs, session markers and pipeline artifacts under the project's `.aid/` directory.
+  Project content and paths may contain personal data. The learning system stores feedback
+  locally in `~/.aid/`; see [memory-system privacy](memory-system/README.md#privacy).
+- The optional `/aid-pair` command sends `tenantId`, `projectPath` and `source` to the
+  AID-hosted pairing service at
+  https://figma-plugin-server-983606191500.us-central1.run.app/auth/generate-pairing.
+  This is an AID service hosted on Google Cloud Run, not a Figma-operated endpoint.
+  It is used to pair the Figma plugin with the project. See
+  [the pairing command](commands/aid-pair.md) for the request and authentication flow.
+- The bundled pairing server keeps pairing/session metadata in memory and emits operational
+  logs. This repository does not establish a production retention period for sessions or
+  hosting-provider logs; pairing-code expiry is not a data-deletion guarantee.
+- Other integrations send data to their configured services when used. Review their setup
+  guides and the data involved before enabling them.
+
+---
+
 ## MCP Integrations
 
 AID integrates with 6 Model Context Protocol (MCP) servers for seamless tool connectivity:
