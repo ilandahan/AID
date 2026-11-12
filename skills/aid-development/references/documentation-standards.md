@@ -146,7 +146,7 @@ Every function must have a comment explaining:
  * const user = await userService.createUser({
  *   email: 'jane@example.com',
  *   name: 'Jane Doe',
- *   password: 'securePassword123'
+ *   password: '<example-password>'
  * });
  */
 async createUser(data: CreateUserInput): Promise<User> {
