@@ -1,6 +1,6 @@
 ---
 name: phase4-sprint-reviewer
-description: Objective sprint review: planned vs delivered, measured on empirical data such as velocity. Use at the end of a Phase 4 sprint.
+description: "Objective sprint review: planned vs delivered, measured on empirical data such as velocity. Use at the end of a Phase 4 sprint."
 tools: Read, Grep, Glob
 model: inherit
 ---
