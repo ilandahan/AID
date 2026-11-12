@@ -5,8 +5,8 @@
 ### Grid-Based Layout
 ```tsx
 /**
- * Standard grid layout from Figma
- * @figma Extracted grid: 12 columns, 24px gap
+ * Standard grid layout from design spec
+ * @design-source Extracted grid: 12 columns, 24px gap
  */
 import styles from './GridLayout.module.css';
 
@@ -26,7 +26,7 @@ export const GridLayout = ({ children }) => (
   padding: var(--spacing-8);
 }
 
-/* Responsive - from Figma breakpoints */
+/* Responsive - from design spec breakpoints */
 @media (max-width: 1024px) {
   .grid {
     grid-template-columns: repeat(8, 1fr);
@@ -46,7 +46,7 @@ export const GridLayout = ({ children }) => (
 ```tsx
 /**
  * Dashboard with sidebar + main content
- * @figma Sidebar: 280px, Main: fluid
+ * @design-source Sidebar: 280px, Main: fluid
  */
 import { Sidebar } from '@/organisms/Sidebar';
 import { Header } from '@/organisms/Header';
@@ -108,7 +108,7 @@ export const DashboardLayout = ({ children }) => (
 ```tsx
 /**
  * Master-detail split view
- * @figma Left panel: 320px, Right: fluid
+ * @design-source Left panel: 320px, Right: fluid
  */
 export const SplitLayout = ({ list, detail }) => (
   <div className={styles.split}>
