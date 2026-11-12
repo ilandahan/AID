@@ -295,9 +295,8 @@ When reviewing code that validates/audits other code:
 
 ## References
 
-### Figma Plugin Example
+### Validator Calibration Example
 
-The Figma component auditor ([ComponentAuditor.ts](../../../integrations/figma-plugin/ComponentAuditor.ts)) demonstrates these patterns:
 
 | Issue # | Pattern | Fix |
 |---------|---------|-----|
@@ -314,7 +313,6 @@ The Figma component auditor ([ComponentAuditor.ts](../../../integrations/figma-p
 
 | Resource | Topic |
 |----------|-------|
-| [./common-issues.md](../figma-design-review/references/common-issues.md) | Design review false positives |
 | ESLint rule configuration | Severity calibration patterns |
 | Static analysis best practices | Threshold selection methodology |
 
