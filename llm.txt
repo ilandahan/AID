@@ -15,7 +15,7 @@ KEY FEATURES
 - 12-Step Dev Pipeline: Automated pipeline with a hard QA gate
 - Context Tracking: Real-time tracking of tasks/steps in .aid/context.json
 - Memory System: Learning-based improvements through feedback loops
-- MCP Integrations: Jira, GitHub, Figma, Chrome DevTools, filesystem
+- MCP Integrations: Jira, GitHub, Chrome DevTools, filesystem
 - Cucumber/BDD: Gherkin acceptance criteria across 5 languages
 - Data Science / ML Track: Full role-data-scientist skill plus phase-specific rule sets
 - One-Command Setup: install.sh / install.bat, link-project.sh / .bat for existing projects
@@ -72,8 +72,7 @@ Development:
   /tech-spec - Create Technical Specification
   /architecture - System architecture design
   /jira-breakdown - Break spec into Jira issues
-  /design-system - Build design system from Figma
-  /design-review - Review Figma components before extraction
+  /design-system - Build design system from design spec
   /build-page - Compose pages from components
   /storybook - Manage Storybook component previews
   /write-tests - Write tests (TDD methodology)
@@ -90,9 +89,6 @@ Pipeline & Automation:
   /breather-start - Enable breather - break offers, presence tracking
   /breather-stop - Snooze breather offers, skip today, or uninstall
 
-Figma Integration:
-  /aid-pair - Pair with the Figma plugin (auth code)
-  /figma-relay - Process Figma plugin server requests
 
 Learning & Improvement:
   /aid-improve - Run learning cycle (requires 3+ feedback)
@@ -118,8 +114,7 @@ Loaded automatically by role and phase. Highlights:
 - reflection: Quality Check + phase criteria
 - aid-discovery, aid-prd, aid-tech-spec, aid-impl-plan, aid-qa-ship: Phase workflows
 - system-architect: Architecture design (Phase 2)
-- atomic-design, atomic-page-builder: Figma-to-code design systems (Phase 4)
-- figma-design-review: Review Figma components before extraction
+- atomic-design, atomic-page-builder: Specification-to-code design systems (Phase 4)
 - test-driven, cucumber-bdd: TDD and BDD (Gherkin across 5 languages)
 - code-review: Code quality assessment (Phase 5)
 - autoresearch: Bounded keep/revert improvement loop
@@ -145,7 +140,6 @@ STATE FILES
 MCP INTEGRATIONS
 Atlassian (Jira/Confluence) - Project management
 GitHub - Repository operations and version control
-Figma - Design token extraction and component documentation
 Chrome DevTools - Browser automation, testing, performance
 Filesystem - File operations and project access
 Templates: .mcp.json.mac / .mcp.json.windows - copy to .mcp.json, add your tokens
@@ -160,7 +154,7 @@ WORKFLOW EXAMPLE (full feature cycle)
 7. /aid-start - Select Tech Lead role, Phase 2
 8. /tech-spec - Create technical specification
 9. /architecture - Design system architecture
-10. /design-system - Extract Figma tokens
+10. /design-system - Extract design spec tokens
 11. /phase-approve - Human approval
 12. /phase-advance - Move to Phase 3
 13. /jira-breakdown - Create Jira tasks
@@ -190,7 +184,6 @@ hooks/             - Phase gate, QA gate, pipeline enforcement, session writer
 docs/              - prd/, tech-spec/, implementation-plan/, research/ outputs + guides
 memory-system/     - Learning system (Python package: python -m memory_system)
 storybook-preview/ - Component preview workspace
-integrations/      - MCP setup guides + figma-plugin (Figma plugin for /aid-pair)
 scripts/           - init-project.sh scaffolding
 testing/e2e/       - 228 tests covering AID itself
 install.sh / install.bat, link-project.sh / .bat
