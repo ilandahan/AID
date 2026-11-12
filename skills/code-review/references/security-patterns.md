@@ -192,9 +192,9 @@ app.get('/api/admin/users',
 
 ```typescript
 // ❌ VULNERABLE: Hardcoded secrets
-const apiKey = 'sk-1234567890abcdef';
-const dbPassword = 'supersecret123';
-const jwtSecret = 'my-jwt-secret';
+const apiKey = '<your-api-key>';
+const dbPassword = '<your-db-password>';
+const jwtSecret = '<your-jwt-secret>';
 
 // ✅ SAFE: Environment variables
 const apiKey = process.env.API_KEY;
