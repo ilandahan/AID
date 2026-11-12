@@ -37,7 +37,7 @@ Deep examples live in `references/`. Do not re-derive them here:
 | SQL Injection | `` const query = `SELECT * FROM users WHERE id = ${userId}`; `` | `const query = 'SELECT * FROM users WHERE id = ?'; db.query(query, [userId]);` |
 | XSS | `element.innerHTML = userInput;` | `element.textContent = userInput;` |
 | Command injection | `` exec(`ls ${userPath}`); `` | `fs.readdir(userPath);` |
-| Hardcoded secrets | `const apiKey = 'sk-1234567890';` | `const apiKey = process.env.API_KEY;` |
+| Hardcoded secrets | Real credentials embedded in source code | Supply production credentials through secure runtime configuration, never committed literals. Documentation uses only fake placeholders such as `YOUR_API_KEY`. |
 
 ### Security Review Questions
 - [ ] ALL user input validated/sanitized?
