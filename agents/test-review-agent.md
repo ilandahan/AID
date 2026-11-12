@@ -377,7 +377,7 @@ Quick reference for the test-review-agent. Distilled from review-checklist.md an
 
 | Mock (Acceptable) | Don't Mock (Flag) |
 |---|---|
-| External HTTP APIs | Internal functions |
+| External service interfaces | Internal functions |
 | Third-party SDKs | Database queries (use test DB) |
 | Email/SMS services | Cache layer (use test Redis) |
 | Payment processors | Business logic |
