@@ -60,7 +60,7 @@
       "4": {
         "name": "Feature Validation & UAT",
         "description": "Validate implemented features against requirements, conduct user acceptance testing",
-        "skills": ["aid-development", "atomic-design", "atomic-page-builder", "pipeline-orchestrator", "figma-design-review"]
+        "skills": ["aid-development", "atomic-design", "atomic-page-builder", "pipeline-orchestrator"]
       },
       "5": {
         "name": "Launch & Post-Launch",
@@ -93,7 +93,7 @@
       "4": {
         "name": "Code Review & Architecture Oversight",
         "description": "Review code quality, ensure architectural compliance, mentor developers",
-        "skills": ["aid-development", "code-review", "test-driven", "cucumber-bdd", "pipeline-orchestrator", "figma-design-review"]
+        "skills": ["aid-development", "code-review", "test-driven", "cucumber-bdd", "pipeline-orchestrator"]
       },
       "5": {
         "name": "Release Engineering & Deployment",
@@ -126,7 +126,7 @@
       "4": {
         "name": "Implementation & Coding",
         "description": "Write production code with TDD, implement features, write unit/integration tests",
-        "skills": ["aid-development", "atomic-design", "atomic-page-builder", "test-driven", "code-review", "cucumber-bdd", "pipeline-orchestrator", "figma-design-review"]
+        "skills": ["aid-development", "atomic-design", "atomic-page-builder", "test-driven", "code-review", "cucumber-bdd", "pipeline-orchestrator"]
       },
       "5": {
         "name": "Bug Fixes & Polish",
