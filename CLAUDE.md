@@ -381,8 +381,7 @@ Review your own changes for:
 ### Development Commands
 | Command | Skill | Purpose |
 |---------|-------|---------|
-| `/design-system` | atomic-design | Build design system from Figma |
-| `/design-review` | figma-design-review | Review Figma components before extraction |
+| `/design-system` | atomic-design | Build design system from design spec |
 | `/build-page` | atomic-page-builder | Compose pages from components |
 | `/architecture` | system-architect | System architecture design |
 | `/code-review` | code-review | Review code quality |
@@ -396,12 +395,6 @@ Review your own changes for:
 | `/tech-spec` | - | Create technical specification |
 | `/jira-breakdown` | - | Break spec into Jira issues |
 | `/start-project` | - | Initialize new project |
-
-### Figma Integration
-| Command | Purpose |
-|---------|---------|
-| `/aid-pair` | Pair with Figma plugin (auth code) |
-| `/figma-relay` | Process Figma plugin server requests |
 
 ### Automation
 | Command | Purpose |
@@ -437,7 +430,7 @@ Claude MUST update `.aid/context.json` when:
 | 1 | `skills/aid-prd/`, `skills/cucumber-bdd/` **(Gherkin acceptance criteria)** |
 | 2 | `skills/system-architect/`, `skills/aid-tech-spec/` |
 | 3 | `skills/aid-impl-plan/` **(Consolidation → Breakdown → Jira)** |
-| 4 | `skills/atomic-design/`, `skills/atomic-page-builder/`, `skills/figma-design-review/` |
+| 4 | `skills/atomic-design/`, `skills/atomic-page-builder/` |
 | 4 | `skills/aid-development/` **(Phase 4 base skill)** |
 | 4-5 | `skills/code-review/`, `skills/test-driven/`, `skills/cucumber-bdd/`, `skills/pipeline-orchestrator/` |
 | 4-5 | `skills/autoresearch/` **(bounded keep/revert runner for the AR_DESIGN / AR_FUNCTION / AR_ACCEPTANCE steps — invoked by pipeline-orchestrator)** |
