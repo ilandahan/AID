@@ -102,7 +102,7 @@ describe('POST /api/auth/login', () => {
   test('accepts valid credentials', async () => {
     const response = await request(app)
       .post('/api/auth/login')
-      .send({ email: 'user@example.com', password: 'SecurePass123!' })
+      .send({ email: 'user@example.com', password: '<test-password>' })
       .expect(200);
 
     expect(response.body).toEqual({
