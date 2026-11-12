@@ -25,12 +25,14 @@ Connect Claude Code to GitHub for repository management and code operations.
 Add to your `.env` file:
 
 ```bash
-GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+GITHUB_PERSONAL_ACCESS_TOKEN=YOUR_API_KEY
 ```
 
 ### 2. MCP Configuration
 
-Add to your `.mcp.json`:
+Illustrative configuration only: `YOUR_API_KEY` is a fake placeholder, not a lookup of an existing machine credential. Supply your own GitHub token securely for the GitHub server; never commit it.
+
+Add to your private `.mcp.json`:
 
 ```json
 {
@@ -39,7 +41,7 @@ Add to your `.mcp.json`:
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_API_KEY"
       }
     }
   }
