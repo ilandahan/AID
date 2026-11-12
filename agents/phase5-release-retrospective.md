@@ -1,6 +1,6 @@
 ---
 name: phase5-release-retrospective
-description: Post-release retrospective: what the PRD promised versus what actually shipped, across the full development trace. Use after release.
+description: "Post-release retrospective: what the PRD promised versus what actually shipped, across the full development trace. Use after release."
 tools: Read, Grep, Glob
 model: inherit
 ---
