@@ -694,7 +694,7 @@ hooks - run `npm install` first to exercise them. They **skip**, they do not sil
 | Suite | What it proves |
 |-------|----------------|
 | `test_repo_integrity.py` | Every path the docs promise exists and runs - `python -m memory_system`, `scripts/init-project.sh`, the autoresearch assets, no skill without a `SKILL.md` |
-| `test_agents_and_hooks.py` | All 8 agents are registered with valid frontmatter; every hook in `settings.json` exists and parses; no bare `Bash` in the allow list |
+| `test_agents_and_hooks.py` | All 39 agents are registered with valid frontmatter; every hook in `settings.json` exists and parses; no bare `Bash` in the allow list |
 | `test_link_project_guards.py` | Linking refuses to run against the AID install itself, and refuses to link a source directory that is missing |
 | `test_pipeline_hooks.py` | The Stop hook blocks in the schema Claude Code actually reads, respects `stop_hook_active`, and does not claim a `tsc` pass it never ran |
 | `test_installation.py` | A fresh install produces a working tree |
