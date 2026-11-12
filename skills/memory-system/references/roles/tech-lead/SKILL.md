@@ -1,3 +1,8 @@
+---
+name: memory-system-tech-lead
+description: Reference for the Tech Lead role in the AID lifecycle.
+---
+
 # Tech Lead Role Skill
 
 > **Source**: `../role-tech-lead/SKILL.md`
