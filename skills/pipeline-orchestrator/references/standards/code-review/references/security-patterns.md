@@ -196,13 +196,14 @@ const apiKey = '<your-api-key>';
 const dbPassword = '<your-db-password>';
 const jwtSecret = '<your-jwt-secret>';
 
-// ✅ SAFE: Environment variables
-const apiKey = process.env.API_KEY;
-const dbPassword = process.env.DB_PASSWORD;
-const jwtSecret = process.env.JWT_SECRET;
+// ✅ SAFE: Inject a secret-provider adapter at application startup.
+// Pseudocode: secrets.get is supplied by your app, not by this plugin.
+const apiKey = secrets.get('application-api-key');
+const dbPassword = secrets.get('database-password');
+const jwtSecret = secrets.get('jwt-signing-key');
 
 // ✅ SAFE: Fail if missing
-const apiKey = process.env.API_KEY;
+const apiKey = secrets.get('application-api-key');
 if (!apiKey) throw new Error('API_KEY required');
 ```
 
