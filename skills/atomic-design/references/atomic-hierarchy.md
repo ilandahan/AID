@@ -1,8 +1,8 @@
 # Atomic Design Hierarchy
 
-## Critical: Extract from Figma First
+## Critical: Extract from design spec First
 
-Before creating any component: Extract specs from Figma, document Figma link, use EXACT values.
+Before creating any component: Extract specs from design spec, document design spec link, use EXACT values.
 
 ## Level 1: Atoms
 
