@@ -30,14 +30,14 @@ This applies to:
 // BAD - Real-looking credentials
 const testUser = {
   email: 'admin@company.com',
-  password: 'P@ssw0rd123!',
-  apiKey: 'sk-live-abc123xyz'
+  password: '<test-password>',
+  apiKey: '<test-api-key>'
 };
 
 // BAD - Even in "test" files
 const config = {
   stripeKey: 'sk_test_abcdefg',
-  dbPassword: 'mysecretpassword'
+  dbPassword: '<test-db-password>'
 };
 ```
 
@@ -55,8 +55,8 @@ const testUser = {
 // GOOD - Factory with clearly fake data
 const createTestUser = (overrides = {}) => ({
   email: `test-${Date.now()}@example.com`,
-  password: 'DefinitelyNotARealPassword',
-  apiKey: 'test_key_not_real_00000000',
+  password: '<fake-test-password>',
+  apiKey: '<fake-test-api-key>',
   ...overrides
 });
 ```
@@ -119,7 +119,7 @@ grep -rn "AKIA[A-Z0-9]" tests/
 // Factory pattern
 export const createTestCredentials = () => ({
   email: `test-${Date.now()}@example.test`,
-  password: 'TestOnlyPassword123!',
+  password: '<test-password>',
 });
 ```
 
@@ -127,7 +127,7 @@ export const createTestCredentials = () => ({
 
 ```typescript
 // Clearly fake keys
-const testApiKey = 'test_key_0000000000000000';
+const testApiKey = '<test-api-key>';
 const testStripeKey = 'sk_test_fake_key_for_testing';
 ```
 
