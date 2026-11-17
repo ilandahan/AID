@@ -43,7 +43,7 @@ my-project/
 ├── .aid/
 │   ├── state.json      (project-specific, not linked)
 │   └── context.json    (project-specific, not linked)
-├── .mcp.json           (copied from template, user edits tokens)
+├── .mcp.json           (copied from template, gitignored, tokens via ${VAR})
 └── CLAUDE.md           -> SYMLINK to AID-main/CLAUDE.md
 ```
 
@@ -104,14 +104,15 @@ Creating symbolic links...
 Creating project-specific files...
   [OK] .aid/state.json
   [OK] .aid/context.json
-  [OK] .mcp.json (edit with your API tokens)
+  [OK] .mcp.json (reads tokens from environment variables)
+  [OK] .mcp.json added to .gitignore
 
 ===========================================
 Project linked successfully!
 ===========================================
 
 Next steps:
-1. Edit my-app/.mcp.json with your API tokens
+1. Export your API tokens from the OS keystore (see INSTALLATION.md); .mcp.json reads them
 2. Open Claude Code in C:\Projects\my-app
 3. Run /aid-start to begin working
 
@@ -142,5 +143,5 @@ Fall back to copying instead of linking (run install.bat in the target folder)
 
 - Symbolic links mean updates to AID-main automatically apply to all linked projects
 - Each project maintains its own .aid/state.json (phase progress is per-project)
-- .mcp.json must be configured separately per project (different tokens possible)
+- .mcp.json is copied per project and added to its .gitignore; tokens come from environment variables, never the file
 - Run from within AID-main folder, pointing to the target project

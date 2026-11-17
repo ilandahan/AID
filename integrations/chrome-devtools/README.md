@@ -17,7 +17,7 @@ Chrome DevTools MCP allows Claude Code to control and inspect a live Chrome brow
 
 | Package | Type | Installation | Purpose |
 |---------|------|--------------|---------|
-| `chrome-devtools-mcp@latest` | MCP Server | `npx` (on-demand) | Browser automation via Claude |
+| `chrome-devtools-mcp@1.12.0` | MCP Server | `npx` (on-demand) | Browser automation via Claude |
 | `puppeteer` | Dev dependency | `npm install --save-dev` | Browser automation testing |
 | `chromium` | Binary | Auto-installed by puppeteer | Headless browser for testing |
 
@@ -38,7 +38,7 @@ npm install
 ### Claude Code CLI
 
 ```bash
-claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
+claude mcp add chrome-devtools npx chrome-devtools-mcp@1.12.0
 ```
 
 ### Configuration File (.mcp.json)
@@ -48,7 +48,7 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"]
+      "args": ["-y", "chrome-devtools-mcp@1.12.0"]
     }
   }
 }
@@ -63,7 +63,7 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
       "command": "npx",
       "args": [
         "-y",
-        "chrome-devtools-mcp@latest",
+        "chrome-devtools-mcp@1.12.0",
         "--browser-url=http://127.0.0.1:9222"
       ]
     }
@@ -120,29 +120,37 @@ Chrome DevTools MCP starts Chrome automatically - no setup needed.
 
 ### Manual Chrome Instance
 
-Launch Chrome with remote debugging:
+Launch a separate Chrome with remote debugging and a **temporary, throwaway profile**.
+Never point the debug port at your everyday profile: anything on port 9222 can read its
+cookies, sessions and saved passwords. The port listens on 127.0.0.1 only; do not
+forward or expose it.
 
 ```bash
 # macOS
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --user-data-dir="$(mktemp -d)"
 
 # Linux
-google-chrome --remote-debugging-port=9222
+google-chrome --remote-debugging-port=9222 --user-data-dir="$(mktemp -d)"
 
-# Windows
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+# Windows (PowerShell)
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="$env:TEMP\aid-chrome-debug"
 ```
+
+Delete the temporary profile directory when you are done.
 
 ### Headless Mode (CI/CD)
 
 ```bash
-npx chrome-devtools-mcp@latest --headless
+npx chrome-devtools-mcp@1.12.0 --headless
 ```
 
-### Isolated Session
+### Isolated Session (recommended default)
+
+Uses a temporary profile that is deleted when the browser closes. Add `--isolated` to
+the `args` in `.mcp.json` unless you need a manual instance as above.
 
 ```bash
-npx chrome-devtools-mcp@latest --isolated
+npx chrome-devtools-mcp@1.12.0 --isolated
 ```
 
 ## Example Workflows
@@ -196,15 +204,18 @@ curl http://127.0.0.1:9222/json/version
 
 # Remove and re-add server
 claude mcp remove chrome-devtools
-claude mcp add chrome-devtools npx chrome-devtools-mcp@latest
+claude mcp add chrome-devtools npx chrome-devtools-mcp@1.12.0
 ```
 
 ### Sandbox Issues
 
-Some environments block Chrome sandbox. Use:
+**CI containers only.** Some CI containers block the Chrome sandbox. There, and only
+there (throwaway container, no real profile, no untrusted sites beyond the app under
+test), use:
 
 ```bash
-npx chrome-devtools-mcp@latest --no-sandbox
+# CI only - never on a developer machine; it disables Chrome's process sandbox
+npx chrome-devtools-mcp@1.12.0 --headless --isolated --no-sandbox
 ```
 
 ### Timeout Issues

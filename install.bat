@@ -157,9 +157,10 @@ if not exist ".mcp.json" (
         copy ".mcp.json.windows" ".mcp.json" >nul
         echo [OK] MCP configuration created from Windows template
         echo.
-        echo   NOTE: Edit .mcp.json to add your API tokens:
-        echo     - ATLASSIAN_API_TOKEN (for Jira/Confluence^)
-        echo     - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub^)
+        echo   NOTE: .mcp.json reads tokens from environment variables. Do NOT paste
+        echo   tokens into it. Set them from Windows Credential Manager - see INSTALLATION.md:
+        echo     - ATLASSIAN_SITE_URL, ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN for Jira/Confluence
+        echo     - GITHUB_PERSONAL_ACCESS_TOKEN for GitHub
     ) else (
         echo [ERROR] .mcp.json.windows template not found!
         echo.
@@ -190,8 +191,8 @@ if exist ".mcp.json" (
 
     findstr /C:"YOUR_" ".mcp.json" >nul 2>nul
     if !ERRORLEVEL! EQU 0 (
-        echo [WARNING] MCP tokens not configured yet
-        echo   Edit .mcp.json and replace YOUR_* placeholders with real tokens
+        echo [WARNING] .mcp.json is an old template with inline token placeholders
+        echo   Run: copy .mcp.json.windows .mcp.json  - it reads tokens from environment variables
     )
 ) else (
     echo [WARNING] No .mcp.json found - MCP servers won't work
@@ -310,15 +311,13 @@ echo [BONUS] Pre-caching MCP server packages...
 echo   This speeds up first Claude Code startup.
 echo.
 echo   Caching: @modelcontextprotocol/server-filesystem...
-call npm cache add @modelcontextprotocol/server-filesystem >nul 2>nul
+call npm cache add @modelcontextprotocol/server-filesystem@2.1.0 >nul 2>nul
 echo   Caching: chrome-devtools-mcp...
-call npm cache add chrome-devtools-mcp >nul 2>nul
+call npm cache add chrome-devtools-mcp@1.12.0 >nul 2>nul
 echo   Caching: @aashari/mcp-server-atlassian-jira...
-call npm cache add @aashari/mcp-server-atlassian-jira >nul 2>nul
+call npm cache add @aashari/mcp-server-atlassian-jira@3.3.0 >nul 2>nul
 echo   Caching: @aashari/mcp-server-atlassian-confluence...
-call npm cache add @aashari/mcp-server-atlassian-confluence >nul 2>nul
-echo   Caching: @modelcontextprotocol/server-github...
-call npm cache add @modelcontextprotocol/server-github >nul 2>nul
+call npm cache add @aashari/mcp-server-atlassian-confluence@3.3.0 >nul 2>nul
 echo [OK] MCP server packages cached
 
 :finish
@@ -334,9 +333,10 @@ if exist ".mcp.json" (
 echo.
 echo Next steps:
 echo.
-echo 1. Edit .mcp.json with your API tokens:
-echo    - ATLASSIAN_API_TOKEN (for Jira/Confluence)
+echo 1. Set your API tokens as environment variables - do not edit them into .mcp.json:
+echo    - ATLASSIAN_SITE_URL, ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (for Jira/Confluence)
 echo    - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)
+echo    Store them in Windows Credential Manager and load them per session - see INSTALLATION.md
 echo.
 echo 2. Start Claude Code FROM THIS FOLDER:
 echo    cd "%CD%"

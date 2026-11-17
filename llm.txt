@@ -142,7 +142,7 @@ Atlassian (Jira/Confluence) - Project management
 GitHub - Repository operations and version control
 Chrome DevTools - Browser automation, testing, performance
 Filesystem - File operations and project access
-Templates: .mcp.json.mac / .mcp.json.windows - copy to .mcp.json, add your tokens
+Templates: .mcp.json.mac / .mcp.json.windows - copy to .mcp.json; tokens come from ${ATLASSIAN_API_TOKEN} / ${GITHUB_PERSONAL_ACCESS_TOKEN} env vars loaded from the OS keystore, never pasted into the file
 
 WORKFLOW EXAMPLE (full feature cycle)
 1. /good-morning - Load context, check systems

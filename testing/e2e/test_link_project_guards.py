@@ -61,8 +61,8 @@ def _make_aid_fixture(root):
         f.write('# fixture\n')
     with open(os.path.join(root, '.claude', 'settings.json'), 'w') as f:
         f.write('{}\n')
-    shutil.copy(os.path.join(REPO_ROOT, '.mcp.json.mac'),
-                os.path.join(root, '.mcp.json.mac'))
+    for template in ('.mcp.json.mac', '.mcp.json.windows'):
+        shutil.copy(os.path.join(REPO_ROOT, template), os.path.join(root, template))
     shutil.copy(LINK_SCRIPT, os.path.join(root, 'link-project.sh'))
     shutil.copy(os.path.join(REPO_ROOT, 'link-project.bat'),
                 os.path.join(root, 'link-project.bat'))
@@ -253,6 +253,24 @@ class TestWindowsLinkerRefusesSelfTarget:
             assert sentinel.is_file(), f".claude/{name} not usable at target"
             assert sentinel.read_text() == SENTINEL
 
+    def test_bat_gitignores_mcp_json_once(self, tmp_path):
+        """Windows linker: same .gitignore contract as link-project.sh."""
+        aid = _make_aid_fixture(str(tmp_path / 'aid'))
+        target = tmp_path / 'project'
+        target.mkdir()
+        (target / '.gitignore').write_bytes(b'node_modules')  # no trailing newline
+
+        for _ in range(2):
+            result = subprocess.run(
+                [os.path.join(aid, 'link-project.bat'), str(target), '--force'],
+                capture_output=True, text=True, timeout=120,
+                stdin=subprocess.DEVNULL, cwd=aid,
+            )
+            assert result.returncode == 0, result.stdout
+
+        lines = [l.strip() for l in (target / '.gitignore').read_text().splitlines()]
+        assert [l for l in lines if l] == ['node_modules', '.mcp.json'], lines
+
     def test_bat_propagates_aid_updates_to_linked_project(self, tmp_path):
         """
         WHY THIS TEST:
@@ -385,6 +403,21 @@ class TestLegitimateLinkStillWorks:
         assert (target / '.aid' / 'state.json').is_file()
         assert (target / '.mcp.json').is_file()
 
+    def test_gitignores_mcp_json_once(self, tmp_path):
+        """The copied .mcp.json is per-user config: linking must keep it out of the
+        project's git history, without duplicating the line on re-link and without
+        gluing it onto a last line that has no trailing newline."""
+        aid = _make_aid_fixture(str(tmp_path / 'aid'))
+        target = tmp_path / 'project'
+        target.mkdir()
+        (target / '.gitignore').write_bytes(b'node_modules')  # no trailing newline
+
+        _run_link(aid, '../project')
+        _run_link(aid, '../project')
+
+        lines = (target / '.gitignore').read_text().splitlines()
+        assert lines == ['node_modules', '.mcp.json'], lines
+
 
 class TestNoRealSecretsInTrackedTemplates:
     """
@@ -418,6 +451,39 @@ class TestNoRealSecretsInTrackedTemplates:
             match = re.search(pattern, content)
             assert match is None, (
                 f"{template} contains what looks like a real credential "
-                f"({match.group(0)[:12]}...). Put secrets in .mcp.json, which is "
-                f"gitignored — never in a tracked template."
+                f"({match.group(0)[:4]}****). Use ${{VAR}} env expansion and load the "
+                f"value from the OS keystore - never put it in a tracked template."
+            )
+
+    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac'])
+    def test_template_credentials_come_from_environment(self, template):
+        """Every env value and header must be a ${VAR} reference, so the file a
+        user copies never invites them to paste a token into it."""
+        with open(os.path.join(REPO_ROOT, template)) as f:
+            servers = json.load(f)['mcpServers']
+        for name, server in servers.items():
+            for field in ('env', 'headers'):
+                for key, value in server.get(field, {}).items():
+                    # Only a ${VAR} reference (optionally behind the auth scheme
+                    # word) may remain: any literal left over is a pasted value.
+                    literal = re.sub(r'\$\{[A-Z0-9_]+(:-)?\}', '', value)
+                    literal = re.sub(r'^Bearer ', '', literal)
+                    assert '${' in value and literal == '', (
+                        f"{template}: {name}.{field}.{key} is a literal; "
+                        f"use ${{{key}}} env expansion"
+                    )
+
+    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac'])
+    def test_template_npx_packages_are_pinned(self, template):
+        """npx -y fetches whatever is newest and runs it with the user's tokens;
+        every package must carry an exact x.y.z version."""
+        with open(os.path.join(REPO_ROOT, template)) as f:
+            servers = json.load(f)['mcpServers']
+        for name, server in servers.items():
+            args = server.get('args', [])
+            if 'npx' not in [server.get('command')] + args:
+                continue
+            pkg = args[args.index('-y') + 1]
+            assert re.fullmatch(r'(@[\w.-]+/)?[\w.-]+@\d+\.\d+\.\d+', pkg), (
+                f"{template}: {name} runs unpinned package {pkg!r}"
             )

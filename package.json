@@ -23,19 +23,18 @@
     "test:mcp": "python -m pytest testing/e2e/test_mcp_sanity.py -v",
     "test:memory": "python -m pytest testing/e2e/test_memory_system_sanity.py -v",
     "test:all": "python -m pytest testing/e2e/ -v",
-    "install:mcp": "npm run install:mcp:filesystem && npm run install:mcp:jira && npm run install:mcp:confluence && npm run install:mcp:github && npm run install:mcp:chrome",
-    "install:mcp:filesystem": "npx -y @modelcontextprotocol/server-filesystem --help || true",
-    "install:mcp:jira": "npx -y @aashari/mcp-server-atlassian-jira --help || true",
-    "install:mcp:confluence": "npx -y @aashari/mcp-server-atlassian-confluence --help || true",
-    "install:mcp:github": "npx -y @modelcontextprotocol/server-github --help || true",
-    "install:mcp:chrome": "npx -y chrome-devtools-mcp@latest --help || true",
+    "install:mcp": "npm run install:mcp:filesystem && npm run install:mcp:jira && npm run install:mcp:confluence && npm run install:mcp:chrome",
+    "install:mcp:filesystem": "npm cache add @modelcontextprotocol/server-filesystem@2.1.0",
+    "install:mcp:jira": "npm cache add @aashari/mcp-server-atlassian-jira@3.3.0",
+    "install:mcp:confluence": "npm cache add @aashari/mcp-server-atlassian-confluence@3.3.0",
+    "install:mcp:chrome": "npm cache add chrome-devtools-mcp@1.12.0",
     "security:audit": "npm audit"
   },
   "optionalDependencies": {
-    "chrome-devtools-mcp": "latest"
+    "chrome-devtools-mcp": "1.12.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
   },
   "keywords": [
     "claude-code",
@@ -47,11 +46,9 @@
   ],
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "prisma": "^6.19.1",
     "ts-node": "^10.9.2"
   },
   "dependencies": {
-    "@cucumber/cucumber": "^10.3.1",
-    "@prisma/client": "^6.19.1"
+    "@cucumber/cucumber": "^12.9.0"
   }
 }

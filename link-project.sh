@@ -294,12 +294,21 @@ echo "Copying MCP configuration..."
 if [ ! -f "$TARGET_PATH/.mcp.json" ]; then
     if [ -f "$AID_PATH/.mcp.json.mac" ]; then
         cp "$AID_PATH/.mcp.json.mac" "$TARGET_PATH/.mcp.json"
-        echo "  [COPY] .mcp.json (edit with your API tokens)"
+        echo "  [COPY] .mcp.json (reads tokens from environment variables)"
     else
         echo "  [ERROR] .mcp.json.mac template not found"
     fi
 else
     echo "  [SKIP] .mcp.json already exists (preserving your tokens)"
+fi
+# .mcp.json is per-user config; keep it out of the project's git history even if
+# someone pastes a token into it. Idempotent: only appends when no exact line exists.
+if ! grep -qxF '.mcp.json' "$TARGET_PATH/.gitignore" 2>/dev/null; then
+    if [ -s "$TARGET_PATH/.gitignore" ] && [ -n "$(tail -c1 "$TARGET_PATH/.gitignore")" ]; then
+        echo "" >> "$TARGET_PATH/.gitignore"
+    fi
+    echo ".mcp.json" >> "$TARGET_PATH/.gitignore"
+    echo "  [OK] .mcp.json added to .gitignore"
 fi
 
 #============================================
@@ -330,7 +339,7 @@ echo "  docs/                 - Phase outputs"
 echo ""
 echo "Next steps:"
 echo ""
-echo "1. Edit \"$TARGET_PATH/.mcp.json\" with your API tokens"
+echo "1. Export your API tokens as environment variables (see INSTALLATION.md); .mcp.json reads them"
 echo ""
 echo "2. Open Claude Code in the project:"
 echo "   cd \"$TARGET_PATH\""

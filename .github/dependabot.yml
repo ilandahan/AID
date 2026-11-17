@@ -1,5 +1,9 @@
 # Dependabot configuration for AID.
 # Keeps npm dependencies and GitHub Actions pinned SHAs up to date.
+# cooldown: a new release must be 7 days old before Dependabot proposes it, so a
+# compromised publish has time to be caught and yanked first.
+# Security updates are a repository setting (Settings > Code security >
+# Dependabot security updates), not part of this file.
 version: 2
 updates:
   - package-ecosystem: "npm"
@@ -7,7 +11,18 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+  - package-ecosystem: "npm"
+    directory: "/storybook-preview"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7

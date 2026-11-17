@@ -256,9 +256,10 @@ setup_mcp_and_env() {
             cp ".mcp.json.mac" ".mcp.json"
             log_success "MCP configuration created from Mac template"
             echo ""
-            echo "  NOTE: Edit .mcp.json to add your API tokens:"
-            echo "    - ATLASSIAN_API_TOKEN (for Jira/Confluence)"
-            echo "    - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)"
+            echo "  NOTE: .mcp.json reads tokens from environment variables. Do NOT paste"
+            echo "  tokens into it. Export them from your OS keystore (see INSTALLATION.md):"
+            echo "    - ATLASSIAN_SITE_URL, ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (Jira/Confluence)"
+            echo "    - GITHUB_PERSONAL_ACCESS_TOKEN (GitHub)"
         else
             log_error ".mcp.json.mac template not found!"
             echo ""
@@ -293,15 +294,15 @@ verify_mcp_config() {
             log_warning "Your .mcp.json uses Windows format (won't work on Mac)!"
             echo ""
             echo "  To fix: cp .mcp.json.mac .mcp.json"
-            echo "  Then add your API tokens to the new file."
+            echo "  Then export your tokens as environment variables (see INSTALLATION.md)."
         else
             log_success "MCP configuration found"
         fi
 
         # Check for placeholder tokens
         if grep -q "YOUR_" ".mcp.json"; then
-            log_warning "MCP tokens not configured yet"
-            echo "  Edit .mcp.json and replace YOUR_* placeholders with real tokens"
+            log_warning ".mcp.json is an old template with inline token placeholders"
+            echo "  Run: cp .mcp.json.mac .mcp.json  (it reads tokens from environment variables)"
         fi
     else
         log_warning "No .mcp.json found - MCP servers won't work"
@@ -444,20 +445,18 @@ preinstall_mcp_servers() {
     TEMP_DIR="${TMPDIR:-/tmp}"
 
     echo "  - Filesystem server..."
-    npm pack @modelcontextprotocol/server-filesystem --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+    npm pack @modelcontextprotocol/server-filesystem@2.1.0 --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
 
     echo "  - Chrome DevTools server..."
-    npm pack chrome-devtools-mcp --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+    npm pack chrome-devtools-mcp@1.12.0 --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
 
     echo "  - Jira server..."
-    npm pack @aashari/mcp-server-atlassian-jira --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+    npm pack @aashari/mcp-server-atlassian-jira@3.3.0 --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
 
     echo "  - Confluence server..."
-    npm pack @aashari/mcp-server-atlassian-confluence --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+    npm pack @aashari/mcp-server-atlassian-confluence@3.3.0 --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
 
-
-    echo "  - GitHub server..."
-    npm pack @modelcontextprotocol/server-github --pack-destination="$TEMP_DIR" >/dev/null 2>&1 || true
+    # GitHub uses GitHub's hosted MCP server (type http): nothing to download.
 
     log_success "MCP servers cached"
 }
@@ -490,9 +489,12 @@ print_next_steps() {
     echo ""
     echo "Next steps:"
     echo ""
-    echo "1. Edit .mcp.json with your API tokens:"
-    echo "   - ATLASSIAN_API_TOKEN (for Jira/Confluence)"
+    echo "1. Export your API tokens as environment variables (do not edit them into .mcp.json):"
+    echo "   - ATLASSIAN_SITE_URL, ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (for Jira/Confluence)"
     echo "   - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)"
+    echo "   Load them from your OS keystore, e.g.:"
+    echo "     export ATLASSIAN_API_TOKEN=\"\$(security find-generic-password -s aid-atlassian -w)\"   # macOS"
+    echo "     export ATLASSIAN_API_TOKEN=\"\$(secret-tool lookup service aid-atlassian)\"          # Linux"
     echo ""
     echo "2. Start Claude Code FROM THIS FOLDER:"
     echo "   cd $(pwd)"

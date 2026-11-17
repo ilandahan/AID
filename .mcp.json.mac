@@ -3,39 +3,38 @@
     "filesystem": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem@2.1.0", "."]
     },
     "chrome-devtools": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"]
+      "args": ["-y", "chrome-devtools-mcp@1.12.0"]
     },
     "jira": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@aashari/mcp-server-atlassian-jira"],
+      "args": ["-y", "@aashari/mcp-server-atlassian-jira@3.3.0"],
       "env": {
-        "ATLASSIAN_SITE_URL": "https://YOUR_SITE.atlassian.net",
-        "ATLASSIAN_USER_EMAIL": "your@email.com",
-        "ATLASSIAN_API_TOKEN": "YOUR_ATLASSIAN_API_TOKEN"
+        "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL:-}",
+        "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL:-}",
+        "ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN:-}"
       }
     },
     "confluence": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@aashari/mcp-server-atlassian-confluence"],
+      "args": ["-y", "@aashari/mcp-server-atlassian-confluence@3.3.0"],
       "env": {
-        "ATLASSIAN_SITE_URL": "https://YOUR_SITE.atlassian.net",
-        "ATLASSIAN_USER_EMAIL": "your@email.com",
-        "ATLASSIAN_API_TOKEN": "YOUR_ATLASSIAN_API_TOKEN"
+        "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL:-}",
+        "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL:-}",
+        "ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN:-}"
       }
     },
     "github": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_GITHUB_TOKEN"
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN:-}"
       }
     }
   }

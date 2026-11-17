@@ -6,36 +6,42 @@ Connect Claude Code to Jira for project management automation.
 
 - Jira Cloud account
 - API token from [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
-- Node.js 18+
+- Node.js 20.19+
+
+Preferred: Atlassian's official remote MCP server with OAuth sign-in (no token on
+disk): `claude mcp add --transport http atlassian https://mcp.atlassian.com/v2/mcp`,
+then authorize with `/mcp`. The rest of this page covers the bundled token-based server.
 
 ## Configuration
 
 ### 1. Environment Variables
 
-Add to your `.env` file:
+Store the API token in your OS keystore (macOS `security add-generic-password -s aid-atlassian -a "$USER" -w`,
+Linux `secret-tool store --label="AID Atlassian" service aid-atlassian`,
+Windows `cmdkey /generic:aid-atlassian /user:you@company.com /pass`) and export it
+into the shell you start `claude` from. Do not keep it in `.env` or `.mcp.json`:
 
 ```bash
-ATLASSIAN_SITE_URL=https://your-domain.atlassian.net
-ATLASSIAN_USER_EMAIL=your-email@company.com
-ATLASSIAN_API_TOKEN=YOUR_API_KEY
+export ATLASSIAN_SITE_URL=https://your-domain.atlassian.net
+export ATLASSIAN_USER_EMAIL=your-email@company.com
+export ATLASSIAN_API_TOKEN="$(security find-generic-password -s aid-atlassian -w)"   # macOS
 ```
 
 ### 2. MCP Configuration
 
-Illustrative configuration only: `YOUR_API_KEY` is a fake placeholder, not a lookup of an existing machine credential. Supply your own Atlassian token securely for the Atlassian server; never commit it.
-
-Add to your `.mcp.json`:
+The shipped `.mcp.json.mac` / `.mcp.json.windows` already contain this entry
+(pinned version, every value expanded from the environment):
 
 ```json
 {
   "mcpServers": {
     "jira": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-atlassian"],
+      "args": ["-y", "@aashari/mcp-server-atlassian-jira@3.3.0"],
       "env": {
-        "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL}",
-        "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL}",
-        "ATLASSIAN_API_TOKEN": "YOUR_API_KEY"
+        "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL:-}",
+        "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL:-}",
+        "ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN:-}"
       }
     }
   }
@@ -44,11 +50,11 @@ Add to your `.mcp.json`:
 
 ## Installation
 
-The MCP server is installed automatically via npx when Claude Code connects.
+The pinned MCP server is fetched by npx when Claude Code connects.
 
 Manual test:
 ```bash
-npx -y @modelcontextprotocol/server-atlassian
+npx -y @aashari/mcp-server-atlassian-jira@3.3.0 --help
 ```
 
 ## Available Tools

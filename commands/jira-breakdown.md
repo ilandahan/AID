@@ -121,25 +121,26 @@ Epic: User Authentication System
 
 ## Jira MCP Integration
 
-Illustrative configuration only: `YOUR_API_KEY` is a fake placeholder, not a lookup of an existing machine credential. Supply your own Atlassian token securely for the Atlassian server; never commit it.
-
-If Atlassian MCP is configured in `.mcp.json`:
+If Jira MCP is configured in `.mcp.json` (the shipped templates already include it;
+the token comes from the environment, loaded from the OS keystore - never written into the file):
 
 ```json
 {
   "mcpServers": {
-    "atlassian": {
+    "jira": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-atlassian"],
+      "args": ["-y", "@aashari/mcp-server-atlassian-jira@3.3.0"],
       "env": {
-        "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL}",
-        "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL}",
-        "ATLASSIAN_API_TOKEN": "YOUR_API_KEY"
+        "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL:-}",
+        "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL:-}",
+        "ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN:-}"
       }
     }
   }
 }
 ```
+
+Atlassian's official remote MCP (`https://mcp.atlassian.com/v2/mcp`, OAuth) works too.
 
 The command will:
 1. Create Epic in Jira

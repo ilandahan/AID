@@ -396,12 +396,20 @@ echo Copying MCP configuration...
 if not exist "!TARGET_PATH!\.mcp.json" (
     if exist "!AID_PATH!\.mcp.json.windows" (
         copy "!AID_PATH!\.mcp.json.windows" "!TARGET_PATH!\.mcp.json" >nul
-        echo   [COPY] .mcp.json (edit with your API tokens)
+        echo   [COPY] .mcp.json - reads tokens from environment variables
     ) else (
         echo   [ERROR] .mcp.json.windows template not found
     )
 ) else (
-    echo   [SKIP] .mcp.json already exists (preserving your tokens)
+    echo   [SKIP] .mcp.json already exists (preserving your tokens^)
+)
+REM .mcp.json is per-user config; keep it out of the project's git history.
+REM Idempotent: only appends when no exact line exists. Leading blank line guards
+REM against a .gitignore that does not end in a newline.
+findstr /X /L /C:".mcp.json" "!TARGET_PATH!\.gitignore" >nul 2>nul
+if errorlevel 1 (
+    (echo.& echo .mcp.json)>>"!TARGET_PATH!\.gitignore"
+    echo   [OK] .mcp.json added to .gitignore
 )
 
 REM ============================================
@@ -444,7 +452,7 @@ echo   docs\                 - Phase outputs
 echo.
 echo Next steps:
 echo.
-echo 1. Edit "!TARGET_PATH!\.mcp.json" with your API tokens
+echo 1. Set your API tokens as environment variables - see INSTALLATION.md; .mcp.json reads them
 echo.
 echo 2. Open Claude Code in the project:
 echo    cd "!TARGET_PATH!"

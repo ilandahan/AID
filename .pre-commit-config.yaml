@@ -16,7 +16,7 @@ repos:
           (?x)^(
             package-lock\.json|
             \.mcp\.json\.example|
-            \.claude/skills/role-qa-engineer/references/security-in-tests\.md|
+            skills/role-qa-engineer/references/security-in-tests\.md|
             .*\.test\.(ts|tsx|js|jsx)$
           )$
 

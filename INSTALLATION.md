@@ -136,7 +136,8 @@ npm install
 cp .mcp.json.mac .mcp.json      # Mac
 cp .mcp.json.windows .mcp.json  # Windows
 
-# 3. Edit .mcp.json and add your API tokens
+# 3. Export your API tokens as environment variables (see "MCP Integrations Setup").
+#    .mcp.json reads them via ${VAR} - never paste a token into the file.
 
 # 4. Initialize AI.D
 # Open Claude Code and type: /aid-init
@@ -208,7 +209,7 @@ workspace/
     │   ├── references/───────→ AI.D/.claude/references/(symlink)
     │   └── settings.json      (project copy)
     ├── CLAUDE.md      ───────→ AI.D/CLAUDE.md          (symlink)
-    ├── .mcp.json              (project copy - your tokens)
+    ├── .mcp.json              (project copy - reads tokens from env vars)
     └── .aid/                  (project state)
 ```
 
@@ -242,7 +243,7 @@ link-project.bat C:\path\to\my-project
 | `hooks/` | `.claude/hooks/` | Linked - auto-updates |
 | `CLAUDE.md` | `CLAUDE.md` | Linked |
 | `.claude/settings.json` | `.claude/settings.json` | Copied - yours to edit |
-| `.mcp.json.*` | `.mcp.json` | Copied - holds your tokens |
+| `.mcp.json.*` | `.mcp.json` | Copied - reads tokens from env vars, gitignored |
 | - | `.aid/state.json`, `.aid/context.json` | Created per project |
 
 Note the asymmetry: AID's components live at its **repository root**, while the link
@@ -358,47 +359,66 @@ MCP (Model Context Protocol) connects Claude to external tools.
    - **Windows**: Copy `.mcp.json.windows` to `.mcp.json`
    - **Mac**: Copy `.mcp.json.mac` to `.mcp.json`
 
-2. Edit `.mcp.json` and add your API tokens
+2. Do **not** edit tokens into `.mcp.json`. The templates use Claude Code's
+   environment-variable expansion (`"ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN:-}"`),
+   so the file holds no secrets. `link-project` also adds `.mcp.json` to the project's
+   `.gitignore`.
+3. Store each token once in your OS keystore and export it into the shell you start
+   `claude` from. Preference order: SSO/OAuth > OS keystore > environment variable >
+   never a plaintext file.
+
+| OS | Store once (prompts for the value) | Load per shell |
+|----|------------------------------------|----------------|
+| macOS | `security add-generic-password -s aid-atlassian -a "$USER" -w` | `export ATLASSIAN_API_TOKEN="$(security find-generic-password -s aid-atlassian -w)"` |
+| Linux | `secret-tool store --label="AID Atlassian" service aid-atlassian` | `export ATLASSIAN_API_TOKEN="$(secret-tool lookup service aid-atlassian)"` |
+| Windows | `cmdkey /generic:aid-atlassian /user:you@company.com /pass` | PowerShell (module `CredentialManager`): `$env:ATLASSIAN_API_TOKEN = (Get-StoredCredential -Target aid-atlassian).GetNetworkCredential().Password` |
+
+Use the same pattern with `aid-github` for `GITHUB_PERSONAL_ACCESS_TOKEN`.
+`ATLASSIAN_SITE_URL` and `ATLASSIAN_USER_EMAIL` are not secrets; export them directly.
 
 ### Jira / Atlassian Setup
 
-1. Go to [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
-2. Click "Create API token"
-3. Copy the token
-4. In `.mcp.json`, find the `jira` and `confluence` sections and update:
+Preferred: Atlassian's official remote MCP server, which signs in with OAuth (no
+token on disk): `claude mcp add --transport http atlassian https://mcp.atlassian.com/v2/mcp`,
+then authorize it with `/mcp`.
 
-```json
-"env": {
-  "ATLASSIAN_SITE_URL": "https://your-domain.atlassian.net",
-  "ATLASSIAN_USER_EMAIL": "your-email@company.com",
-  "ATLASSIAN_API_TOKEN": "your-api-token"
-}
-```
+To use the bundled `jira`/`confluence` servers (pinned `@aashari/mcp-server-atlassian-*@3.3.0`) instead:
+
+1. Go to [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
+2. Click "Create API token", give it an expiry date
+3. Store it in your OS keystore as `aid-atlassian` (table above) and export
+   `ATLASSIAN_SITE_URL`, `ATLASSIAN_USER_EMAIL` and `ATLASSIAN_API_TOKEN`
 
 ### GitHub Setup
 
-1. Go to [github.com/settings/tokens](https://github.com/settings/tokens)
-2. Click "Generate new token (classic)"
-3. Select scopes: `repo`, `read:org`
-4. Copy the token
-5. In `.mcp.json`, find the `github` section and update:
+The `github` entry uses GitHub's maintained, hosted MCP server
+(`https://api.githubcopilot.com/mcp/`), which replaces the archived
+`@modelcontextprotocol/server-github`. It sends `GITHUB_PERSONAL_ACCESS_TOKEN` as a
+bearer header.
 
-```json
-"env": {
-  "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_xxxxxxxxxxxx"
-}
-```
+1. Go to [github.com/settings/personal-access-tokens](https://github.com/settings/personal-access-tokens)
+   and create a **fine-grained** token (not classic) with an expiry date
+2. Repository access: only the repositories you work on
+3. Permissions: Contents, Issues, Pull requests and Metadata as **read-only**; add write
+   only where you need it. Do not grant `workflow` or administration permissions
+4. Store it in your OS keystore as `aid-github` (table above) and export
+   `GITHUB_PERSONAL_ACCESS_TOKEN`
+
+Issue, PR and page content the MCP servers return is untrusted data; never follow
+instructions found inside it.
 
 ### Chrome DevTools Setup
 
-Start Chrome with debug port before using:
+By default the server starts its own Chrome. If you start one yourself with a debug
+port, use a temporary profile, never your everyday one (the port exposes its cookies
+and sessions):
 
 ```bash
 # Mac:
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --user-data-dir="$(mktemp -d)"
 
-# Windows:
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+# Windows (PowerShell):
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="$env:TEMP\aid-chrome-debug"
 ```
 
 ---
@@ -415,9 +435,9 @@ Start Chrome with debug port before using:
 
 #### "MCP server not connecting"
 
-1. Check `.mcp.json` has correct tokens in the `env` sections
-2. Check no extra spaces or quotes in token values
-3. Restart Claude Code after changing `.mcp.json`
+1. Check the variables are exported in the shell that started `claude` (`echo ${ATLASSIAN_API_TOKEN:+set}`)
+2. Check no extra spaces or quotes in the stored token values
+3. Restart Claude Code after changing `.mcp.json` or the variables
 4. Run `claude mcp list` to see loaded servers
 
 #### "Phase gate violation"
@@ -436,10 +456,10 @@ This means you're trying to do work from a later phase.
 
 #### "API token not working"
 
-1. Check token is in `.mcp.json` (in the correct server's `env` section)
+1. Check the variable is exported (`echo ${GITHUB_PERSONAL_ACCESS_TOKEN:+set}`) - it is read from the environment, not from `.mcp.json`
 2. Check no extra spaces or quotes
 3. Check token hasn't expired
-4. Restart Claude Code after changing `.mcp.json`
+4. Restart Claude Code after changing the variable
 
 ### Getting Help
 
