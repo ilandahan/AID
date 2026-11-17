@@ -49,6 +49,7 @@
             "command": "node",
             "timeout": 10,
             "statusMessage": "AID phase gate (writes)...",
+            "onFailure": "block",
             "args": [
               "${CLAUDE_PLUGIN_ROOT}/hooks/hook-runner.mjs",
               "phase-gate-write"
@@ -64,6 +65,7 @@
             "command": "node",
             "timeout": 10,
             "statusMessage": "AID phase gate (commands)...",
+            "onFailure": "block",
             "args": [
               "${CLAUDE_PLUGIN_ROOT}/hooks/hook-runner.mjs",
               "phase-gate-bash"
