@@ -12,9 +12,9 @@ This shows what NOT to do when analyzing feedback.
     "positive": [
       {
         "id": "PAT-P01",
-        "description": "Asking about the payment API integration helped identify Stripe dependencies",
+        "description": "Asking about the payment API integration helped identify ExamplePay dependencies",
         "supporting_quotes": [
-          "The Acme Corp payment flow needed Stripe webhooks",
+          "The Acme Corp payment flow needed ExamplePay webhooks",
           "John mentioned we need PCI compliance"
         ]
       }
@@ -26,7 +26,7 @@ This shows what NOT to do when analyzing feedback.
 ### Why It's Bad
 
 - ❌ "payment API integration" - project-specific feature
-- ❌ "Stripe" - specific vendor
+- ❌ "ExamplePay" - specific vendor
 - ❌ "Acme Corp" - company name
 - ❌ "John" - person's name
 - ❌ "PCI compliance" - domain-specific term

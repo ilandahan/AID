@@ -524,7 +524,7 @@ POST /api/v1/webhooks
 {
   "url": "https://customer.example.com/hooks/aid",
   "events": ["project.created", "project.archived", "campaign.completed"],
-  "secret": "whsec_a1b2c3d4e5f6..."
+  "secret": "<webhook-secret>"
 }
 ```
 

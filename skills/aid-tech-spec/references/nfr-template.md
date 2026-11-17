@@ -234,7 +234,7 @@ Is the bottleneck CPU or memory on a single node?
   "traceId": "abc-123-def",
   "userId": "user_456",
   "message": "Payment processing failed",
-  "error": { "code": "STRIPE_DECLINED", "message": "Card declined" },
+  "error": { "code": "PAYMENT_DECLINED", "message": "Card declined" },
   "context": { "orderId": "order_789", "amount": 4999 }
 }
 ```
@@ -277,7 +277,7 @@ Every production service must have:
 3. **Database**: Query rate, slow query count, connection pool usage, replication lag
 4. **Business Events**: Signups, logins, key feature usage, payment events
 5. **Error Breakdown**: Top errors by type, affected users, trending errors
-6. **Dependency Health**: Status and latency of external services (Stripe, email, etc.)
+6. **Dependency Health**: Status and latency of external services (payment provider, email, etc.)
 
 ---
 

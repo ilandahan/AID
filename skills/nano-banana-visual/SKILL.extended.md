@@ -99,7 +99,7 @@ Components:
 - API Gateway: Kong
 - Services: User, Order, Payment, Notification
 - Database: PostgreSQL, Redis
-- External: Stripe, SendGrid
+- External: Payment provider, Email provider
 
 Style: Cloud architecture, flat icons
 `);

@@ -25,8 +25,8 @@ This includes:
 | Type | Examples | Risk |
 |------|----------|------|
 | Passwords | `password123`, `P@ssw0rd!` | Account compromise |
-| API Keys | `sk_live_xxx`, `AKIA...` | Service abuse/billing |
-| Tokens | `ghp_xxx`, `xoxb-xxx` | API access |
+| API Keys | `key_live_xxxx`, cloud access-key IDs | Service abuse/billing |
+| Tokens | personal access tokens, chat bot tokens | API access |
 | Connection strings | `postgresql://user:pass@host` | Database access |
 | Private keys | `-----BEGIN [RSA] PRIVATE KEY-----` | Full compromise |
 | Secrets | `JWT_SECRET=<token-value>` | Token forgery |
@@ -44,10 +44,10 @@ const testUser = {
   password: '<example-password>'
 };
 
-// BAD - API keys that look real
+// BAD - API keys hardcoded in source (imagine real values here)
 const config = {
-  stripeKey: 'sk_test_FAKE_KEY_FOR_DOCS_12345',
-  awsKey: 'AKIAIOSFODNN7EXAMPLE'
+  paymentApiKey: 'EXAMPLE_NOT_A_REAL_KEY',
+  cloudAccessKey: 'EXAMPLE_NOT_A_REAL_KEY'
 };
 ```
 
@@ -70,7 +70,7 @@ export const testUsers = [
 Set up your environment:
 ```
 TEST_DB_PASSWORD=mysecretpassword
-STRIPE_KEY=sk_test_abcdef123456
+PAYMENT_PROVIDER_KEY=<your-api-key>
 ```
 ```
 
@@ -132,8 +132,8 @@ const adminUser = createTestUser({ role: 'admin' });
 ```bash
 # .env.test (ADD TO .gitignore)
 TEST_DB_URL=postgresql://test:testpassword@localhost:5432/test_db
-TEST_API_KEY=sk_test_your_sandbox_key_here
-TEST_STRIPE_KEY=sk_test_your_stripe_test_key
+TEST_API_KEY=<test-api-key>
+TEST_PAYMENT_PROVIDER_KEY=<test-api-key>
 ```
 
 ```gitignore
@@ -149,7 +149,7 @@ TEST_STRIPE_KEY=sk_test_your_stripe_test_key
 # .env.example (SAFE TO COMMIT)
 TEST_DB_URL=postgresql://user:password@localhost:5432/test_db
 TEST_API_KEY=your_test_api_key_here
-TEST_STRIPE_KEY=sk_test_your_key_here
+TEST_PAYMENT_PROVIDER_KEY=your_test_api_key_here
 ```
 
 ### ✅ README with Placeholders
@@ -185,17 +185,17 @@ const dbConfig = {
 ### API Keys
 
 ```typescript
-// GOOD - Stripe
-const stripeKey = process.env.STRIPE_TEST_KEY || 'sk_test_fake_key_for_testing';
+// GOOD - Third-party API
+const providerKey = process.env.PROVIDER_TEST_API_KEY || 'EXAMPLE_NOT_A_REAL_KEY';
 
 // GOOD - AWS
 const awsConfig = {
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'AKIATEST00000000000',
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'EXAMPLE_NOT_A_REAL_KEY',
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'test/secret/key/not/real'
 };
 
 // GOOD - GitHub
-const githubToken = process.env.GITHUB_TOKEN || 'ghp_testtoken00000000000000000000000000';
+const githubToken = process.env.GITHUB_TOKEN || 'EXAMPLE_NOT_A_REAL_TOKEN';
 ```
 
 ### JWT Secrets
@@ -213,9 +213,9 @@ const jwtSecret = process.env.JWT_SECRET || 'test-jwt-secret-not-for-production-
 
 - [ ] Search for `password` - no real passwords?
 - [ ] Search for `secret` - no real secrets?
-- [ ] Search for `sk_live`, `pk_live` - no production keys?
+- [ ] Search for your providers' live-mode key prefixes - no production keys?
 - [ ] Search for `AKIA` - no real AWS keys?
-- [ ] Search for `ghp_`, `xoxb-` - no real tokens?
+- [ ] Search for personal-access-token and bot-token prefixes - no real tokens?
 - [ ] Check README - no real credentials in examples?
 - [ ] Check `.gitignore` - includes `.env*`?
 
@@ -228,7 +228,7 @@ Add to CI pipeline:
 - name: Check for secrets
   run: |
     # Fail if we find patterns that look like real credentials
-    ! grep -rE "(sk_live_|pk_live_|AKIA[A-Z0-9]{16})" tests/
+    ! grep -rE "(AKIA[A-Z0-9]{16}|['\"][A-Za-z0-9_-]{32,}['\"])" tests/
     ! grep -rE "password.*=.*['\"][^'\"]{8,}['\"]" tests/ --include="*.ts"
 ```
 
@@ -259,7 +259,7 @@ Add to CI pipeline:
 ### For Test/Sandbox Environments
 
 Use sandbox/test API keys provided by services:
-- Stripe: `sk_test_...` keys (safe for testing)
+- Payment and other third-party APIs: sandbox or test-mode keys (safe for testing)
 - AWS: IAM user with minimal test permissions
 - Database: Dedicated test database with test data only
 

@@ -294,7 +294,7 @@ Follow these steps in exact order:
 |---|------|------------------------|
 | 1 | Every Story traces to a PRD user story (US-XXX) | Orphan Stories have no business justification — the Coverage Verifier will flag them and they waste development effort |
 | 2 | Never create Tasks — that is the technical lead's job | Tasks contain HOW (technical implementation); creating them violates the content boundary and oversteps your role |
-| 3 | No technical HOW in Stories | "System sends reset token via SendGrid API" is a Task, not a Story. Stories describe WHAT the user can do. |
+| 3 | No technical HOW in Stories | "System sends reset token via the email provider's API" is a Task, not a Story. Stories describe WHAT the user can do. |
 | 4 | No Story exceeds 13 story points | Stories above 13 SP indicate insufficient decomposition — they cannot be reliably estimated or completed in a sprint |
 | 5 | Never fabricate requirements | Every Epic and Story must trace to the PRD. If the consolidated spec mentions something not in the PRD, it may be infrastructure (future Task material), not a Story. |
 | 6 | Acceptance criteria must be testable | A QA engineer who has never read the PRD discussion should be able to verify each criterion with a clear pass/fail outcome |

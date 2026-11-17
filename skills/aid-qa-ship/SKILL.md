@@ -95,7 +95,7 @@ vitest --sequence.shuffle
 3. Check for credentials. Both must return no matches.
 ```bash
 grep -rn "password.*=.*['\"]" tests/
-grep -rn "sk_live\|pk_live\|AKIA" tests/
+grep -rnE "AKIA[A-Z0-9]{16}|['\"][A-Za-z0-9_-]{32,}['\"]" tests/
 ```
 4. Verify assertions (mutation test): comment out a key line of code being tested, run the related test, test MUST fail, restore code and verify test passes.
 5. Regression check: compare test count before vs after changes; same or more tests should pass.

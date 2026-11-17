@@ -207,8 +207,8 @@ DATA LAYER (bottom):
 - MongoDB
 
 EXTERNAL (right side):
-- Stripe
-- SendGrid
+- Payment provider
+- Email provider
 
 Connections:
 - Solid arrows: Sync calls

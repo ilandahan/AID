@@ -359,7 +359,7 @@ ATLASSIAN_USER_EMAIL=your-email@company.com
 ATLASSIAN_API_TOKEN=your-api-token
 
 # GitHub
-GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
+GITHUB_PERSONAL_ACCESS_TOKEN=<your-github-token>
 
 ```
 

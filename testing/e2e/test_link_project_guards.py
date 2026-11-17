@@ -433,7 +433,7 @@ class TestNoRealSecretsInTrackedTemplates:
     SECRET_PATTERNS = [
         r'ATATT[A-Za-z0-9_=\-]{20,}',
         r'sk-ant-[A-Za-z0-9_\-]{20,}',
-        r'ghp_[A-Za-z0-9]{30,}',
+        r'gh[p]_[A-Za-z0-9]{30,}',  # [p] keeps the literal prefix out of tracked files
         r'github_pat_[A-Za-z0-9_]{50,}',
         r'figd_[A-Za-z0-9_\-]{20,}',
         r'AIza[A-Za-z0-9_\-]{30,}',

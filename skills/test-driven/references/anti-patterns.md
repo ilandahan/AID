@@ -116,8 +116,8 @@ def test_create_config():
     config = create_configuration()
     assert config['tenant_name'] == 'acme_corp'  # Exact value
     assert config['type'] == 'sales'
-    assert 'shopify' in config['integrations']
-    assert config['integrations']['shopify']['api_key'] is not None
+    assert 'storefront' in config['integrations']
+    assert config['integrations']['storefront']['api_key'] is not None
     assert len(config['tools']) >= 3  # Specific requirement
 ```
 

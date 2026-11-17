@@ -167,7 +167,7 @@ mutmut run
 # Search for common credential patterns
 grep -rn "password.*=.*['\"]" tests/
 grep -rn "secret.*=.*['\"]" tests/
-grep -rn "sk_live\|pk_live" tests/
+grep -rnE "['\"][A-Za-z0-9_-]{32,}['\"]" tests/   # long opaque literals: likely keys or tokens
 grep -rn "AKIA[A-Z0-9]" tests/
 
 # Search for email patterns that look real
@@ -177,7 +177,7 @@ grep -rn "@company.com\|@corp.com" tests/
 ### Manual Review Checklist
 
 - [ ] No real-looking passwords (not `test123`, but also not `CompanyPass2024!`)
-- [ ] No API keys with real prefixes (`sk_live_`, `pk_live_`)
+- [ ] No API keys with real live-mode provider prefixes
 - [ ] No database URLs with real hostnames
 - [ ] No emails with company domains
 - [ ] Factory functions use clearly fake data
@@ -263,9 +263,9 @@ echo -e "\n2. Running in random order..."
 npm test -- --randomize || { echo "❌ FAIL: Order-dependent tests"; exit 1; }
 
 echo -e "\n3. Checking for credentials..."
-if grep -rqE "(password|secret|sk_live|AKIA).*=.*['\"]" tests/; then
+if grep -rqE "(password|secret|api_?key|token|AKIA).*=.*['\"]" tests/; then
   echo "❌ FAIL: Possible hardcoded credentials found"
-  grep -rn "(password|secret|sk_live|AKIA).*=.*['\"]" tests/
+  grep -rn "(password|secret|api_?key|token|AKIA).*=.*['\"]" tests/
   exit 1
 fi
 

@@ -487,7 +487,7 @@ When Used:
 GITHUB
 
 Environment Variables:
-- GITHUB_PERSONAL_ACCESS_TOKEN: ghp_xxxxx
+- GITHUB_PERSONAL_ACCESS_TOKEN: <your-github-token>
 
 When Used:
 - Commit changes during development
@@ -702,7 +702,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/app_db
 ATLASSIAN_SITE_URL=https://your-domain.atlassian.net
 ATLASSIAN_USER_EMAIL=your-email@company.com
 ATLASSIAN_API_TOKEN=your-api-token
-GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxx
+GITHUB_PERSONAL_ACCESS_TOKEN=<your-github-token>
 
 ================================================================================
 11. TROUBLESHOOTING

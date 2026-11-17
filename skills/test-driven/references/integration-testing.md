@@ -333,17 +333,17 @@ import { http, HttpResponse } from 'msw';
 
 const server = setupServer(
   // Default handlers
-  http.get('https://api.stripe.com/v1/customers/:id', ({ params }) => {
+  http.get('https://api.payments.example.com/v1/customers/:id', ({ params }) => {
     return HttpResponse.json({
       id: params.id,
       email: 'customer@example.com'
     });
   }),
 
-  http.post('https://api.stripe.com/v1/charges', async ({ request }) => {
+  http.post('https://api.payments.example.com/v1/charges', async ({ request }) => {
     const body = await request.json();
     return HttpResponse.json({
-      id: 'ch_test123',
+      id: 'charge_test123',
       amount: body.amount,
       status: 'succeeded'
     });
@@ -354,9 +354,9 @@ beforeAll(() => server.listen());
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
-test('creates charge via Stripe', async () => {
+test('creates charge via payment provider', async () => {
   const result = await paymentService.charge({
-    customerId: 'cus_123',
+    customerId: 'customer_123',
     amount: 1000
   });
 
@@ -364,9 +364,9 @@ test('creates charge via Stripe', async () => {
 });
 
 // Override for specific test
-test('handles Stripe error', async () => {
+test('handles payment provider error', async () => {
   server.use(
-    http.post('https://api.stripe.com/v1/charges', () => {
+    http.post('https://api.payments.example.com/v1/charges', () => {
       return HttpResponse.json(
         { error: { message: 'Card declined' } },
         { status: 402 }

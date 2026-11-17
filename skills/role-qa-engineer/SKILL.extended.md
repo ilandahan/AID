@@ -254,7 +254,7 @@ const testUser = {
 
 // BAD - Even in "test" files
 const config = {
-  stripeKey: 'sk_test_abcdefg',
+  paymentApiKey: 'EXAMPLE_NOT_A_REAL_KEY',
   dbPassword: '<test-db-password>'
 };
 ```
@@ -279,7 +279,7 @@ const createTestUser = (overrides = {}) => ({
 // GOOD - For integration tests
 // Store secrets in .env.test (gitignored)
 // .env.test:
-// TEST_API_KEY=sk_test_your_sandbox_key
+// TEST_API_KEY=<test-api-key>
 // TEST_DB_URL=postgresql://test:test@localhost:5432/test_db
 ```
 
@@ -288,7 +288,7 @@ const createTestUser = (overrides = {}) => ({
 | Check | How to Verify |
 |-------|---------------|
 | No real passwords | Search for common patterns: `password:`, `secret:` |
-| No real API keys | Search for `sk_live`, `pk_live`, real key prefixes |
+| No real API keys | Search for your providers' live-mode key prefixes, or run a secret scanner |
 | No credentials in README | Review all documentation examples |
 | `.env.test` gitignored | Check `.gitignore` includes `*.env*` |
 | Factories use fake data | Review fixture files |

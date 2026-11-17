@@ -36,7 +36,7 @@ const testUser = {
 
 // BAD - Even in "test" files
 const config = {
-  stripeKey: 'sk_test_abcdefg',
+  paymentApiKey: 'EXAMPLE_NOT_A_REAL_KEY',
   dbPassword: '<test-db-password>'
 };
 ```
@@ -70,7 +70,7 @@ Create `.env.test` (gitignored):
 ```bash
 # .env.test (ADD TO .gitignore)
 TEST_DB_URL=postgresql://test:testpassword@localhost:5432/test_db
-TEST_API_KEY=sk_test_your_sandbox_key_here
+TEST_API_KEY=<test-api-key>
 ```
 
 Create `.env.example` (safe to commit):
@@ -91,7 +91,7 @@ Before committing test code:
 # Search for common credential patterns
 grep -rn "password.*=.*['\"]" tests/
 grep -rn "secret.*=.*['\"]" tests/
-grep -rn "sk_live\|pk_live" tests/
+grep -rnE "['\"][A-Za-z0-9_-]{32,}['\"]" tests/   # long opaque literals: likely keys or tokens
 grep -rn "AKIA[A-Z0-9]" tests/
 
 # Should return NO matches
@@ -102,7 +102,7 @@ grep -rn "AKIA[A-Z0-9]" tests/
 ## Security Checklist
 
 - [ ] No real passwords in test code
-- [ ] No real API keys (sk_live_, pk_live_, AKIA)
+- [ ] No real API keys (no live-mode provider keys, no cloud access-key IDs)
 - [ ] No credentials in README examples
 - [ ] `.env.test` is in `.gitignore`
 - [ ] Using factories with clearly fake data
@@ -128,7 +128,7 @@ export const createTestCredentials = () => ({
 ```typescript
 // Clearly fake keys
 const testApiKey = '<test-api-key>';
-const testStripeKey = 'sk_test_fake_key_for_testing';
+const testProviderKey = 'EXAMPLE_NOT_A_REAL_KEY';
 ```
 
 ### For Database

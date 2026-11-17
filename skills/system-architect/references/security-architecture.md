@@ -152,8 +152,8 @@ interface ApiKey {
 }
 
 // API Key format: prefix_secret
-// Example: sk_live_abc123...xyz789
-// Only show prefix after creation: sk_live_abc123...
+// Example: key_<random-secret>
+// Only show a masked form after creation: key_****…abcd
 ```
 
 ---

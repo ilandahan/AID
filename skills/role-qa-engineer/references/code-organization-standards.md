@@ -88,8 +88,8 @@ tests/integration/
 │   ├── user-repository.integration.test.ts
 │   └── order-repository.integration.test.ts
 ├── external/               # Third-party service tests
-│   ├── stripe.integration.test.ts
-│   └── sendgrid.integration.test.ts
+│   ├── payment-provider.integration.test.ts
+│   └── email-provider.integration.test.ts
 └── messaging/              # Queue/event tests
     └── order-events.integration.test.ts
 ```

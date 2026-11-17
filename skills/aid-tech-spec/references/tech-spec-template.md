@@ -105,8 +105,8 @@ enable future extraction. Events decouple billing from core flow. [SD-001]
 | Component | Responsibility | Owner | Dependencies | Source |
 |-----------|---------------|-------|-------------|--------|
 | API Gateway | Rate limiting, JWT validation, routing | Platform | Cloud Run, Redis | [SD-002] |
-| Billing Service | Subscription lifecycle, invoice generation | Billing team | PostgreSQL, Stripe API | [SD-003] |
-| Notification Worker | Email/Slack dispatch from event queue | Platform | Pub/Sub, SendGrid | [SD-004] |
+| Billing Service | Subscription lifecycle, invoice generation | Billing team | PostgreSQL, payment provider API | [SD-003] |
+| Notification Worker | Email/Slack dispatch from event queue | Platform | Pub/Sub, email provider | [SD-004] |
 | Auth Module | Token issuance, session management | Platform | PostgreSQL, Redis | [SEC-001] |
 
 ### 2.3 Communication Patterns
@@ -116,7 +116,7 @@ enable future extraction. Events decouple billing from core flow. [SD-001]
 | Client | API Gateway | Synchronous | HTTPS/REST | User-facing, needs immediate response |
 | API Gateway | Billing Service | Synchronous | Internal HTTP | Same deployment unit |
 | Billing Service | Notification Worker | Asynchronous | Pub/Sub event | Decouple: notification failure must not block billing |
-| Notification Worker | SendGrid | Asynchronous | HTTPS/REST | Fire-and-forget with retry |
+| Notification Worker | Email provider | Asynchronous | HTTPS/REST | Fire-and-forget with retry |
 
 ### 2.4 Deployment Topology
 
@@ -125,7 +125,7 @@ enable future extraction. Events decouple billing from core flow. [SD-001]
 | Environment | Infrastructure | Scaling | Notes |
 |------------|---------------|---------|-------|
 | Development | Local Docker Compose | — | Mocked external services |
-| Staging | Cloud Run (1 instance) | Manual | Connected to staging Stripe |
+| Staging | Cloud Run (1 instance) | Manual | Connected to payment provider sandbox |
 | Production | Cloud Run (2-10 instances) | Auto (CPU > 60%) | Multi-region TBD in v2 |
 ```
 
@@ -157,7 +157,7 @@ enable future extraction. Events decouple billing from core flow. [SD-001]
 | status | ENUM | NOT NULL | internal | draft, active, past_due, cancelled |
 | current_period_start | TIMESTAMPTZ | NOT NULL | internal | Billing period start |
 | current_period_end | TIMESTAMPTZ | NOT NULL | internal | Billing period end |
-| stripe_subscription_id | VARCHAR(255) | UNIQUE | confidential | External Stripe reference |
+| provider_subscription_id | VARCHAR(255) | UNIQUE | confidential | External payment provider reference |
 | created_at | TIMESTAMPTZ | NOT NULL, auto | internal | Creation timestamp |
 | updated_at | TIMESTAMPTZ | NOT NULL, auto | internal | Last update timestamp |
 | cancelled_at | TIMESTAMPTZ | NULL | internal | When cancellation was requested |
@@ -167,11 +167,11 @@ enable future extraction. Events decouple billing from core flow. [SD-001]
 |------|--------|------|-----------|
 | idx_sub_tenant | tenant_id | B-tree | Tenant isolation queries |
 | idx_sub_status | status | B-tree | WHERE status = 'active' filtering |
-| idx_sub_stripe | stripe_subscription_id | Unique | Webhook deduplication |
+| idx_sub_provider | provider_subscription_id | Unique | Webhook deduplication |
 
 ### 3.2 Data Flow
 
-1. **Ingress**: Stripe webhook -> API Gateway -> Billing Service
+1. **Ingress**: Payment provider webhook -> API Gateway -> Billing Service
 2. **Processing**: Validate signature -> Idempotency check -> State transition
 3. **Storage**: PostgreSQL (source of truth) + Redis (cached plan limits)
 4. **Egress**: Pub/Sub event -> Notification Worker -> User email
@@ -218,7 +218,7 @@ enable future extraction. Events decouple billing from core flow. [SD-001]
 | GET | /api/v1/subscriptions/:id | JWT (user) | Get subscription details | [API-002] |
 | PATCH | /api/v1/subscriptions/:id | JWT (user) | Update subscription (plan change) | [API-003] |
 | DELETE | /api/v1/subscriptions/:id | JWT (user) | Cancel subscription | [API-004] |
-| POST | /api/v1/webhooks/stripe | API key (Stripe signature) | Receive Stripe events | [API-005] |
+| POST | /api/v1/webhooks/<payment-provider> | API key (provider signature) | Receive payment provider events | [API-005] |
 | GET | /api/v1/billing/usage | JWT (user) | Current period usage | [API-006] |
 
 ### 4.2 Contract Detail (per endpoint)
@@ -232,7 +232,7 @@ enable future extraction. Events decouple billing from core flow. [SD-001]
 ```typescript
 interface CreateSubscriptionRequest {
   plan_id: string;           // UUID of target plan
-  payment_method_id: string; // Stripe payment method
+  payment_method_id: string; // Payment method token issued by the payment provider
   billing_cycle?: 'monthly' | 'annual'; // Default: monthly
 }
 ```
@@ -256,14 +256,14 @@ interface SubscriptionResponse {
 | 401 | UNAUTHORIZED | Missing or invalid JWT | Yes | Section 7.1 |
 | 403 | FORBIDDEN | User cannot create subscriptions for this tenant | Yes | Section 7.1 |
 | 409 | SUBSCRIPTION_EXISTS | Tenant already has active subscription | No | Section 7.1 |
-| 502 | STRIPE_UNAVAILABLE | Stripe API unreachable | Yes | Section 7.2 |
+| 502 | PAYMENT_PROVIDER_UNAVAILABLE | Payment provider API unreachable | Yes | Section 7.2 |
 
 ### 4.3 Integration Points
 
 | External System | Protocol | Auth | SLA | Fallback | Source |
 |----------------|----------|------|-----|----------|--------|
-| Stripe | HTTPS/REST | API key (secret) | 99.95% | Queue and retry (max 3) | [API-005] |
-| SendGrid | HTTPS/REST | API key | 99.9% | Dead letter queue then manual | [SD-004] |
+| <payment-provider> | HTTPS/REST | API key (secret) | 99.95% | Queue and retry (max 3) | [API-005] |
+| <email-provider> | HTTPS/REST | API key | 99.9% | Dead letter queue then manual | [SD-004] |
 | Google Cloud Pub/Sub | gRPC | Service account | 99.95% | Local retry with backoff | [INF-003] |
 
 ### 4.4 Versioning Strategy
@@ -316,9 +316,9 @@ interface SubscriptionResponse {
 3. Checks audience claim matches service URL
 4. Proceeds with system-level permissions
 
-#### Webhook Authentication (Stripe)
-1. Stripe sends event to /api/v1/webhooks/stripe
-2. Server verifies stripe-signature header against webhook signing secret
+#### Webhook Authentication (third-party provider)
+1. The payment provider sends an event to /api/v1/webhooks/<payment-provider>
+2. Server verifies the provider's signature header against webhook signing secret
 3. Rejects if timestamp > 5 min old (replay protection)
 
 ### 5.2 Threat Model Summary [SEC-001]
@@ -326,7 +326,7 @@ interface SubscriptionResponse {
 | Threat | STRIDE Category | Impact | Likelihood | Mitigation | Status |
 |--------|----------------|--------|-----------|------------|--------|
 | JWT theft via XSS | Information Disclosure | High | Medium | CSP headers, no localStorage, httpOnly refresh | Mitigated |
-| Stripe webhook forgery | Spoofing | High | Low | Signature verification + timestamp check | Mitigated |
+| Provider webhook forgery | Spoofing | High | Low | Signature verification + timestamp check | Mitigated |
 | Tenant data leakage | Information Disclosure | Critical | Low | Row-Level Security (RLS) on all tenant tables | Mitigated |
 | Brute force login | Spoofing | Medium | High | Rate limiting (5 attempts/15min), account lockout | Mitigated |
 | SQL injection | Tampering | Critical | Low | Parameterized queries via Prisma ORM | Mitigated |
@@ -336,7 +336,7 @@ interface SubscriptionResponse {
 | Data Element | Classification | At Rest | In Transit | Access Control |
 |-------------|---------------|---------|-----------|---------------|
 | User email | Confidential | AES-256 (DB encryption) | TLS 1.3 | Owner + admin |
-| Payment method token | Restricted | Stripe-managed (never stored) | TLS 1.3 | Never accessed directly |
+| Payment method token | Restricted | Provider-managed (never stored) | TLS 1.3 | Never accessed directly |
 | Subscription status | Internal | DB encryption | TLS 1.3 | Owner + billing role |
 | Audit logs | Internal | BigQuery default encryption | TLS 1.3 | Admin only |
 
@@ -344,7 +344,7 @@ interface SubscriptionResponse {
 
 | Requirement | Applies | Implementation | Owner |
 |------------|---------|---------------|-------|
-| PCI DSS | Yes (payments) | Stripe handles card data; we never see raw PANs | Stripe + Platform |
+| PCI DSS | Yes (payments) | Payment provider handles card data; we never see raw PANs | Payment provider + Platform |
 | GDPR | Yes (EU users) | Data export endpoint, deletion workflow, DPA with processors | Platform |
 | SOC 2 Type II | Planned | Audit logging, access controls, encryption | Platform |
 ```
@@ -432,7 +432,7 @@ interface SubscriptionResponse {
 
 | Dependency | Failure Mode | Degraded Behavior | Recovery |
 |-----------|-------------|-------------------|----------|
-| Stripe API | Timeout / 5xx | Queue subscription change, show "processing" to user | Retry with exponential backoff (max 3, then dead-letter) |
+| Payment provider API | Timeout / 5xx | Queue subscription change, show "processing" to user | Retry with exponential backoff (max 3, then dead-letter) |
 | Redis (cache) | Connection lost | Fall through to PostgreSQL direct queries | Auto-reconnect; log performance degradation |
 | Pub/Sub | Publishing fails | Write event to local fallback table | Background job retries from fallback table every 60s |
 | PostgreSQL | Connection exhausted | Return 503 with Retry-After header | Connection pool auto-recovery; alert on-call |
@@ -443,7 +443,7 @@ interface SubscriptionResponse {
 |--------|-----------|----------|--------|--------------|
 | Error rate (5xx) | > 1% of requests in 5 min window | Critical | Page on-call | Section 6.1 |
 | Latency (P95) | > 500ms sustained 10 min | Warning | Slack notification | Section 6.1 |
-| Stripe webhook lag | > 30s processing delay | Warning | Slack notification | Section 6.1 |
+| Provider webhook lag | > 30s processing delay | Warning | Slack notification | Section 6.1 |
 | Auth failures spike | > 5x baseline in 15 min | Critical | Page security on-call | Section 5.2 |
 | Database connections | > 80% pool utilization | Warning | Slack + auto-scale investigation | Section 6.3 |
 | Dead letter queue depth | > 0 messages for > 1 hour | Warning | Slack notification | — |
@@ -454,7 +454,7 @@ interface SubscriptionResponse {
 |----------|-------|-----|-----|
 | Database failover | Automatic (Cloud SQL HA) -> verify connections -> clear cache | < 5 min | 0 (synchronous replication) |
 | Corrupted deployment | Revert Cloud Run revision -> verify health checks -> notify team | < 10 min | 0 (stateless) |
-| Stripe webhook backlog | Check dead-letter queue -> replay events in order -> reconcile state | < 1 hour | Events are idempotent |
+| Provider webhook backlog | Check dead-letter queue -> replay events in order -> reconcile state | < 1 hour | Events are idempotent |
 ```
 
 **Guidance for the synthesizer**:
@@ -485,8 +485,8 @@ interface SubscriptionResponse {
 | Task | Dependencies | Estimate | Owner | Deliverable |
 |------|-------------|----------|-------|-------------|
 | Subscription CRUD endpoints | Auth module, schema | 4d | Backend | POST/GET/PATCH/DELETE endpoints |
-| Stripe integration (create subscription) | Subscription endpoints | 3d | Backend | Stripe API integration |
-| Webhook handler (signature verification) | Stripe integration | 2d | Backend | POST /webhooks/stripe |
+| Payment provider integration (create subscription) | Subscription endpoints | 3d | Backend | Payment provider API integration |
+| Webhook handler (signature verification) | Payment provider integration | 2d | Backend | POST /webhooks/<payment-provider> |
 | Unit + integration tests | All above | 2d | Backend | 80%+ coverage on billing module |
 
 #### Sprint 3: Events & Polish (Week 5-6)
@@ -505,7 +505,7 @@ graph LR
     A[Schema + Migrations] --> B[Auth Module]
     A --> C[Subscription CRUD]
     B --> C
-    C --> D[Stripe Integration]
+    C --> D[Payment Provider Integration]
     D --> E[Webhook Handler]
     C --> F[Pub/Sub Events]
     F --> G[Notification Worker]
@@ -520,14 +520,14 @@ graph LR
 | Milestone | Date | Criteria | Gate |
 |-----------|------|----------|------|
 | M1: API Live (staging) | Week 2 | Health check + auth + empty CRUD on staging | Demo to team |
-| M2: Billing functional | Week 4 | Subscription lifecycle works end-to-end with Stripe test mode | PM sign-off |
+| M2: Billing functional | Week 4 | Subscription lifecycle works end-to-end with the payment provider's sandbox | PM sign-off |
 | M3: Production ready | Week 6 | Monitoring live, load test passed, security review clean | Tech Lead + PM approval |
 
 ### 8.4 Risk Register
 
 | Risk | Likelihood | Impact | Mitigation | Owner | Contingency |
 |------|-----------|--------|------------|-------|-------------|
-| Stripe API changes during development | Low | High | Pin API version (2024-12-18) | Backend | Abstract Stripe calls behind adapter interface |
+| Payment provider API changes during development | Low | High | Pin the provider's API version | Backend | Abstract provider calls behind an adapter interface |
 | Performance miss on webhook processing | Medium | Medium | Load test early (Sprint 2) | QA | Switch to batch processing |
 | Schema migration breaks existing data | Low | Critical | Expand-then-contract pattern, staging-first | Backend | Automated rollback in migration script |
 | Team member unavailable | Medium | Medium | Document all decisions, pair on critical paths | PM | Adjust sprint scope, not timeline |
@@ -571,14 +571,14 @@ C4Context
     System(billing, "Billing Platform", "Subscription management, invoicing, usage tracking")
   }
 
-  System_Ext(stripe, "Stripe", "Payment processing and card management")
-  System_Ext(sendgrid, "SendGrid", "Transactional email delivery")
+  System_Ext(payments, "Payment Provider", "Payment processing and card management")
+  System_Ext(email, "Email Provider", "Transactional email delivery")
   System_Ext(analytics, "Analytics Platform", "Usage and revenue dashboards")
 
   Rel(user, billing, "Manages subscription", "HTTPS/REST")
   Rel(admin, billing, "Configures plans", "HTTPS/REST")
-  Rel(billing, stripe, "Creates charges, receives webhooks", "HTTPS/REST")
-  Rel(billing, sendgrid, "Sends invoices and notifications", "HTTPS/REST")
+  Rel(billing, payments, "Creates charges, receives webhooks", "HTTPS/REST")
+  Rel(billing, email, "Sends invoices and notifications", "HTTPS/REST")
   Rel(billing, analytics, "Exports usage events", "Pub/Sub")
 ```
 
@@ -603,8 +603,8 @@ C4Container
     ContainerDb(queue, "Message Queue", "Cloud Pub/Sub", "Async event delivery")
   }
 
-  System_Ext(stripe, "Stripe")
-  System_Ext(sendgrid, "SendGrid")
+  System_Ext(payments, "Payment Provider")
+  System_Ext(email, "Email Provider")
 
   Rel(user, spa, "Uses", "HTTPS")
   Rel(spa, api, "API calls", "HTTPS/REST + JWT")
@@ -613,9 +613,9 @@ C4Container
   Rel(api, queue, "Publishes events", "gRPC")
   Rel(worker, queue, "Consumes events", "gRPC")
   Rel(worker, db, "Updates state", "Prisma/SQL")
-  Rel(worker, sendgrid, "Sends emails", "HTTPS/REST")
-  Rel(stripe, api, "Webhooks", "HTTPS + signature")
-  Rel(api, stripe, "API calls", "HTTPS + API key")
+  Rel(worker, email, "Sends emails", "HTTPS/REST")
+  Rel(payments, api, "Webhooks", "HTTPS + signature")
+  Rel(api, payments, "API calls", "HTTPS + API key")
 ```
 
 ### Example 3: Sequence Diagram with Trust Boundaries
@@ -628,7 +628,7 @@ sequenceDiagram
   participant G as API Gateway
   participant A as Auth Module
   participant B as Billing Service
-  participant S as Stripe API
+  participant S as Payment Provider API
   participant D as PostgreSQL
   participant Q as Pub/Sub
 
@@ -642,8 +642,8 @@ sequenceDiagram
   B->>D: Check no active subscription exists
   D-->>B: No conflict
 
-  B->>S: POST /v1/subscriptions (Stripe API)
-  S-->>B: Stripe subscription created
+  B->>S: POST /v1/subscriptions (provider API)
+  S-->>B: Provider subscription created
 
   B->>D: INSERT subscription (status=active)
   D-->>B: Saved
@@ -684,7 +684,7 @@ Section 3.1 says "The subscription table has fields id, tenant_id, plan_id..." a
 
 **RIGHT** (cross-reference):
 
-Section 3.1 contains the full entity definition with all fields `[DM-001]`. Section 4.2 says "Request/response types map to the Subscription entity (Section 3.1). The response omits stripe_subscription_id (classified confidential)."
+Section 3.1 contains the full entity definition with all fields `[DM-001]`. Section 4.2 says "Request/response types map to the Subscription entity (Section 3.1). The response omits provider_subscription_id (classified confidential)."
 
 ### Rule 2: Resolve Contradictions Explicitly
 
@@ -696,9 +696,9 @@ When two specialists disagree, the synthesizer MUST:
 **Resolution Block format**:
 
 > **Contradiction resolved** [DM-003 vs SEC-002]:
-> Data Modeler proposed storing Stripe customer IDs in plaintext.
+> Data Modeler proposed storing payment provider customer IDs in plaintext.
 > Security Architect requires all external identifiers be classified as confidential with encryption at rest.
-> **Resolution**: Stripe customer IDs stored in encrypted column.
+> **Resolution**: Payment provider customer IDs stored in encrypted column.
 > Rationale: Low performance cost, high breach-impact reduction.
 
 ### Rule 3: Fill Integration Gaps
@@ -718,7 +718,7 @@ The synthesizer must verify cross-section consistency:
 
 When a gap is found, the synthesizer adds a `[SYNTHESIS GAP]` annotation:
 
-> **[SYNTHESIS GAP]**: The SendGrid integration (Section 4.3) has no corresponding degradation strategy in Section 7.2. Added: "Queue failed emails to dead-letter table, retry every 5 min for 24h, then alert." [Synthesized — no specialist source]
+> **[SYNTHESIS GAP]**: The email provider integration (Section 4.3) has no corresponding degradation strategy in Section 7.2. Added: "Queue failed emails to dead-letter table, retry every 5 min for 24h, then alert." [Synthesized — no specialist source]
 
 ### Rule 4: Cross-Reference Specialist IDs
 
