@@ -1195,14 +1195,31 @@ def evaluate_bash(command, cwd, root, phase, rules, extra_allowed=()):
 # Layer A: permission deny rules; Layer B: integrity baseline
 # ---------------------------------------------------------------------------
 
+_SETTINGS_BOMS = ((b"\xff\xfe", "utf-16-le"), (b"\xfe\xff", "utf-16-be"), (b"\xef\xbb\xbf", "utf-8"))
+
+
+def read_settings(path):
+    """
+    AC-44: the ONE reader for Claude Code settings files (layer A, layer B, AC-40). UTF-8
+    with or without a BOM, and UTF-16 LE/BE with a BOM. Returns (data, bom, codec) so a
+    writer can keep the file's encoding. Raises FileNotFoundError / OSError, and ValueError
+    when the bytes cannot be decoded or parsed.
+    """
+    raw = Path(path).read_bytes()
+    bom, codec = next(((b, c) for b, c in _SETTINGS_BOMS if raw.startswith(b)), (b"", "utf-8"))
+    return json.loads(raw[len(bom):].decode(codec)), bom, codec
+
+
 def ensure_permissions(root):
     """
     Add AID's deny rules to <root>/.claude/settings.json (additive; never removes rules).
-    Returns (added_count, error_or_None). A malformed settings file is left untouched.
+    Returns (added_count, error_or_None). A malformed settings file is left untouched; a
+    BOM / UTF-16 file is rewritten in its own encoding (AC-44).
     """
     path = Path(root) / ".claude" / "settings.json"
+    bom, codec = b"", "utf-8"
     try:
-        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        data, bom, codec = read_settings(path) if path.exists() else ({}, bom, codec)
     except (ValueError, OSError) as e:
         return 0, "cannot read {}: {}".format(path, e)
     if not isinstance(data, dict):
@@ -1218,13 +1235,13 @@ def ensure_permissions(root):
         return 0, None
     deny.extend(missing)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    path.write_bytes(bom + (json.dumps(data, indent=2) + "\n").encode(codec))
     return len(missing), None
 
 
 def deny_rules_present(root):
     try:
-        data = json.loads((Path(root) / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        data = read_settings(Path(root) / ".claude" / "settings.json")[0]
         deny = data.get("permissions", {}).get("deny", [])
         return all(r in deny for r in DENY_RULES)
     except (ValueError, OSError, AttributeError):
@@ -1241,14 +1258,11 @@ def hooks_disabled(root):
     """
     for name in ("settings.local.json", "settings.json"):
         try:
-            raw = (Path(root) / ".claude" / name).read_bytes()
+            data = read_settings(Path(root) / ".claude" / name)[0]
         except FileNotFoundError:
             continue
         except OSError:
             return ".claude/{} cannot be read (possibly disables hooks)".format(name)
-        try:
-            enc = "utf-16" if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else "utf-8-sig"
-            data = json.loads(raw.decode(enc))
         except ValueError:      # UnicodeDecodeError and JSONDecodeError are ValueErrors
             return ".claude/{} cannot be decoded or parsed (possibly disables hooks)".format(name)
         if not isinstance(data, dict):

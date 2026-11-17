@@ -1045,6 +1045,32 @@ def test_ac_44_unreadable_settings_count_as_possibly_disabled(acp, raw):
     assert acp.bash('ls') == ('ALLOW', None)
 
 
+@pytest.mark.parametrize('enc', AC44_ENCODINGS)
+def test_ac_44_bom_project_settings_keeps_layer_a_and_b(acp, enc):
+    """
+    WHY (T1 final review MINOR): only hooks_disabled decoded a BOM. Layer A and layer B
+    read .claude/settings.json as plain UTF-8, so a BOM file holding every deny rule was
+    judged "rules removed" (false DENY on every call), and SessionStart could not install
+    layer A into a BOM file at all.
+    """
+    s = acp.P / '.claude' / 'settings.json'
+    s.write_bytes(_encode('{"x": 1}', enc))
+    acp.start('s1')                                     # layer A installs, keeps the encoding
+    raw = s.read_bytes()
+    assert raw[:2] == _encode('', enc)[:2], raw[:8]
+    data = aid_guard.read_settings(s)[0]
+    assert data['x'] == 1 and all(r in data['permissions']['deny'] for r in aid_guard.DENY_RULES)
+    assert acp.bash('ls') == ('ALLOW', None)
+    # Re-saved mid-session with a BOM, rules intact, flag false: still no false denial.
+    s.write_bytes(_encode(json.dumps(dict(data, disableAllHooks=False)), enc))
+    assert acp.bash('ls') == ('ALLOW', None)
+    # Removing a rule from the BOM file is still caught.
+    data['permissions']['deny'] = data['permissions']['deny'][1:]
+    s.write_bytes(_encode(json.dumps(data), enc))
+    v = acp.bash('ls')
+    assert v[0] == 'DENY' and 'removed' in v[1], v
+
+
 def test_ac_35_f1_write_tool_does_not_expand_tilde_user(acp):
     """
     WHY (F1): Claude Code's Write tool expands only "~", "~/" and "~\\"; "~<user>/..." is a

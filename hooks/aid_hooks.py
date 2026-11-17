@@ -59,8 +59,8 @@ def is_aid_root(d):
     # let SessionStart rewrite ~/.claude/settings.json (review T1-fix1 MAJOR).
     user_aids = [os.environ.get("AID_HOME") or str(Path.home() / ".aid")]
     user_aids += [os.path.join(h, ".aid") for h in (str(Path.home()), _account_home()) if h]
-    key = path_key(os.path.realpath(str(aid)))
-    return all(key != path_key(os.path.realpath(u)) for u in user_aids)
+    key = aid_guard._key(os.path.realpath(str(aid)))
+    return all(key != aid_guard._key(os.path.realpath(u)) for u in user_aids)
 
 
 def _account_home():
@@ -277,11 +277,6 @@ def normalize_path(file_path):
         return os.path.realpath(file_path).replace("\\", "/")
 
 
-def path_key(path_str):
-    """Comparison form of a path: forward slashes, case-folded where the OS is case-insensitive."""
-    return os.path.normcase(path_str).replace("\\", "/")
-
-
 # ---------------------------------------------------------------------------
 # Utility: Marker files
 # ---------------------------------------------------------------------------
@@ -440,7 +435,8 @@ def handle_session_start(input_data, config):
                              "If the user did not make this change, restore "
                              ".aid/hooks/config.json.".format("; ".join(weaker)))
         env_dir = os.environ.get("CLAUDE_PROJECT_DIR")
-        if env_dir and path_key(os.path.realpath(env_dir)) != path_key(os.path.realpath(str(PROJECT_ROOT))):
+        if env_dir and (aid_guard._key(os.path.realpath(env_dir))
+                        != aid_guard._key(os.path.realpath(str(PROJECT_ROOT)))):
             notes.append("WARNING: Claude Code was started in {} but the AID project is {}; AID's "
                          "permission rules only apply when Claude Code is started in the AID "
                          "project folder.".format(env_dir, PROJECT_ROOT))
