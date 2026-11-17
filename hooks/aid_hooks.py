@@ -123,9 +123,11 @@ LATCHED = False   # set by resolve_project_root: root lost its AID markers mid-s
 
 set_project_root(Path.cwd())
 
+# T2 (owner 2026-11-16): the phase gates BLOCK unless the project lowers them in
+# .aid/hooks/config.json. Non-AID projects never reach a gate (AC-27). Other hooks log.
 DEFAULT_ENFORCEMENT = {
-    "phase_gate_write": "log",
-    "phase_gate_bash": "log",
+    "phase_gate_write": "block",
+    "phase_gate_bash": "block",
     "quality_check_verifier": "log",
     "session_reminder": "log",
     "context_injector": "log",
@@ -422,6 +424,13 @@ def handle_session_start(input_data, config):
                          "protecting its gate configuration.".format(added))
         if err:
             notes.append("WARNING: AID could not install its permission deny rules: " + err)
+        raw_cfg = load_json(HOOKS_CONFIG_FILE)
+        enf = raw_cfg.get("enforcement") if isinstance(raw_cfg, dict) else None
+        if not (isinstance(enf, dict) and all(
+                str(enf.get(g, "")).strip().lower() in ("log", "warn", "block") for g in GATES)):
+            # T2-8: upgraders from the old "log" default learn why calls are now denied.
+            notes.append("NOTE: AID phase gates block by default (since 3.0.8). The user can "
+                         "lower a gate in .aid/hooks/config.json.")
         off = aid_guard.hooks_disabled(PROJECT_ROOT)
         if off:
             notes.append("WARNING: {} -- this switches AID's enforcement off once Claude Code "
@@ -653,6 +662,15 @@ def check_integrity_or_deny(input_data, config, hook_name, phase):
                                 "phase": phase, "violation": True})
 
 
+def gate_level(config, hook_name, control_reason):
+    """
+    T2-10 (owner 2026-11-17): refusing an AID control file is a DENY at every level.
+    Lowering a gate in .aid/hooks/config.json relaxes the phase rules only, never the
+    tamper protection (otherwise "log" would let the agent rewrite that very file).
+    """
+    return "block" if control_reason else get_enforcement_level(config, hook_name)
+
+
 def aid_in_use():
     return is_aid_root(PROJECT_ROOT)
 
@@ -691,7 +709,12 @@ def handle_phase_gate_write(input_data, config):
 
     min_phase = config["phase_gate_rules"].get("code_write_min_phase", 4)
     tool_name = input_data.get("tool_name", "Write")
-    if phase is not None and phase < min_phase:
+    # T2-10: the same verdict with no phase = only the every-phase (control-file) refusals.
+    control = aid_guard.write_target_verdict(
+        file_path, gate_cwd(input_data), PROJECT_ROOT, None, config["phase_gate_rules"], literal=True)
+    if control:
+        message = "Phase gate: cannot {} — {}. {}".format(tool_name.lower(), control, CONTROL_FILE_HINT)
+    elif phase is not None and phase < min_phase:
         message = (
             "Phase gate: cannot {} — {}. Phase {} ({}); source changes need Phase {} "
             "(Development). Use /gate-check, then /phase-advance.".format(
@@ -699,7 +722,7 @@ def handle_phase_gate_write(input_data, config):
     else:
         # Phase 4+: only control files are refused; advancing a phase cannot help.
         message = "Phase gate: cannot {} — {}. {}".format(tool_name.lower(), reason, CONTROL_FILE_HINT)
-    enforce(get_enforcement_level(config, "phase_gate_write"), message, {
+    enforce(gate_level(config, "phase_gate_write", control), message, {
         "event": "PreToolUse",
         "hook": "phase_gate_write",
         "tool": tool_name,
@@ -745,7 +768,11 @@ def handle_phase_gate_bash(input_data, config):
 
     min_phase = rules.get("code_execute_min_phase", 4)
     cmd_display = command[:100] + ("..." if len(command) > 100 else "")
-    if phase is not None and phase < min_phase:
+    # T2-10: the Phase 4+ check (no phase) = only the control-file refusals.
+    control = aid_guard.evaluate_bash(command, gate_cwd(input_data), str(PROJECT_ROOT), None, rules)
+    if control:
+        message = "Phase gate: '{}' — {}. {}".format(cmd_display, control, CONTROL_FILE_HINT)
+    elif phase is not None and phase < min_phase:
         message = (
             "Phase gate: '{}' — {}. Phase {} ({}); running code needs Phase {} (Development). "
             "Until then Bash runs only read-only commands (ls, cat, grep, git status/log/diff/"
@@ -756,7 +783,7 @@ def handle_phase_gate_bash(input_data, config):
                 cmd_display, reason, phase, (state or {}).get("phase_name", "?"), min_phase))
     else:
         message = "Phase gate: '{}' — {}. {}".format(cmd_display, reason, CONTROL_FILE_HINT)
-    enforce(get_enforcement_level(config, "phase_gate_bash"), message, {
+    enforce(gate_level(config, "phase_gate_bash", control), message, {
         "event": "PreToolUse",
         "hook": "phase_gate_bash",
         "command": command[:200],

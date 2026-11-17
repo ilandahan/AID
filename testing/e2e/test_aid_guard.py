@@ -784,11 +784,27 @@ AC25_INPUTS = (AC1_DENY + AC2_DENY + AC3_DENY + AC4_DENY + AC5_DENY + AC8_DENY +
                + AC12_DENY + AC15_DENY)
 
 
+# T2-10 (owner 2026-11-17): flipped deliberately. These AC-25 inputs write an AID control
+# file, and a control-file refusal is a DENY at every level; warn/log relax phase rules only.
+AC25_CONTROL_FILE = {
+    'echo {} > .claude/settings.json', 'sort --out=.claude/settings.local.json docs/x',
+    'sed -n --in-pl 1p .claude/settings.json', 'git log -1 --outp=.claude/settings.local.json',
+    'git log -1 {--output=.claude/settings.local.json,}', 'git diff {--output=.claude/settings.local.json,}',
+    'git checkout -- .claude/settings.json'}
+
+
+def test_ac_25_control_file_inputs_are_ac_inputs():
+    assert AC25_CONTROL_FILE <= set(AC25_INPUTS)
+
+
 @pytest.mark.parametrize('level', ['warn', 'log'])
 @pytest.mark.parametrize('cmd', AC25_INPUTS)
 def test_ac_25_warn_and_log_never_deny(world, cmd, level):
     cfg = {'enforcement': {'phase_gate_write': level, 'phase_gate_bash': level}}
     v = bash(world, cmd, config=cfg)
+    if cmd in AC25_CONTROL_FILE:
+        assert v[0] == 'DENY' and 'control file' in v[1], (cmd, level, v[1])
+        return
     assert v[0] == 'ALLOW', (cmd, level, v[1])
     if level == 'warn':
         assert 'AID ENFORCEMENT WARNING' in v[2]['hookSpecificOutput']['additionalContext']

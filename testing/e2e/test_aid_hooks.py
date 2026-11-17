@@ -17,8 +17,8 @@ exit 0. These tests EXECUTE the hook and assert on the emitted JSON.
 
 Every test injects its own .aid/ fixture in tmp_path and runs the hook with cwd set
 there. The hook derives PROJECT_ROOT from cwd, so it must never read the repo's own
-.aid/ - a test that did would pass green against the broken code, since the shipped
-default enforcement level is "log" (never blocks) for every gate.
+.aid/ - a test that did would depend on whatever config that checkout happens to hold.
+Since 3.0.8 (T2) the shipped default is "block" for the two phase gates, "log" otherwise.
 """
 import json
 import os
@@ -141,15 +141,16 @@ class TestPhaseGateWriteBlocks:
         denied = got and got.get('hookSpecificOutput', {}).get('permissionDecision') == 'deny'
         assert not denied
 
-    def test_shipped_default_is_log_not_block(self, tmp_path):
+    def test_shipped_default_blocks_in_an_aid_project(self, tmp_path):
         """
-        Defaults must not deny. A freshly installed plugin that starts refusing writes
-        would be indistinguishable from a broken install.
+        # T2 (owner 2026-11-16): default is block. Flipped from
+        # test_shipped_default_is_log_not_block. Uninitialised projects stay untouched
+        # (test_uninitialised_project_never_blocks / AC-27).
         """
         p = make_project(tmp_path, phase=1)  # no enforcement config
         got = parse(run_hook(p, 'PreToolUse', 'phase_gate_write', WRITE_SRC))
-        denied = got and got.get('hookSpecificOutput', {}).get('permissionDecision') == 'deny'
-        assert not denied, 'the default enforcement level must be "log", never "block"'
+        assert got and got['hookSpecificOutput'].get('permissionDecision') == 'deny', (
+            'default phase_gate_write must be "block"')
 
 
 class TestContextInjection:
@@ -1096,3 +1097,176 @@ def test_ac_20_f2_mkdir_options_denied_from_docs(acp):
         v = bash(cmd)
         assert v[0] == 'DENY' and 'option' in v[1], (cmd, v)
     assert bash('mkdir -p x') == ('ALLOW', None)
+
+
+# ===========================================================================
+# T2 (T2-acceptance.md): default enforcement = block, per-project override, notice.
+# ===========================================================================
+
+T2_NOTICE = 'AID phase gates block by default'
+
+
+def _t2_gate_results(acp):
+    assert acp.write(str(acp.P / 'src' / 'a.ts'))[0] == 'DENY'
+    assert acp.bash('node x.js')[0] == 'DENY'
+    assert acp.bash('npm test')[0] == 'DENY'
+    assert acp.write(str(acp.P / 'docs' / 'a.md')) == ('ALLOW', None)
+    assert acp.bash('git status') == ('ALLOW', None)
+    assert acp.bash('ls') == ('ALLOW', None)
+
+
+@pytest.mark.parametrize('cfg', [None, {}, {'enforcement': {}},
+                                 {'phase_gate_rules': {'code_write_min_phase': 4}}])
+def test_t2_1_2_unconfigured_aid_project_blocks(acp, cfg):
+    """
+    WHY (A-04, D-07/08): with no gate level configured the gates only logged, so an AID
+    project that never wrote .aid/hooks/config.json had no phase gate at all.
+    """
+    c = acp.P / '.aid' / 'hooks' / 'config.json'
+    if cfg is None:
+        c.unlink()
+    else:
+        acp.config(cfg)
+    acp.start('s1')
+    _t2_gate_results(acp)
+
+
+def test_t2_2_config_only_root_blocks(acp):
+    """A root marked only by .aid/hooks/config.json (no state.json) is gated at phase 0."""
+    acp.config({})
+    (acp.P / '.aid' / 'state.json').unlink()
+    acp.start('s1')
+    assert acp.write(str(acp.P / 'src' / 'a.ts'))[0] == 'DENY'
+    assert acp.bash('node x.js')[0] == 'DENY'
+
+
+@pytest.mark.parametrize('level,expect', [('log', ('ALLOW', None)), ('LOG', ('ALLOW', None)),
+                                          (' Warn ', 'warn'), ('warn', 'warn')])
+def test_t2_3_project_can_lower_a_gate(acp, level, expect):
+    acp.config({'enforcement': {'phase_gate_write': level}})
+    acp.start('s1')
+    v = acp.write(str(acp.P / 'src' / 'a.ts'))
+    if expect == 'warn':
+        assert v[0] == 'ALLOW' and 'AID ENFORCEMENT WARNING' in v[1], v
+    else:
+        assert v == expect, v
+    assert acp.bash('node x.js')[0] == 'DENY'           # the other gate keeps the default
+
+
+@pytest.mark.parametrize('bad', ['off', 'none', '', 1, None])
+def test_t2_4_unknown_gate_level_blocks(acp, bad):
+    acp.config({'enforcement': {'phase_gate_write': bad, 'phase_gate_bash': bad}})
+    acp.start('s1')
+    assert acp.write(str(acp.P / 'src' / 'a.ts'))[0] == 'DENY'
+    assert acp.bash('node x.js')[0] == 'DENY'
+
+
+def test_t2_5_other_hooks_still_default_to_log():
+    import aid_hooks
+    assert {k: v for k, v in aid_hooks.DEFAULT_ENFORCEMENT.items() if k not in aid_hooks.GATES} == {
+        'quality_check_verifier': 'log', 'session_reminder': 'log',
+        'context_injector': 'log', 'audit_logger': 'log'}
+    cfg = {'enforcement': {'quality_check_verifier': 'off'}}
+    assert aid_hooks.get_enforcement_level(cfg, 'quality_check_verifier') == 'log'
+
+
+def test_t2_6_non_aid_project_stays_untouched_under_the_block_default(clean_tmp):
+    Q = clean_tmp / 'Q'
+    (Q / '.aid' / 'audit').mkdir(parents=True)          # stray: not an AID root
+    H = clean_tmp / 'home'
+    H.mkdir()
+    for action, ti in (('phase_gate_write', {'file_path': str(Q / 'src' / 'a.ts')}),
+                       ('phase_gate_bash', {'command': 'node x.js'})):
+        assert decision(spawn(Q, 'PreToolUse', action, H, {
+            'session_id': 's1', 'cwd': str(Q), 'tool_name': 'Write' if 'write' in action else 'Bash',
+            'tool_input': ti})) == ('ALLOW', None)
+
+
+def test_t2_7_lowering_from_the_default_is_reported_but_the_default_is_not(acp):
+    (acp.P / '.aid' / 'hooks' / 'config.json').unlink()
+    assert 'weaker' not in acp.start('s1')
+    acp.level('log')
+    out = acp.start('s2')
+    assert 'phase_gate_write went from block to log' in out, out
+    (acp.P / '.aid' / 'hooks' / 'config.json').unlink()  # back to the default: stronger
+    assert 'weaker' not in acp.start('s3')
+
+
+@pytest.mark.parametrize('cfg,shown', [(None, True), ({}, True),
+                                       ({'enforcement': {'phase_gate_write': 'block'}}, True),
+                                       (BLOCK_CFG, False),
+                                       ({'enforcement': {'phase_gate_write': 'off', 'phase_gate_bash': None}}, True),
+                                       ({'enforcement': {'phase_gate_write': 'log', 'phase_gate_bash': 'warn'}}, False)])
+def test_t2_8_session_start_notice_until_both_gates_are_set(acp, cfg, shown):
+    """WHY: users upgrading from the old log default must learn why calls are now
+    denied. The note is for the user; it does not tell the agent to edit the config."""
+    if cfg is None:
+        (acp.P / '.aid' / 'hooks' / 'config.json').unlink()
+    else:
+        acp.config(cfg)
+    out = acp.start('s1')
+    assert (T2_NOTICE in out) is shown, out
+
+
+@pytest.mark.parametrize('level', ['log', 'warn', 'LOG', 'off'])
+@pytest.mark.parametrize('phase', [1, 5])
+def test_t2_10_control_files_are_refused_at_every_level(acp, level, phase):
+    """
+    WHY (T2 docs review r1 MAJOR, owner decision 2026-11-17): the control-file refusal
+    followed the gate level, so lowering phase_gate_write to warn/log (the docs' own
+    example) let the agent rewrite .aid/hooks/config.json and ~/.claude/settings.json.
+    Lowering a gate relaxes phase rules only.
+    """
+    acp.config({'enforcement': {'phase_gate_write': level, 'phase_gate_bash': level}})
+    acp.state(phase)
+    acp.start('s1')
+    for target in (acp.P / '.aid' / 'hooks' / 'config.json', acp.P / '.claude' / 'settings.json',
+                   acp.H / '.claude' / 'settings.json'):
+        v = acp.write(str(target))
+        assert v[0] == 'DENY' and 'control file' in v[1], (target, v)
+    v = acp.bash('echo {} > .claude/settings.local.json')
+    assert v[0] == 'DENY' and 'control file' in v[1], v
+    # The phase rules themselves follow the lowered level ('off' is unknown, so block).
+    expect = 'DENY' if level == 'off' and phase < 4 else 'ALLOW'
+    assert acp.write(str(acp.P / 'src' / 'a.ts'))[0] == expect
+    assert acp.bash('node x.js')[0] == expect
+
+
+@pytest.mark.parametrize('where', ['home', 'stray', 'plain'])
+def test_t2_8_notice_never_shown_outside_an_aid_project(clean_tmp, where):
+    """WHY (T2 code review r1 MINOR): the notice must not reach projects that do not use
+    AID (AC-27): the home dir whose .aid is AID_HOME, a stray .aid/audit, a plain dir."""
+    H = clean_tmp / 'home'
+    (H / '.aid' / 'hooks').mkdir(parents=True)
+    (H / '.aid' / 'state.json').write_text('{"current_phase":1}', encoding='utf-8')
+    Q = {'home': H, 'stray': clean_tmp / 'S', 'plain': clean_tmp / 'Q'}[where]
+    Q.mkdir(exist_ok=True)
+    if where == 'stray':
+        (Q / '.aid' / 'audit').mkdir(parents=True)
+    out = spawn(Q, 'SessionStart', None, H, {'session_id': 's1', 'source': 'startup', 'cwd': str(Q)})
+    assert T2_NOTICE not in (out or ''), out
+
+
+T2_DOCS = ['README.md', 'docs/PHASE-GATES.md', 'docs/SECURITY-MODEL.md']
+
+
+@pytest.mark.parametrize('doc', T2_DOCS)
+def test_t2_d5_docs_match_the_code(doc):
+    """WHY (D-5): the docs tell users the default and how to override it; an example
+    with a typo'd gate name or level would silently fall back to block or be ignored."""
+    import re
+    import aid_hooks
+    text = Path(REPO_ROOT, doc).read_text(encoding='utf-8')
+    assert 'block by default' in text, doc
+    assert all(aid_hooks.DEFAULT_ENFORCEMENT[g] == 'block' for g in aid_hooks.GATES)
+    examples = [json.loads(b) for b in re.findall(r'```json\n(.*?)```', text, re.S) if '"enforcement"' in b]
+    assert examples, doc
+    for ex in examples:
+        for gate, level in ex['enforcement'].items():
+            assert gate in aid_hooks.GATES and level in ('log', 'warn', 'block'), (doc, gate, level)
+
+
+def test_t2_d1_security_model_lists_the_real_deny_rules():
+    text = Path(REPO_ROOT, 'docs', 'SECURITY-MODEL.md').read_text(encoding='utf-8')
+    for rule in aid_guard.DENY_RULES:
+        assert '`{}`'.format(rule) in text, rule

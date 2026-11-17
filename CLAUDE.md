@@ -72,6 +72,8 @@ After WHY is established, Claude MUST:
 3. Verify requested work is allowed in current phase
 4. **REFUSE work that belongs to a later phase**
 
+The phase-gate hooks block out-of-phase writes and commands by default. Only the user changes their levels.
+
 ### 6-Phase Lifecycle
 
 ```

@@ -43,6 +43,27 @@
 
 ## What's New
 
+### 3.0.8 — phase gates block by default
+
+**Behaviour change.** In an AID project (one with `.aid/state.json` or
+`.aid/hooks/config.json`), the write and bash phase gates now **block** by default. Before
+Phase 4, a source write or a code run is denied with a reason. Earlier versions only logged
+unless you configured `block`. Folders without AID are never touched.
+
+To lower a gate for one project, set its level in `.aid/hooks/config.json` (`block`, `warn`
+= allow with a warning to Claude, `log` = audit only):
+
+```json
+{ "enforcement": { "phase_gate_write": "warn", "phase_gate_bash": "log" } }
+```
+
+Lowering a gate relaxes only the phase rules. Writes to AID's own control files are refused
+at every level.
+
+AID's gates are a guardrail for a cooperating agent, not a sandbox.
+[docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md) explains what they guarantee and what they
+do not, and how to add the Claude Code sandbox or managed settings for a hard boundary.
+
 ### 3.0.5 — `/aid-start` and `/aid-end` in seconds
 
 Starting and ending a session used to take five to ten minutes before a single line of
@@ -313,8 +334,9 @@ templates live in `agent-assets/`; see `agent-assets/AGENT-STANDARD.md` to add y
 ## Data handling and privacy
 
 - AID's hooks read project state and tool-call inputs locally. They can write audit logs,
-  error logs, session markers and pipeline artifacts under the project's `.aid/` directory.
-  Project content and paths may contain personal data. The learning system stores feedback
+  error logs, session markers and pipeline artifacts under the project's `.aid/` directory,
+  and small per-session integrity records (hashes and gate levels) under
+  `~/.aid/integrity/` (or `$AID_HOME/integrity/`). Project content and paths may contain personal data. The learning system stores feedback
   locally in `~/.aid/`; see [memory-system privacy](memory-system/README.md#privacy).
 - No AID-hosted collection service is configured by this plugin. Local artifacts remain until
   the user removes them; this repository does not enforce a local retention period.

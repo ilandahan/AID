@@ -31,6 +31,31 @@ Before advancing to the next phase, ALL of the following must be true:
 3. **Human approval** — Explicit sign-off via `/phase-approve`
 4. **No blockers** — No open questions or unresolved issues
 
+## Enforcement
+
+The write and bash phase gates are hooks that check every Write/Edit and Bash call against
+the current phase. Since 3.0.8 they **block by default** in an AID project. Folders without
+AID are never touched.
+
+| Level | On a violation |
+|-------|----------------|
+| `block` (default) | The call is denied, with the reason and a way forward. |
+| `warn` | The call is allowed, and Claude gets a warning. |
+| `log` | The call is allowed and only recorded in `.aid/audit/`. |
+
+To lower a gate for one project, set it in `.aid/hooks/config.json`. Levels are
+case-insensitive, and an unknown value counts as `block`:
+
+```json
+{ "enforcement": { "phase_gate_write": "warn", "phase_gate_bash": "log" } }
+```
+
+Lowering a gate relaxes only the phase rules. Writes to AID's own control files (such as
+this config file and `.claude/settings.json`) are refused at every level.
+
+The gates are a guardrail, not a sandbox. See [SECURITY-MODEL.md](SECURITY-MODEL.md) for
+what they guarantee and how to add a hard boundary.
+
 ## Commands
 
 | Command | Purpose |
