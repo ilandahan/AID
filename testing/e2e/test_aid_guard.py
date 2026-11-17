@@ -860,13 +860,15 @@ def _wpaths(w):
                 P + '/docs/w/.git/config', P + '/docs/w/.GIT/config', P + '/docs/w/.git./config',
                 P + '/docs/w/.git /config', P + '/docs/w/.git', P + '/src/app.ts']
     P_deny_5 = [P + '/.claude/settings.json', P + '/.CLAUDE/SETTINGS.JSON',
-                P + '/.claude/settings.json.', P + '/.claude/settings.json ',
                 '.aid/hooks/config.json', '.aid/pipeline/ESCALATION.json', '.aid/pipeline/escalation.json',
                 '.claude/settings.local.json', '.claude/hooks/x.sh', str(H / '.claude' / 'settings.json')]
     allow = [P + '/docs/spec.md', P + '/.claude/plans/x.ts', P + '/.aid/state.json',
              str(H / '.claude' / 'plans' / 'p.md')]
     if WIN:
         B = P.replace('/', '\\')
+        # Win32 drops a trailing dot/space, so these ARE settings.json there. On Linux and
+        # macOS they are different files, and the gate rightly allows them at phase 5.
+        P_deny_5 += [P + '/.claude/settings.json.', P + '/.claude/settings.json ']
         P_deny_1 += [B + '\\src\\app.ts', B + '\\docs\\..\\src\\app.ts']
         P_deny_5 += [B + '\\.claude\\settings.json', B + '\\.CLAUDE\\SETTINGS.JSON',
                      B + '\\.claude\\settings.json::$DATA', B + '\\CLAUDE~1\\settings.json', '\\\\?\\' + B + '\\.claude\\settings.json',
