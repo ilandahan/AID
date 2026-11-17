@@ -136,8 +136,9 @@ class TestInstallerCreatesTheMirror:
             link = claude / c
             if not os.path.lexists(str(link)):
                 continue
-            subprocess.run(['cmd', '/c', 'rmdir', str(link)],
-                           capture_output=True, timeout=60)
+            if os.name == 'nt':
+                subprocess.run(['cmd', '/c', 'rmdir', str(link)],
+                               capture_output=True, timeout=60)
             if os.path.lexists(str(link)):
                 # A symlink (macOS/Linux, or Windows with Developer Mode) unlinks cleanly.
                 try:

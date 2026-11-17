@@ -24,7 +24,7 @@ into the shell you start `claude` from. Do not keep it in `.env` or `.mcp.json`:
 ```bash
 export ATLASSIAN_SITE_URL=https://your-domain.atlassian.net
 export ATLASSIAN_USER_EMAIL=your-email@company.com
-export ATLASSIAN_API_TOKEN="$(security find-generic-password -s aid-atlassian -w)"   # macOS
+export ATLASSIAN_API_TOKEN=$(security find-generic-password -s aid-atlassian -w)   # macOS
 ```
 
 ### 2. MCP Configuration

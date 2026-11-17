@@ -36,7 +36,7 @@ const testUser = {
 
 // BAD - Even in "test" files
 const config = {
-  paymentApiKey: 'EXAMPLE_NOT_A_REAL_KEY',
+  paymentApiKey: '<hardcoded key>',
   dbPassword: '<test-db-password>'
 };
 ```
@@ -128,7 +128,7 @@ export const createTestCredentials = () => ({
 ```typescript
 // Clearly fake keys
 const testApiKey = '<test-api-key>';
-const testProviderKey = 'EXAMPLE_NOT_A_REAL_KEY';
+const testProviderKey = '<hardcoded key>';
 ```
 
 ### For Database

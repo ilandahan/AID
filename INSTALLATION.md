@@ -369,8 +369,8 @@ MCP (Model Context Protocol) connects Claude to external tools.
 
 | OS | Store once (prompts for the value) | Load per shell |
 |----|------------------------------------|----------------|
-| macOS | `security add-generic-password -s aid-atlassian -a "$USER" -w` | `export ATLASSIAN_API_TOKEN="$(security find-generic-password -s aid-atlassian -w)"` |
-| Linux | `secret-tool store --label="AID Atlassian" service aid-atlassian` | `export ATLASSIAN_API_TOKEN="$(secret-tool lookup service aid-atlassian)"` |
+| macOS | `security add-generic-password -s aid-atlassian -a "$USER" -w` | `export ATLASSIAN_API_TOKEN=$(security find-generic-password -s aid-atlassian -w)` |
+| Linux | `secret-tool store --label="AID Atlassian" service aid-atlassian` | `export ATLASSIAN_API_TOKEN=$(secret-tool lookup service aid-atlassian)` |
 | Windows | `cmdkey /generic:aid-atlassian /user:you@company.com /pass` | PowerShell (module `CredentialManager`): `$env:ATLASSIAN_API_TOKEN = (Get-StoredCredential -Target aid-atlassian).GetNetworkCredential().Password` |
 
 Use the same pattern with `aid-github` for `GITHUB_PERSONAL_ACCESS_TOKEN`.

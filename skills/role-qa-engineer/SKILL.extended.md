@@ -254,7 +254,7 @@ const testUser = {
 
 // BAD - Even in "test" files
 const config = {
-  paymentApiKey: 'EXAMPLE_NOT_A_REAL_KEY',
+  paymentApiKey: '<hardcoded key>',
   dbPassword: '<test-db-password>'
 };
 ```

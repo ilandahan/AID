@@ -46,8 +46,8 @@ const testUser = {
 
 // BAD - API keys hardcoded in source (imagine real values here)
 const config = {
-  paymentApiKey: 'EXAMPLE_NOT_A_REAL_KEY',
-  cloudAccessKey: 'EXAMPLE_NOT_A_REAL_KEY'
+  paymentApiKey: '<hardcoded key>',
+  cloudAccessKey: '<hardcoded key>'
 };
 ```
 
@@ -186,16 +186,16 @@ const dbConfig = {
 
 ```typescript
 // GOOD - Third-party API
-const providerKey = process.env.PROVIDER_TEST_API_KEY || 'EXAMPLE_NOT_A_REAL_KEY';
+const providerKey = process.env.PROVIDER_TEST_API_KEY || '<hardcoded key>';
 
 // GOOD - AWS
 const awsConfig = {
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'EXAMPLE_NOT_A_REAL_KEY',
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID || '<hardcoded key>',
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'test/secret/key/not/real'
 };
 
 // GOOD - GitHub
-const githubToken = process.env.GITHUB_TOKEN || 'EXAMPLE_NOT_A_REAL_TOKEN';
+const githubToken = process.env.GITHUB_TOKEN || '<hardcoded token>';
 ```
 
 ### JWT Secrets

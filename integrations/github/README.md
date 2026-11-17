@@ -30,8 +30,8 @@ do not use it.
 Export the token from the keystore into the shell you start `claude` from:
 
 ```bash
-export GITHUB_PERSONAL_ACCESS_TOKEN="$(security find-generic-password -s aid-github -w)"   # macOS
-export GITHUB_PERSONAL_ACCESS_TOKEN="$(secret-tool lookup service aid-github)"            # Linux
+export GITHUB_PERSONAL_ACCESS_TOKEN=$(security find-generic-password -s aid-github -w)   # macOS
+export GITHUB_PERSONAL_ACCESS_TOKEN=$(secret-tool lookup service aid-github)            # Linux
 ```
 ```powershell
 # Windows (PowerShell, module CredentialManager)
