@@ -22,8 +22,11 @@ default enforcement level is "log" (never blocks) for every gate.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -53,6 +56,29 @@ def run_hook(project, event, action=None, payload=None):
         f'stderr: {proc.stderr[:500]}'
     )
     return proc.stdout.strip()
+
+
+def _marker_above(p):
+    return any((d / '.aid' / 'state.json').is_file() or (d / '.aid' / 'hooks' / 'config.json').is_file()
+               for d in [p] + list(p.parents))
+
+
+@pytest.fixture
+def clean_tmp(tmp_path):
+    """
+    A directory with no AID project marker above it (AC-27 harness). On a machine whose
+    real ~/.aid/state.json sits above the temp dir (tests run with a fake HOME, so it is
+    not excluded as AID_HOME), use a fresh directory at the drive root instead.
+    """
+    if not _marker_above(tmp_path):
+        yield tmp_path
+        return
+    alt = Path(tempfile.mkdtemp(prefix='aid-t1-', dir=tmp_path.anchor))
+    if _marker_above(alt):
+        shutil.rmtree(alt, ignore_errors=True)
+        pytest.skip('no directory without an AID marker ancestor is available')
+    yield alt
+    shutil.rmtree(alt, ignore_errors=True)
 
 
 def parse(out):
@@ -109,9 +135,9 @@ class TestPhaseGateWriteBlocks:
         denied = got and got.get('hookSpecificOutput', {}).get('permissionDecision') == 'deny'
         assert not denied, 'Phase 4 is the coding phase; writes must pass'
 
-    def test_uninitialised_project_never_blocks(self, tmp_path):
+    def test_uninitialised_project_never_blocks(self, clean_tmp):
         """No .aid/ at all: AID is not in use here, so stay out of the way."""
-        got = parse(run_hook(tmp_path, 'PreToolUse', 'phase_gate_write', WRITE_SRC))
+        got = parse(run_hook(clean_tmp,'PreToolUse', 'phase_gate_write', WRITE_SRC))
         denied = got and got.get('hookSpecificOutput', {}).get('permissionDecision') == 'deny'
         assert not denied
 
@@ -168,8 +194,10 @@ class TestStopEvent:
 
 class TestRobustness:
     @pytest.mark.parametrize('junk', ['', 'not json', '[]', '{"tool_input": null}'])
-    def test_garbage_stdin_never_crashes_or_blocks(self, tmp_path, junk):
-        """A hook that dies on malformed input takes the user's session with it."""
+    def test_garbage_stdin_never_crashes(self, tmp_path, junk):
+        """A hook that dies on malformed input takes the user's session with it.
+        In block mode the gate may DENY malformed input (fail closed), but it still
+        exits 0 with a readable payload."""
         p = make_project(tmp_path, phase=1, enforcement={'phase_gate_write': 'block'})
         proc = subprocess.run(
             [sys.executable, HOOK, '--event', 'PreToolUse', '--action', 'phase_gate_write'],
@@ -187,3 +215,562 @@ class TestRobustness:
                                               'tool_input': {'command': 'npm run dev'}})
             if out:
                 json.loads(out)  # raises if the hook emitted garbage
+
+# ---------------------------------------------------------------------------
+# Phase-gate hardening: bypasses found in the audit (D-01..D-05, D-10, D-12).
+# Each case EXECUTES the hook with the attack input and asserts the decision.
+# ---------------------------------------------------------------------------
+
+PLUGIN_SESSION = os.path.join(REPO_ROOT, 'hooks', 'aid_session.py')
+
+
+def run_gate(project, action, tool_input, env=None):
+    full_env = dict(os.environ)
+    full_env.pop('CLAUDE_CONFIG_DIR', None)
+    full_env.update(env or {})
+    proc = subprocess.run(
+        [sys.executable, HOOK, '--event', 'PreToolUse', '--action', action],
+        input=json.dumps({'tool_name': 'Bash' if action == 'phase_gate_bash' else 'Write',
+                          'tool_input': tool_input}),
+        capture_output=True, text=True, timeout=60, cwd=str(project), env=full_env)
+    assert proc.returncode == 0, proc.stderr[:500]
+    got = parse(proc.stdout.strip())
+    return bool(got) and got.get('hookSpecificOutput', {}).get('permissionDecision') == 'deny'
+
+
+def bash_denied(project, command):
+    return run_gate(project, 'phase_gate_bash', {'command': command})
+
+
+BASH_BYPASSES = [
+    'git status && node evil.js',          # allow-list prefix, then a chained runner
+    'ls; python3 -c "print(1)"',
+    'echo aid_session.py; node evil.js',   # old aid_session.py substring allow
+    'cat evil.js | node',                  # "node " pattern needed a trailing space
+    'node\tevil.js',                       # tab instead of space
+    'echo $(node evil.js)',
+    'echo "`node evil.js`"',
+    'mkdir -p x\nnode evil.js',
+    'git log || bash -c "node evil.js"',
+    'FOO=1 timeout 5 node evil.js',
+    'py -3 evil.py',
+    'bun evil.ts', 'deno run evil.ts', 'tsx evil.ts', 'ts-node evil.ts',
+    'pnpm exec tsx evil.ts', 'yarn exec evil', 'uv run evil.py',
+    'python3.11 evil.py', 'C:/tools/node/node.exe evil.js',
+    'npm --prefix app run dev',
+    'python hooks/aid_session.py roles',   # the PROJECT's copy, not the plugin's
+    'python "{plugin}" roles && node evil.js',
+    'python "{plugin}" roles > .aid/hooks/config.json',
+    './python "{plugin}" roles',
+]
+
+BASH_LEGIT = [
+    'git status', 'ls -la', 'grep -rn "node " docs',
+    'git commit -m "docs; node is mentioned here"', 'ls node_modules', 'mkdir -p docs/x',
+    'python "{plugin}" roles',
+]
+# Former BASH_LEGIT entries the T1 acceptance contract now denies (AC-52, AC-8, AC-23).
+BASH_FLIPPED = [  # owner decision 2026-11-16: deny outright before Phase 4
+    'npm install', 'pip install requests',
+    'python "${{CLAUDE_PLUGIN_ROOT}}/hooks/aid_session.py" start developer 1',
+    'python "${{CLAUDE_PLUGIN_ROOT}}/hooks/aid_session.py" phases 3     # role name',
+    'python "${{CLAUDE_PLUGIN_ROOT}}/hooks/aid_session.py" end --rating 4 --worked "tests & docs; fine"',
+]
+
+
+class TestBashGateHardening:
+    @pytest.mark.parametrize('command', BASH_BYPASSES)
+    def test_bypass_is_denied_in_block_mode(self, tmp_path, command):
+        p = make_project(tmp_path, phase=1, enforcement={'phase_gate_bash': 'block'})
+        (p / 'hooks').mkdir()
+        (p / 'hooks' / 'aid_session.py').write_text('print("project code")', encoding='utf-8')
+        assert bash_denied(p, command.format(plugin=PLUGIN_SESSION)), (
+            f'{command!r} runs code before Phase 4 but the gate allowed it')
+
+    @pytest.mark.parametrize('command', BASH_FLIPPED)
+    def test_flipped_former_allow_is_denied(self, tmp_path, command):
+        p = make_project(tmp_path, phase=1, enforcement={'phase_gate_bash': 'block'})
+        assert bash_denied(p, command.format(plugin=PLUGIN_SESSION))
+
+    @pytest.mark.parametrize('command', BASH_LEGIT)
+    def test_legit_command_is_allowed(self, tmp_path, command):
+        p = make_project(tmp_path, phase=1, enforcement={'phase_gate_bash': 'block'})
+        assert not bash_denied(p, command.format(plugin=PLUGIN_SESSION)), (
+            f'{command!r} is a legitimate Phase 1 command but was denied')
+
+    def test_coding_phase_allows_runners(self, tmp_path):
+        p = make_project(tmp_path, phase=4, enforcement={'phase_gate_bash': 'block'})
+        assert not bash_denied(p, 'git status && node app.js')
+
+
+class TestWriteGateHardening:
+    @pytest.mark.parametrize('path', [
+        'docs/../src/app.ts',                  # traversal out of an allowed prefix
+        'docs/../../outside/app.ts',           # traversal out of the project
+        'src/.claude/plans/app.ts',            # old ".claude/plans/" substring allow
+        'src/.claude/plans/../../app.ts',
+    ])
+    def test_traversal_and_substring_writes_are_denied(self, tmp_path, path):
+        proj = tmp_path / 'proj'
+        proj.mkdir()
+        p = make_project(proj, phase=1, enforcement={'phase_gate_write': 'block'})
+        home = tmp_path / 'home'
+        assert run_gate(p, 'phase_gate_write', {'file_path': path},
+                        env={'HOME': str(home), 'USERPROFILE': str(home)})
+
+    def test_real_plan_file_is_allowed(self, tmp_path):
+        proj = tmp_path / 'proj'
+        proj.mkdir()
+        p = make_project(proj, phase=1, enforcement={'phase_gate_write': 'block'})
+        home = tmp_path / 'home'
+        plan = home / '.claude' / 'plans' / 'my-plan.md'
+        assert not run_gate(p, 'phase_gate_write', {'file_path': str(plan)},
+                            env={'HOME': str(home), 'USERPROFILE': str(home)})
+
+    @pytest.mark.skipif(os.name != 'nt', reason='case-insensitive / backslash paths are Windows-only')
+    @pytest.mark.parametrize('path', ['DOCS\\prd.md', 'Docs/prd.md', 'docs\\sub\\x.md'])
+    def test_windows_spelling_of_allowed_prefix_is_allowed(self, tmp_path, path):
+        p = make_project(tmp_path, phase=1, enforcement={'phase_gate_write': 'block'})
+        assert not run_gate(p, 'phase_gate_write', {'file_path': path})
+
+
+class TestFailClosed:
+    """D-12: in block mode, a gate that cannot read its inputs must deny, not allow."""
+
+    BLOCK = json.dumps({'enforcement': {'phase_gate_write': 'block', 'phase_gate_bash': 'block'}})
+    LOG = json.dumps({'enforcement': {'phase_gate_write': 'log', 'phase_gate_bash': 'log'}})
+
+    @staticmethod
+    def _project(tmp_path, state_text, config_text=None):
+        aid = tmp_path / '.aid'
+        (aid / 'hooks').mkdir(parents=True)
+        (aid / 'state.json').write_text(state_text, encoding='utf-8')
+        if config_text is not None:
+            (aid / 'hooks' / 'config.json').write_text(config_text, encoding='utf-8')
+        return tmp_path
+
+    @pytest.mark.parametrize('state', ['{not json', '[]', '{"current_phase": "one"}'])
+    def test_malformed_state_denies_in_block_mode(self, tmp_path, state):
+        p = self._project(tmp_path, state, self.BLOCK)
+        assert run_gate(p, 'phase_gate_write', {'file_path': 'src/app.ts'})
+        assert run_gate(p, 'phase_gate_bash', {'command': 'node app.js'})
+
+    def test_malformed_state_still_allows_in_log_mode(self, tmp_path):
+        p = self._project(tmp_path, '{not json', self.LOG)
+        assert not run_gate(p, 'phase_gate_write', {'file_path': 'src/app.ts'})
+
+    def test_malformed_config_fails_closed(self, tmp_path):
+        p = self._project(tmp_path, '{"current_phase": 1}', '{broken')
+        assert run_gate(p, 'phase_gate_bash', {'command': 'node app.js'})
+        assert not run_gate(p, 'phase_gate_bash', {'command': 'git status'})
+
+    @pytest.mark.parametrize('level', ['BLOCK', ' Block ', 'deny'])
+    def test_level_is_case_insensitive_and_unknown_fails_closed(self, tmp_path, level):
+        cfg = json.dumps({'enforcement': {'phase_gate_bash': level}})
+        p = self._project(tmp_path, '{"current_phase": 1}', cfg)
+        assert run_gate(p, 'phase_gate_bash', {'command': 'node app.js'})
+
+    def test_null_tool_input_denies_in_block_mode(self, tmp_path):
+        p = self._project(tmp_path, '{"current_phase": 1}', self.BLOCK)
+        assert run_gate(p, 'phase_gate_bash', None)
+
+    def test_deleting_state_does_not_switch_a_block_config_off(self, tmp_path):
+        """Design review MAJOR 3: block config + no state.json = phase 0, still gated."""
+        (tmp_path / '.aid' / 'hooks').mkdir(parents=True)
+        (tmp_path / '.aid' / 'hooks' / 'config.json').write_text(self.BLOCK, encoding='utf-8')
+        assert run_gate(tmp_path, 'phase_gate_bash', {'command': 'node app.js'})
+        (tmp_path / '.aid' / 'state.json').write_text('{"current_phase": null}', encoding='utf-8')
+        assert run_gate(tmp_path, 'phase_gate_bash', {'command': 'node app.js'})
+
+    def test_project_without_aid_is_untouched(self, clean_tmp):
+        """No .aid/ at all = AID not in use here: stay out of the way."""
+        assert not run_gate(clean_tmp, 'phase_gate_bash', {'command': 'node app.js'})
+        assert not run_gate(clean_tmp, 'phase_gate_write', {'file_path': 'src/app.ts'})
+
+
+class TestProtectedPaths:
+    """
+    A-02: the agent being gated must not be able to switch its own gates off.
+    Writes into the gate control files are denied in EVERY phase (also Phase 4+),
+    through the Write tool and through Bash; reading them stays allowed.
+    """
+
+    PROTECTED_WRITES = [
+        '.aid/hooks/config.json',
+        '.aid/hooks/new.json',
+        '.aid/pipeline/ESCALATION.json',
+        '.claude/settings.json',
+        '.claude/settings.local.json',
+        '.claude/hooks/evil.sh',
+        'docs/../.aid/hooks/config.json',      # traversal from an allowed prefix
+    ]
+
+    BASH_WRITES = [
+        'echo {} > .aid/hooks/config.json',
+        'echo {"current_phase":4} >.aid/hooks/config.json',
+        'printf x >> .claude/settings.json',
+        'cp /dev/null .aid/hooks/config.json',
+        'rm -f .aid/hooks/config.json',
+        'mv x.json .claude/settings.local.json',
+        'git status && tee .aid/hooks/config.json < x',
+        "sed -i 's/block/log/' .aid/hooks/config.json",
+        'rm -rf .claude/hooks',
+    ]
+
+    BASH_READS = [
+        'cat .aid/hooks/config.json',
+        'grep block .aid/hooks/config.json',
+        'ls .claude/hooks',
+    ]
+    # owner decision 2026-11-16: deny outright before Phase 4 (redirect to a file, AC-4)
+    BASH_READS_FLIPPED = ['cat .claude/settings.json > docs/settings-copy.json']
+
+    @pytest.mark.parametrize('command', BASH_READS_FLIPPED)
+    def test_flipped_read_with_redirect_is_denied(self, tmp_path, command):
+        p = make_project(tmp_path, phase=1, enforcement={'phase_gate_bash': 'block'})
+        assert bash_denied(p, command)
+
+    @pytest.mark.parametrize('phase', [1, 4])
+    @pytest.mark.parametrize('path', PROTECTED_WRITES)
+    def test_write_tool_cannot_change_gate_files(self, tmp_path, path, phase):
+        p = make_project(tmp_path, phase=phase,
+                         enforcement={'phase_gate_write': 'block', 'phase_gate_bash': 'block'})
+        assert run_gate(p, 'phase_gate_write', {'file_path': path}), (
+            f'Write to {path!r} in phase {phase} would let the agent disable its gates')
+
+    def test_absolute_path_to_gate_file_is_denied(self, tmp_path):
+        p = make_project(tmp_path, phase=4, enforcement={'phase_gate_write': 'block'})
+        assert run_gate(p, 'phase_gate_write',
+                        {'file_path': str(p / '.aid' / 'hooks' / 'config.json')})
+
+    @pytest.mark.parametrize('phase', [1, 4])
+    @pytest.mark.parametrize('command', BASH_WRITES)
+    def test_bash_cannot_change_gate_files(self, tmp_path, command, phase):
+        p = make_project(tmp_path, phase=phase,
+                         enforcement={'phase_gate_write': 'block', 'phase_gate_bash': 'block'})
+        assert bash_denied(p, command), (
+            f'{command!r} in phase {phase} would let the agent disable its gates')
+
+    @pytest.mark.parametrize('command', BASH_READS)
+    def test_reading_gate_files_is_allowed(self, tmp_path, command):
+        p = make_project(tmp_path, phase=1, enforcement={'phase_gate_bash': 'block'})
+        assert not bash_denied(p, command)
+
+    @pytest.mark.parametrize('path', ['.aid/state.json', '.aid/qa/T1.yaml', 'docs/prd.md',
+                                      '.claude/plans/x.md', '.claude/commands/x.md'])
+    def test_other_aid_and_claude_files_stay_writable(self, tmp_path, path):
+        """.aid/state.json stays writable until T3 moves phase-approve/advance into aid_session.py."""
+        p = make_project(tmp_path, phase=1, enforcement={'phase_gate_write': 'block'})
+        assert not run_gate(p, 'phase_gate_write', {'file_path': path})
+
+    def test_uninitialised_project_is_untouched(self, clean_tmp):
+        """No .aid/state.json: AID is not in use here, so the gate stays out of the way."""
+        assert not run_gate(clean_tmp, 'phase_gate_write', {'file_path': '.claude/settings.json'})
+
+
+# ===========================================================================
+# T1 acceptance criteria (T1-acceptance.md) for the hook plumbing: AC-27, AC-38..AC-42,
+# AC-45, AC-48. Every case spawns hooks/aid_hooks.py with stdin JSON, as Claude Code does.
+# ===========================================================================
+
+sys.path.insert(0, os.path.join(REPO_ROOT, 'hooks'))
+import aid_guard  # noqa: E402
+
+BLOCK_CFG = {'enforcement': {'phase_gate_write': 'block', 'phase_gate_bash': 'block'}}
+
+
+def spawn(cwd, event, action, home, payload=None, raw=None):
+    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home), AID_HOME=str(Path(home) / '.aid'))
+    env.pop('CLAUDE_PROJECT_DIR', None)
+    env.pop('CLAUDE_CONFIG_DIR', None)
+    args = [sys.executable, HOOK, '--event', event] + (['--action', action] if action else [])
+    p = subprocess.run(args, input=raw if raw is not None else json.dumps(payload), capture_output=True,
+                       text=True, cwd=str(cwd), env=env, timeout=60)
+    assert p.returncode == 0, p.stderr[-400:]
+    return p.stdout.strip()
+
+
+def decision(out):
+    """('DENY', reason) / ('ALLOW', additionalContext-or-None)."""
+    if not out:
+        return 'ALLOW', None
+    hso = json.loads(out).get('hookSpecificOutput', {})
+    if hso.get('permissionDecision') == 'deny':
+        assert hso.get('hookEventName') == 'PreToolUse' and hso.get('permissionDecisionReason')
+        return 'DENY', hso['permissionDecisionReason']
+    return 'ALLOW', hso.get('additionalContext')
+
+
+class AC(object):
+    """Common-harness project P (git repo, block config) plus fake home H."""
+
+    def __init__(self, base, config=BLOCK_CFG):
+        self.P, self.H = base / 'proj', base / 'home'
+        for d in ('.aid/hooks', '.claude', 'docs'):
+            (self.P / d).mkdir(parents=True, exist_ok=True)
+        self.H.mkdir(exist_ok=True)
+        subprocess.run(['git', 'init', '-q', str(self.P)], check=True, capture_output=True)
+        self.state(1)
+        self.config(config)
+        (self.P / '.claude' / 'settings.json').write_text('{}', encoding='utf-8')
+
+    def state(self, phase):
+        (self.P / '.aid' / 'state.json').write_text(json.dumps({'current_phase': phase}), encoding='utf-8')
+
+    def config(self, cfg):
+        (self.P / '.aid' / 'hooks' / 'config.json').write_text(
+            cfg if isinstance(cfg, str) else json.dumps(cfg), encoding='utf-8')
+
+    def level(self, level):
+        self.config({'enforcement': {'phase_gate_write': level, 'phase_gate_bash': level}})
+
+    def start(self, sid, source='startup'):
+        out = spawn(self.P, 'SessionStart', None, self.H,
+                    {'session_id': sid, 'source': source, 'cwd': str(self.P)})
+        return json.loads(out)['hookSpecificOutput']['additionalContext'] if out else ''
+
+    def bash(self, cmd, sid='s1'):
+        return decision(spawn(self.P, 'PreToolUse', 'phase_gate_bash', self.H, {
+            'session_id': sid, 'cwd': str(self.P), 'tool_name': 'Bash', 'tool_input': {'command': cmd}}))
+
+    def write(self, path, sid='s1'):
+        return decision(spawn(self.P, 'PreToolUse', 'phase_gate_write', self.H, {
+            'session_id': sid, 'cwd': str(self.P), 'tool_name': 'Write', 'tool_input': {'file_path': path}}))
+
+    def raw(self, action, text):
+        return decision(spawn(self.P, 'PreToolUse', action, self.H, raw=text))
+
+
+@pytest.fixture
+def acp(clean_tmp):
+    return AC(clean_tmp)
+
+
+def test_ac_27_non_aid_project_is_left_alone(clean_tmp):
+    D = clean_tmp / 'D'
+    (D / '.aid' / 'hooks').mkdir(parents=True)
+    (D / '.aid' / 'state.json').write_text('{"current_phase":1}', encoding='utf-8')
+    (D / '.aid' / 'hooks' / 'config.json').write_text(json.dumps(BLOCK_CFG), encoding='utf-8')
+    A = D / 'A'
+    (A / '.aid' / 'audit').mkdir(parents=True)              # stray: no state, no config
+    Q = A / 'q'
+    Q.mkdir()
+    subprocess.run(['git', 'init', '-q', str(Q)], check=True, capture_output=True)
+
+    def bash(cmd):
+        return decision(spawn(Q, 'PreToolUse', 'phase_gate_bash', D, {
+            'session_id': 's1', 'cwd': str(Q), 'tool_name': 'Bash', 'tool_input': {'command': cmd}}))
+
+    assert bash('node x.js')[0] == 'ALLOW'
+    assert decision(spawn(Q, 'PreToolUse', 'phase_gate_write', D, {
+        'session_id': 's1', 'cwd': str(Q), 'tool_name': 'Write',
+        'tool_input': {'file_path': str(Q / 'src' / 'x.ts')}}))[0] == 'ALLOW'
+    start = {'session_id': 's1', 'source': 'startup', 'cwd': str(Q)}
+    spawn(Q, 'SessionStart', None, D, start)
+    assert not (Q / '.claude' / 'settings.json').exists()
+    assert not (D / '.claude' / 'settings.json').exists()
+    assert not (Q / '.aid').exists()
+    (Q / '.claude').mkdir()
+    (Q / '.claude' / 'settings.json').write_text('{"x":1}', encoding='utf-8')
+    spawn(Q, 'SessionStart', None, D, start)
+    assert (Q / '.claude' / 'settings.json').read_bytes() == b'{"x":1}'
+    assert not (Q / '.aid').exists()
+    # Positive control (monorepo): an ancestor that IS an AID project still gates.
+    (A / '.aid' / 'hooks').mkdir()
+    (A / '.aid' / 'state.json').write_text('{"current_phase":1}', encoding='utf-8')
+    (A / '.aid' / 'hooks' / 'config.json').write_text(json.dumps(BLOCK_CFG), encoding='utf-8')
+    assert bash('node x.js')[0] == 'DENY'
+
+
+def test_ac_27_home_dir_is_never_an_aid_root_when_aid_home_moves(clean_tmp):
+    """Review T1-fix1 MAJOR: with AID_HOME moved elsewhere, the user-level ~/.aid/state.json
+    made ~ an AID root, so every non-AID project under ~ was gated and SessionStart rewrote
+    ~/.claude/settings.json. The home dir must never be an AID project."""
+    D = clean_tmp / 'D'
+    (D / '.aid' / 'hooks').mkdir(parents=True)
+    (D / '.aid' / 'state.json').write_text('{"current_phase":1}', encoding='utf-8')
+    (D / '.aid' / 'hooks' / 'config.json').write_text(json.dumps(BLOCK_CFG), encoding='utf-8')
+    Q = D / 'q'
+    Q.mkdir()
+    env = dict(os.environ, HOME=str(D), USERPROFILE=str(D), AID_HOME=str(clean_tmp / 'elsewhere'))
+    env.pop('CLAUDE_PROJECT_DIR', None)
+    env.pop('CLAUDE_CONFIG_DIR', None)
+
+    def run(event, action, payload):
+        args = [sys.executable, HOOK, '--event', event] + (['--action', action] if action else [])
+        p = subprocess.run(args, input=json.dumps(payload), capture_output=True, text=True,
+                           cwd=str(Q), env=env, timeout=60)
+        assert p.returncode == 0, p.stderr[-400:]
+        return p.stdout.strip()
+
+    assert decision(run('PreToolUse', 'phase_gate_bash', {
+        'session_id': 's1', 'cwd': str(Q), 'tool_name': 'Bash',
+        'tool_input': {'command': 'node x.js'}}))[0] == 'ALLOW'
+    run('SessionStart', None, {'session_id': 's1', 'source': 'startup', 'cwd': str(Q)})
+    assert not (D / '.claude' / 'settings.json').exists()
+
+
+def test_ac_38_session_start_installs_deny_rules_and_nothing_else(acp):
+    s = acp.P / '.claude' / 'settings.json'
+    s.write_text(json.dumps({'permissions': {'deny': ['Bash(rm:*)']}, 'x': 1}), encoding='utf-8')
+    acp.start('s1')
+    data = json.loads(s.read_text(encoding='utf-8'))
+    assert all(r in data['permissions']['deny'] for r in aid_guard.DENY_RULES)
+    assert 'Bash(rm:*)' in data['permissions']['deny'] and data['x'] == 1
+    assert set(data) == {'permissions', 'x'} and set(data['permissions']) == {'deny'}
+    before = s.read_bytes()
+    acp.start('s1')
+    assert s.read_bytes() == before
+
+
+@pytest.mark.parametrize('name', ['settings.json', 'settings.local.json'])
+def test_ac_38_disable_all_hooks_is_kept_and_warned(acp, name):
+    f = acp.P / '.claude' / name
+    f.write_text(json.dumps({'disableAllHooks': True}), encoding='utf-8')
+    out = acp.start('s1')
+    assert json.loads(f.read_text(encoding='utf-8'))['disableAllHooks'] is True
+    assert 'WARNING' in out and name in out and 'disableAllHooks' in out, out
+
+
+def test_ac_39_malformed_settings_left_alone_with_warning(acp):
+    s = acp.P / '.claude' / 'settings.json'
+    s.write_text('{bad', encoding='utf-8')
+    out = acp.start('s1')
+    assert s.read_bytes() == b'{bad'
+    assert 'WARNING' in out and 'could not install' in out, out
+
+
+def _disable(acp, case, value=True):
+    if case == 'project_disable':
+        f = acp.P / '.claude' / 'settings.json'
+        data = json.loads(f.read_text(encoding='utf-8'))
+        if value is None:
+            data.pop('disableAllHooks', None)
+        else:
+            data['disableAllHooks'] = value
+        f.write_text(json.dumps(data), encoding='utf-8')
+        return
+    f = acp.P / '.claude' / 'settings.local.json'
+    if value is None:
+        f.unlink()
+    elif case == 'local_disable':
+        f.write_text(json.dumps({'disableAllHooks': value}), encoding='utf-8')
+    else:
+        f.write_text(json.dumps({'enabledPlugins': {'aid@AID': not value}}), encoding='utf-8')
+
+
+@pytest.mark.parametrize('case', ['local_disable', 'local_plugin', 'project_disable'])
+def test_ac_40_disabling_hooks_mid_session_denies_in_block_baseline(acp, case):
+    acp.start('s1')
+    assert acp.bash('ls')[0] == 'ALLOW'
+    _disable(acp, case)
+    for phase in (1, 5):
+        acp.state(phase)
+        v = acp.bash('ls')
+        assert v[0] == 'DENY' and 'disabled' in v[1] and 'reloaded' in v[1], (phase, v)
+        assert acp.write('docs/a.md')[0] == 'DENY', phase
+    _disable(acp, case, None)
+    assert acp.bash('ls')[0] == 'ALLOW'
+    _disable(acp, case, False)
+    assert acp.bash('ls')[0] == 'ALLOW'
+    assert acp.write('docs/a.md')[0] == 'ALLOW'
+
+
+def test_ac_41_deleted_baseline_is_not_re_trusted(acp):
+    """
+    WHY: Phase 4+ code could set the gate config to log AND delete the integrity dir in
+    one command; with first-use trust the next call took a new baseline and allowed
+    (review 3, MAJOR). A session SessionStart recorded must not be re-trusted.
+    """
+    import shutil
+    acp.start('s1')
+    acp.state(5)
+    assert acp.bash('ls')[0] == 'ALLOW'
+    acp.level('log')
+    shutil.rmtree(acp.H / '.aid' / 'integrity')
+    v = acp.bash('ls')
+    assert v[0] == 'DENY' and 'disappeared' in v[1], v
+    assert acp.write('docs/a.md')[0] == 'DENY'
+    # Still deleted on the next call: no silent re-trust after the first deny.
+    assert acp.bash('ls')[0] == 'DENY'
+    # A session SessionStart never saw keeps first-use trust; a restart recovers.
+    assert acp.bash('ls', sid='s9')[0] == 'ALLOW'
+    acp.start('s2')
+    assert acp.bash('ls', sid='s2')[0] == 'ALLOW'
+
+
+def test_ac_40_warn_baseline_warns(acp):
+    acp.level('warn')
+    acp.start('s1')
+    _disable(acp, 'local_disable')
+    for phase in (1, 5):
+        acp.state(phase)
+        for v in (acp.bash('ls'), acp.write('docs/a.md')):
+            assert v[0] == 'ALLOW' and 'AID ENFORCEMENT WARNING' in v[1] and 'disabled' in v[1], v
+
+
+def test_ac_40_log_baseline_logs(acp):
+    acp.level('log')
+    acp.start('s1')
+    _disable(acp, 'local_disable')
+    audit = acp.P / '.aid' / 'audit' / 'tool-usage.jsonl'
+    for phase in (1, 5):
+        acp.state(phase)
+        for call in (lambda: acp.bash('ls'), lambda: acp.write('docs/a.md')):
+            n = len(audit.read_text(encoding='utf-8').splitlines()) if audit.exists() else 0
+            assert call() == ('ALLOW', None)
+            lines = audit.read_text(encoding='utf-8').splitlines()
+            assert len(lines) == n + 1 and json.loads(lines[-1]).get('integrity') is True
+
+
+def test_ac_42_weakening_between_sessions_is_reported(acp):
+    acp.start('s1')
+    acp.level('log')
+    out = acp.start('s2')
+    assert 'WARNING' in out, out
+    assert 'phase_gate_bash went from block to log' in out and 'phase_gate_write went from block to log' in out
+    assert 'weaker' not in acp.start('s3')                  # nothing changed
+    acp.level('block')
+    assert 'weaker' not in acp.start('s4')                  # stronger
+
+
+AC45_DENY = [
+    ('{not json', BLOCK_CFG, 'git status'), ('[1]', BLOCK_CFG, 'git status'),
+    ('{"current_phase":"one"}', BLOCK_CFG, 'git status'), ('{"current_phase":1}', '{bad', 'node x.js'),
+    ('{"current_phase":1}', {'enforcement': {'phase_gate_bash': 'BLOCK '}}, 'node x.js'),
+    ('{"current_phase":1}', {'enforcement': {'phase_gate_bash': 'blokc'}}, 'node x.js'),
+    ('{"current_phase":3}', dict(BLOCK_CFG, phase_gate_rules={'code_execute_min_phase': 'four'}), 'node x.js'),
+    ('{"current_phase":3}', dict(BLOCK_CFG, phase_gate_rules={'code_execute_min_phase': '4'}), 'node x.js'),
+]
+
+
+@pytest.mark.parametrize('state,cfg,cmd', AC45_DENY)
+def test_ac_45_fail_closed_inputs_deny(acp, state, cfg, cmd):
+    (acp.P / '.aid' / 'state.json').write_text(state, encoding='utf-8')
+    acp.config(cfg)
+    assert acp.bash(cmd)[0] == 'DENY'
+
+
+@pytest.mark.parametrize('action,raw', [
+    ('phase_gate_bash', 'not json'), ('phase_gate_bash', '{"tool_name":"Bash","tool_input":null}'),
+    ('phase_gate_bash', '{"tool_name":"Bash","tool_input":{"command":["node","x"]}}'),
+    ('phase_gate_write', '{"tool_name":"Write","tool_input":{"file_path":123}}'),
+    ('phase_gate_write', '{"tool_name":"Write","tool_input":{"file_path":"src/a\\u0000.ts"}}')])
+def test_ac_45_malformed_stdin_denies(acp, action, raw):
+    assert acp.raw(action, raw)[0] == 'DENY'
+
+
+def test_ac_45_numeric_string_is_coerced_and_log_allows_garbage(acp):
+    acp.config(dict(BLOCK_CFG, phase_gate_rules={'code_execute_min_phase': '4'}))
+    acp.state(4)
+    assert acp.bash('node x.js')[0] == 'ALLOW'
+    acp.level('log')
+    assert acp.raw('phase_gate_bash', 'not json')[0] == 'ALLOW'
+
+
+def test_ac_48_deny_message_gives_a_way_forward(acp):
+    v = acp.bash('npm install')
+    assert v[0] == 'DENY'
+    for part in ('Write tool', '/gate-check', '/phase-advance', 'extra_allowed_commands'):
+        assert part in v[1], (part, v[1])
+    assert 'package installs are allowed' not in v[1]

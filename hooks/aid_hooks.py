@@ -16,6 +16,7 @@ Actions: phase_gate_write, phase_gate_bash, audit_log, quality_check
 import sys
 import json
 import os
+import re
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,16 +25,83 @@ from pathlib import Path
 # Constants
 # ---------------------------------------------------------------------------
 
-# Project root = where .aid/ lives. Hooks are invoked with cwd = project root.
-PROJECT_ROOT = Path.cwd()
-STATE_FILE = PROJECT_ROOT / ".aid" / "state.json"
-CONTEXT_FILE = PROJECT_ROOT / ".aid" / "context.json"
-HOOKS_CONFIG_FILE = PROJECT_ROOT / ".aid" / "hooks" / "config.json"
-AUDIT_DIR = PROJECT_ROOT / ".aid" / "audit"
-AUDIT_FILE = AUDIT_DIR / "tool-usage.jsonl"
-ERROR_LOG = AUDIT_DIR / "errors.log"
-MARKERS_DIR = PROJECT_ROOT / ".aid" / "markers"
-REFLECTION_MARKER = MARKERS_DIR / "reflection-ran.marker"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import aid_guard  # noqa: E402  (bundled beside this file)
+
+
+def set_project_root(root):
+    """Point every project path at root (the directory that holds .aid/)."""
+    global PROJECT_ROOT, STATE_FILE, CONTEXT_FILE, HOOKS_CONFIG_FILE, AUDIT_DIR, AUDIT_FILE
+    global ERROR_LOG, MARKERS_DIR, REFLECTION_MARKER
+    PROJECT_ROOT = Path(root)
+    STATE_FILE = PROJECT_ROOT / ".aid" / "state.json"
+    CONTEXT_FILE = PROJECT_ROOT / ".aid" / "context.json"
+    HOOKS_CONFIG_FILE = PROJECT_ROOT / ".aid" / "hooks" / "config.json"
+    AUDIT_DIR = PROJECT_ROOT / ".aid" / "audit"
+    AUDIT_FILE = AUDIT_DIR / "tool-usage.jsonl"
+    ERROR_LOG = AUDIT_DIR / "errors.log"
+    MARKERS_DIR = PROJECT_ROOT / ".aid" / "markers"
+    REFLECTION_MARKER = MARKERS_DIR / "reflection-ran.marker"
+
+
+def is_aid_root(d):
+    """
+    AC-27: a directory is an AID project root only if its .aid/ holds state.json or
+    hooks/config.json, and that .aid/ is not the user-level AID_HOME (default ~/.aid).
+    A stray .aid/ holding only audit/ or qa/ does not make a project an AID project.
+    """
+    aid = Path(d) / ".aid"
+    if not ((aid / "state.json").is_file() or (aid / "hooks" / "config.json").is_file()):
+        return False
+    # A home directory is never an AID project: its .aid/ is the user-level session dir.
+    # Check AID_HOME, $HOME/$USERPROFILE AND the account's real profile, because a moved
+    # AID_HOME or a faked HOME would otherwise turn the real ~ into a gated "project" and
+    # let SessionStart rewrite ~/.claude/settings.json (review T1-fix1 MAJOR).
+    user_aids = [os.environ.get("AID_HOME") or str(Path.home() / ".aid")]
+    user_aids += [os.path.join(h, ".aid") for h in (str(Path.home()), _account_home()) if h]
+    key = path_key(os.path.realpath(str(aid)))
+    return all(key != path_key(os.path.realpath(u)) for u in user_aids)
+
+
+def _account_home():
+    """The logged-in account's profile dir, ignoring HOME/USERPROFILE overrides."""
+    try:
+        if os.name == "nt":
+            import ctypes
+            import uuid
+            guid = (ctypes.c_byte * 16).from_buffer_copy(
+                uuid.UUID("{5E6C858F-0E22-4760-9AFE-EA3317B67173}").bytes_le)   # FOLDERID_Profile
+            buf = ctypes.c_wchar_p()
+            if ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(guid), 0, None, ctypes.byref(buf)):
+                return None
+            try:
+                return buf.value
+            finally:
+                ctypes.windll.ole32.CoTaskMemFree(buf)
+        import pwd
+        return pwd.getpwuid(os.getuid()).pw_dir
+    except Exception:
+        return None
+
+
+def resolve_project_root(input_data):
+    """
+    The AID project this call belongs to (audit MAJOR 4: a session that cd'ed into a
+    subfolder must still be gated). $CLAUDE_PROJECT_DIR when it is an AID root, else the
+    nearest AID-root ancestor of the call's cwd, else the cwd itself (AID not in use).
+    """
+    env_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+    if env_dir and is_aid_root(env_dir):
+        return Path(env_dir)
+    cwd = input_data.get("cwd") if isinstance(input_data, dict) else None
+    start = Path(cwd) if isinstance(cwd, str) and cwd else Path.cwd()
+    for d in [start] + list(start.parents):
+        if is_aid_root(d):
+            return d
+    return start
+
+
+set_project_root(Path.cwd())
 
 DEFAULT_ENFORCEMENT = {
     "phase_gate_write": "log",
@@ -48,17 +116,19 @@ DEFAULT_PHASE_RULES = {
     "code_write_min_phase": 4,
     "code_execute_min_phase": 4,
     "allowed_write_prefixes": ["docs/", ".aid/", ".claude/", "features/", "testing/", "tests/"],
-    "allowed_bash_commands_all_phases": [
-        "git", "ls", "cat", "head", "tail", "find", "grep", "rg",
-        "npm install", "pip install", "echo", "pwd", "date", "wc",
-        "mkdir", "cp", "mv", "touch", "dir", "type", "where",
-    ],
-    "blocked_bash_patterns_pre_phase4": [
-        "npm run", "npm start", "npm test", "node ", "python ",
-        "python3 ", "npx ", "tsx ", "ts-node ", "jest ", "vitest ",
-        "playwright ", "cucumber",
-    ],
+    # Bash before Phase 4 (block mode) is a small READ-ONLY allow-list (aid_guard._pre4:
+    # aid_guard.READ_ONLY, GIT_OPTIONS, mkdir, cd-to-root, --version). Package installs
+    # run code and are NOT on it. The human adds exact commands here, e.g.
+    # ["make lint", "npm ci"] (first word = command, rest = leading arguments).
+    "extra_allowed_commands": [],
 }
+
+# The two PreToolUse gates. They fail CLOSED in block mode (see fail_closed()).
+GATES = ("phase_gate_write", "phase_gate_bash")
+
+
+class GateInputError(Exception):
+    """State, config or hook input a gate cannot trust. Fails closed in block mode."""
 
 # ---------------------------------------------------------------------------
 # Utility: File I/O helpers
@@ -87,19 +157,42 @@ def load_context():
 
 def load_hooks_config():
     """Load .aid/hooks/config.json with defaults."""
-    config = load_json(HOOKS_CONFIG_FILE) or {}
+    config = load_json(HOOKS_CONFIG_FILE)
+    if config is None and not HOOKS_CONFIG_FILE.exists():
+        config = {}
+    malformed = not (
+        isinstance(config, dict)
+        and isinstance(config.get("enforcement", {}), dict)
+        and isinstance(config.get("phase_gate_rules", {}), dict))
     enforcement = dict(DEFAULT_ENFORCEMENT)
-    enforcement.update(config.get("enforcement", {}))
     rules = dict(DEFAULT_PHASE_RULES)
-    rules.update(config.get("phase_gate_rules", {}))
+    if malformed:
+        # A config exists but cannot be read: the author meant to configure enforcement,
+        # so the gates fail closed instead of silently dropping to the "log" default.
+        log_error("Malformed {}: phase gates forced to block".format(HOOKS_CONFIG_FILE))
+        for gate in GATES:
+            enforcement[gate] = "block"
+    else:
+        enforcement.update(config.get("enforcement", {}))
+        rules.update(config.get("phase_gate_rules", {}))
+    for key in ("code_write_min_phase", "code_execute_min_phase"):
+        try:
+            rules[key] = int(rules[key])
+        except (TypeError, ValueError):
+            log_error("{} {!r} is not an integer: using 4".format(key, rules[key]))
+            rules[key] = 4
     return {"enforcement": enforcement, "phase_gate_rules": rules}
 
 
 def get_enforcement_level(config, hook_name):
-    """Get severity level for a hook: 'log', 'warn', or 'block'."""
-    level = config["enforcement"].get(hook_name, "log")
+    """Get severity level for a hook: 'log', 'warn', or 'block' (case-insensitive).
+
+    An unknown value fails closed ('block') for the PreToolUse gates and open ('log')
+    for every other hook.
+    """
+    level = str(config["enforcement"].get(hook_name, "log")).strip().lower()
     if level not in ("log", "warn", "block"):
-        return "log"
+        return "block" if hook_name in GATES else "log"
     return level
 
 
@@ -112,7 +205,9 @@ def now_iso():
 # ---------------------------------------------------------------------------
 
 def audit_log_entry(entry):
-    """Append a JSONL entry to the audit log."""
+    """Append a JSONL entry to the audit log (never in a non-AID project: AC-27)."""
+    if not aid_in_use():
+        return
     try:
         AUDIT_DIR.mkdir(parents=True, exist_ok=True)
         entry["timestamp"] = now_iso()
@@ -123,7 +218,9 @@ def audit_log_entry(entry):
 
 
 def log_error(msg):
-    """Log an error for debugging."""
+    """Log an error for debugging (never in a non-AID project: AC-27)."""
+    if not aid_in_use():
+        return
     try:
         AUDIT_DIR.mkdir(parents=True, exist_ok=True)
         with open(ERROR_LOG, "a", encoding="utf-8") as f:
@@ -154,9 +251,15 @@ def normalize_path(file_path):
         rel = p.relative_to(root)
         return str(rel).replace("\\", "/")
     except (ValueError, OSError):
-        # Path is not under project root or can't be resolved --
-        # return as-is with forward slashes
-        return file_path.replace("\\", "/")
+        # Not under the project root (or unresolvable): return the RESOLVED absolute path.
+        # Returning the raw input let "docs/../../elsewhere/x.ts" match the "docs/" prefix.
+        return os.path.realpath(file_path).replace("\\", "/")
+
+
+def path_key(path_str):
+    """Comparison form of a path: forward slashes, case-folded where the OS is case-insensitive."""
+    return os.path.normcase(path_str).replace("\\", "/")
+
 
 # ---------------------------------------------------------------------------
 # Utility: Marker files
@@ -164,6 +267,8 @@ def normalize_path(file_path):
 
 def write_marker(name):
     """Write a marker file with a timestamp."""
+    if not aid_in_use():
+        return
     try:
         MARKERS_DIR.mkdir(parents=True, exist_ok=True)
         marker = MARKERS_DIR / name
@@ -284,6 +389,37 @@ def handle_session_start(input_data, config):
     """
     clear_markers()
 
+    # Layer A then layer B (order matters: the baseline must include the deny rules).
+    notes = []
+    if aid_in_use():
+        if STATE_FILE.exists():
+            added, err = aid_guard.ensure_permissions(PROJECT_ROOT)
+            if added:
+                notes.append("AID added {} permission deny rules to .claude/settings.json "
+                             "protecting its gate configuration.".format(added))
+            if err:
+                notes.append("WARNING: AID could not install its permission deny rules: " + err)
+        off = aid_guard.hooks_disabled(PROJECT_ROOT)
+        if off:
+            notes.append("WARNING: {} -- this switches AID's enforcement off once Claude Code "
+                         "applies it. Remove it unless the user set it on purpose.".format(off))
+        if input_data.get("source") != "compact":   # compact keeps the session's baseline
+            aid_guard.write_baseline(PROJECT_ROOT, input_data.get("session_id"), gate_levels(config),
+                                     session_start=True)
+            weaker = aid_guard.weakened_since_last_session(PROJECT_ROOT, gate_levels(config))
+            if weaker:
+                notes.append("WARNING: AID enforcement is weaker than in the last session: {}. "
+                             "If the user did not make this change, restore "
+                             ".aid/hooks/config.json.".format("; ".join(weaker)))
+        env_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+        if env_dir and path_key(os.path.realpath(env_dir)) != path_key(os.path.realpath(str(PROJECT_ROOT))):
+            notes.append("WARNING: Claude Code was started in {} but the AID project is {}; AID's "
+                         "permission rules only apply when Claude Code is started in the AID "
+                         "project folder.".format(env_dir, PROJECT_ROOT))
+
+    def say(text):
+        output_allow("\n".join(notes + [text]))
+
     state = load_state()
     context = load_context()
 
@@ -295,7 +431,7 @@ def handle_session_start(input_data, config):
     })
 
     if not state:
-        output_allow(
+        say(
             "NOTE: No AID state found (.aid/state.json missing). "
             "Run /aid-start to initialize your AID session with role and phase selection."
         )
@@ -303,7 +439,7 @@ def handle_session_start(input_data, config):
 
     session = state.get("current_session", {})
     if not session.get("active"):
-        output_allow(
+        say(
             "NOTE: No active AID session. Run /aid-start to select your role and phase."
         )
         return
@@ -371,7 +507,7 @@ def handle_session_start(input_data, config):
                 pipeline_state.get("pipeline_status")))
 
     lines.append("=== END AID CONTEXT ===")
-    output_allow("\n".join(lines))
+    say("\n".join(lines))
 
 
 # ---------------------------------------------------------------------------
@@ -419,71 +555,130 @@ def handle_user_prompt_submit(input_data, config):
 
 
 # ---------------------------------------------------------------------------
-# Handler: PreToolUse (Write|Edit) -> Phase Gate for Code Writes
+# Phase-gate helpers: state, fail-closed, shell command parsing
+# ---------------------------------------------------------------------------
+
+def load_gate_state(config):
+    """
+    Return (state, phase) for the PreToolUse gates.
+
+    - state.json unreadable / not an object / non-integer phase -> GateInputError
+      (fails closed in block mode).
+    - No state.json, or current_phase null: phase None (gates only protect control files)
+      -- unless a gate is configured to block, then phase 0: deleting or blanking
+      state.json must not switch the gates off (design review MAJOR 3).
+    """
+    state = load_state()
+    blocking = any(get_enforcement_level(config, g) == "block" for g in GATES)
+    if state is None:
+        if STATE_FILE.exists():
+            raise GateInputError("{} exists but is not valid JSON".format(STATE_FILE))
+        return None, (0 if blocking else None)
+    if not isinstance(state, dict):
+        raise GateInputError("{} is not a JSON object".format(STATE_FILE))
+    phase = state.get("current_phase")
+    if phase is None:
+        return state, (0 if blocking else None)
+    try:
+        return state, int(str(phase).strip())
+    except (ValueError, TypeError):
+        raise GateInputError("current_phase {!r} is not an integer".format(phase))
+
+
+ACTION = None  # set by main(); read by fail_closed()
+
+
+def fail_closed(reason):
+    """
+    A PreToolUse gate could not evaluate the call. In block mode deny it (fail CLOSED);
+    in log/warn mode, and for every other hook, log the error and allow.
+    """
+    log_error(reason)
+    if EVENT == "PreToolUse" and ACTION in GATES:
+        try:
+            level = get_enforcement_level(load_hooks_config(), ACTION)
+        except Exception:  # config unreadable while failing: stay closed
+            level = "block"
+        if level == "block":
+            output_deny("🚫 AID ENFORCEMENT BLOCK: the phase gate could not evaluate "
+                        "this call ({}), so it is denied.".format(reason))
+    sys.exit(0)
+
+
+# ---------------------------------------------------------------------------
+# Gate plumbing shared by both PreToolUse gates (decision logic lives in aid_guard.py)
+# ---------------------------------------------------------------------------
+
+def gate_levels(config):
+    return {g: get_enforcement_level(config, g) for g in GATES}
+
+
+def gate_cwd(input_data):
+    """The directory the tool call runs in (Bash cwd persists between calls)."""
+    cwd = input_data.get("cwd")
+    return cwd if isinstance(cwd, str) and cwd else str(PROJECT_ROOT)
+
+
+def check_integrity_or_deny(input_data, config, hook_name, phase):
+    """Layer B: deny (per the BASELINE's level) when the gate config or deny rules changed."""
+    reason, base_levels = aid_guard.check_integrity(
+        PROJECT_ROOT, input_data.get("session_id"), gate_levels(config))
+    if reason:
+        level = base_levels.get(hook_name, get_enforcement_level(config, hook_name))
+        enforce(level, reason, {"event": "PreToolUse", "hook": hook_name, "integrity": True,
+                                "phase": phase, "violation": True})
+
+
+def aid_in_use():
+    return is_aid_root(PROJECT_ROOT)
+
+
+# Phase 4+ deny footer, shared by both gates: only control files are refused then.
+CONTROL_FILE_HINT = ("AID control files are protected in every phase; edit them only if the "
+                     "user asks, and let the user make the change.")
+
+
+# ---------------------------------------------------------------------------
+# Handler: PreToolUse (Write|Edit|MultiEdit|NotebookEdit) -> Phase Gate for Code Writes
 # ---------------------------------------------------------------------------
 
 def handle_phase_gate_write(input_data, config):
     """
-    Block source code writes in phases before code_write_min_phase.
-    Allow writes to docs/, .aid/, .claude/, features/, testing/.
+    Refuse writes to AID control files in every phase, and source writes before
+    code_write_min_phase. Allowed before then: docs/, .aid/, .claude/, features/,
+    testing/, tests/ and Claude Code's own plan files. Rules: aid_guard.write_target_verdict.
     """
-    state = load_state()
-    if not state:
-        output_allow()  # AID not initialized -- don't block
+    if not aid_in_use():
+        output_allow()  # AID not used in this project -- stay out of the way
         return
+    state, phase = load_gate_state(config)
+    check_integrity_or_deny(input_data, config, "phase_gate_write", phase)
 
-    phase = state.get("current_phase")
-    if phase is None:
+    tool_input = input_data["tool_input"]
+    file_path = tool_input.get("file_path") or tool_input.get("notebook_path") or ""
+    if not isinstance(file_path, str):
+        raise GateInputError("file_path is not a string")
+    reason = aid_guard.write_target_verdict(
+        file_path, gate_cwd(input_data), PROJECT_ROOT, phase, config["phase_gate_rules"], literal=True)
+    if not reason:
         output_allow()
         return
 
-    # Coerce to int (state.json may store as string)
-    try:
-        phase = int(phase)
-    except (ValueError, TypeError):
-        output_allow()
-        return
-
-    rules = config["phase_gate_rules"]
-    min_phase = rules.get("code_write_min_phase", 4)
-
-    if phase >= min_phase:
-        output_allow()  # In coding phase -- allow everything
-        return
-
-    # Phase < min_phase -- check if this is an allowed path
-    file_path = input_data.get("tool_input", {}).get("file_path", "")
-    rel_path = normalize_path(file_path)
-
-    allowed_prefixes = rules.get("allowed_write_prefixes", [])
-    for prefix in allowed_prefixes:
-        if rel_path.startswith(prefix):
-            output_allow()  # Writing to allowed path
-            return
-
-    # Also allow the plan file (Claude Code creates these in ~/.claude/plans/)
-    if ".claude/plans/" in file_path.replace("\\", "/"):
-        output_allow()
-        return
-
-    # VIOLATION: writing source code in a pre-coding phase
-    level = get_enforcement_level(config, "phase_gate_write")
+    min_phase = config["phase_gate_rules"].get("code_write_min_phase", 4)
     tool_name = input_data.get("tool_name", "Write")
-    message = (
-        "Phase gate violation. Cannot {} '{}' in "
-        "Phase {} ({}). "
-        "Source code changes require Phase {} (Development). "
-        "Allowed paths: {}. "
-        "Use /gate-check to verify readiness, then /phase-advance.".format(
-            tool_name.lower(), rel_path,
-            phase, state.get("phase_name", "?"),
-            min_phase, ", ".join(allowed_prefixes)))
-
-    enforce(level, message, {
+    if phase is not None and phase < min_phase:
+        message = (
+            "Phase gate: cannot {} — {}. Phase {} ({}); source changes need Phase {} "
+            "(Development). Use /gate-check, then /phase-advance.".format(
+                tool_name.lower(), reason, phase, (state or {}).get("phase_name", "?"), min_phase))
+    else:
+        # Phase 4+: only control files are refused; advancing a phase cannot help.
+        message = "Phase gate: cannot {} — {}. {}".format(tool_name.lower(), reason, CONTROL_FILE_HINT)
+    enforce(get_enforcement_level(config, "phase_gate_write"), message, {
         "event": "PreToolUse",
         "hook": "phase_gate_write",
         "tool": tool_name,
-        "file": rel_path,
+        "file": file_path[:300],
         "phase": phase,
         "violation": True,
     })
@@ -495,87 +690,54 @@ def handle_phase_gate_write(input_data, config):
 
 def handle_phase_gate_bash(input_data, config):
     """
-    Block code execution commands in phases before code_execute_min_phase.
-    Always allow read-only commands (git, ls, etc.) and package installation.
-
-    Edge cases:
-    - Piped commands: "cat file.ts | node" -> caught by "node " pattern
-    - Chained commands: "echo hi && npm run dev" -> caught by "npm run" pattern
-    - Quoted args: 'python "script.py"' -> caught by "python " pattern
-    - Empty command: "" -> allowed (no-op)
+    Before code_execute_min_phase (block mode), the command must be a flat list of
+    read-only commands (aid_guard.evaluate_bash); anything else is denied. From then on
+    only a best-effort literal control-file check runs (layers A and B are the real
+    protection). The human extends the pre-Phase-4 list with
+    phase_gate_rules.extra_allowed_commands in .aid/hooks/config.json (a protected file).
     """
-    state = load_state()
-    if not state:
+    if not aid_in_use():
         output_allow()
         return
+    state, phase = load_gate_state(config)
+    check_integrity_or_deny(input_data, config, "phase_gate_bash", phase)
 
-    phase = state.get("current_phase")
-    try:
-        phase = int(phase)
-    except (ValueError, TypeError):
-        output_allow()
-        return
-
-    rules = config["phase_gate_rules"]
-    min_phase = rules.get("code_execute_min_phase", 4)
-
-    if phase >= min_phase:
-        output_allow()
-        return
-
-    command = input_data.get("tool_input", {}).get("command", "")
+    command = input_data["tool_input"].get("command") or ""
+    if not isinstance(command, str):
+        raise GateInputError("command is not a string")
     if not command.strip():
         output_allow()
         return
 
-    # Normalize: lowercase for matching, strip leading whitespace
-    cmd_lower = command.strip().lower()
-
-    # AID's own session writer must run in every phase (it is how /aid-start works).
-    if "aid_session.py" in cmd_lower:
+    rules = config["phase_gate_rules"]
+    extra = [str(e).split() for e in rules.get("extra_allowed_commands", []) if str(e).strip()]
+    reason = aid_guard.evaluate_bash(command, gate_cwd(input_data), str(PROJECT_ROOT), phase,
+                                     rules, extra)
+    if not reason:
         output_allow()
         return
 
-    # Check allowed commands first (fail-open pattern)
-    allowed = rules.get("allowed_bash_commands_all_phases", [])
-    for allowed_cmd in allowed:
-        # Match if command starts with allowed command
-        # e.g., "git status" starts with "git"
-        if cmd_lower.startswith(allowed_cmd.lower()):
-            output_allow()
-            return
-
-    # Check blocked patterns (substring match catches piped/chained commands)
-    blocked = rules.get("blocked_bash_patterns_pre_phase4", [])
-    for pattern in blocked:
-        if pattern.lower() in cmd_lower:
-            # VIOLATION: executing code in a pre-coding phase
-            level = get_enforcement_level(config, "phase_gate_bash")
-            # Truncate command for display (may be very long)
-            cmd_display = command[:100] + ("..." if len(command) > 100 else "")
-            message = (
-                "Phase gate violation. Cannot execute '{}' in "
-                "Phase {} ({}). "
-                "Code execution requires Phase {} (Development). "
-                "Allowed: {}... "
-                "Use /gate-check to verify readiness.".format(
-                    cmd_display,
-                    phase, state.get("phase_name", "?"),
-                    min_phase,
-                    ", ".join(allowed[:8])))
-
-            enforce(level, message, {
-                "event": "PreToolUse",
-                "hook": "phase_gate_bash",
-                "command": command[:200],
-                "blocked_pattern": pattern,
-                "phase": phase,
-                "violation": True,
-            })
-            return  # enforce() calls sys.exit, but being explicit
-
-    # Unrecognized command -- fail-open (allow)
-    output_allow()
+    min_phase = rules.get("code_execute_min_phase", 4)
+    cmd_display = command[:100] + ("..." if len(command) > 100 else "")
+    if phase is not None and phase < min_phase:
+        message = (
+            "Phase gate: '{}' — {}. Phase {} ({}); running code needs Phase {} (Development). "
+            "Until then Bash runs only read-only commands (ls, cat, grep, git status/log/diff/"
+            "add/commit, mkdir in docs/...). To create or change files use the Write tool. "
+            "When this phase's work is done, use /gate-check, then /phase-advance. If the "
+            "project needs a specific command earlier, ask the user to add it to "
+            "phase_gate_rules.extra_allowed_commands in .aid/hooks/config.json.".format(
+                cmd_display, reason, phase, (state or {}).get("phase_name", "?"), min_phase))
+    else:
+        message = "Phase gate: '{}' — {}. {}".format(cmd_display, reason, CONTROL_FILE_HINT)
+    enforce(get_enforcement_level(config, "phase_gate_bash"), message, {
+        "event": "PreToolUse",
+        "hook": "phase_gate_bash",
+        "command": command[:200],
+        "reason": reason[:200],
+        "phase": phase,
+        "violation": True,
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -704,14 +866,18 @@ def main():
     args = parser.parse_args()
 
     # Every hookSpecificOutput payload must name its event or Claude Code drops it.
-    global EVENT
+    global EVENT, ACTION
     EVENT = args.event
+    ACTION = args.action
 
     # Read stdin (hook input data)
     try:
         input_data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
         input_data = {}
+    if not isinstance(input_data, dict):
+        input_data = {}
+    set_project_root(resolve_project_root(input_data))
 
     # Load config
     config = load_hooks_config()
@@ -754,7 +920,6 @@ if __name__ == "__main__":
     except SystemExit:
         raise  # Let sys.exit() through
     except Exception as e:
-        # Catch-all: never crash -- log and allow. Allowing is silence + exit 0; a hook
-        # that fails must not become a hook that blocks the user's work.
-        log_error("Unhandled exception: {}: {}".format(type(e).__name__, e))
-        sys.exit(0)
+        # Catch-all: never crash. A phase gate in block mode fails CLOSED (deny with the
+        # reason); every other hook, and the gates in log/warn mode, log and allow.
+        fail_closed("{}: {}".format(type(e).__name__, e))
