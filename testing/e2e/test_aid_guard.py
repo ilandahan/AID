@@ -891,6 +891,24 @@ def test_ac_35_write_tool_path_forms(world, monkeypatch):
     assert write(world, baseline, phase=5)[0] == 'DENY', baseline
 
 
+@pytest.mark.parametrize('is_win', [False, True])
+def test_f3_protected_set_ignores_case_on_every_os(monkeypatch, is_win):
+    """
+    WHY (F3): the protected-path check folded case only on Windows. macOS file systems are
+    case-insensitive by default, so a Phase 5 Write to `.CLAUDE/SETTINGS.JSON` reached the
+    real control file there. IS_WIN=False forces the POSIX comparison on every CI runner.
+    """
+    monkeypatch.setattr(g, 'IS_WIN', is_win)
+    for p in ('/u/p/.CLAUDE/SETTINGS.JSON', '/u/p/.Claude/Settings.Local.Json',
+              '/u/p/.AID/HOOKS/config.json', '/u/p/.aid/pipeline/escalation.json',
+              '/u/p/.CLAUDE/Hooks/x.sh', '/u/p/.Claude/PLUGINS/Cache/x.js'):
+        assert g.is_protected(p), p
+    for p in ('/u/p/.CLAUDE', '/u/p/.AID/Pipeline', '/u/p/.Claude/Plugins'):
+        assert g.is_protected_or_parent(p), p
+    for p in ('/u/p/docs/settings.json', '/u/p/.claude/plans/x.md', '/u/p/.aid/state.json'):
+        assert not g.is_protected(p), p
+
+
 def test_ac_35_trailing_dot_or_space_denied_if_either_form_is_refused(world):
     """AC-35 corrected (§7): Windows drops a trailing dot/space, Node does not (it creates a
     real root-level 'docs ' directory). Deny if EITHER the stripped or the raw form is refused."""

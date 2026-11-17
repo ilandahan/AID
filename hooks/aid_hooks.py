@@ -89,16 +89,36 @@ def resolve_project_root(input_data):
     The AID project this call belongs to (audit MAJOR 4: a session that cd'ed into a
     subfolder must still be gated). $CLAUDE_PROJECT_DIR when it is an AID root, else the
     nearest AID-root ancestor of the call's cwd, else the cwd itself (AID not in use).
+
+    AC-43 session latch (the ONE place it lives): an ancestor that is not an AID root but
+    holds this session's layer-B baseline written by SessionStart
+    (aid_guard.integrity_dir(d)/<session_id>.json with session_start) was the AID root when
+    the session began and lost its markers (.aid renamed or deleted mid-session). A
+    first-use baseline layer B wrote for a root the session only visited does not latch. It is still this session's root; LATCHED tells layer B to refuse.
+    The latch is checked first, over $CLAUDE_PROJECT_DIR and every cwd ancestor, so
+    neither a cwd outside the root nor a fresh nearer .aid can step around it.
     """
+    global LATCHED
+    LATCHED = False
     env_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+    data = input_data if isinstance(input_data, dict) else {}
+    cwd, sid = data.get("cwd"), data.get("session_id")
+    start = Path(cwd) if isinstance(cwd, str) and cwd else Path.cwd()
+    walk = [start] + list(start.parents)
+    if isinstance(sid, str) and aid_guard._SESSION_ID.fullmatch(sid):
+        for d in ([Path(env_dir)] if env_dir else []) + walk:
+            if aid_guard.started_at(d, sid) and not is_aid_root(d):
+                LATCHED = True
+                return d
     if env_dir and is_aid_root(env_dir):
         return Path(env_dir)
-    cwd = input_data.get("cwd") if isinstance(input_data, dict) else None
-    start = Path(cwd) if isinstance(cwd, str) and cwd else Path.cwd()
-    for d in [start] + list(start.parents):
+    for d in walk:
         if is_aid_root(d):
             return d
     return start
+
+
+LATCHED = False   # set by resolve_project_root: root lost its AID markers mid-session
 
 
 set_project_root(Path.cwd())
@@ -205,8 +225,9 @@ def now_iso():
 # ---------------------------------------------------------------------------
 
 def audit_log_entry(entry):
-    """Append a JSONL entry to the audit log (never in a non-AID project: AC-27)."""
-    if not aid_in_use():
+    """Append a JSONL entry to the audit log (never in a non-AID project: AC-27).
+    A latched root (AC-43) still logs while its .aid/audit exists, but never recreates it."""
+    if not aid_in_use() and not (LATCHED and AUDIT_DIR.is_dir()):
         return
     try:
         AUDIT_DIR.mkdir(parents=True, exist_ok=True)
@@ -387,18 +408,25 @@ def handle_session_start(input_data, config):
     Inject current AID phase/role/skills/task into Claude's context.
     Also clears stale marker files from previous sessions.
     """
-    clear_markers()
-
     # Layer A then layer B (order matters: the baseline must include the deny rules).
+    # Nothing at all is touched outside an AID project (AC-27ext): markers included.
+    global LATCHED
     notes = []
+    if (LATCHED and input_data.get("source") in aid_guard.LATCH_RELEASE_SOURCES
+            and aid_guard.release_latch(PROJECT_ROOT, input_data.get("session_id"))):
+        LATCHED = False     # now a plain non-AID project: AC-27 applies from here on
+        notes.append("NOTE: AID's markers (.aid/state.json, .aid/hooks/config.json) are gone "
+                     "from {} since this session last ran, so AID no longer gates it. If the "
+                     "user did not remove AID on purpose, restore the .aid folder."
+                     .format(PROJECT_ROOT))
     if aid_in_use():
-        if STATE_FILE.exists():
-            added, err = aid_guard.ensure_permissions(PROJECT_ROOT)
-            if added:
-                notes.append("AID added {} permission deny rules to .claude/settings.json "
-                             "protecting its gate configuration.".format(added))
-            if err:
-                notes.append("WARNING: AID could not install its permission deny rules: " + err)
+        clear_markers()
+        added, err = aid_guard.ensure_permissions(PROJECT_ROOT)   # AC-38ext: config-only roots too
+        if added:
+            notes.append("AID added {} permission deny rules to .claude/settings.json "
+                         "protecting its gate configuration.".format(added))
+        if err:
+            notes.append("WARNING: AID could not install its permission deny rules: " + err)
         off = aid_guard.hooks_disabled(PROJECT_ROOT)
         if off:
             notes.append("WARNING: {} -- this switches AID's enforcement off once Claude Code "
@@ -622,7 +650,7 @@ def gate_cwd(input_data):
 def check_integrity_or_deny(input_data, config, hook_name, phase):
     """Layer B: deny (per the BASELINE's level) when the gate config or deny rules changed."""
     reason, base_levels = aid_guard.check_integrity(
-        PROJECT_ROOT, input_data.get("session_id"), gate_levels(config))
+        PROJECT_ROOT, input_data.get("session_id"), gate_levels(config), markers_missing=LATCHED)
     if reason:
         level = base_levels.get(hook_name, get_enforcement_level(config, hook_name))
         enforce(level, reason, {"event": "PreToolUse", "hook": hook_name, "integrity": True,
@@ -648,11 +676,12 @@ def handle_phase_gate_write(input_data, config):
     code_write_min_phase. Allowed before then: docs/, .aid/, .claude/, features/,
     testing/, tests/ and Claude Code's own plan files. Rules: aid_guard.write_target_verdict.
     """
-    if not aid_in_use():
+    if not aid_in_use() and not LATCHED:
         output_allow()  # AID not used in this project -- stay out of the way
         return
+    # INV-3: layer B before the state is read, so a broken state.json cannot skip it.
+    check_integrity_or_deny(input_data, config, "phase_gate_write", None)
     state, phase = load_gate_state(config)
-    check_integrity_or_deny(input_data, config, "phase_gate_write", phase)
 
     tool_input = input_data["tool_input"]
     file_path = tool_input.get("file_path") or tool_input.get("notebook_path") or ""
@@ -696,11 +725,12 @@ def handle_phase_gate_bash(input_data, config):
     protection). The human extends the pre-Phase-4 list with
     phase_gate_rules.extra_allowed_commands in .aid/hooks/config.json (a protected file).
     """
-    if not aid_in_use():
+    if not aid_in_use() and not LATCHED:
         output_allow()
         return
+    # INV-3: layer B before the state is read, so a broken state.json cannot skip it.
+    check_integrity_or_deny(input_data, config, "phase_gate_bash", None)
     state, phase = load_gate_state(config)
-    check_integrity_or_deny(input_data, config, "phase_gate_bash", phase)
 
     command = input_data["tool_input"].get("command") or ""
     if not isinstance(command, str):

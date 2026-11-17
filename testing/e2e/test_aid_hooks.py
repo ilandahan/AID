@@ -479,9 +479,11 @@ import aid_guard  # noqa: E402
 BLOCK_CFG = {'enforcement': {'phase_gate_write': 'block', 'phase_gate_bash': 'block'}}
 
 
-def spawn(cwd, event, action, home, payload=None, raw=None):
+def spawn(cwd, event, action, home, payload=None, raw=None, project_dir=None):
     env = dict(os.environ, HOME=str(home), USERPROFILE=str(home), AID_HOME=str(Path(home) / '.aid'))
     env.pop('CLAUDE_PROJECT_DIR', None)
+    if project_dir:
+        env['CLAUDE_PROJECT_DIR'] = str(project_dir)
     env.pop('CLAUDE_CONFIG_DIR', None)
     args = [sys.executable, HOOK, '--event', event] + (['--action', action] if action else [])
     p = subprocess.run(args, input=raw if raw is not None else json.dumps(payload), capture_output=True,
@@ -774,3 +776,297 @@ def test_ac_48_deny_message_gives_a_way_forward(acp):
     for part in ('Write tool', '/gate-check', '/phase-advance', 'extra_allowed_commands'):
         assert part in v[1], (part, v[1])
     assert 'package installs are allowed' not in v[1]
+
+
+# ===========================================================================
+# T1b (T1-acceptance.md section 7): AC-27ext, AC-38ext, AC-43 latch, AC-44 encoding,
+# plus T1a follow-ups F1 (~user Write paths) and F2 (mkdir options).
+# ===========================================================================
+
+@pytest.mark.parametrize('where', ['project', 'home'])
+def test_ac_27ext_session_start_in_non_aid_project_keeps_markers(clean_tmp, where):
+    """
+    WHY: SessionStart cleared .aid/markers before checking that AID is in use, so it
+    deleted files in projects (and the home dir) that never opted into AID (AC-27ext).
+    """
+    D = clean_tmp / 'D'
+    (D / '.aid' / 'hooks').mkdir(parents=True)
+    (D / '.aid' / 'state.json').write_text('{"current_phase":1}', encoding='utf-8')
+    (D / '.aid' / 'hooks' / 'config.json').write_text(json.dumps(BLOCK_CFG), encoding='utf-8')
+    Q = D / 'q' if where == 'project' else D        # home: its .aid is AID_HOME, not a root
+    marker = Q / '.aid' / 'markers' / 'x.marker'
+    marker.parent.mkdir(parents=True)
+    marker.write_bytes(b'keep me')
+    spawn(Q, 'SessionStart', None, D, {'session_id': 's1', 'source': 'startup', 'cwd': str(Q)})
+    assert marker.read_bytes() == b'keep me'
+    assert sorted(p.name for p in marker.parent.iterdir()) == ['x.marker']
+    assert not (Q / '.claude').exists()
+
+
+def test_ac_38ext_config_only_root_gets_deny_rules(acp):
+    """WHY: layer A was installed only when state.json existed, so a project configured
+    with just .aid/hooks/config.json had no permission deny rules (AC-38ext)."""
+    (acp.P / '.aid' / 'state.json').unlink()
+    acp.start('s1')
+    data = json.loads((acp.P / '.claude' / 'settings.json').read_text(encoding='utf-8'))
+    assert all(r in data['permissions']['deny'] for r in aid_guard.DENY_RULES), data
+
+
+def _latched(acp, level):
+    acp.level(level)
+    acp.state(5)
+    acp.start('s1')
+    assert acp.bash('ls') == ('ALLOW', None)
+    (acp.P / '.aid').rename(acp.P / '.aid-off')        # what Phase 4+ Bash can do
+
+
+def test_ac_43_latch_denies_after_aid_markers_disappear(acp):
+    """
+    WHY: renaming .aid mid-session made the project "non-AID", so every gate stepped
+    aside (in-scope bypass: a mid-session change the next call does not deny).
+    """
+    _latched(acp, 'block')
+    v = acp.bash('ls')
+    assert v[0] == 'DENY' and 'disappeared mid-session' in v[1], v
+    v = acp.write(str(acp.P / 'docs' / 'a.md'))
+    assert v[0] == 'DENY' and 'disappeared mid-session' in v[1], v
+    assert not (acp.P / '.aid').exists()                # the denial wrote nothing into P
+    # AC-27 still holds: a session with no baseline here is a non-AID session.
+    assert acp.bash('ls', sid='s2') == ('ALLOW', None)
+    (acp.P / '.aid-off').rename(acp.P / '.aid')
+    assert acp.bash('ls') == ('ALLOW', None)
+    assert acp.write(str(acp.P / 'docs' / 'a.md')) == ('ALLOW', None)
+
+
+def test_ac_43_latch_warn_baseline_warns(acp):
+    _latched(acp, 'warn')
+    for v in (acp.bash('ls'), acp.write(str(acp.P / 'docs' / 'a.md'))):
+        assert v[0] == 'ALLOW' and 'AID ENFORCEMENT WARNING' in v[1] and 'disappeared' in v[1], v
+
+
+def test_ac_43_latch_log_baseline_allows_and_skips_missing_audit(acp):
+    _latched(acp, 'log')
+    assert acp.bash('ls') == ('ALLOW', None)
+    assert acp.write(str(acp.P / 'docs' / 'a.md')) == ('ALLOW', None)
+    assert not (acp.P / '.aid').exists()                # audit dir gone: skipped, not recreated
+
+
+def test_ac_43_latch_log_baseline_writes_audit_line_when_audit_dir_survives(acp):
+    """
+    WHY (T1b review 3 MAJOR): with only the markers deleted and .aid/audit kept,
+    audit_log_entry bailed on aid_in_use() and the latched root logged nothing, although in
+    log mode that line is the only trace AID was switched off (AC-43 -> AC-40).
+    """
+    _latched(acp, 'log')
+    (acp.P / '.aid' / 'audit').mkdir(parents=True)      # markers gone, audit dir still there
+    assert acp.bash('ls') == ('ALLOW', None)
+    lines = [json.loads(l) for l in (acp.P / '.aid' / 'audit' / 'tool-usage.jsonl')
+             .read_text(encoding='utf-8').splitlines() if l.strip()]
+    assert any(e.get('integrity') is True for e in lines), lines
+
+
+@pytest.mark.parametrize('source', ['resume', 'clear'])
+def test_ac_43_user_session_start_releases_the_latch(acp, source):
+    """
+    WHY (T1b review 3 MAJOR, owner decision (a) 2026-11-17): --resume/--continue keep the
+    session id, so a project the user de-initialised between sittings stayed denied for the
+    rest of the conversation. A SessionStart the user caused ends the latch.
+    """
+    _latched(acp, 'block')
+    assert acp.bash('ls')[0] == 'DENY'
+    note = acp.start('s1', source)
+    assert 'no longer gates it' in note, note
+    assert acp.bash('ls') == ('ALLOW', None)
+    assert acp.write(str(acp.P / 'src' / 'a.ts')) == ('ALLOW', None)
+    assert not (acp.P / '.aid').exists()                # releasing wrote nothing into P (AC-27)
+    # The baseline was kept: AID coming back mid-session is gated again with no false denial.
+    (acp.P / '.aid-off').rename(acp.P / '.aid')
+    assert acp.bash('ls') == ('ALLOW', None)
+    assert acp.bash('node x.js')[0] == 'ALLOW'          # phase 5
+
+
+@pytest.mark.parametrize('source', ['compact', None])
+def test_ac_43_compact_or_unknown_session_start_keeps_the_latch(acp, source):
+    """WHY: Claude Code fires SessionStart(compact) mid-session on its own, so an agent could
+    rename .aid and wait for it; only startup/resume/clear (a user's act) release."""
+    _latched(acp, 'block')
+    acp.start('s1', source)
+    v = acp.bash('ls')
+    assert v[0] == 'DENY' and 'disappeared mid-session' in v[1], v
+
+
+def _call(acp, action, cwd, tool_input, project_dir=None):
+    return decision(spawn(cwd, 'PreToolUse', action, acp.H, {
+        'session_id': 's1', 'cwd': str(cwd), 'tool_name': 'Bash' if action == 'phase_gate_bash' else 'Write',
+        'tool_input': tool_input}, project_dir=project_dir))
+
+
+def test_ac_43_latch_holds_for_claude_project_dir_with_cwd_outside(acp):
+    """
+    WHY (fix round 1 BLOCKER): the latch only covered the cwd walk. With
+    CLAUDE_PROJECT_DIR=P (Claude Code sets it) and a cwd outside P, renaming .aid made the
+    call non-AID and a Write to P/.claude/settings.json was allowed.
+    """
+    S = acp.P.parent / 'sibling'
+    S.mkdir()
+    _latched(acp, 'block')
+    settings = str(acp.P / '.claude' / 'settings.json')
+    v = _call(acp, 'phase_gate_write', S, {'file_path': settings}, project_dir=acp.P)
+    assert v[0] == 'DENY' and 'disappeared mid-session' in v[1], v
+    v = _call(acp, 'phase_gate_bash', S, {'command': 'ls'}, project_dir=acp.P)
+    assert v[0] == 'DENY' and 'disappeared mid-session' in v[1], v
+    (acp.P / '.aid-off').rename(acp.P / '.aid')
+    assert _call(acp, 'phase_gate_bash', S, {'command': 'ls'}, project_dir=acp.P) == ('ALLOW', None)
+
+
+@pytest.mark.parametrize('project_dir', [False, True])
+def test_ac_43_latch_beats_a_fresh_nearer_aid_root(acp, project_dir):
+    """
+    WHY (fix round 1 BLOCKER): after renaming P/.aid, a new P/docs/.aid (log config) was a
+    nearer AID root with no baseline, so it got first-use trust and the latch never ran.
+    """
+    _latched(acp, 'block')
+    (acp.P / 'docs' / '.aid' / 'hooks').mkdir(parents=True)
+    (acp.P / 'docs' / '.aid' / 'hooks' / 'config.json').write_text(
+        json.dumps({'enforcement': {'phase_gate_write': 'log', 'phase_gate_bash': 'log'}}), encoding='utf-8')
+    pd = acp.P if project_dir else None
+    D = acp.P / 'docs'
+    v = _call(acp, 'phase_gate_bash', D, {'command': 'ls'}, pd)
+    assert v[0] == 'DENY' and 'disappeared mid-session' in v[1], v
+    v = _call(acp, 'phase_gate_write', D, {'file_path': str(acp.P / '.claude' / 'settings.local.json')}, pd)
+    assert v[0] == 'DENY', v
+    # A nested AID project whose parent still IS an AID root is used as before (no latch).
+    (acp.P / '.aid-off').rename(acp.P / '.aid')
+    assert _call(acp, 'phase_gate_bash', D, {'command': 'node x.js'}, None) == ('ALLOW', None)
+
+
+def test_ac_43_no_latch_on_a_root_the_session_only_visited(clean_tmp):
+    """
+    WHY (fix round 2 MAJOR): layer B writes a first-use baseline in any AID root the agent
+    visits. The latch fired on that baseline, so after a visited fixture/sub-project lost its
+    .aid legitimately (teardown, de-init), every call there was denied, even `cd` out.
+    Only a root SessionStart recorded for this session may latch (AC-43 step 1).
+    """
+    W, H = clean_tmp / 'W', clean_tmp / 'home'
+    F = W / 'fixtures' / 'F'
+    for d in (W, H, F / '.aid' / 'hooks', F / 'docs'):
+        d.mkdir(parents=True, exist_ok=True)
+    subprocess.run(['git', 'init', '-q', str(W)], check=True, capture_output=True)
+    (F / '.aid' / 'state.json').write_text('{"current_phase":5}', encoding='utf-8')
+    (F / '.aid' / 'hooks' / 'config.json').write_text(json.dumps(BLOCK_CFG), encoding='utf-8')
+    spawn(W, 'SessionStart', None, H, {'session_id': 's1', 'source': 'startup', 'cwd': str(W)}, project_dir=W)
+
+    def call(action, cwd, tool_input):
+        return decision(spawn(cwd, 'PreToolUse', action, H, {
+            'session_id': 's1', 'cwd': str(cwd), 'tool_name': 'Bash' if action == 'phase_gate_bash' else 'Write',
+            'tool_input': tool_input}, project_dir=W))
+
+    assert call('phase_gate_bash', F, {'command': 'ls'}) == ('ALLOW', None)    # F's baseline is written
+    shutil.rmtree(str(F / '.aid'))
+    assert call('phase_gate_bash', F, {'command': 'ls'}) == ('ALLOW', None)
+    assert call('phase_gate_bash', F, {'command': 'cd "{}"'.format(W)}) == ('ALLOW', None)
+    assert call('phase_gate_write', F, {'file_path': str(F / 'x.ts')}) == ('ALLOW', None)
+    assert call('phase_gate_bash', F / 'docs', {'command': 'ls'}) == ('ALLOW', None)
+
+
+@pytest.mark.parametrize('rename', [False, True])
+@pytest.mark.parametrize('bad', ['{bad', '[1]', '{"current_phase":"x"}'])
+def test_inv3_broken_state_does_not_skip_layer_b(acp, rename, bad):
+    """
+    WHY (fix round 1 BLOCKER, INV-3): the gates read state.json before layer B, and a broken
+    state fails closed at the CURRENT config's level. Deleting the block config (or renaming
+    .aid and planting a fresh .aid/state.json) plus a broken state then allowed everything.
+    """
+    acp.state(5)
+    acp.start('s1')
+    assert acp.bash('ls') == ('ALLOW', None)
+    if rename:
+        (acp.P / '.aid').rename(acp.P / '.aid-off')
+        (acp.P / '.aid').mkdir()
+    else:
+        (acp.P / '.aid' / 'hooks' / 'config.json').unlink()
+    (acp.P / '.aid' / 'state.json').write_text(bad, encoding='utf-8')
+    assert acp.bash('node x.js')[0] == 'DENY'
+    assert acp.write(str(acp.P / '.claude' / 'settings.local.json'))[0] == 'DENY'
+    assert acp.write(str(acp.P / 'src' / 'x.ts'))[0] == 'DENY'
+
+
+def test_ac_44_unreadable_settings_file_denies(acp):
+    """WHY (fix round 1 MAJOR): a settings file that exists but cannot be read (here a
+    directory) counts as possibly disabling hooks under a block baseline."""
+    acp.start('s1')
+    d = acp.P / '.claude' / 'settings.local.json'
+    d.mkdir()
+    v = acp.bash('ls')
+    assert v[0] == 'DENY' and 'settings.local.json' in v[1] and 'cannot be read' in v[1], v
+    d.rmdir()
+    assert acp.bash('ls') == ('ALLOW', None)
+
+
+def _encode(obj_text, enc):
+    if enc == 'utf-8-sig':
+        return b'\xef\xbb\xbf' + obj_text.encode('utf-8')
+    if enc == 'utf-16le':
+        return b'\xff\xfe' + obj_text.encode('utf-16-le')
+    return b'\xfe\xff' + obj_text.encode('utf-16-be')
+
+
+AC44_ENCODINGS = ['utf-8-sig', 'utf-16le', 'utf-16be']
+
+
+@pytest.mark.parametrize('enc', AC44_ENCODINGS)
+@pytest.mark.parametrize('payload', [{'disableAllHooks': True}, {'enabledPlugins': {'aid@AID': False}}])
+def test_ac_44_bom_settings_disable_is_detected(acp, enc, payload):
+    """WHY: a settings file saved with a BOM (PowerShell's default) hid disableAllHooks
+    from the json reader, so the mid-session disable was allowed (AC-44)."""
+    acp.start('s1')
+    (acp.P / '.claude' / 'settings.local.json').write_bytes(_encode(json.dumps(payload), enc))
+    v = acp.bash('ls')
+    assert v[0] == 'DENY' and 'settings.local.json' in v[1], v
+    assert acp.write('docs/a.md')[0] == 'DENY'
+
+
+@pytest.mark.parametrize('enc', AC44_ENCODINGS)
+@pytest.mark.parametrize('text', ['{}', '{"disableAllHooks": false}', '{"enabledPlugins": {"aid@AID": true}}'])
+def test_ac_44_bom_settings_harmless_content_allows(acp, enc, text):
+    acp.start('s1')
+    (acp.P / '.claude' / 'settings.local.json').write_bytes(_encode(text, enc))
+    assert acp.bash('ls') == ('ALLOW', None)
+    assert acp.write('docs/a.md') == ('ALLOW', None)
+
+
+@pytest.mark.parametrize('raw', [b'{"disableAllHooks": "\xff"}', b'{bad', b'\xff\xfe{\x00'])
+def test_ac_44_unreadable_settings_count_as_possibly_disabled(acp, raw):
+    acp.start('s1')
+    (acp.P / '.claude' / 'settings.local.json').write_bytes(raw)
+    v = acp.bash('ls')
+    assert v[0] == 'DENY' and 'settings.local.json' in v[1], v
+    (acp.P / '.claude' / 'settings.local.json').write_text('{}', encoding='utf-8')
+    assert acp.bash('ls') == ('ALLOW', None)
+
+
+def test_ac_35_f1_write_tool_does_not_expand_tilde_user(acp):
+    """
+    WHY (F1): Claude Code's Write tool expands only "~", "~/" and "~\\"; "~<user>/..." is a
+    literal relative dir. The gate expanded it to <home>/.claude/plans and allowed a write
+    that lands in <P>/~<user>/... before Phase 4.
+    """
+    import getpass
+    user = getpass.getuser()      # Windows expanduser maps ~<current user> to the (fake) home H
+    for path in ('~{}/.claude/plans/evil.ts'.format(user), '~{}\\.claude\\plans\\evil.ts'.format(user)):
+        assert acp.write(path)[0] == 'DENY', path
+    for path in ('~/.claude/plans/p.md', '~\\.claude\\plans\\p.md'):
+        assert acp.write(path) == ('ALLOW', None), path
+
+
+def test_ac_20_f2_mkdir_options_denied_from_docs(acp):
+    """WHY (F2): from cwd docs/, "-m"/"777" are allowed write targets, so only the option
+    check stops mkdir -m 777; without it the command was allowed."""
+    def bash(cmd):
+        return decision(spawn(acp.P / 'docs', 'PreToolUse', 'phase_gate_bash', acp.H, {
+            'session_id': 's1', 'cwd': str(acp.P / 'docs'), 'tool_name': 'Bash',
+            'tool_input': {'command': cmd}}))
+    for cmd in ('mkdir -m 777 x', 'mkdir --mode=777 x'):
+        v = bash(cmd)
+        assert v[0] == 'DENY' and 'option' in v[1], (cmd, v)
+    assert bash('mkdir -p x') == ('ALLOW', None)

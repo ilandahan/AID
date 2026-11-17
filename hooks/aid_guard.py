@@ -115,7 +115,10 @@ def normalize(path, cwd, literal=False, strip=True):
             p = "{}:/{}".format(m.group(1), m.group(3))
         if re.match(r"^[A-Za-z]:(?!/)", p):
             return SUSPICIOUS                                 # drive-relative C: / C:x: Git Bash reads C:/ or a literal name, Win32 joins cwd
-    p = os.path.expanduser(p)
+    # Bash expands ~user too; Claude Code's Write tool expands only "~", "~/" and "~\"
+    # (backslashes are already "/"), so a literal "~Iland/x" is a dir named "~Iland" (F1).
+    if not literal or re.match(r"^~(/|$)", p):
+        p = os.path.expanduser(p)
     if IS_WIN:
         drive, rest = os.path.splitdrive(p)
         if ":" in rest:
@@ -153,18 +156,27 @@ def _env_protected():
     return out
 
 
+def _pkey(path):
+    """Protected-set comparison form: case-folded on EVERY OS (F3). macOS (APFS/HFS+) is
+    case-insensitive by default, so `.CLAUDE/SETTINGS.JSON` reaches the real control file
+    there; _key folds only on Windows. Over-matching a distinct-case name on a
+    case-sensitive Linux disk is a deliberate false denial on a control-file name."""
+    return _key(path).casefold()
+
+
 def is_protected(norm):
     if norm in (None, SUSPICIOUS) or norm in SINKS:
         return norm == SUSPICIOUS
-    k = norm.rstrip("/")
+    k = _pkey(norm.rstrip("/"))
     for s in PROTECTED_SUFFIXES:
-        sk = _key(s)
+        sk = _pkey(s)
         if sk.endswith("/"):
             if (k + "/").find(sk) >= 0:
                 return True
         elif k.endswith(sk):
             return True
-    return any((k + "/").startswith(e) if e.endswith("/") else k == e for e in _env_protected())
+    return any((k + "/").startswith(e) if e.endswith("/") else k == e
+               for e in map(_pkey, _env_protected()))
 
 
 def is_protected_or_parent(norm):
@@ -172,8 +184,8 @@ def is_protected_or_parent(norm):
         return True
     if norm in (None, SUSPICIOUS):
         return norm == SUSPICIOUS
-    k = norm.rstrip("/")
-    return any(k.endswith(_key(p)) for p in PROTECTED_PARENTS)
+    k = _pkey(norm.rstrip("/"))
+    return any(k.endswith(_pkey(p)) for p in PROTECTED_PARENTS)
 
 
 def mentions_protected(text):
@@ -1224,12 +1236,21 @@ def hooks_disabled(root):
     "<file> sets <key>" when project settings switch Claude Code hooks or the AID plugin
     off, else None. LIMIT: once Claude Code has applied such a setting no AID hook runs at
     all, so this can only catch the window before Claude Code reloads its settings.
+    AC-44: UTF-8 (BOM or not) and UTF-16 with a BOM are read; a file that exists but
+    cannot be decoded or parsed is reported as possibly disabling hooks.
     """
     for name in ("settings.local.json", "settings.json"):
         try:
-            data = json.loads((Path(root) / ".claude" / name).read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+            raw = (Path(root) / ".claude" / name).read_bytes()
+        except FileNotFoundError:
             continue
+        except OSError:
+            return ".claude/{} cannot be read (possibly disables hooks)".format(name)
+        try:
+            enc = "utf-16" if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else "utf-8-sig"
+            data = json.loads(raw.decode(enc))
+        except ValueError:      # UnicodeDecodeError and JSONDecodeError are ValueErrors
+            return ".claude/{} cannot be decoded or parsed (possibly disables hooks)".format(name)
         if not isinstance(data, dict):
             continue
         v = data.get("disableAllHooks")
@@ -1286,7 +1307,10 @@ def write_baseline(root, session_id, levels, session_start=False):
         return
     d = integrity_dir(root)
     d.mkdir(parents=True, exist_ok=True)
-    (d / (session_id + ".json")).write_text(json.dumps(snapshot(root, levels)), encoding="utf-8")
+    snap = snapshot(root, levels)
+    if session_start:
+        snap["session_start"] = True    # AC-43: only a SessionStart baseline may latch the root
+    (d / (session_id + ".json")).write_text(json.dumps(snap), encoding="utf-8")
     if session_start:
         seen = _seen_sessions(root)
         seen.pop(session_id, None)
@@ -1297,6 +1321,39 @@ def write_baseline(root, session_id, levels, session_start=False):
             _seen_file(root).write_text(json.dumps(seen), encoding="utf-8")
         except OSError:
             pass
+
+
+def started_at(root, session_id):
+    """AC-43: True when SessionStart (not layer B's first-use trust) wrote this session's
+    baseline for root. The baseline lives under AID_HOME, so it survives .aid going away."""
+    try:
+        base = json.loads((integrity_dir(root) / (session_id + ".json")).read_text(encoding="utf-8"))
+        return isinstance(base, dict) and base.get("session_start") is True
+    except (OSError, ValueError):
+        return False
+
+
+LATCH_RELEASE_SOURCES = ("startup", "resume", "clear")
+
+
+def release_latch(root, session_id):
+    """
+    AC-43 amendment (a): a SessionStart the user caused (LATCH_RELEASE_SOURCES; never
+    "compact", which Claude Code fires mid-session on its own) ends the latch for a root
+    whose .aid is gone. --resume/--continue keep the session id, so without this a project
+    the user de-initialised between sittings was denied for the rest of the conversation.
+    The baseline is kept minus its session_start flag (no new store; layer B still has it
+    if .aid comes back). Returns True when a latch was released.
+    """
+    f = integrity_dir(root) / (session_id + ".json")
+    try:
+        base = json.loads(f.read_text(encoding="utf-8"))
+        if isinstance(base, dict) and base.pop("session_start", None) is True:
+            f.write_text(json.dumps(base), encoding="utf-8")
+            return True
+    except (OSError, ValueError):
+        pass
+    return False
 
 
 _RANK = {"log": 0, "warn": 1, "block": 2}
@@ -1331,7 +1388,7 @@ def weakened_since_last_session(root, levels):
     return out
 
 
-def check_integrity(root, session_id, levels):
+def check_integrity(root, session_id, levels, markers_missing=False):
     """
     Layer B, every gate call. Returns (violation_reason_or_None, baseline_levels).
     Order: hooks/plugin being disabled (AC-40), then the gate config and deny rules vs this
@@ -1340,7 +1397,20 @@ def check_integrity(root, session_id, levels):
     SessionStart recorded (so "set config to log + delete the integrity dir" is refused).
     LIMIT (same honesty rule as AC-32): Phase 4+ code can still forge a matching baseline
     and the record; this closes only the cheap deletion route.
+    markers_missing (AC-43): the root was latched from this session's baseline because its
+    .aid markers are gone; that is a violation at the baseline's levels (N-15: code that
+    also deletes the baseline is out of scope).
     """
+    if markers_missing:
+        try:
+            lv = json.loads((integrity_dir(root) / (session_id + ".json")).read_text(encoding="utf-8"))["levels"]
+        except (OSError, ValueError, TypeError, KeyError):
+            lv = {}
+        lv = lv if isinstance(lv, dict) else {}
+        return ("AID's markers (.aid/state.json, .aid/hooks/config.json) disappeared mid-session "
+                "from {}; restore the .aid folder to continue. If the user removed AID on "
+                "purpose, resuming or restarting Claude Code ends this check".format(root),
+                {g: lv[g] if lv.get(g) in _RANK else "block" for g in levels})
     base = None
     valid = bool(session_id) and _SESSION_ID.fullmatch(session_id) is not None
     if valid:
