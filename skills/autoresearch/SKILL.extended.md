@@ -91,10 +91,34 @@ production source:
 - **No scope reduction to game the score.** Deleting behaviour, criteria or tests to make
   a number go up is explicitly forbidden — that is the obvious exploit for any
   score-maximising loop, and the prompts call it out.
-- **Harness-tamper detection.** The rubric's SHA-256 is fingerprinted at pass start and
-  recorded. If the criteria file changes mid-pass, the scores are no longer comparable and
-  that is detectable after the fact.
+- **Rubric fingerprint (weak).** `verify-run.sh` step 8 recomputes a SHA-256 over the
+  criteria YAML and `reflection-agent.md` only, and compares it with a hash the runner
+  itself records in `.aid/pipeline/state.json`. That file is runner-writable, so the check
+  is self-attested and is not a reliable tamper detector; a missing hash only warns.
 - **AR-1 may not change interfaces.** Design cleanup must not ripple into callers.
+
+## Scope of the harness guard
+
+`bin/check-harness-immutable.mjs` is a PreToolUse hook on Write, Edit, MultiEdit and
+NotebookEdit. It protects files by role (rubric YAMLs, the three scorer prompts,
+`skills/autoresearch/**`, `skills/reflection/**`, `.claude/skills|agents/**`, Claude
+settings, `.mcp.json`, `.aid/**/*.json` except runner state, per-task stage records such as
+`fix-<n>.json` / `self-review-<n>.json`, the QA-gate verdicts in `.aid/qa/` and the
+`~/.aid/feedback/` queue, the acceptance sources `.aid/qa/**/*.yaml|yml` (existing or new), and
+an existing `.aid/pipeline/<task>/brief.md` or `config.frozen.json` (creating them once at
+kickoff is allowed)), wherever the file lives: project, link target, AID
+checkout or plugin cache.
+
+- **It is a guardrail, not a sandbox.** It stops a score-maximising agent from editing its
+  own harness with the four file-edit tools.
+- **Out of scope and not reliably detected today:** writes through Bash, python/node
+  subprocesses, git or MCP file tools. The step-8 fingerprint covers only the criteria YAML
+  and `reflection-agent.md`, and its hash is self-attested in runner-writable `state.json`,
+  so it does not catch what the guard misses.
+- **It stays active for the whole session** after `/autoresearch` (a property of
+  skill-frontmatter hooks). Harness edits belong in a new session without an AR pass.
+- **AR passes cannot edit `skills/autoresearch/**` or `skills/reflection/**`**, including
+  on AID's own tasks that own those trees. Run those tasks without an AR stage.
 
 ## Artifacts it leaves behind
 
@@ -125,7 +149,7 @@ active criteria file.
 | `program.ar-function.md` | AR-2 pass definition |
 | `program.ar-acceptance.md` | AR-3 pass definition |
 | `verify-run.sh` | Post-run checker (read-only) |
-| `bin/check-harness-immutable.sh` | PreToolUse guard: blocks edits to the frozen harness |
+| `bin/check-harness-immutable.mjs` | PreToolUse guard: blocks edits to the frozen harness |
 
 Scoring criteria live with the reflection skill, not here:
 `../reflection/criteria/phase-4a-code-design.yaml` and

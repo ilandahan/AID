@@ -3,13 +3,7 @@ name: autoresearch
 description: "Bounded improvement loop: one artifact, fixed eval score, keep an edit only if strictly better. Use for AR_DESIGN/AR_FUNCTION/AR_ACCEPTANCE stages or standalone bounded iteration."
 hooks:
   PreToolUse:
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "node"
-          args: ["${CLAUDE_PLUGIN_ROOT}/skills/autoresearch/bin/check-harness-immutable.mjs"]
-          statusMessage: "Checking harness immutability..."
-    - matcher: "Edit"
+    - matcher: "Write|Edit|MultiEdit|NotebookEdit"
       hooks:
         - type: command
           command: "node"

@@ -96,13 +96,13 @@ class TestAutoresearchSkill:
     @pytest.mark.parametrize('rel', [
         'SKILL.md', 'SKILL.extended.md',
         'program.ar-design.md', 'program.ar-function.md', 'program.ar-acceptance.md',
-        'verify-run.sh', 'bin/check-harness-immutable.sh',
+        'verify-run.sh', 'bin/check-harness-immutable.mjs',
     ])
     def test_asset_present(self, rel):
         assert os.path.isfile(os.path.join(SKILLS, 'autoresearch', rel)), \
             f'autoresearch/{rel} is missing'
 
-    @pytest.mark.parametrize('rel', ['verify-run.sh', 'bin/check-harness-immutable.sh'])
+    @pytest.mark.parametrize('rel', ['verify-run.sh'])
     def test_shell_assets_are_valid(self, rel):
         r = _run(['bash', '-n', f'./{rel}'], cwd=os.path.join(SKILLS, 'autoresearch'))
         assert r.returncode == 0, f'{rel} syntax error: {r.stderr}'
