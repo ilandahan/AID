@@ -1,0 +1,24 @@
+# Reviewed gitleaks findings in past commits (checked 2026-11-17).
+# All 18 are example credentials in security-teaching docs ("BAD:" examples). Each value was checked and cannot be a real
+# credential: counting sequences (sk-1234...), wrong format (sk-live- with hyphens), alternating placeholders ending in '...',
+# and a 12-character sk_test_ value (real Stripe keys are 24+ random characters). The current files use placeholders.
+# Format: commit:file:rule:line. Add a line here only after reviewing that finding. New findings still fail CI.
+
+0e9fed53f018bfdd0b4430648e5c685b8ccf1b3b:.claude/rules/code/security.md:generic-api-key:28
+0e9fed53f018bfdd0b4430648e5c685b8ccf1b3b:.claude/rules/testing/test-security.md:generic-api-key:34
+0e9fed53f018bfdd0b4430648e5c685b8ccf1b3b:.claude/skills/code-review/SKILL.extended.md:generic-api-key:78
+0e9fed53f018bfdd0b4430648e5c685b8ccf1b3b:.claude/skills/code-review/SKILL.md:generic-api-key:55
+0e9fed53f018bfdd0b4430648e5c685b8ccf1b3b:.claude/skills/code-review/references/security-patterns.md:generic-api-key:195
+0e9fed53f018bfdd0b4430648e5c685b8ccf1b3b:.claude/skills/role-qa-engineer/SKILL.extended.md:generic-api-key:252
+0e9fed53f018bfdd0b4430648e5c685b8ccf1b3b:.claude/skills/role-qa-engineer/references/security-in-tests.md:stripe-access-token:73
+48f8ee234799d6f5c3f97780f652b0bf932475d6:skills/pipeline-orchestrator/references/standards/code-review/SKILL.extended.md:generic-api-key:78
+48f8ee234799d6f5c3f97780f652b0bf932475d6:skills/pipeline-orchestrator/references/standards/code-review/SKILL.md:generic-api-key:55
+48f8ee234799d6f5c3f97780f652b0bf932475d6:skills/pipeline-orchestrator/references/standards/code-review/references/security-patterns.md:generic-api-key:195
+ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/rules/code/security.md:generic-api-key:28
+ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/rules/testing/test-security.md:generic-api-key:34
+ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/skills/aid-tech-spec/references/api-design-template.md:generic-api-key:527
+ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/skills/code-review/SKILL.extended.md:generic-api-key:78
+ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/skills/code-review/SKILL.md:generic-api-key:40
+ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/skills/code-review/references/security-patterns.md:generic-api-key:195
+ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/skills/role-qa-engineer/SKILL.extended.md:generic-api-key:252
+ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/skills/role-qa-engineer/references/security-in-tests.md:stripe-access-token:73
