@@ -65,6 +65,45 @@ fi
 json_enc() { python -c 'import json,sys;print(json.dumps(sys.stdin.read()))' 2>/dev/null \
   || { printf '"'; sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n' ' '; printf '"'; }; }
 
+# Block the stop with $1 as the reason. The bypass hint goes to STDERR only (A-28): the reason is
+# read by the agent, and a block that teaches the agent how to switch the gate off is not a gate.
+# Claude Code shows a hook's stderr to the human (verbose/transcript view), not to the model.
+block() {
+  printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$1" | json_enc)"
+  echo "dev-pipeline-gate: a human can bypass this gate by starting Claude Code with SKIP_PIPELINE_GATE=1" >&2
+  exit 0
+}
+
+# Shared time budget for every external check (A-20). The plugin registers this hook with a 120 s
+# timeout, and a hook that times out is cancelled with its output discarded, so an unbounded check
+# made the gate fail open SILENTLY. Each check now gets only what is left of one budget well under
+# that timeout; a check cut off by it is reported as NOT VERIFIED instead of passing.
+# DEV_GATE_BUDGET can only LOWER the budget (tests use it); it is clamped to 90.
+GATE_BUDGET=90
+case "${DEV_GATE_BUDGET:-}" in ''|*[!0-9]*) ;; *) [ "$DEV_GATE_BUDGET" -lt 90 ] && GATE_BUDGET=$DEV_GATE_BUDGET ;; esac
+_gate_start=$SECONDS
+TIMEOUT_BIN=$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null)
+# DEV_GATE_NO_TIMEOUT_BIN forces the pure-bash watchdog below (tests use it to cover stock
+# macOS, which has no timeout binary). It cannot unbound a check, only pick the fallback.
+[ -n "${DEV_GATE_NO_TIMEOUT_BIN:-}" ] && TIMEOUT_BIN=""
+not_verified=""   # checks the budget cut off, e.g. " mypy js"
+# Run "$@" bounded by the remaining budget. Returns 124 (as timeout does) when cut off or when
+# no budget is left. Without a timeout binary a watchdog kills the check's process group
+# (set -m gives each background job its own group, so a check's children die with it).
+run_bounded() {
+  local left=$((GATE_BUDGET - (SECONDS - _gate_start)))
+  [ "$left" -gt 0 ] || return 124
+  if [ -n "$TIMEOUT_BIN" ]; then "$TIMEOUT_BIN" -k 2 "$left" "$@"; return; fi
+  local pid dog rc
+  set -m
+  "$@" & pid=$!
+  ( sleep "$left"; kill -- -"$pid" ) >/dev/null 2>&1 & dog=$!
+  set +m
+  wait "$pid"; rc=$?
+  if kill -0 "$dog" 2>/dev/null; then kill -- -"$dog" 2>/dev/null; return "$rc"; fi
+  return 124
+}
+
 # starthook-6: SHA-256 of a file (sha256sum preferred, shasum -a 256 fallback).
 # Echoes the bare hash, or empty if neither tool exists / file unreadable.
 sha256_of() {
@@ -90,9 +129,8 @@ if [ -f "$ESC" ] && grep -q '"status"[[:space:]]*:[[:space:]]*"open"' "$ESC" 2>/
   reason="Stop blocked: the pipeline gate ESCALATED and it is UNRESOLVED (step: ${esc_step:-?}). ${esc_why:-below threshold with iterations exhausted}
 This is a decision only the human can make. Present it to them and let them choose: (a) keep working to clear the threshold, (b) lower it in .aid/pipeline/config.json, or (c) accept this result. Then record the choice:
   node \"\$HOME/.claude/skills/pipeline-orchestrator/gate.mjs\" --resolve \"<what was decided>\"
-Do NOT resolve it on the human's behalf. SKIP_PIPELINE_GATE=1 bypasses this gate entirely."
-  printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$reason" | json_enc)"
-  exit 0
+Do NOT resolve it on the human's behalf."
+  block "$reason"
 fi
 
 # Files this SESSION wrote, read out of the transcript Claude Code hands the hook. The changed-file
@@ -223,8 +261,8 @@ fi
 tsc_timed_out=0
 if [ -n "$changed_ts" ] && [ "$tsc_runnable" = 1 ]; then
   funcs=$(printf '%s\n' "$changed_ts" | grep -oE '^functions/[^/]+' | sort -u | sed 's#functions/##')
-  for f in $funcs; do
-    [ -f "functions/$f/tsconfig.json" ] || continue
+  while IFS= read -r f; do
+    [ -n "$f" ] && [ -f "functions/$f/tsconfig.json" ] || continue
     ran_tsc=1
     f_tsc=$(_resolve_tsc "$PWD/functions/$f")
     if [ -n "$f_tsc" ]; then
@@ -233,30 +271,31 @@ if [ -n "$changed_ts" ] && [ "$tsc_runnable" = 1 ]; then
       # tsconfig explicitly, instead of climbing above a function with ../.
       # Relative arguments avoid Git Bash/native Windows path conversion bugs.
       if [ -f "functions/$f/node_modules/typescript/bin/tsc" ]; then
-        out=$(cd "functions/$f" && timeout 30 node "node_modules/typescript/bin/tsc" --noEmit 2>&1)
+        out=$(cd "functions/$f" && run_bounded node "node_modules/typescript/bin/tsc" --noEmit 2>&1)
       else
-        out=$(timeout 30 node "node_modules/typescript/bin/tsc" --project "functions/$f/tsconfig.json" --noEmit 2>&1)
+        out=$(run_bounded node "node_modules/typescript/bin/tsc" --project "functions/$f/tsconfig.json" --noEmit 2>&1)
       fi
-      [ $? -eq 124 ] && { tsc_timed_out=1; out=""; }
+      rc=$?
+      [ "$rc" -eq 124 ] && { tsc_timed_out=1; out=""; }
     else
       out="typescript not resolvable from functions/$f via node module resolution"
     fi
     [ -n "$out" ] && errs="$errs [$f] $(printf '%s' "$out" | head -6 | tr '\n' ' ')"
-  done
+  done <<< "$funcs"
   if [ "$ran_tsc" = 0 ] && [ -f "tsconfig.json" ]; then
-    out=$(timeout 30 node "node_modules/typescript/bin/tsc" --noEmit 2>&1)
-    [ $? -eq 124 ] && { tsc_timed_out=1; out=""; }
+    out=$(run_bounded node "node_modules/typescript/bin/tsc" --noEmit 2>&1)
+    rc=$?
+    [ "$rc" -eq 124 ] && { tsc_timed_out=1; out=""; }
     [ -n "$out" ] && errs="$errs $(printf '%s' "$out" | head -8 | tr '\n' ' ')"
     ran_tsc=1
   fi
   if [ -n "$errs" ]; then
-    reason="Stop blocked: tsc --noEmit failed on changed TypeScript.$errs  Fix the type errors before finishing (or set SKIP_PIPELINE_GATE=1)."
-    printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$reason" | json_enc)"
-    exit 0
+    block "Stop blocked: tsc --noEmit failed on changed TypeScript.$errs  Fix the type errors before finishing."
   fi
 fi
 if [ "$tsc_timed_out" = 1 ]; then
-  tsc_status="WARN: tsc TIMED OUT (30s) - not blocked, result inconclusive"
+  not_verified="$not_verified tsc"
+  tsc_status="WARN: tsc NOT VERIFIED (time budget) - not blocked, result inconclusive"
 elif [ "$ran_tsc" = 1 ]; then
   tsc_status="tsc --noEmit clean"
 elif [ -n "$changed_ts" ] && [ "$tsc_runnable" = 0 ]; then
@@ -269,78 +308,105 @@ else
   tsc_status="n/a"
 fi
 
+# Changed-file names come from the repo, so they are attacker-controlled: a file named
+# "--require=evil.js" passed bare to `node --check` is an OPTION and runs code (A-19). Every name
+# below is passed as "./$f" (git and the transcript reader both yield root-relative paths), which
+# can never start with "-".
+skipped=""   # languages with changed files whose checker is not installed, e.g. " JS(node)"
+
 # ── 2) JavaScript — node --check (syntax only; skipped if node absent) ──
+if [ -n "$changed_js" ] && ! command -v node >/dev/null 2>&1; then skipped="$skipped JS(node)"; fi
 if [ -n "$changed_js" ] && command -v node >/dev/null 2>&1; then
   js_errs=""
   while IFS= read -r f; do
     [ -f "$f" ] || continue
-    out=$(node --check "$f" 2>&1)
+    out=$(run_bounded node --check "./$f" 2>&1)
+    rc=$?
+    [ "$rc" -eq 124 ] && { not_verified="$not_verified js"; break; }
     [ -n "$out" ] && js_errs="$js_errs [$f] $(printf '%s' "$out" | head -4 | tr '\n' ' ')"
   done <<< "$changed_js"
   if [ -n "$js_errs" ]; then
-    reason="Stop blocked: node --check syntax error in changed JavaScript.$js_errs  Fix before finishing (or set SKIP_PIPELINE_GATE=1)."
-    printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$reason" | json_enc)"
-    exit 0
+    block "Stop blocked: node --check syntax error in changed JavaScript.$js_errs  Fix before finishing."
   fi
 fi
 
 # ── 3) Python — py_compile syntax check + mypy if available ──
+if [ -n "$changed_py" ] && ! command -v python >/dev/null 2>&1; then skipped="$skipped Python(python)"; fi
 if [ -n "$changed_py" ] && command -v python >/dev/null 2>&1; then
   py_errs=""
+  py_files=()
   while IFS= read -r f; do
     [ -f "$f" ] || continue
-    out=$(python -m py_compile "$f" 2>&1)
+    py_files+=("./$f")
+    out=$(run_bounded python -m py_compile "./$f" 2>&1)
+    rc=$?
+    [ "$rc" -eq 124 ] && { not_verified="$not_verified py_compile"; break; }
     [ -n "$out" ] && py_errs="$py_errs [$f] $(printf '%s' "$out" | head -4 | tr '\n' ' ')"
   done <<< "$changed_py"
   if [ -n "$py_errs" ]; then
-    reason="Stop blocked: Python syntax error in changed files.$py_errs  Fix before finishing (or set SKIP_PIPELINE_GATE=1)."
-    printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$reason" | json_enc)"
-    exit 0
+    block "Stop blocked: Python syntax error in changed files.$py_errs  Fix before finishing."
   fi
   # mypy type-check (advisory block only if mypy is installed)
-  if command -v mypy >/dev/null 2>&1; then
-    mypy_out=$(printf '%s\n' "$changed_py" | xargs mypy --ignore-missing-imports 2>&1)
-    if echo "$mypy_out" | grep -qE '^.*error:'; then
-      reason="Stop blocked: mypy type errors in changed Python. $(printf '%s' "$mypy_out" | grep 'error:' | head -8 | tr '\n' ' ')  Fix or set SKIP_PIPELINE_GATE=1."
-      printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$reason" | json_enc)"
-      exit 0
+  if [ "${#py_files[@]}" -gt 0 ] && command -v mypy >/dev/null 2>&1; then
+    mypy_out=$(run_bounded mypy --ignore-missing-imports -- "${py_files[@]}" 2>&1)
+    rc=$?
+    if [ "$rc" -eq 124 ]; then
+      not_verified="$not_verified mypy"
+    elif echo "$mypy_out" | grep -qE '^.*error:'; then
+      block "Stop blocked: mypy type errors in changed Python. $(printf '%s' "$mypy_out" | grep 'error:' | head -8 | tr '\n' ' ')  Fix before finishing."
     fi
   fi
 fi
 
 # ── 4) Go — go vet (skipped if go absent or no go.mod) ──
+if [ -n "$changed_go" ] && ! { command -v go >/dev/null 2>&1 && [ -f "go.mod" ]; }; then skipped="$skipped Go(go/go.mod)"; fi
 if [ -n "$changed_go" ] && command -v go >/dev/null 2>&1 && [ -f "go.mod" ]; then
-  go_out=$(go vet ./... 2>&1)
-  if [ -n "$go_out" ]; then
-    reason="Stop blocked: go vet found issues in changed Go files. $(printf '%s' "$go_out" | head -8 | tr '\n' ' ')  Fix before finishing (or set SKIP_PIPELINE_GATE=1)."
-    printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$reason" | json_enc)"
-    exit 0
+  go_out=$(run_bounded go vet ./... 2>&1)
+  rc=$?
+  if [ "$rc" -eq 124 ]; then
+    not_verified="$not_verified go-vet"
+  elif [ -n "$go_out" ]; then
+    block "Stop blocked: go vet found issues in changed Go files. $(printf '%s' "$go_out" | head -8 | tr '\n' ' ')  Fix before finishing."
   fi
 fi
 
 # ── 5) Rust — cargo check (skipped if cargo absent or no Cargo.toml) ──
+if [ -n "$changed_rs" ] && ! { command -v cargo >/dev/null 2>&1 && [ -f "Cargo.toml" ]; }; then skipped="$skipped Rust(cargo/Cargo.toml)"; fi
 if [ -n "$changed_rs" ] && command -v cargo >/dev/null 2>&1 && [ -f "Cargo.toml" ]; then
-  rs_out=$(cargo check 2>&1)
-  if [ $? -ne 0 ]; then
-    reason="Stop blocked: cargo check failed on changed Rust files. $(printf '%s' "$rs_out" | grep '^error' | head -6 | tr '\n' ' ')  Fix before finishing (or set SKIP_PIPELINE_GATE=1)."
-    printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$reason" | json_enc)"
-    exit 0
+  rs_out=$(run_bounded cargo check 2>&1)
+  rc=$?
+  if [ "$rc" -eq 124 ]; then
+    not_verified="$not_verified cargo"
+  elif [ "$rc" -ne 0 ]; then
+    block "Stop blocked: cargo check failed on changed Rust files. $(printf '%s' "$rs_out" | grep '^error' | head -6 | tr '\n' ' ')  Fix before finishing."
   fi
 fi
 
 # ── 6) Java — javac syntax check (skipped if javac absent) ──
+if [ -n "$changed_java" ] && ! command -v javac >/dev/null 2>&1; then skipped="$skipped Java(javac)"; fi
 if [ -n "$changed_java" ] && command -v javac >/dev/null 2>&1; then
   java_errs=""
   while IFS= read -r f; do
     [ -f "$f" ] || continue
-    out=$(javac -proc:none "$f" 2>&1)
-    [ $? -ne 0 ] && java_errs="$java_errs [$f] $(printf '%s' "$out" | head -4 | tr '\n' ' ')"
+    out=$(run_bounded javac -proc:none "./$f" 2>&1)
+    rc=$?
+    [ "$rc" -eq 124 ] && { not_verified="$not_verified javac"; break; }
+    [ "$rc" -ne 0 ] && java_errs="$java_errs [$f] $(printf '%s' "$out" | head -4 | tr '\n' ' ')"
   done <<< "$changed_java"
   if [ -n "$java_errs" ]; then
-    reason="Stop blocked: javac compile error in changed Java files.$java_errs  Fix before finishing (or set SKIP_PIPELINE_GATE=1)."
-    printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$reason" | json_enc)"
-    exit 0
+    block "Stop blocked: javac compile error in changed Java files.$java_errs  Fix before finishing."
   fi
+fi
+
+# One honest summary for every non-blocking message below (A-43): "all language checks passed" only
+# when every applicable check actually ran to completion.
+[ "$tsc_timed_out" = 1 ] || case "$tsc_status" in WARN:*) skipped="$skipped TS" ;; esac
+if [ -z "$skipped$not_verified" ]; then
+  checks_summary="all language checks passed (TS: $tsc_status)"
+else
+  checks_summary="language checks INCOMPLETE (TS: $tsc_status)"
+  [ -n "$skipped" ] && checks_summary="$checks_summary; checks skipped:$skipped"
+  [ -n "$not_verified" ] && checks_summary="$checks_summary; NOT VERIFIED (time budget):$not_verified"
 fi
 
 # ── 6.5) UI changes need browser evidence (the "Avoid buggy code" rule, mechanized) ──
@@ -408,11 +474,9 @@ if [ -d ".aid/pipeline" ]; then
     # produced 30 false blocks (benign post-AR-restore mtimes, ordinary edits
     # after a finished pipeline).
     if grep -q '"pipeline_status": *"running"' "$state" 2>/dev/null; then
-      reason="${brief_warn}Stop blocked: a source file is newer than .aid/pipeline/state.json while a pipeline run is ACTIVE, so changes look unvalidated. Run /pipeline (CODE_REVIEW → TDD → TEST_REVIEW) to validate, then finish. NOTE: this can also be a benign post-AR-restore state — it self-clears once /pipeline writes state.json last. SKIP_PIPELINE_GATE=1 to bypass."
-      printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$reason" | json_enc)"
-      exit 0
+      block "${brief_warn}Stop blocked: a source file is newer than .aid/pipeline/state.json while a pipeline run is ACTIVE, so changes look unvalidated. Run /pipeline (CODE_REVIEW → TDD → TEST_REVIEW) to validate, then finish. NOTE: this can also be a benign post-AR-restore state — it self-clears once /pipeline writes state.json last."
     fi
-    msg="${brief_warn}dev-pipeline-gate: $count source file(s) newer than the last (non-running) pipeline state - checks passed ($tsc_status); validate/commit at your own pace."
+    msg="${brief_warn}dev-pipeline-gate: $count source file(s) newer than the last (non-running) pipeline state - $checks_summary; validate/commit at your own pace."
     printf '{"systemMessage":%s}\n' "$(printf '%s' "$msg" | json_enc)"
     exit 0
   fi
@@ -424,7 +488,7 @@ if [ -d ".aid/pipeline" ]; then
 Changed:
 $files"
   else
-    msg="${brief_warn}Validated: $tsc_status + /pipeline fresh for $count changed file(s) (NOT committed - your call). Review the diff, then commit yourself.
+    msg="${brief_warn}Validated: $checks_summary + /pipeline fresh for $count changed file(s) (NOT committed - your call). Review the diff, then commit yourself.
 Changed:
 $files"
   fi
@@ -438,7 +502,7 @@ fi
 # block, firing on ANY uncommitted file (including prior sessions' work), which
 # interrupted even read-only turns. Real failures (tsc/mypy/syntax/vet/cargo/javac)
 # still hard-block above; a clean pass is now a non-blocking notice.
-msg="dev-pipeline-gate: $count source file(s) changed, all language checks passed (TS: $tsc_status). NOT committed - review and commit yourself.
+msg="dev-pipeline-gate: $count source file(s) changed, $checks_summary. NOT committed - review and commit yourself.
 Changed:
 $files"
 printf '{"systemMessage":%s}\n' "$(printf '%s' "$msg" | json_enc)"

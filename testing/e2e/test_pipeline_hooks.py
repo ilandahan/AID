@@ -20,6 +20,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 
 import pytest
 
@@ -229,9 +230,19 @@ class TestPlanExecutionHook:
         assert 'INTENT GATE' in ctx, 'it must still let the work proceed'
 
 
-def _ts_project(tmp_path, ts_source):
-    """A throwaway git repo with one TypeScript file. Never the real repo."""
+_REPO_TS = os.path.join(REPO_ROOT, 'node_modules', 'typescript')
+
+
+def _ts_project(tmp_path, ts_source, with_typescript=False):
+    """A throwaway git repo with one TypeScript file. Never the real repo.
+
+    with_typescript copies the repo's own TypeScript into the fixture's node_modules: the
+    gate resolves tsc ONLY from the project it checks (never a global, never the plugin's
+    install), so without it the gate says 'tsc NOT RUN' and can never block (D-13)."""
     (tmp_path / 'src').mkdir()
+    if with_typescript:
+        shutil.copytree(_REPO_TS, str(tmp_path / 'node_modules' / 'typescript'))
+        (tmp_path / '.gitignore').write_text('node_modules/\n')
     (tmp_path / 'src' / 'sample.ts').write_text(ts_source)
     (tmp_path / 'tsconfig.json').write_text(
         json.dumps({'compilerOptions': {'strict': True, 'noEmit': True}}))
@@ -264,34 +275,167 @@ class TestDevPipelineGate:
         assert result.stdout.strip() == '', 'SKIP_PIPELINE_GATE=1 was not honoured'
 
 
-# tsc is only exercised when TypeScript is installed locally. npx would otherwise
-# download it per run, making the result depend on the network rather than on the code.
-_HAS_TSC = os.path.isfile(os.path.join(REPO_ROOT, 'node_modules', '.bin', 'tsc')) or \
-    shutil.which('tsc') is not None
+# The gate tests below run under the bash FIRST ON PATH (what a user's shell resolves).
+# subprocess's bare 'bash' on Windows is System32's WSL launcher, which re-expands the
+# command line and usually has no node/python, so every language check would be skipped
+# and the tests would prove nothing. A prelude script (not `bash -c`) carries env/PATH
+# changes for the same re-expansion reason.
+GATE_BASH = shutil.which('bash') or 'bash'
+
+
+def _gate_bash_has(tool):
+    try:
+        r = subprocess.run([GATE_BASH, '-c', f'command -v {tool}'],
+                           capture_output=True, text=True, timeout=60)
+        return r.returncode == 0 and r.stdout.strip() != ''
+    except Exception:
+        return False
+
+
+def _run_gate(project, prelude=''):
+    """Run the gate in `project` under GATE_BASH; returns (result, seconds)."""
+    shutil.copy(GATE_HOOK, os.path.join(str(project), 'dev-pipeline-gate.sh'))
+    with open(os.path.join(str(project), 'run-gate.sh'), 'w', newline='\n') as f:
+        f.write(prelude + '\nexec bash ./dev-pipeline-gate.sh\n')
+    t0 = time.monotonic()
+    result = subprocess.run([GATE_BASH, 'run-gate.sh'],
+                            input=json.dumps({'session_id': 's1', 'cwd': str(project)}),
+                            capture_output=True, text=True, timeout=300, cwd=str(project))
+    return result, time.monotonic() - t0
+
+
+def _git_project(tmp_path, files):
+    for rel, text in files.items():
+        p = tmp_path / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+    subprocess.run(['git', 'init', '-q'], cwd=str(tmp_path), timeout=60)
+    return tmp_path
+
+
+# tsc is only exercised when TypeScript is installed in this repo (the fixture gets a copy,
+# see _ts_project) and the gate's bash has node. A global tsc does not count: the gate
+# never uses one, which is why the old `shutil.which('tsc')` precondition let
+# test_blocks_on_broken_typescript run against a fixture the gate could not check (D-13).
+_HAS_TSC = os.path.isfile(os.path.join(_REPO_TS, 'bin', 'tsc')) and _gate_bash_has('node')
 needs_tsc = pytest.mark.skipif(
-    not _HAS_TSC, reason='TypeScript not installed locally - run `npm install` to enable'
+    not _HAS_TSC,
+    reason="needs `npm install` (TypeScript in node_modules) and node in the gate's bash",
 )
+needs_gate_node = pytest.mark.skipif(not _gate_bash_has('node'),
+                                     reason="node is not on PATH in the gate's bash")
+needs_gate_python = pytest.mark.skipif(not _gate_bash_has('python'),
+                                       reason="python is not on PATH in the gate's bash")
+
+
+class TestDevPipelineGateHardening:
+    @needs_gate_node
+    def test_js_file_name_is_not_parsed_as_a_node_option(self, tmp_path):
+        """
+        WHY THIS TEST (A-19):
+        - PROBLEM: changed-file names were passed bare to `node --check`, so a file named
+          "--require=evil.js" became a node OPTION and loaded node_modules/evil.js.
+        - COST OF FAILURE: arbitrary code runs on every Stop in any repo with the plugin.
+        - SUCCESS: the payload never runs, and the oddly named file is syntax-checked.
+        """
+        project = _git_project(tmp_path, {
+            '--require=evil.js': 'const ok = 1;\n',
+            'node_modules/evil.js': "require('fs').writeFileSync('PWNED', 'x');\n",
+            '.gitignore': 'node_modules/\nPWNED\n',
+        })
+
+        result, _ = _run_gate(project)
+
+        assert not (project / 'PWNED').exists(), \
+            f'a file name executed code through node options: {result.stdout!r}'
+        assert result.returncode == 0, result.stderr
+        assert '"decision":"block"' not in result.stdout.replace(' ', ''), result.stdout
+
+    @needs_gate_node
+    def test_broken_js_still_blocks_without_teaching_the_bypass(self, tmp_path):
+        """
+        WHY THIS TEST (A-19 regression + A-28):
+        - PROBLEM: the "./" prefix must not stop real syntax errors from blocking, and the
+          block reason used to end with "(or set SKIP_PIPELINE_GATE=1)" - read by the agent.
+        - SUCCESS: still blocks; the bypass hint reaches stderr (human) and not the reason.
+        """
+        project = _git_project(tmp_path, {'src/bad.js': 'function (\n'})
+
+        result, _ = _run_gate(project)
+
+        out = json.loads(result.stdout)
+        assert out.get('decision') == 'block', result.stdout
+        assert 'bad.js' in out['reason']
+        assert 'SKIP_PIPELINE_GATE' not in out['reason'], \
+            'the block reason tells the agent how to switch the gate off'
+        assert 'SKIP_PIPELINE_GATE=1' in result.stderr, 'the human lost the bypass hint'
+
+    @needs_gate_python
+    @pytest.mark.parametrize('prelude_extra', ['', 'export DEV_GATE_NO_TIMEOUT_BIN=1'],
+                             ids=['timeout-binary', 'no-timeout-binary'])
+    def test_slow_check_is_cut_off_and_reported_not_verified(self, tmp_path, prelude_extra):
+        """
+        WHY THIS TEST (A-20):
+        - PROBLEM: checks had no time bound; one slower than the 120 s hook timeout got
+          the hook cancelled and its output discarded - the gate failed open silently.
+          Stock macOS has no `timeout` binary, so the no-timeout-binary case must be
+          bounded too (the pure-bash watchdog).
+        - SUCCESS: a hanging mypy is cut off by the shared budget and the message says
+          NOT VERIFIED instead of "all language checks passed".
+        Budget 10 leaves headroom for file listing + py_compile on a loaded box; which
+        checks it cuts off besides mypy does not matter here.
+        """
+        project = _git_project(tmp_path, {
+            'ok.py': 'x = 1\n',
+            'stubs/mypy': '#!/usr/bin/env bash\nsleep 60\n',
+        })
+        os.chmod(str(project / 'stubs' / 'mypy'), 0o755)
+
+        result, secs = _run_gate(
+            project,
+            'export PATH="$PWD/stubs:$PATH"\nexport DEV_GATE_BUDGET=10\n' + prelude_extra)
+
+        assert secs < 30, f'the gate waited {secs:.0f}s for a hanging check'
+        msg = json.loads(result.stdout)['systemMessage']
+        assert 'NOT VERIFIED (time budget):' in msg, msg
+        assert 'mypy' in msg.split('NOT VERIFIED (time budget):', 1)[1], msg
+        assert 'all language checks passed' not in msg, msg
+
+    def test_skipped_tsc_is_not_reported_as_passed(self, tmp_path):
+        """
+        WHY THIS TEST (A-43): with no local TypeScript the gate said "all language checks
+        passed" although tsc never ran. It must say the check was skipped.
+        """
+        project = _ts_project(tmp_path, 'const x: number = "bad";\n')
+
+        result, _ = _run_gate(project)
+
+        msg = json.loads(result.stdout)['systemMessage']
+        assert 'all language checks passed' not in msg, msg
+        assert 'checks skipped: TS' in msg, msg
 
 
 @needs_tsc
 class TestDevPipelineGateCompileCheck:
     def test_blocks_on_broken_typescript(self, tmp_path):
-        project = _ts_project(tmp_path, 'const x: number = "not a number";\n')
+        project = _ts_project(tmp_path, 'const x: number = "not a number";\n',
+                              with_typescript=True)
 
-        result = _run(GATE_HOOK, {'session_id': 's1', 'cwd': str(project)}, project)
+        result, _ = _run_gate(project)
 
         assert result.returncode == 0, result.stderr
         out = json.loads(result.stdout)
         assert out.get('decision') == 'block', (
             f'broken TypeScript did not block the stop: {result.stdout!r}'
         )
-        assert 'TS2322' in out.get('reason', '') or 'tsc' in out.get('reason', ''), \
+        assert 'TS2322' in out.get('reason', ''), \
             'the block reason must carry the compiler error'
 
     def test_allows_clean_typescript(self, tmp_path):
-        project = _ts_project(tmp_path, 'const x: number = 42;\nexport default x;\n')
+        project = _ts_project(tmp_path, 'const x: number = 42;\nexport default x;\n',
+                              with_typescript=True)
 
-        result = _run(GATE_HOOK, {'session_id': 's1', 'cwd': str(project)}, project)
+        result, _ = _run_gate(project)
 
         assert result.returncode == 0
         if result.stdout.strip():
