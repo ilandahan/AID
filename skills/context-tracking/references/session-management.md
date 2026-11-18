@@ -70,7 +70,7 @@ function generateSessionId() {
 │                                                              │
 │  2. Load Context                                             │
 │     ├── Read .aid/context.json                               │
-│     ├── Sync with .aid/state.json                            │
+│     ├── Read phase from .aid/state.json                      │
 │     └── Check staleness                                      │
 │                                                              │
 │  3. Display Status                                           │

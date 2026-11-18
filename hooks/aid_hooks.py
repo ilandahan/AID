@@ -420,7 +420,7 @@ def handle_session_start(input_data, config):
         clear_markers()
         added, err = aid_guard.ensure_permissions(PROJECT_ROOT)   # AC-38ext: config-only roots too
         if added:
-            notes.append("AID added {} permission deny rules to .claude/settings.json "
+            notes.append("AID added {} permission rules (deny, and ask-the-user for phase changes) to .claude/settings.json "
                          "protecting its gate configuration.".format(added))
         if err:
             notes.append("WARNING: AID could not install its permission deny rules: " + err)
@@ -460,7 +460,7 @@ def handle_session_start(input_data, config):
         "event": "SessionStart",
         "source": input_data.get("source", "unknown"),
         "phase": state.get("current_phase") if state else None,
-        "role": state.get("current_session", {}).get("role") if state else None,
+        "role": get_session(state).get("role"),
     })
 
     if not state:
@@ -470,7 +470,7 @@ def handle_session_start(input_data, config):
         )
         return
 
-    session = state.get("current_session", {})
+    session = get_session(state)
     if not session.get("active"):
         say(
             "NOTE: No active AID session. Run /aid-start to select your role and phase."
@@ -561,7 +561,7 @@ def handle_user_prompt_submit(input_data, config):
             output_allow()
         return
 
-    session = state.get("current_session", {})
+    session = get_session(state)
     if not session.get("active"):
         if level != "log":
             output_allow("NOTE: AID session inactive. Run /aid-start to resume.")
@@ -669,6 +669,26 @@ def gate_level(config, hook_name, control_reason):
     tamper protection (otherwise "log" would let the agent rewrite that very file).
     """
     return "block" if control_reason else get_enforcement_level(config, hook_name)
+
+
+def get_session(state):
+    """
+    T3-3 (A-18, D-09): the ONE reader of the session. aid_session.py (since T3) writes
+    current_session {active, role, phase, started}; older state files only have the flat
+    keys (status: active, role, current_phase, ...). Both shapes are accepted, nested wins.
+    """
+    if not isinstance(state, dict):
+        return {}
+    flat = {"active": state.get("status") == "active", "role": state.get("role"),
+            "role_display": state.get("role_display"),
+            "phase": state.get("current_phase", state.get("phase")),
+            "phase_display": state.get("phase_display"),
+            "skills_loaded": state.get("skills_loaded")}
+    session = {k: v for k, v in flat.items() if v is not None}
+    nested = state.get("current_session")
+    if isinstance(nested, dict):
+        session.update(nested)
+    return session
 
 
 def aid_in_use():
@@ -809,7 +829,7 @@ def handle_audit_log(input_data, config):
         "event": "PostToolUse",
         "tool": tool_name,
         "phase": state.get("current_phase") if state else None,
-        "role": state.get("current_session", {}).get("role") if state else None,
+        "role": get_session(state).get("role"),
     }
 
     # Add tool-specific fields (concise, no full content)
@@ -859,7 +879,7 @@ def handle_quality_check(input_data, config):
         output_allow()
         return
 
-    session = state.get("current_session", {})
+    session = get_session(state)
     if not session.get("active"):
         output_allow()
         return

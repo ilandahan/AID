@@ -29,9 +29,14 @@ This command provides a gate check before moving to the next phase. It ensures:
    - Ask for rating (1-5)
    - Ask what worked well
    - Ask what could improve
-   - Save feedback to `~/.aid/feedback/pending/{timestamp}.json`
+   - Do NOT write a feedback file yourself: the feedback travels in the `approve --note`
 5. **Request Approval**: Ask human to confirm
-6. **Update State**: Set `phase_approved: true` and `feedback_provided: true`
+6. **Record Approval**: Run `aid_session.py approve` (see Implementation). It sets
+   `phase_approved` and `feedback_provided` for the current phase. Claude Code asks the
+   user to confirm the call; if the user declines, nothing changes.
+
+`.aid/state.json` is written only by `aid_session.py`. Never edit it directly: the phase
+gates refuse any agent write to it.
 
 ## MANDATORY: Feedback Collection
 
@@ -64,20 +69,16 @@ Before showing the approval prompt, Claude MUST:
    (Examples: more detail needed, different approach, better communication)
    ```
 
-4. **Save Feedback** to `~/.aid/feedback/pending/{timestamp}.json`:
-   ```json
-   {
-     "timestamp": "2024-01-15T12:20:00Z",
-     "phase": "PRD",
-     "phase_number": 1,
-     "rating": 4,
-     "worked_well": "Clear requirements, good user story format",
-     "to_improve": "Could include more technical constraints",
-     "type": "phase_approval"
-   }
+4. **Condense the feedback into the approval note.** Do not write any feedback file
+   yourself (the phase gates refuse `~/.aid/feedback/` before Phase 4). Instead, put the
+   rating and a short summary into the `approve --note` text, using only letters, digits,
+   spaces and `. _ : -`, for example:
    ```
+   rating 4 clear scope - more technical constraints next time
+   ```
+   The script stores it in `.aid/state.json` as `phase_approval_note`.
 
-5. **Only AFTER feedback is saved**, proceed to approval prompt
+5. **Only AFTER all three answers are collected**, proceed to approval prompt
 
 ## Phase Checklists
 
@@ -135,20 +136,28 @@ What worked well?
 What could be improved?
 > More technical constraints upfront
 
-✅ Feedback saved to ~/.aid/feedback/pending/
+Feedback note: rating 4 clear requirements format - more technical constraints upfront
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Type 'approve' to approve this phase and allow advancement.
 Type 'reject' to continue working on this phase.
+> approve
+
+Recording approval with aid_session.py approve.
+Claude Code will ask you to confirm this command. If you decline, nothing changes.
+
+[script output, shown verbatim]
+
+Next steps:
+- Run /phase-advance to move to Phase 2 (Tech Spec)
 ```
 
 ## After Approval
 
-Once approved:
-- `phase_approved` is set to `true` in `.aid/state.json`
-- `feedback_provided` is set to `true` in `.aid/state.json`
-- Feedback is saved to learning system
+Once approved (the user typed `approve` AND confirmed the `aid_session.py approve` prompt):
+- `aid_session.py` has set `phase_approved` and `feedback_provided` in `.aid/state.json`
+- The feedback note is stored as `phase_approval_note`
 - Run `/phase-advance` to move to the next phase
 - Or continue working in current phase if needed
 
@@ -159,14 +168,30 @@ When this command is invoked:
 1. Read `.aid/state.json` to get current phase
 2. Display phase-specific checklist
 3. **MANDATORY: Collect feedback** (rating, worked well, to improve)
-4. Save feedback to `~/.aid/feedback/pending/{timestamp}.json`
-5. Update `.aid/state.json` with `feedback_provided: true`
-6. Ask for human confirmation
-7. If confirmed:
-   - Set `phase_approved: true`
-   - Update `last_updated` timestamp
-   - Save to `.aid/state.json`
-8. Display next steps
+4. Condense the feedback into one note (rating plus short summary, allowed characters only)
+5. Ask for human confirmation (`approve` / `reject`)
+6. If the user typed `approve`, run ONE Bash call:
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" approve --note "rating <1-5> <short summary>"
+   ```
+
+   - Run it exactly in this shape: one simple command, lowercase `python`, single spaces,
+     no `;`, `&&`, pipes, redirects, `$( )` or loops.
+   - Always pass `--note`, never empty: it carries at least the rating, for example
+     `--note "rating 4 clear scope"`. Its text may contain only letters, digits, spaces and
+     `. _ : -` (no commas, apostrophes, slashes or parentheses).
+   - If `${CLAUDE_PLUGIN_ROOT}` was not replaced by a real path, this is not a plugin
+     install: AID's phase commands need the plugin (`claude plugin install aid@AID`). Do not
+     substitute another path. The user can also run the command themselves by typing it
+     with a leading `!`.
+   - Claude Code will ask the user to confirm this call. That prompt is the real human
+     sign-off. If the user declines, nothing changes and the phase stays unapproved.
+   - The script sets `phase_approved` and `feedback_provided` and prints what it did. Show
+     that output. If it refuses (non-zero exit), show its reason to the user verbatim.
+   - Never retry in another spelling, never work around a refusal or a declined prompt, and
+     never edit `.aid/state.json` yourself.
+7. Display next steps
 
 ## Error: Missing Feedback
 

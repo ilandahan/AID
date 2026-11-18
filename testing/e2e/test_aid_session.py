@@ -48,7 +48,11 @@ def run(args, cwd=None):
 @pytest.fixture()
 def project(tmp_path):
     """An empty project dir plus an isolated HOME, so feedback never touches the real one."""
-    (tmp_path / '.aid').mkdir()
+    # T3 (owner 2026-11-17): the project marker makes tmp_path the AID root the script
+    # resolves (A2: it uses the hooks' root resolution), and the first state is `init`
+    # (`start` never creates it). These tests exercise role/phase resolution, which is shared.
+    (tmp_path / '.aid' / 'hooks').mkdir(parents=True)
+    (tmp_path / '.aid' / 'hooks' / 'config.json').write_text('{}', encoding='utf-8')
     home = tmp_path / 'home'
     home.mkdir()
     os.environ['HOME'] = str(home)
@@ -87,15 +91,15 @@ class TestMenuNumbersSelectWhatTheMenuShowed:
 
     @pytest.mark.parametrize("number,expected", list(enumerate(ROLE_IDS, 1)))
     def test_role_number_resolves_to_the_listed_role(self, number, expected, project):
-        assert run(['start', str(number), '0'], cwd=project).returncode == 0
+        assert run(['init', str(number), '0'], cwd=project).returncode == 0
         assert read_state(project)['role'] == expected
 
     def test_number_after_the_last_role_is_other(self, project):
-        assert run(['start', str(len(ROLE_IDS) + 1), '0'], cwd=project).returncode == 0
+        assert run(['init', str(len(ROLE_IDS) + 1), '0'], cwd=project).returncode == 0
         assert read_state(project)['role'] == 'other'
 
     def test_other_falls_back_to_developer_terminology(self, project):
-        run(['start', 'other', '4'], cwd=project)
+        run(['init', 'other', '4'], cwd=project)
         expected = TERMS_DATA['phases']['developer']['4']['name']
         assert read_state(project)['phase_display'] == expected
 
@@ -104,7 +108,7 @@ class TestEveryCombinationStarts:
 
     @pytest.mark.parametrize("role,phase", ROLE_PHASE)
     def test_role_phase_pair_writes_usable_state(self, role, phase, project):
-        result = run(['start', role, phase], cwd=project)
+        result = run(['init', role, phase], cwd=project)
         assert result.returncode == 0, result.stderr
         state = read_state(project)
         assert state['role'] == role
@@ -121,13 +125,13 @@ class TestEveryCombinationStarts:
 class TestRejectsBadInput:
 
     def test_unknown_role_exits_nonzero(self, project):
-        assert run(['start', 'nope', '0'], cwd=project).returncode != 0
+        assert run(['init', 'nope', '0'], cwd=project).returncode != 0
 
     def test_role_number_past_other_is_rejected(self, project):
-        assert run(['start', str(len(ROLE_IDS) + 2), '0'], cwd=project).returncode != 0
+        assert run(['init', str(len(ROLE_IDS) + 2), '0'], cwd=project).returncode != 0
 
     def test_unknown_phase_exits_nonzero(self, project):
-        assert run(['start', 'pm', '9'], cwd=project).returncode != 0
+        assert run(['init', 'pm', '9'], cwd=project).returncode != 0
 
     def test_end_without_a_session_exits_nonzero(self, tmp_path):
         assert run(['end', '--rating', '3'], cwd=tmp_path).returncode != 0
@@ -136,7 +140,7 @@ class TestRejectsBadInput:
 class TestEndRecordsTheSession:
 
     def test_feedback_and_review_verdict_are_saved(self, project):
-        run(['start', 'qa', '5'], cwd=project)
+        run(['init', 'qa', '5'], cwd=project)
         result = run(['end', '--rating', '4', '--worked', 'w', '--improve', 'i',
                       '--review', 'partial', '--review-note', '2 ACs missing'], cwd=project)
         assert result.returncode == 0, result.stderr

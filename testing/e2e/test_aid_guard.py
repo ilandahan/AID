@@ -877,8 +877,9 @@ def _wpaths(w):
                 P + '/docs/w/.git /config', P + '/docs/w/.git', P + '/src/app.ts']
     P_deny_5 = [P + '/.claude/settings.json', P + '/.CLAUDE/SETTINGS.JSON',
                 '.aid/hooks/config.json', '.aid/pipeline/ESCALATION.json', '.aid/pipeline/escalation.json',
-                '.claude/settings.local.json', '.claude/hooks/x.sh', str(H / '.claude' / 'settings.json')]
-    allow = [P + '/docs/spec.md', P + '/.claude/plans/x.ts', P + '/.aid/state.json',
+                '.claude/settings.local.json', '.claude/hooks/x.sh', str(H / '.claude' / 'settings.json'),
+                P + '/.aid/state.json', '.aid/state.json']    # T3 (owner 2026-11-17): flipped from allow
+    allow = [P + '/docs/spec.md', P + '/.claude/plans/x.ts', P + '/.aid/pipeline/state.json',
              str(H / '.claude' / 'plans' / 'p.md')]
     if WIN:
         B = P.replace('/', '\\')
@@ -890,7 +891,8 @@ def _wpaths(w):
                      B + '\\.claude\\settings.json::$DATA', B + '\\CLAUDE~1\\settings.json', '\\\\?\\' + B + '\\.claude\\settings.json',
                      '.aid\\hooks\\config.json', '.aid\\pipeline\\ESCALATION.json', '.claude\\settings.local.json',
                      '.claude\\hooks\\x.sh']
-        allow += [B + '\\docs\\spec.md', B + '\\DOCS\\spec.md', B + '\\.aid\\state.json',
+        P_deny_5 += [B + '\\.aid\\state.json']                  # T3 (owner 2026-11-17): flipped
+        allow += [B + '\\docs\\spec.md', B + '\\DOCS\\spec.md', B + '\\.aid\\pipeline\\state.json',
                   '/' + P[0].lower() + P[2:].replace('\\', '/') + '/docs/x.md']
     return P_deny_1, P_deny_5, allow
 
@@ -923,7 +925,7 @@ def test_f3_protected_set_ignores_case_on_every_os(monkeypatch, is_win):
         assert g.is_protected(p), p
     for p in ('/u/p/.CLAUDE', '/u/p/.AID/Pipeline', '/u/p/.Claude/Plugins'):
         assert g.is_protected_or_parent(p), p
-    for p in ('/u/p/docs/settings.json', '/u/p/.claude/plans/x.md', '/u/p/.aid/state.json'):
+    for p in ('/u/p/docs/settings.json', '/u/p/.claude/plans/x.md', '/u/p/.aid/pipeline/state.json'):
         assert not g.is_protected(p), p
 
 

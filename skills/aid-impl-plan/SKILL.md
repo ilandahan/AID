@@ -237,6 +237,9 @@ Enhancement Template:
 
 ## State Tracking
 
+Do not write these fields yourself: `.aid/state.json` is written only by `aid_session.py`
+(phase changes go through `/phase-approve` and `/phase-advance`), and the phase gates refuse
+direct edits. Track 3a-3d progress in `.aid/context.json`. Shape for reference
 `.aid/state.json`:
 ```json
 {

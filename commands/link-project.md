@@ -56,7 +56,9 @@ my-project/
 5. **Create Symbolic Links**:
    - Windows: `mklink /D` (requires Admin or Developer Mode)
    - Mac/Linux: `ln -s`
-6. **Create .aid Directory** with fresh state files
+6. **Create .aid Directory** with a fresh `context.json`. Do not write `.aid/state.json`:
+   only `aid_session.py` writes it. It is created when the user runs `/aid-start` in the
+   linked project: with no `state.json` it runs `init`, which the user confirms.
 7. **Copy .mcp.json.example** to target as `.mcp.json`
 8. **Link CLAUDE.md** for methodology instructions
 9. **Show Success** with next steps
@@ -102,8 +104,8 @@ Creating symbolic links...
   [OK] CLAUDE.md        -> AID methodology
 
 Creating project-specific files...
-  [OK] .aid/state.json
   [OK] .aid/context.json
+  [--] .aid/state.json (created by /aid-start)
   [OK] .mcp.json (reads tokens from environment variables)
   [OK] .mcp.json added to .gitignore
 

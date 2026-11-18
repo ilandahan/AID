@@ -185,7 +185,25 @@ If review status is PENDING, Claude will:
    )
    ```
 5. Process result (PASS/PARTIAL/FAIL)
-6. Update `.aid/state.json` with review status
+6. Record the review status with ONE Bash call (no confirmation prompt):
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" review <N> <PASS|PARTIAL|FAIL> --note "<one-line issue summary>"
+   ```
+
+   - Run it exactly in this shape: one simple command, lowercase `python`, single spaces,
+     no `;`, `&&`, pipes, redirects, `$( )` or loops. `--note` is optional; its text may
+     contain only letters, digits, spaces and `. _ : -` (no commas, apostrophes, slashes or
+     parentheses). Leave the flag out entirely when its text would be empty (an empty `""`
+     is refused).
+   - If `${CLAUDE_PLUGIN_ROOT}` was not replaced by a real path, this is not a plugin
+     install: AID's phase commands need the plugin (`claude plugin install aid@AID`). Do not
+     substitute another path. The user can also run the command themselves by typing it
+     with a leading `!`.
+   - The script stores the result under `subagent_review.phase_<N>`, the same key
+     `/phase-advance` reads. It prints what it did; if it refuses (non-zero exit), show its
+     reason to the user verbatim.
+   - Never edit `.aid/state.json` yourself: `aid_session.py` is its only writer.
 
 ### Review Cannot Be Skipped
 

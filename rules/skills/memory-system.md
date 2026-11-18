@@ -68,11 +68,18 @@ Task(
 
 ### Update Triggers
 
-Update `.aid/state.json` when:
-- Session starts (`/aid-start`)
-- Session ends (`/aid-end`)
-- Phase changes
-- Improvement analysis runs
+The project `.aid/state.json` is a protected control file. It is written only by
+`hooks/aid_session.py`, through these commands:
+- `/aid-start` (`init` for a new project and `jump` for a forward move, both confirmed by
+  the user; `start` for the current or an earlier phase)
+- `/setup` (`init`, which the user confirms)
+- `/aid-end` (`end`, `review`)
+- `/phase-approve` (`approve`, which the user confirms)
+- `/phase-advance` (`advance`, which the user confirms)
+- `/gate-check` (`review`)
+
+Never edit the project `.aid/state.json` directly (Write, Edit, Bash or redirects); the
+phase gates refuse it in every phase. Reading it is fine.
 
 Update `.aid/context.json` when:
 - New task begins
@@ -146,7 +153,7 @@ When session starts, load references from `skills/memory-system/references/`:
 |-------|--------|
 | Missing `~/.aid/` | Run `/aid-init` automatically |
 | Missing skill files | Use defaults, log warning |
-| Corrupted state.json | Backup and reset |
+| Corrupted project `.aid/state.json` | Do not edit it. Run `aid_session.py init <role> <phase> --repair` (the user confirms) |
 | User skips rating | Gently insist, then save as null |
 
 ---

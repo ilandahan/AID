@@ -369,7 +369,7 @@ degrades to something usable rather than stopping the session.
 |-------|--------|
 | Missing `~/.aid/` | Run `/aid-init` automatically |
 | Missing skill files | Use defaults, log warning |
-| Corrupted `state.json` | Backup and reset |
+| Corrupted project `.aid/state.json` | Do not edit it. Run `aid_session.py init <role> <phase> --repair` (the user confirms) |
 | User skips rating | Gently insist, then save as null |
 
 ---

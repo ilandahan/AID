@@ -118,7 +118,8 @@ class TestPhaseGateWriteBlocks:
         )
         assert 'reason' not in hso, 'the reason field must be permissionDecisionReason'
 
-    @pytest.mark.parametrize('path', ['docs/prd.md', '.aid/state.json',
+    # T3 (owner 2026-11-17): .aid/state.json left this list; it is a control file now.
+    @pytest.mark.parametrize('path', ['docs/prd.md',
                                       'testing/e2e/test_x.py', 'features/login.feature'])
     def test_allowed_prefixes_are_not_blocked(self, tmp_path, path):
         """Writing docs during Phase 1 is the whole point of Phase 1."""
@@ -457,10 +458,12 @@ class TestProtectedPaths:
         p = make_project(tmp_path, phase=1, enforcement={'phase_gate_bash': 'block'})
         assert not bash_denied(p, command)
 
-    @pytest.mark.parametrize('path', ['.aid/state.json', '.aid/qa/T1.yaml', 'docs/prd.md',
+    # T3 (owner 2026-11-17): .aid/state.json flipped to protected (T3-1); see
+    # test_t3_1_state_json_is_a_control_file.
+    @pytest.mark.parametrize('path', ['.aid/pipeline/state.json', '.aid/qa/T1.yaml', 'docs/prd.md',
                                       '.claude/plans/x.md', '.claude/commands/x.md'])
     def test_other_aid_and_claude_files_stay_writable(self, tmp_path, path):
-        """.aid/state.json stays writable until T3 moves phase-approve/advance into aid_session.py."""
+        """Other .aid/.claude files stay writable; only the control files are refused."""
         p = make_project(tmp_path, phase=1, enforcement={'phase_gate_write': 'block'})
         assert not run_gate(p, 'phase_gate_write', {'file_path': path})
 
@@ -620,7 +623,9 @@ def test_ac_38_session_start_installs_deny_rules_and_nothing_else(acp):
     data = json.loads(s.read_text(encoding='utf-8'))
     assert all(r in data['permissions']['deny'] for r in aid_guard.DENY_RULES)
     assert 'Bash(rm:*)' in data['permissions']['deny'] and data['x'] == 1
-    assert set(data) == {'permissions', 'x'} and set(data['permissions']) == {'deny'}
+    # T3 (owner 2026-11-17): layer A also installs the T3-4 ask rules.
+    assert all(r in data['permissions']['ask'] for r in aid_guard.ASK_RULES)
+    assert set(data) == {'permissions', 'x'} and set(data['permissions']) == {'deny', 'ask'}
     before = s.read_bytes()
     acp.start('s1')
     assert s.read_bytes() == before
@@ -1270,3 +1275,326 @@ def test_t2_d1_security_model_lists_the_real_deny_rules():
     text = Path(REPO_ROOT, 'docs', 'SECURITY-MODEL.md').read_text(encoding='utf-8')
     for rule in aid_guard.DENY_RULES:
         assert '`{}`'.format(rule) in text, rule
+
+
+# ===========================================================================
+# T3 (T3-acceptance.md): protected phase state, human-confirmed phase changes,
+# one session schema, QA gate id/key.
+# ===========================================================================
+
+SESSION = os.path.join(REPO_ROOT, 'hooks', 'aid_session.py')
+SESSION_FWD = SESSION.replace('\\', '/')
+QA_HOOK = os.path.join(REPO_ROOT, 'hooks', 'validate-qa-gate.py')
+
+
+def sess(project, home, *args):
+    """Run the REAL writer (T3-3: fixtures come from the writer, not by hand)."""
+    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
+    p = subprocess.run([sys.executable, SESSION] + list(args), cwd=str(project), env=env,
+                       capture_output=True, text=True, timeout=60, encoding='utf-8', errors='replace')
+    return p.returncode, (p.stdout + p.stderr)
+
+
+def state_of(project):
+    return json.loads((Path(project) / '.aid' / 'state.json').read_text(encoding='utf-8'))
+
+
+@pytest.mark.parametrize('level', ['block', 'log'])
+@pytest.mark.parametrize('phase', [1, 5])
+def test_t3_1_state_json_is_a_control_file(acp, level, phase):
+    """
+    WHY (T1 N-9, reproduced in the T2 review): the gates read .aid/state.json and the agent
+    could write it; {"current_phase": 5} switched every gate off.
+    """
+    acp.level(level)
+    acp.state(phase)
+    acp.start('s1')
+    for target in (str(acp.P / '.aid' / 'state.json'), '.aid/state.json'):
+        v = acp.write(target)
+        assert v[0] == 'DENY' and 'control file' in v[1], (target, v)
+    v = acp.bash('echo {} > .aid/state.json')
+    assert v[0] == 'DENY', v
+    assert acp.bash('cat .aid/state.json') == ('ALLOW', None)
+    assert acp.write(str(acp.P / '.aid' / 'pipeline' / 'state.json'))[0] == 'ALLOW'
+
+
+def test_t3_2_only_the_script_moves_the_phase(clean_tmp):
+    """WHY (G1): `aid_session.py start developer 4` jumped an unapproved project to Phase 4;
+    G2: gate-check wrote phase_reviews.N while phase-advance read subagent_review.phase_N."""
+    P, H = clean_tmp / 'P', clean_tmp / 'H'
+    P.mkdir()
+    H.mkdir()
+    rc, out = sess(P, H, 'start', 'developer', '1')                 # A2: start never creates
+    assert rc != 0 and 'init' in out and not (P / '.aid' / 'state.json').exists()
+    assert sess(P, H, 'init', 'developer', '1')[0] == 0              # confirmed by the user
+    cs = state_of(P)['current_session']
+    assert cs['active'] is True and cs['phase'] == 1 and cs['role'] == 'developer' and cs['started']
+    rc, out = sess(P, H, 'start', 'developer', '3')
+    assert rc != 0 and 'jump' in out and state_of(P)['current_phase'] == 1
+    rc, out = sess(P, H, 'advance')
+    assert rc != 0 and 'not approved' in out
+    assert sess(P, H, 'review', '1', 'PASS')[0] == 0
+    assert state_of(P)['subagent_review']['phase_1']['status'] == 'passed'
+    assert sess(P, H, 'approve', '--note', 'looks good')[0] == 0
+    assert sess(P, H, 'advance')[0] == 0
+    s = state_of(P)
+    assert s['current_phase'] == 2 and s['phase_approved'] is False
+    assert s['current_session']['phase'] == 2 and s['phase_name'] == 'Tech Spec'
+    assert sess(P, H, 'jump', 'developer', '4')[0] == 0 and state_of(P)['current_phase'] == 4
+    cs = state_of(P)['current_session']
+    assert cs['active'] is True and cs['phase'] == 4 and cs['role'] == 'developer' and cs['started']
+    rc, out = sess(P, H, 'jump', 'developer', '2')
+    assert rc != 0 and 'forward' in out
+    # An approval belongs to its phase: moving back drops it.
+    assert sess(P, H, 'approve')[0] == 0
+    assert sess(P, H, 'start', 'developer', '2')[0] == 0
+    assert state_of(P)['phase_approved'] is False
+    assert sess(P, H, 'init', 'developer', '0')[0] != 0             # state exists
+    (P / '.aid' / 'state.json').write_text('{bad', encoding='utf-8')
+    for args in (('start', 'developer', '2'), ('approve',), ('advance',), ('review', '2', 'PASS')):
+        rc, out = sess(P, H, *args)
+        assert rc != 0 and '--repair' in out, (args, out)
+    # T3 review r1: argparse abbreviations are off, so `--rep` is not --repair.
+    rc, out = sess(P, H, 'init', 'developer', '5', '--rep')
+    assert rc != 0 and 'unrecognized' in out, out
+    assert sess(P, H, 'init', 'developer', '2', '--repair')[0] == 0
+    assert state_of(P)['current_phase'] == 2
+    assert not list((P / '.aid').glob('*.tmp'))                     # atomic write left nothing
+
+
+@pytest.mark.parametrize('shape', ['writer', 'legacy-flat', 'legacy-nested'])
+def test_t3_3_session_start_sees_the_session_the_writer_wrote(acp, shape):
+    """WHY (A-18, D-09): right after /aid-start, SessionStart said 'No active AID session'."""
+    if shape == 'writer':
+        (acp.P / '.aid' / 'state.json').unlink()
+        assert sess(acp.P, acp.H, 'init', 'developer', '1')[0] == 0
+    elif shape == 'legacy-flat':
+        (acp.P / '.aid' / 'state.json').write_text(json.dumps(
+            {'current_phase': 1, 'status': 'active', 'role': 'developer'}), encoding='utf-8')
+    else:
+        (acp.P / '.aid' / 'state.json').write_text(json.dumps(
+            {'current_phase': 1, 'current_session': {'active': True, 'role': 'developer'}}), encoding='utf-8')
+    out = acp.start('s1')
+    assert 'No active AID session' not in out, out
+    if shape == 'writer':
+        assert sess(acp.P, acp.H, 'end', '--rating', '4')[0] == 0
+        assert 'No active AID session' in acp.start('s2')
+
+
+def test_t3_4_ask_rules_installed_and_watched(acp):
+    """WHY: the ask rules are the human-confirmation layer; removing one mid-session must
+    be caught like removing a deny rule (layer B)."""
+    acp.start('s1')
+    s = acp.P / '.claude' / 'settings.json'
+    data = json.loads(s.read_text(encoding='utf-8'))
+    assert all(r in data['permissions']['ask'] for r in aid_guard.ASK_RULES)
+    assert acp.bash('ls') == ('ALLOW', None)
+    data['permissions']['ask'] = data['permissions']['ask'][1:]
+    s.write_text(json.dumps(data), encoding='utf-8')
+    v = acp.bash('ls')
+    assert v[0] == 'DENY' and 'removed' in v[1], v
+
+
+T3_CONFIRMED_DENY = [
+    'PYTHON "{s}" approve', 'python.exe "{s}" approve', 'Python "{s}" jump developer 5',
+    'python "{s}"  advance', 'python "{d}/AID_SESSION.PY" approve',
+    # T3 review r1: argparse abbreviations, and bash-equivalent quoting of the subcommand.
+    'python "{s}" "approve"', 'python "{s}" ap""prove',
+    'python "{s}" ap\\prove', 'python "{s}" -- advance',
+    # T3 review r2 BLOCKER: a quote pair inside the script NAME hid the call.
+    'PYTHON "{d}/aid_sess""ion.py" approve', 'python "{d}/AID_SESS""ION.PY" jump developer 5',
+    'python.exe "{d}/aid_sess""ion.py" init developer 5', 'python "{d}/aid_sess"ion.py advance',
+    'python "{d}/aid_sess""ion.py"  approve',
+    # T3 review r3: 'aid_session' in a PARENT segment fooled the text check (the AC-23
+    # words check catches it), and bash-only quoting hid the subcommand at log / Phase 4.
+    'PYTHON "{d}/aid_session x/../aid_session.py" approve',
+    'python "{d}/AID_SESSION x/../AID_SESSION.PY" jump developer 5',
+    "PYTHON \"{s}\" $'\\x61pprove'", 'PYTHON "{s}" app\\\nrove',
+]
+
+
+@pytest.mark.parametrize('level,phase', [('block', 1), ('log', 1), ('block', 4)])
+@pytest.mark.parametrize('form', T3_CONFIRMED_DENY)
+def test_t3_4b_confirmed_subcommands_only_in_the_asked_spelling(acp, form, level, phase):
+    """
+    WHY (T3-P1, T3-probe.md): Claude Code's ask rules match case-sensitively, but Windows
+    runs PYTHON too, and AC-23 lowercased the interpreter. Any other spelling would change
+    the phase without asking the user, so the gate refuses it at every level and phase.
+    """
+    acp.level(level)
+    acp.state(phase)
+    acp.start('s1')
+    cmd = form.format(s=SESSION_FWD, d=os.path.dirname(SESSION_FWD))
+    v = acp.bash(cmd)
+    assert v[0] == 'DENY' and 'confirm' in v[1], (cmd, v)
+
+
+@pytest.mark.parametrize('cmd', ['python "{s}" approve', 'python3 "{s}" advance', 'py "{b}" jump developer 3',
+                                 'python "{s}" init developer 2', 'python "{s}" init developer 2 --repair',
+                                 'python "{s}" start developer 1', 'python "{s}" review 1 PASS',
+                                 # T3 docs review r2 BLOCKER/MAJOR: the documented quoted values
+                                 'python "{s}" approve --note "rating 4 clear scope"',
+                                 'python "{s}" init other 0 --role-desc "Ops engineer"',
+                                 'python "{s}" jump developer 3 --phase-desc "infra work"'])
+def test_t3_4b_the_asked_spelling_passes_the_gate(acp, cmd):
+    """The lower-case AC-23 forms pass AID's gate; Claude Code then asks the user (T3-P1)."""
+    acp.start('s1')
+    v = acp.bash(cmd.format(s=SESSION_FWD, b=SESSION.replace('/', '\\')))
+    assert v == ('ALLOW', None), v
+
+
+def test_t3_4b_ask_rules_match_the_spellings_they_must():
+    import fnmatch
+    pats = [r[len('Bash('):-1] for r in aid_guard.ASK_RULES]
+    for cmd in ('python {s} approve', 'python3 {s} advance', 'py {s} jump developer 3',
+                'python {s} init developer 2', 'python {s} init developer 2 --repair'):
+        assert any(fnmatch.fnmatchcase(cmd.format(s=SESSION_FWD), p) for p in pats), cmd
+    for cmd in ('python {s} start developer 1', 'python {s} review 1 PASS', 'python {s} roles'):
+        assert not any(fnmatch.fnmatchcase(cmd.format(s=SESSION_FWD), p) for p in pats), cmd
+
+
+T3_STATE_WRITE = __import__('re').compile(
+    r'(write|update|save|set|create|edit|sync|modify)[^|\n]*\.aid/state\.json|'
+    r'\.aid/state\.json[^|\n]*(write|update|save|set |create|edit|sync|modify)', __import__('re').I)
+T3_NEGATION = ('never', 'not ', "don't", 'only', 'aid_session', 'read-only', 'created by', 'refuse')
+
+
+def test_t3_5_no_markdown_tells_the_agent_to_write_state_json():
+    """WHY (T3-5): /phase-approve was a prompt that told the agent to edit state.json itself."""
+    hits = []
+    for top in ('commands', 'skills', 'rules', 'agents'):
+        for f in Path(REPO_ROOT, top).rglob('*.md'):
+            for n, line in enumerate(f.read_text(encoding='utf-8', errors='replace').splitlines(), 1):
+                low = line.lower()
+                if ('pipeline/state.json' in low or '~/.aid/state.json' in low
+                        or not T3_STATE_WRITE.search(line)):
+                    continue
+                if not any(w in low for w in T3_NEGATION):
+                    hits.append('{}:{}: {}'.format(f.relative_to(REPO_ROOT), n, line.strip()))
+    assert not hits, '\n'.join(hits)
+
+
+def test_t3_5_commands_call_the_script_in_the_gate_form():
+    """WHY (N-11): the old locator loop ($( ) + for) is denied before Phase 4."""
+    bad = []
+    for f in Path(REPO_ROOT, 'commands').glob('*.md'):
+        text = f.read_text(encoding='utf-8')
+        if 'for c in hooks/aid_session.py' in text or '$CLAUDE_PLUGIN_ROOT/' in text:
+            bad.append(str(f.name))
+        for line in text.splitlines():
+            s = line.strip()
+            if s.startswith(('python ', 'python3 ', 'py ')) and 'aid_session.py' in s:
+                if not s.startswith(('python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py"',
+                                     'python "${CLAUDE_PROJECT_DIR}/.claude/hooks/aid_session.py"')):
+                    bad.append('{}: {}'.format(f.name, s))
+    assert not bad, bad
+
+
+def _qa_project(root, current_task):
+    (root / '.aid' / 'qa').mkdir(parents=True)
+    (root / '.aid' / 'state.json').write_text(json.dumps({'current_phase': 4}), encoding='utf-8')
+    (root / '.aid' / 'context.json').write_text(json.dumps({'current_task': current_task}), encoding='utf-8')
+    (root / '.aid' / 'qa' / 'T-1.yaml').write_text('criteria:\n  - it works\n', encoding='utf-8')
+    p = subprocess.run([sys.executable, QA_HOOK], input='{}', capture_output=True, text=True,
+                       timeout=60, cwd=str(root))
+    assert p.returncode == 0, p.stderr
+    return json.loads(p.stdout) if p.stdout.strip() else {}
+
+
+@pytest.mark.parametrize('field', ['key', 'id'])
+def test_t3_6_qa_gate_reads_the_producers_task_key(tmp_path, field):
+    """WHY (A-17, D-06): the context writer stores current_task.key; the gate read only id,
+    so the QA Stop gate never fired for real context files."""
+    assert _qa_project(tmp_path, {field: 'T-1'}).get('decision') == 'block'
+
+
+def test_t3_6_qa_gate_tolerates_a_null_task(tmp_path):
+    """The installers seed "current_task": null."""
+    assert _qa_project(tmp_path, None).get('decision') != 'block'
+
+
+def test_t3_a2_script_uses_the_gates_project_root(clean_tmp):
+    """WHY (T3 review r1 BLOCKER): from cwd P/docs, `start developer 5` bootstrapped
+    P/docs/.aid/state.json at phase 5; the gates then took P/docs as the root and opened."""
+    P, H = clean_tmp / 'P', clean_tmp / 'H'
+    (P / 'docs').mkdir(parents=True)
+    H.mkdir()
+    assert sess(P, H, 'init', 'developer', '1')[0] == 0
+    D = P / 'docs'
+    for args in (('start', 'developer', '5'), ('init', 'developer', '5')):
+        rc, out = sess(D, H, *args)
+        assert rc != 0, (args, out)
+    assert not (D / '.aid').exists()
+    assert sess(D, H, 'review', '1', 'PASS')[0] == 0                 # writes the ROOT's file
+    assert state_of(P)['subagent_review']['phase_1']['status'] == 'passed'
+
+
+def _plugin_install(home):
+    """A real plugin layout: <home>/.claude/plugins/cache/AID/aid/<ver>/{hooks,references}."""
+    root = home / '.claude' / 'plugins' / 'cache' / 'AID' / 'aid' / '3.0.8'
+    shutil.copytree(os.path.join(REPO_ROOT, 'hooks'), str(root / 'hooks'),
+                    ignore=shutil.ignore_patterns('__pycache__'))
+    shutil.copytree(os.path.join(REPO_ROOT, 'references'), str(root / 'references'))
+    return root
+
+
+@pytest.mark.parametrize('phase', [1, 4, 5])
+def test_t3_a3_plugin_install_runs_its_script_in_every_phase(acp, phase):
+    """WHY (T3 review r1 BLOCKER): from Phase 4 the plugin-cache path read as a control file,
+    so /aid-end, /gate-check, /phase-approve and /phase-advance had no working path."""
+    root = _plugin_install(acp.H)
+    hook = str(root / 'hooks' / 'aid_hooks.py')
+    script = str(root / 'hooks' / 'aid_session.py').replace(chr(92), '/')
+    acp.state(phase)
+    env = dict(os.environ, HOME=str(acp.H), USERPROFILE=str(acp.H), AID_HOME=str(acp.H / '.aid'))
+    env.pop('CLAUDE_PROJECT_DIR', None)
+    env.pop('CLAUDE_CONFIG_DIR', None)
+
+    def gate(cmd):
+        p = subprocess.run([sys.executable, hook, '--event', 'PreToolUse', '--action', 'phase_gate_bash'],
+                           input=json.dumps({'session_id': 's1', 'cwd': str(acp.P), 'tool_name': 'Bash',
+                                             'tool_input': {'command': cmd}}),
+                           capture_output=True, text=True, cwd=str(acp.P), env=env, timeout=60)
+        return decision(p.stdout.strip())
+    for sub in ('approve', 'advance', 'review {} PASS'.format(phase), 'end --rating 4',
+                'start developer {}'.format(phase)):
+        assert gate('python "{}" {}'.format(script, sub)) == ('ALLOW', None), sub
+    v = gate('PYTHON "{}" approve'.format(script))
+    assert v[0] == 'DENY', v
+
+
+def test_t3_2_a_pre_created_tmp_name_cannot_block_writes(clean_tmp):
+    """WHY (T3 review NIT): with a fixed 'state.json.tmp', `mkdir .aid/state.json.tmp`
+    (allowed before Phase 4) made every aid_session write fail."""
+    P, H = clean_tmp / 'P', clean_tmp / 'H'
+    P.mkdir()
+    H.mkdir()
+    assert sess(P, H, 'init', 'developer', '1')[0] == 0
+    (P / '.aid' / 'state.json.tmp').mkdir()
+    rc, out = sess(P, H, 'review', '1', 'PASS')
+    assert rc == 0, out
+    assert state_of(P)['subagent_review']['phase_1']['status'] == 'passed'
+
+
+def test_t3_a5_user_level_state_file_is_not_a_control_file(monkeypatch, tmp_path):
+    """WHY (T3 review r1): the /.aid/state.json suffix also matched ~/.aid/state.json, the
+    user-level session file the memory-system skill and /aid-reset write."""
+    monkeypatch.setenv('AID_HOME', str(tmp_path / 'h' / '.aid'))
+    user = aid_guard.normalize(str(tmp_path / 'h' / '.aid' / 'state.json'), None, literal=True)
+    proj = aid_guard.normalize(str(tmp_path / 'p' / '.aid' / 'state.json'), None, literal=True)
+    assert not aid_guard.is_protected(user)
+    assert aid_guard.is_protected(proj)
+
+
+def test_t3_a1_state_json_is_not_a_layer_a_edit_rule():
+    """WHY (T3 review r1, owner A1): Claude Code merges Edit deny paths into the sandbox
+    denyWrite, which would stop aid_session.py itself from writing state.json."""
+    assert not any('state.json' in r for r in aid_guard.DENY_RULES)
+
+
+def test_t3_a3_near_miss_session_call_gets_a_specific_reason(acp):
+    """WHY (T3 review r1 MAJOR): a note with a comma was denied as "'python' is not on
+    AID's read-only list", sending the agent back to the command it was running."""
+    acp.start('s1')
+    v = acp.bash('python "{}" review 1 PARTIAL --note "Missing NFRs, add later"'.format(SESSION_FWD))
+    assert v[0] == 'DENY' and 'letters, digits, spaces' in v[1], v

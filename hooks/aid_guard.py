@@ -20,6 +20,7 @@ rationalises shortcuts -- not a sandbox.
 
 Pure functions only (no stdout, no exit): aid_hooks.py turns the verdicts into hook output.
 """
+import fnmatch
 import hashlib
 import json
 import os
@@ -47,6 +48,7 @@ PROTECTED_SUFFIXES = (
     "/.claude/settings.local.json",
     "/.claude/hooks/",
     "/.claude/plugins/cache/",
+    "/.aid/state.json",           # T3-1: the phase the gates read; only aid_session.py writes it
 )
 # Removing or renaming one of these directories removes protected files with it.
 PROTECTED_PARENTS = ("/.aid", "/.claude", "/.aid/hooks", "/.aid/pipeline", "/.claude/hooks",
@@ -58,7 +60,8 @@ PROTECTED_LITERALS = (".aid/hooks", ".aid/integrity", "escalation.json",
                       ".claude/hooks", ".claude/plugins/cache")
 
 # When the cwd is unknown, a relative target with one of these names may be a control file.
-PROTECTED_BASENAMES = {"settings.json", "settings.local.json", "config.json", "escalation.json"}
+PROTECTED_BASENAMES = {"settings.json", "settings.local.json", "config.json", "escalation.json",
+                       "state.json"}
 
 SUSPICIOUS = "<suspicious>"   # path form we refuse to reason about (8.3 names, ADS, NUL)
 SINKS = {"/dev/null", "nul", "/dev/stdout", "/dev/stderr"}
@@ -71,7 +74,72 @@ DENY_RULES = (
     "Edit(/.claude/settings.json)",
     "Edit(/.claude/settings.local.json)",
     "Edit(/.claude/hooks/**)",
+    # NOT Edit(/.aid/state.json) (T3 A1): Claude Code merges Edit deny paths into the sandbox
+    # denyWrite, which would stop aid_session.py itself. Layer C + the ask rules guard it.
 )
+
+# T3-4: the aid_session.py subcommands that change the phase are confirmed by the HUMAN.
+# Claude Code asks for an explicit ask rule in every mode, bypassPermissions included, and
+# denies it where nobody can answer (-p). ONE constant: SessionStart installs these rules
+# (layer A) and the Bash gate allows the subcommands only in a spelling they match (T3-4b:
+# rule matching is case-sensitive, measured in T3-P1, while Windows runs `PYTHON` too).
+CONFIRMED_SUBCOMMANDS = ("approve", "advance", "jump", "init")    # init incl. --repair (A2)
+_INTERPRETERS = ("python", "python3", "py")
+ASK_RULES = tuple("Bash({} *aid_session.py {}*)".format(i, s)
+                  for s in CONFIRMED_SUBCOMMANDS for i in _INTERPRETERS)
+# A3: interpreter, the script path (quoted or bare), the subcommand BARE, then arguments that
+# are bare or double-quoted plain text (--note "rating 4 clear scope"), single spaces.
+_CANONICAL_CALL = re.compile(
+    r"^(?:python|python3|py) (?:\"[^\"\n]+\"|'[^'\n]+'|[^\s\"']+) [A-Za-z0-9._:-]+"
+    r"(?: (?:[A-Za-z0-9._:-]+|\"[A-Za-z0-9 ._:-]+\"))*$")
+
+
+def _confirmed_intent(command):
+    """T3 A3: does the command run aid_session.py with a confirmed subcommand? Judged on the
+    first non-option word after the script, ignoring quotes and backslashes, so `"approve"`,
+    `ap""prove` and `ap\\prove` (which bash all runs as approve) count."""
+    # Judge the text bash will actually run: quotes and backslashes removed BEFORE looking
+    # for the script, so `aid_sess""ion.py` cannot hide the call (T3 review r2 BLOCKER).
+    cleaned = command.replace('"', "").replace("'", "").replace("\\", "")
+    i = cleaned.lower().find("aid_session")
+    if (i >= 0 or "aid_session" in cleaned.replace("\n", "").lower()) and (
+            "$'" in command or "\\\n" in command):
+        # Bash-only quoting ($'\x61pprove', a backslash-newline split) can spell any
+        # subcommand; never canonical, so treating it as a confirmed call denies it.
+        return True
+    if i >= 0:
+        words = cleaned[i:].split()[1:]
+        first = next((w for w in words if not w.startswith("-")), "")
+        if first.lower() in CONFIRMED_SUBCOMMANDS:
+            return True
+    # And on the same words AC-23 accepts: whatever the gate would run as this plugin's
+    # script, its subcommand decides.
+    if _is_plugin_session(command):
+        w = tokenize_strict(command)[0].words
+        first = next((x.text for x in w[2:] if not x.text.startswith("-")), "")
+        return first.lower() in CONFIRMED_SUBCOMMANDS
+    return False
+
+
+def confirmed_form_verdict(command):
+    """
+    T3-4b: None unless the command runs a confirmed aid_session.py subcommand in a form that
+    Claude Code would NOT ask the user about. Allowed: the canonical shape AND a case-
+    sensitive ASK_RULES match (quote characters ignored, as Claude Code's match did in T3-P1).
+    """
+    if not _confirmed_intent(command):
+        return None
+    raw = command.strip()
+    bare = raw.replace('"', "").replace("'", "")
+    if _CANONICAL_CALL.match(raw) and any(
+            fnmatch.fnmatchcase(bare, r[len("Bash("):-1]) for r in ASK_RULES):
+        return None
+    return ("this aid_session.py call changes the AID phase, so the user must confirm it, and "
+            "Claude Code only asks in the exact form: lower-case python, python3 or py, single "
+            "spaces, the subcommand bare (not quoted), e.g. python \"{}\" approve. Quoted "
+            "values (--note \"...\") may contain only letters, digits, spaces and . _ : - . "
+            "Run it in that form; do not change the phase any other way"
+            ).format(str(SESSION_SCRIPT).replace("\\", "/"))
 
 
 def _key(path):
@@ -164,10 +232,19 @@ def _pkey(path):
     return _key(path).casefold()
 
 
+def _user_state_files():
+    """T3 A5: the user-level session file(s), $AID_HOME/state.json and ~/.aid/state.json.
+    They share the /.aid/state.json suffix with the project file but are not control files."""
+    homes = [os.environ.get("AID_HOME") or str(Path.home() / ".aid"), str(Path.home() / ".aid")]
+    return {_pkey(os.path.realpath(os.path.join(h, "state.json"))) for h in homes}
+
+
 def is_protected(norm):
     if norm in (None, SUSPICIOUS) or norm in SINKS:
         return norm == SUSPICIOUS
     k = _pkey(norm.rstrip("/"))
+    if k in _user_state_files():
+        return False
     for s in PROTECTED_SUFFIXES:
         sk = _pkey(s)
         if sk.endswith("/"):
@@ -591,6 +668,14 @@ def _pre4(command, cwd, root, phase, rules, extra):
                 "with it); use plain newlines")
     if _is_plugin_session(command):
         return None
+    if "aid_session" in command.lower():
+        # T3 review: a near-miss used to get the generic "'python' is not on the read-only
+        # list", which sent the agent back to the very command it was running.
+        return ("this aid_session.py call is not in the one allowed form: a single command, "
+                "lower-case python, python3 or py, this plugin's script as an absolute path "
+                "({}), and plain arguments. Free text (--note and similar) may only contain "
+                "letters, digits, spaces and . _ : - ; leave a flag out when its text is empty"
+                ).format(str(SESSION_SCRIPT).replace("\\", "/"))
     idiom = _commit_idiom(command, cwd, root, phase, rules, extra)
     if idiom is not None:
         return idiom or None
@@ -1185,7 +1270,16 @@ def evaluate_bash(command, cwd, root, phase, rules, extra_allowed=()):
 
     Before code_execute_min_phase: the strict grammar + command tables (_pre4).
     Otherwise (Phase 4+, or no phase): the best-effort control-file check (_phase4_check).
+    In every phase first: a phase-changing aid_session.py call must be in the spelling the
+    ask rules match, or the user would not be asked (T3-4b).
     """
+    reason = confirmed_form_verdict(command)
+    if reason:
+        return reason
+    if _is_plugin_session(command):
+        # T3 A3: the plugin's own script in the exact AC-23 shape runs in every phase. From
+        # Phase 4 its path (~/.claude/plugins/cache/...) would otherwise read as a control file.
+        return None
     if phase is not None and phase < rules.get("code_execute_min_phase", 4):
         return _pre4(command, cwd, root, phase, rules, [list(e) for e in extra_allowed])
     return _phase4_check(command, cwd, root, phase, rules)
@@ -1227,23 +1321,27 @@ def ensure_permissions(root):
     perms = data.setdefault("permissions", {})
     if not isinstance(perms, dict):
         return 0, "permissions in {} is not an object".format(path)
-    deny = perms.setdefault("deny", [])
-    if not isinstance(deny, list):
-        return 0, "permissions.deny in {} is not a list".format(path)
-    missing = [r for r in DENY_RULES if r not in deny]
-    if not missing:
+    added = 0
+    for key, rules in (("deny", DENY_RULES), ("ask", ASK_RULES)):     # T3-4: ask rules too
+        have = perms.setdefault(key, [])
+        if not isinstance(have, list):
+            return 0, "permissions.{} in {} is not a list".format(key, path)
+        missing = [r for r in rules if r not in have]
+        have.extend(missing)
+        added += len(missing)
+    if not added:
         return 0, None
-    deny.extend(missing)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(bom + (json.dumps(data, indent=2) + "\n").encode(codec))
-    return len(missing), None
+    return added, None
 
 
 def deny_rules_present(root):
+    """Layer A intact: every deny rule AND every T3-4 ask rule is still in project settings."""
     try:
-        data = read_settings(Path(root) / ".claude" / "settings.json")[0]
-        deny = data.get("permissions", {}).get("deny", [])
-        return all(r in deny for r in DENY_RULES)
+        perms = read_settings(Path(root) / ".claude" / "settings.json")[0].get("permissions", {})
+        return (all(r in perms.get("deny", []) for r in DENY_RULES)
+                and all(r in perms.get("ask", []) for r in ASK_RULES))
     except (ValueError, OSError, AttributeError):
         return False
 

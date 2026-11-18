@@ -20,7 +20,8 @@ Walk through the entire AID installation and configuration step-by-step.
    - Check if `.claude/` directory exists
 
 2. **Initialize AID structure**
-   - Create `.aid/` directory with `state.json` and `context.json`
+   - Create `.aid/` directory with `context.json` (`state.json` is created in step 3 by
+     `aid_session.py`, never written directly)
    - Create `.aid/qa/` directory for acceptance criteria
    - Verify `skills/` and `agents/` are populated
 
@@ -28,7 +29,22 @@ Walk through the entire AID installation and configuration step-by-step.
    - Ask user for project name and description
    - Ask for primary role (PM, Developer, Tech Lead, QA, Data Scientist)
    - Set initial phase (typically Phase 0: Discovery)
-   - Create `.aid/state.json` with initial values
+   - Create `.aid/state.json` by running ONE Bash call (it works only when no
+     `state.json` exists yet):
+
+     ```bash
+     python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" init <role> <phase>
+     ```
+
+     Claude Code will ask the user to confirm this call; if the user declines, nothing
+     changes. `<role>`: pm | lead | developer | qa | data-scientist | other; `<phase>`: 0-5. Run it
+     exactly in this shape: one simple command, lowercase `python`, single spaces, no `;`,
+     `&&`, pipes, redirects, `$( )` or loops. If `${CLAUDE_PLUGIN_ROOT}` was not
+     replaced by a real path, this is not a plugin install: AID's phase commands need the
+     plugin (`claude plugin install aid@AID`). Do not substitute another path. The user can
+     also run the command themselves by typing it with a leading `!`. Show the
+     script's output; if it refuses (non-zero exit), show its reason verbatim. Never write
+     `.aid/state.json` yourself: `aid_session.py` is its only writer.
 
 4. **Install breather** (session boundaries)
    - Run `node integrations/breather/install.mjs` (works from the AID repo root;

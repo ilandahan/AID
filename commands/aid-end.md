@@ -101,29 +101,51 @@ Critical issues:
 Phase transition blocked until fixed. Ending the session is fine as-is.
 ```
 
+Record the verdict (ONE Bash call, no confirmation prompt). This is the value
+`/phase-advance` reads as `subagent_review.phase_[N]`:
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" review <N> <PASS|PARTIAL|FAIL> --note "<one-line issue summary>"
+```
+
+If `${CLAUDE_PLUGIN_ROOT}` was not replaced by a real path, this is not a plugin install:
+AID's phase commands need the plugin (`claude plugin install aid@AID`). Do not substitute
+another path. The user can also run the command themselves by typing it with a leading `!`.
+
 ### Step 5: Save Feedback + State (ONE Bash call)
 
 ```bash
-# Locate the script: this AID repo → project mirror → installed plugin (newest version)
-f=; for c in hooks/aid_session.py .claude/hooks/aid_session.py "$(ls -d "$HOME"/.claude/plugins/cache/AID/aid/*/ 2>/dev/null | sort -V | tail -1)hooks/aid_session.py"; do [ -f "$c" ] && f=$c && break; done
-python "$f" end \
-  --rating <1-5> --worked "<answer 2>" --improve "<answer 3>" \
-  --review <passed|partial|failed> [--review-note "<one-line issue summary>"]
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" end --rating <1-5> --worked "<answer 2>" --improve "<answer 3>" --review <passed|partial|failed> --review-note "<one-line issue summary>"
 ```
 
+Run each script call exactly in this shape: ONE simple command on one line, lowercase
+`python`, single spaces, no `;`, `&&`, pipes, redirects, `$( )`, loops or line
+continuations. Any other shape is refused by the phase gate. Quoted answers may contain only
+letters, digits, spaces and `. _ : -` (no commas, apostrophes, slashes or parentheses);
+drop other characters. Leave a flag out entirely when its text would be empty (an empty `""`
+is refused); `--review-note` and the review `--note` are optional.
+
 Writes `~/.aid/feedback/pending/<timestamp>.json` (read by `/aid-improve`) and updates
-project-local `.aid/state.json`: `status: ended`, `subagent_review.phase_[N]`. Show its
-output verbatim, then:
+project-local `.aid/state.json`: `status: ended`, `subagent_review.phase_[N]`. The script is
+the only writer of `.aid/state.json`; never edit that file yourself. If the script refuses
+(non-zero exit with a reason), show the reason to the user verbatim; do not retry in another
+spelling or work around it. Show its output verbatim, then:
 
 ```
 Options:
-1. Continue to next phase ([Current] → [Next])   ← only if review PASSED (or overridden with reason)
+1. Continue to next phase ([Current] → [Next])   ← the user decides at /phase-approve
 2. Start new session with different role/phase
 3. End for now
 ```
 
-Option 1 with PARTIAL/FAIL: refuse, point at the issues. `override: <reason>` records
-the reason in `--review-note` and allows it.
+Option 1 is a phase change, so it goes through the human gates: `/phase-approve` (the
+user's sign-off), then `/phase-advance`. Never change the phase any other way.
+
+Option 1 with PARTIAL/FAIL: point at the issues and recommend fixing them first. If the user
+says `override: <reason>`, record the reason in `--review-note` (allowed characters only).
+An override does not change the recorded verdict: it means the user will decide at
+`/phase-approve`, where approving despite a PARTIAL/FAIL review is the user's call.
+`/phase-advance` then shows the non-passing review again before the user confirms.
 
 ## Usage
 

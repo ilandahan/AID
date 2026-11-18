@@ -17,7 +17,7 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 │                                                                 │
 │  1. READ context before starting any work                       │
 │  2. UPDATE context on every significant change                  │
-│  3. SYNC with phase state (.aid/state.json)                     │
+│  3. READ phase state (.aid/state.json, read-only)               │
 │  4. INTEGRATE with feedback system (/aid end)                   │
 │  5. SAVE context at conversation end                            │
 └─────────────────────────────────────────────────────────────────┘
@@ -136,12 +136,12 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 │                                                                 │
 │  context.json              state.json                           │
 │  ────────────              ──────────                           │
-│  phase.current    ◄────►   current_phase                        │
-│  project.documents ◄────►  documents                            │
-│  feedback.pending  ◄────►  feedback_collected                   │
+│  phase.current    ◄─────   current_phase                        │
+│  project.documents ◄─────  documents                            │
+│  feedback.pending  ◄─────  feedback_collected                   │
 │                                                                 │
-│  On phase change: sync both files                               │
-│  On feedback: update both files                                 │
+│  On phase change: copy state.json values into context.json      │
+│  state.json is read-only here (only aid_session.py writes it)   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -279,7 +279,7 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 | `/good-morning` | Read context, display status, prompt continuation |
 | `/context` | Display current context state |
 | `/context update` | Manual context update |
-| `/phase` | Sync phase between context and state |
+| `/phase` | Copy phase from state.json into context (read-only on state) |
 | `/aid end` | Update feedback tracking, save context |
 | `/aid improve` | Reset feedback counters |
 

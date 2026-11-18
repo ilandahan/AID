@@ -124,6 +124,8 @@ After any update:
 Last updated: {timestamp}
 ```
 
-## Auto-sync
+## Phase Changes
 
-After update, sync with `.aid/state.json` if phase info changed.
+This command changes only `.aid/context.json`. It never touches `.aid/state.json`, which
+only `aid_session.py` writes. To change the phase, use `/phase-approve` then
+`/phase-advance`, or `/aid-start` (a forward move uses `jump`, which the user confirms).

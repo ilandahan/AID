@@ -40,11 +40,14 @@ Print the role menu. Do not type it from memory and do not use AskUserQuestion (
 4 options; there are more roles than that):
 
 ```bash
-# Resolve the script path (repo → project mirror → installed plugin). Repeated in each
-# step on purpose: every Bash call is a fresh shell, so $f does not survive between them.
-f=; for c in hooks/aid_session.py .claude/hooks/aid_session.py "$(ls -d "$HOME"/.claude/plugins/cache/AID/aid/*/ 2>/dev/null | sort -V | tail -1)hooks/aid_session.py"; do [ -f "$c" ] && f=$c && break; done
-python "$f" roles
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" roles
 ```
+
+Run it exactly in this shape: ONE simple command, lowercase `python`, single spaces, no
+`;`, `&&`, pipes, redirects, `$( )` or loops. Any other shape is refused by the phase gate.
+If `${CLAUDE_PLUGIN_ROOT}` was not replaced by a real path, this is not a plugin install:
+AID's phase commands need the plugin (`claude plugin install aid@AID`). Do not substitute
+another path. The user can also run the command themselves by typing it with a leading `!`.
 
 Show the output verbatim and wait for the user's number.
 
@@ -54,9 +57,10 @@ Print that role's phases. Phase names and descriptions differ per role, and the 
 supplies the right set:
 
 ```bash
-f=; for c in hooks/aid_session.py .claude/hooks/aid_session.py "$(ls -d "$HOME"/.claude/plugins/cache/AID/aid/*/ 2>/dev/null | sort -V | tail -1)hooks/aid_session.py"; do [ -f "$c" ] && f=$c && break; done
-python "$f" phases <role>     # role name, or the number the user just picked
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" phases <role>
 ```
+
+`<role>` is the role name, or the number the user just picked.
 
 Show the output verbatim and wait for the user's number.
 
@@ -71,29 +75,59 @@ and the number the user types selects exactly what the menu showed.
 
 **If "Other" role selected:**
 - Ask: "Please describe your role for this session:"
-- Record response in session state
+- Pass the response to the script in Step 5 as `--role-desc`
 - Use Developer phase terminology as default
 
 **If "Other" phase selected:**
 - Ask: "Please describe what you're working on:"
-- Record response in session state
+- Pass the response to the script in Step 5 as `--phase-desc`
 - Determine closest matching phase number (0-5) for skill loading
 
 ### Step 5: Write State and Greet (ONE Bash call)
 
 Run the session writer. It resolves role + phase against
-`references/role-phase-terminology.json`, writes project-local `.aid/state.json`
-(role, phase, skills_loaded, session_start), and prints the greeting:
+`references/role-phase-terminology.json`; then `aid_session.py` writes project-local `.aid/state.json`
+(role, phase, skills_loaded, session_start), and prints the greeting. `aid_session.py` is
+the only writer of `.aid/state.json`: never edit that file yourself (the phase gates
+refuse it in every phase).
 
-```bash
-f=; for c in hooks/aid_session.py .claude/hooks/aid_session.py "$(ls -d "$HOME"/.claude/plugins/cache/AID/aid/*/ 2>/dev/null | sort -V | tail -1)hooks/aid_session.py"; do [ -f "$c" ] && f=$c && break; done
-python "$f" start <role> <phase>
-# role:  pm | lead | developer | qa | data-scientist | other, or the menu number
-# phase: 0-5
-# "Other" role/phase: add --role-desc "..." / --phase-desc "..." with the user's words
-```
+Pick the subcommand by comparing the chosen phase with `current_phase` from Step 1:
+
+- **No `.aid/state.json` yet (new project):** use `init`. Claude Code will ask the user to
+  confirm; if the user declines, nothing changes. (`start` never creates the state: with no
+  state file it refuses and names `init`.)
+
+  ```bash
+  python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" init <role> <phase>
+  ```
+
+- **The chosen phase is the current phase or an earlier one:** use `start`.
+
+  ```bash
+  python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" start <role> <phase>
+  ```
+
+- **The chosen phase is LATER than the current phase:** use `jump`. Claude Code will ask
+  the user to confirm the forward move; the user decides. If the user declines, nothing
+  changes.
+
+  ```bash
+  python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" jump <role> <phase>
+  ```
+
+Arguments:
+- `<role>`: pm | lead | developer | qa | data-scientist | other, or the menu number
+- `<phase>`: 0-5
+- "Other" role/phase: add `--role-desc "..."` / `--phase-desc "..."` with the user's words.
+  The quoted text may contain only letters, digits, spaces and `. _ : -` (no commas,
+  apostrophes, slashes or parentheses); drop other characters. Leave a flag out entirely
+  when its text would be empty (an empty `""` is refused).
 
 Show its output to the user verbatim. That output is the greeting; do not compose another.
+
+If the script refuses (it exits non-zero with a reason, for example `start` with a later
+phase names `jump`), show that reason to the user verbatim. Do not retry in another
+spelling, do not try to bypass it, and do not edit `.aid/state.json`.
 
 **Do NOT read SKILL.md files here.** Skills are registered by the plugin and load on
 demand when the work calls for them. Reading 6-12 skill files up front is what made

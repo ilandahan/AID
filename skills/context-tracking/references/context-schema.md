@@ -12,7 +12,7 @@ interface AIDContext {
   last_updated: string;      // ISO 8601 timestamp
   session_id: string;        // Format: YYYY-MM-DD-period
 
-  // Phase Information (synced with state.json)
+  // Phase Information (read from state.json, never written to it)
   phase: PhaseInfo;
 
   // Project Information
@@ -330,7 +330,7 @@ Old format:
 ```
 
 Migration adds:
-- `phase` block (sync from state.json)
+- `phase` block (read from state.json)
 - `project` block (extract from current feature)
 - `feedback` block (initialize with defaults)
 

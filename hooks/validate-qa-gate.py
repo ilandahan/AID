@@ -34,7 +34,11 @@ def get_current_task():
         try:
             with open(context_file) as f:
                 context = json.load(f)
-                return context.get("current_task", {}).get("id")
+                # T3-6 (A-17, D-06): the context writer stores "key" (Jira-style), older
+                # files "id"; the installers seed "current_task": null.
+                task = context.get("current_task") if isinstance(context, dict) else None
+                if isinstance(task, dict):
+                    return task.get("id") or task.get("key")
         except:
             pass
     return None

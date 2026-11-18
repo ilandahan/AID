@@ -154,7 +154,9 @@ Commands that modify state must:
 
 1. **Read current state** from `.aid/state.json` or `.aid/context.json`
 2. **Validate** the operation is allowed
-3. **Update state** atomically
+3. **Update state** atomically: `.aid/context.json` directly; `.aid/state.json` ONLY by
+   running `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" <subcommand> <args>` (never
+   edit `.aid/state.json` directly; the phase gates refuse it)
 4. **Confirm** the change to user
 
 ---

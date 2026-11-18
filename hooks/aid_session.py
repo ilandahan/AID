@@ -15,21 +15,30 @@ CONNECTIONS:
 - READS:  references/role-phase-terminology.json (sibling of hooks/)
 - WRITES: .aid/state.json (project-local), ~/.aid/feedback/pending/<ts>.json
 
-Usage:
+Usage (T3: this script is the ONLY writer of .aid/state.json, a protected file):
   aid_session.py roles                  print the role menu
   aid_session.py phases <role>          print that role's phase menu
-  aid_session.py start <role> <phase> [--role-desc TEXT] [--phase-desc TEXT]
+  aid_session.py init <role> <phase>    first state for a project that has none (any phase)
+  aid_session.py init <role> <phase> --repair   rewrite a malformed state.json   [confirmed]
+  aid_session.py start <role> <phase>   the current phase or an earlier one (no state = init)
+  aid_session.py jump <role> <phase>    move FORWARD to a later phase              [confirmed]
       role:  pm | lead | developer | qa | data-scientist | other, or a menu number
-      phase: 0-5
-  Menus and numbering come from references/role-phase-terminology.json, so every
-  role and phase defined there is offered - nothing is hardcoded here.
+      phase: 0-5;  start/jump/init also take [--role-desc TEXT] [--phase-desc TEXT]
+  aid_session.py review <phase> PASS|PARTIAL|FAIL [--note TEXT]   record a phase review
+  aid_session.py approve [--note TEXT]  human sign-off for the current phase       [confirmed]
+  aid_session.py advance                approved phase -> next phase               [confirmed]
   aid_session.py end --rating N [--worked TEXT] [--improve TEXT]
       [--review passed|partial|failed|skipped] [--review-note TEXT]
+  [confirmed] = Claude Code asks the user first: SessionStart installs permission ask rules
+  for exactly these calls (aid_guard.ASK_RULES), and the phase gate refuses any other
+  spelling of them. Menus and numbering come from references/role-phase-terminology.json.
 """
 
 import argparse
 import json
+import os
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -39,7 +48,23 @@ if hasattr(sys.stdout, "reconfigure"):
 
 HERE = Path(__file__).resolve().parent
 TERMS_FILE = HERE.parent / "references" / "role-phase-terminology.json"
-STATE_FILE = Path.cwd() / ".aid" / "state.json"
+STATE_FILE = Path.cwd() / ".aid" / "state.json"   # replaced in main() by project_state_file()
+
+
+def project_state_file():
+    """
+    T3 A2 / INV-2: the SAME project root the phase gates use (aid_hooks.resolve_project_root),
+    never the cwd on its own. A call from P/docs must write P/.aid/state.json; bootstrapping
+    P/docs/.aid/state.json would create a nearer root the gates then trust (T3 review BLOCKER).
+    With no AID root yet, a new project is created at $CLAUDE_PROJECT_DIR, else the cwd.
+    """
+    sys.path.insert(0, str(HERE))
+    import aid_hooks                      # noqa: E402  (bundled beside this file)
+    root = aid_hooks.resolve_project_root({})
+    if not aid_hooks.is_aid_root(root):
+        env_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+        root = Path(env_dir) if env_dir and os.path.isdir(env_dir) else Path.cwd()
+    return Path(root) / ".aid" / "state.json"
 FEEDBACK_DIR = Path.home() / ".aid" / "feedback" / "pending"
 
 # Menu numbers are DERIVED from the terminology file, never hardcoded. The menus used to be
@@ -69,8 +94,68 @@ def load_json(path, default=None):
 
 
 def save_json(path, data):
+    """Atomic write (T3-2): a temp file renamed over the target, so a crash or a concurrent
+    reader never sees half a state file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    # mkstemp: a fixed "state.json.tmp" name could be pre-created as a directory (mkdir is
+    # allowed before Phase 4) and break every write (T3 review NIT).
+    fd, tmp = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+        os.replace(tmp, str(path))
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+PHASE_NAMES = ["Discovery", "PRD", "Tech Spec", "Impl Plan", "Development", "QA & Ship"]
+
+
+def read_state():
+    """
+    T3-2: (state_dict_or_None, problem_or_None). None/None = no state.json yet (a project
+    that has not started). A file that exists but is not a JSON object with an integer
+    current_phase 0-5 is malformed: every subcommand but `init --repair` refuses.
+    """
+    if not STATE_FILE.exists():
+        return None, None
+    try:
+        state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return None, "cannot read {}: {}".format(STATE_FILE, e)
+    if not isinstance(state, dict):
+        return None, "{} is not a JSON object".format(STATE_FILE)
+    phase = state.get("current_phase", state.get("phase"))
+    if isinstance(phase, bool) or not isinstance(phase, int) or not 0 <= phase <= 5:
+        return None, "{} has no valid current_phase (0-5): {!r}".format(STATE_FILE, phase)
+    return state, None
+
+
+def require_state():
+    state, problem = read_state()
+    if problem:
+        sys.exit(problem + ". Run `init <role> <phase> --repair` (the user will be asked to confirm).")
+    if state is None:
+        sys.exit("no AID state yet: {} is missing (run /aid-start first)".format(STATE_FILE))
+    return state
+
+
+def set_phase(state, phase, role=None, role_display=None):
+    """One place that moves the phase, so the flat keys, current_session and phase_name
+    never disagree (A-18: readers used current_session, the writer only flat keys)."""
+    state["current_phase"] = phase
+    state["phase"] = phase
+    state["phase_name"] = PHASE_NAMES[phase]
+    session = state.get("current_session") if isinstance(state.get("current_session"), dict) else {}
+    session.update({"active": True, "role": role or session.get("role") or state.get("role"),
+                    "phase": phase, "started": session.get("started") or now_iso()})
+    if role_display:
+        session["role_display"] = role_display
+    state["current_session"] = session
 
 
 def load_terms():
@@ -128,6 +213,92 @@ def cmd_phases(args):
 
 
 def cmd_start(args):
+    """start: the current phase or an earlier one. Never creates the state (T3 A2: the
+    first state is `init`, which the user confirms)."""
+    state, problem = read_state()
+    if problem:
+        sys.exit(problem + ". Run `init <role> <phase> --repair` (the user will be asked to confirm).")
+    if state is None:
+        sys.exit("no AID state yet ({} is missing): this project starts with `init <role> "
+                 "<phase>`, which the user confirms.".format(STATE_FILE))
+    if True:
+        want = str(args.phase).strip()
+        if want.isdigit() and int(want) > state["current_phase"]:
+            sys.exit("phase {} is ahead of the project's current phase {}. Moving forward needs "
+                     "the user's confirmation: run `jump {} {}` instead, or finish this phase and "
+                     "use /phase-approve and /phase-advance.".format(
+                         want, state["current_phase"], args.role, want))
+    _begin(args, state)
+
+
+def cmd_init(args):
+    """init: only for a project with no state yet; --repair rewrites a malformed one
+    (human-confirmed through the ask rules)."""
+    state, problem = read_state()
+    if args.repair:
+        if not problem:
+            sys.exit("--repair is only for a malformed {}; it reads fine.".format(STATE_FILE))
+        _begin(args, None)
+        return
+    if problem or state is not None:
+        sys.exit("{} already exists; use start (or jump to move forward).".format(STATE_FILE))
+    _begin(args, None)
+
+
+def cmd_jump(args):
+    """jump: move FORWARD (human-confirmed through the ask rules, T3-4)."""
+    state = require_state()
+    want = str(args.phase).strip()
+    if not (want.isdigit() and int(want) > state["current_phase"]):
+        sys.exit("jump only moves forward (current phase {}); use start for this phase or an "
+                 "earlier one.".format(state["current_phase"]))
+    _begin(args, state)
+
+
+def cmd_review(args):
+    """review: record a phase review (advisory; G2: the one key both writer and reader use)."""
+    state = require_state()
+    # Same vocabulary as `end --review` (passed/partial/failed), so the one key has one format.
+    entry = {"status": {"PASS": "passed", "PARTIAL": "partial", "FAIL": "failed"}[args.status],
+             "timestamp": now_iso()}
+    if args.note:
+        entry["note"] = args.note
+    state.setdefault("subagent_review", {})["phase_{}".format(args.phase)] = entry
+    save_json(STATE_FILE, state)
+    print("Review recorded: phase {} {}".format(args.phase, args.status))
+
+
+def cmd_approve(args):
+    """approve: the human sign-off for the current phase (human-confirmed, T3-4)."""
+    state = require_state()
+    state["phase_approved"] = True
+    state["feedback_provided"] = True
+    state["phase_approved_at"] = now_iso()
+    if args.note:
+        state["phase_approval_note"] = args.note
+    save_json(STATE_FILE, state)
+    print("✅ Phase {} ({}) approved.".format(state["current_phase"], PHASE_NAMES[state["current_phase"]]))
+
+
+def cmd_advance(args):
+    """advance: approved phase -> next phase, approval reset (human-confirmed, T3-4)."""
+    state = require_state()
+    phase = state["current_phase"]
+    if state.get("phase_approved") is not True:
+        sys.exit("phase {} ({}) is not approved yet: run /phase-approve first.".format(
+            phase, PHASE_NAMES[phase]))
+    if phase >= 5:
+        sys.exit("phase 5 (QA & Ship) is the last phase.")
+    set_phase(state, phase + 1)
+    state["phase_approved"] = False
+    state["feedback_provided"] = False
+    state.pop("phase_approved_at", None)
+    state.pop("phase_approval_note", None)
+    save_json(STATE_FILE, state)
+    print("✅ Advanced to phase {} ({}).".format(phase + 1, PHASE_NAMES[phase + 1]))
+
+
+def _begin(args, state):
     terms = load_terms()
 
     role = resolve_role(args.role, terms)
@@ -148,20 +319,26 @@ def cmd_start(args):
         if s not in skills:
             skills.append(s)
 
-    state = load_json(STATE_FILE, {}) or {}
+    state = dict(state or {})
+    new_phase = int(phase_key)
+    if state.get("current_phase") != new_phase:
+        # An approval belongs to the phase it was given in; carrying it to another phase
+        # would let /phase-advance skip that phase's sign-off.
+        state["phase_approved"] = False
+        state["feedback_provided"] = False
+        state.pop("phase_approved_at", None)
+        state.pop("phase_approval_note", None)
     state.update({
         "role": role,
         "role_display": args.role_desc or role_info["name"],
-        "phase": int(phase_key),
-        "current_phase": int(phase_key),
         "phase_display": phase["name"],
         "phase_description": args.phase_desc or phase["description"],
         "session_start": now_iso(),
         "status": "active",
         "skills_loaded": skills,
     })
-    # phase_name is the role-neutral name aid_hooks.py prints in gate messages.
-    state["phase_name"] = ["Discovery", "PRD", "Tech Spec", "Impl Plan", "Development", "QA & Ship"][int(phase_key)]
+    state["current_session"] = {}            # a new session, not a continuation
+    set_phase(state, new_phase, role=role, role_display=state["role_display"])
     save_json(STATE_FILE, state)
 
     print("✅ Session started\n")
@@ -175,9 +352,7 @@ def cmd_start(args):
 
 
 def cmd_end(args):
-    state = load_json(STATE_FILE, {}) or {}
-    if not state:
-        sys.exit(f"no active session: {STATE_FILE} missing (run /aid-start first)")
+    state = require_state()
 
     start = state.get("session_start")
     duration = None
@@ -211,6 +386,8 @@ def cmd_end(args):
     state.setdefault("subagent_review", {})[f"phase_{phase_n}"] = review
     state["status"] = "ended"
     state["session_end"] = ts
+    if isinstance(state.get("current_session"), dict):
+        state["current_session"]["active"] = False
     save_json(STATE_FILE, state)
 
     print("✅ Session ended\n")
@@ -223,8 +400,13 @@ def cmd_end(args):
 
 
 def main():
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    global STATE_FILE
+    # T3 A2: no abbreviations (`--rep` must not act as --repair past the ask rules).
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+                                allow_abbrev=False)
     sub = p.add_subparsers(dest="cmd", required=True)
+    _add = sub.add_parser
+    sub.add_parser = lambda *a, **k: _add(*a, allow_abbrev=False, **k)
 
     r = sub.add_parser("roles", help="print the role menu (from the terminology file)")
     r.set_defaults(fn=cmd_roles)
@@ -233,12 +415,29 @@ def main():
     ph.add_argument("role")
     ph.set_defaults(fn=cmd_phases)
 
-    s = sub.add_parser("start")
-    s.add_argument("role")
-    s.add_argument("phase")
-    s.add_argument("--role-desc", default=None, help="custom description when role is 'other'")
-    s.add_argument("--phase-desc", default=None, help="custom description when phase is 'other'")
-    s.set_defaults(fn=cmd_start)
+    for name, fn in (("start", cmd_start), ("jump", cmd_jump), ("init", cmd_init)):
+        s = sub.add_parser(name)
+        s.add_argument("role")
+        s.add_argument("phase")
+        s.add_argument("--role-desc", default=None, help="custom description when role is 'other'")
+        s.add_argument("--phase-desc", default=None, help="custom description when phase is 'other'")
+        if name == "init":
+            s.add_argument("--repair", action="store_true",
+                           help="rewrite a malformed state.json (the user is asked to confirm)")
+        s.set_defaults(fn=fn, repair=False) if name != "init" else s.set_defaults(fn=fn)
+
+    rv = sub.add_parser("review", help="record a phase review result")
+    rv.add_argument("phase", type=int, choices=range(0, 6))
+    rv.add_argument("status", type=str.upper, choices=["PASS", "PARTIAL", "FAIL"])
+    rv.add_argument("--note", default=None)
+    rv.set_defaults(fn=cmd_review)
+
+    ap = sub.add_parser("approve", help="human sign-off for the current phase")
+    ap.add_argument("--note", default=None)
+    ap.set_defaults(fn=cmd_approve)
+
+    ad = sub.add_parser("advance", help="move an approved phase to the next one")
+    ad.set_defaults(fn=cmd_advance)
 
     e = sub.add_parser("end")
     e.add_argument("--rating", type=int, required=True, choices=range(1, 6))
@@ -249,6 +448,7 @@ def main():
     e.set_defaults(fn=cmd_end)
 
     args = p.parse_args()
+    STATE_FILE = project_state_file()
     args.fn(args)
 
 
