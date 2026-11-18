@@ -1,6 +1,6 @@
 {
   "name": "aid",
-  "version": "3.0.7",
+  "version": "3.0.8",
   "displayName": "AID",
   "icon": "./.claude-plugin/icon.png",
   "description": "AI Development Methodology: 6 phase gates from discovery to ship, 27 skills, 39 review sub-agents, and WHY-first enforcement hooks. Stops code being written before the problem is understood.",
@@ -11,7 +11,7 @@
   "homepage": "https://github.com/ilandahan/AID",
   "privacyPolicyUrl": "https://github.com/ilandahan/AID#data-handling-and-privacy",
   "repository": "https://github.com/ilandahan/AID",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "LicenseRef-AID-Community-License-1.0",
   "keywords": [
     "methodology",
     "phase-gates",
@@ -42,7 +42,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
@@ -58,7 +58,7 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
@@ -118,4 +118,4 @@
       }
     ]
   }
-    }
+}

@@ -718,11 +718,20 @@ def handle_phase_gate_write(input_data, config):
     state, phase = load_gate_state(config)
 
     tool_input = input_data["tool_input"]
-    file_path = tool_input.get("file_path") or tool_input.get("notebook_path") or ""
-    if not isinstance(file_path, str):
-        raise GateInputError("file_path is not a string")
-    reason = aid_guard.write_target_verdict(
-        file_path, gate_cwd(input_data), PROJECT_ROOT, phase, config["phase_gate_rules"], literal=True)
+    # T7-2: NotebookEdit names its file in notebook_path. When both fields are present, both
+    # are checked, so a harmless file_path cannot stand in front of a protected notebook_path.
+    paths = [tool_input[k] for k in ("file_path", "notebook_path") if tool_input.get(k) is not None]
+    for p in paths:
+        if not isinstance(p, str):
+            raise GateInputError("file_path / notebook_path is not a string")
+    paths = [p for p in paths if p] or [""]
+    file_path, reason = paths[0], None
+    for p in paths:
+        reason = aid_guard.write_target_verdict(
+            p, gate_cwd(input_data), PROJECT_ROOT, phase, config["phase_gate_rules"], literal=True)
+        if reason:
+            file_path = p
+            break
     if not reason:
         output_allow()
         return
@@ -753,7 +762,7 @@ def handle_phase_gate_write(input_data, config):
 
 
 # ---------------------------------------------------------------------------
-# Handler: PreToolUse (Bash) -> Phase Gate for Code Execution
+# Handler: PreToolUse (Bash|PowerShell) -> Phase Gate for Code Execution
 # ---------------------------------------------------------------------------
 
 def handle_phase_gate_bash(input_data, config):
@@ -779,19 +788,40 @@ def handle_phase_gate_bash(input_data, config):
         return
 
     rules = config["phase_gate_rules"]
-    extra = [str(e).split() for e in rules.get("extra_allowed_commands", []) if str(e).strip()]
-    reason = aid_guard.evaluate_bash(command, gate_cwd(input_data), str(PROJECT_ROOT), phase,
-                                     rules, extra)
+    tool_name = input_data.get("tool_name") or "Bash"
+    if isinstance(tool_name, str) and tool_name.casefold() == "powershell":
+        tool_name = "PowerShell"          # T7 review r1: defence in depth
+    min_phase = rules.get("code_execute_min_phase", 4)
+    cmd_display = command[:100] + ("..." if len(command) > 100 else "")
+    if tool_name == "PowerShell":
+        # T7 (D1-D3): its own rules; the bash read-only list is never applied to it.
+        def verdict(ph):
+            return aid_guard.evaluate_powershell(command, gate_cwd(input_data), str(PROJECT_ROOT), ph, rules)
+    else:
+        extra = [str(e).split() for e in rules.get("extra_allowed_commands", []) if str(e).strip()]
+
+        def verdict(ph):
+            return aid_guard.evaluate_bash(command, gate_cwd(input_data), str(PROJECT_ROOT), ph, rules,
+                                           extra if ph is not None else ())
+    reason = verdict(phase)
     if not reason:
         output_allow()
         return
 
-    min_phase = rules.get("code_execute_min_phase", 4)
-    cmd_display = command[:100] + ("..." if len(command) > 100 else "")
-    # T2-10: the Phase 4+ check (no phase) = only the control-file refusals.
-    control = aid_guard.evaluate_bash(command, gate_cwd(input_data), str(PROJECT_ROOT), None, rules)
-    if control:
+    # T2-10: the Phase 4+ check (no phase) = only the control-file refusals. For PowerShell
+    # that includes the aid_session refusal (T7-4: every phase and level).
+    control = verdict(None)
+    if control == aid_guard.PS_SESSION_REASON:
+        message = "Phase gate: '{}' — {}.".format(cmd_display, control)
+    elif control:
         message = "Phase gate: '{}' — {}. {}".format(cmd_display, control, CONTROL_FILE_HINT)
+    elif tool_name == "PowerShell" and phase is not None and phase < min_phase:
+        message = (
+            "Phase gate: '{}' — {}. Phase {} ({}). Before Phase {} use the Bash tool for "
+            "read-only commands (ls, cat, grep, git status/log/diff...) or the Read, Grep and Glob "
+            "tools, and the Write tool to create files in docs/. When this phase's work is done, "
+            "use /gate-check, then /phase-advance.".format(
+                cmd_display, reason, phase, (state or {}).get("phase_name", "?"), min_phase))
     elif phase is not None and phase < min_phase:
         message = (
             "Phase gate: '{}' — {}. Phase {} ({}); running code needs Phase {} (Development). "
@@ -806,6 +836,7 @@ def handle_phase_gate_bash(input_data, config):
     enforce(gate_level(config, "phase_gate_bash", control), message, {
         "event": "PreToolUse",
         "hook": "phase_gate_bash",
+        "tool": tool_name,
         "command": command[:200],
         "reason": reason[:200],
         "phase": phase,

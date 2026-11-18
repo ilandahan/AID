@@ -107,8 +107,10 @@ def _confirmed_intent(command):
         # Bash-only quoting ($'\x61pprove', a backslash-newline split) can spell any
         # subcommand; never canonical, so treating it as a confirmed call denies it.
         return True
-    if i >= 0:
-        words = cleaned[i:].split()[1:]
+    # EVERY occurrence: in `".../AID_SESSION x/../AID_SESSION.PY" jump` the first one is a
+    # directory name, and the word after it is not the subcommand (T3 CI, Linux).
+    for m in re.finditer("aid_session", cleaned.lower()):
+        words = cleaned[m.start():].split()[1:]
         first = next((w for w in words if not w.startswith("-")), "")
         if first.lower() in CONFIRMED_SUBCOMMANDS:
             return True
@@ -1283,6 +1285,53 @@ def evaluate_bash(command, cwd, root, phase, rules, extra_allowed=()):
     if phase is not None and phase < rules.get("code_execute_min_phase", 4):
         return _pre4(command, cwd, root, phase, rules, [list(e) for e in extra_allowed])
     return _phase4_check(command, cwd, root, phase, rules)
+
+
+# ---------------------------------------------------------------------------
+# PowerShell tool (T7). Claude Code sends it to the same hook as Bash (matcher
+# Bash|PowerShell, command in tool_input.command). The read-only list above is bash
+# grammar; PowerShell parses \ ` $() & differently, so it is never applied here.
+# ---------------------------------------------------------------------------
+
+PS_SESSION_REASON = (
+    "aid_session.py cannot run from the PowerShell tool: Claude Code's confirmation (ask) "
+    "rules cover the Bash tool only, so the user would not be asked. Run it with the Bash "
+    "tool in the form the command file gives, or let the user type it with a leading !")
+
+
+def ps_mentions_session(command):
+    """T7-4: aid_session named anywhere, after removing PowerShell quoting and joins."""
+    return "aid_session" in re.sub(r"[\"'`+\s]", "", command).casefold()
+
+
+def evaluate_powershell(command, cwd, root, phase, rules):
+    """
+    Return None when a PowerShell command may run, else a reason string.
+
+    Every phase: no aid_session.py call (T7-4, D2). Before code_execute_min_phase: nothing
+    runs (T7-3, D1). Otherwise, or with no phase: the best-effort control-file check on a
+    copy with backticks removed and backslashes as '/' (T7-5, D3); layers A and B remain the
+    real protection, as for Bash at that phase.
+    """
+    if ps_mentions_session(command):
+        return PS_SESSION_REASON
+    min_phase = rules.get("code_execute_min_phase", 4)
+    if phase is not None and phase < min_phase:
+        return ("PowerShell commands cannot run before Phase {}: AID's read-only command list "
+                "is defined for the Bash tool only".format(min_phase))
+    norm = command.replace("`", "").replace("\\", "/")
+    # T7 review r1: the bash lexer misreads PowerShell (an escaped `" left a quote open and
+    # hid the rest; -Path:x, [IO.File]::WriteAllText('x') and x:stream were not seen as
+    # paths). So any PowerShell command whose text names a control file is refused, even a
+    # read (the Read tool or Bash can read it). Best effort, D3.
+    low = norm.casefold()
+    hit = next((lit for lit in PS_PROTECTED_LITERALS if lit in low), None)
+    if hit:
+        return "this PowerShell command names an AID control file ({})".format(hit)
+    return _phase4_check(norm, cwd, root, phase, rules)
+
+
+PS_PROTECTED_LITERALS = PROTECTED_LITERALS + (".aid/state.json", ".aid/pipeline/escalation.json")
 
 
 # ---------------------------------------------------------------------------

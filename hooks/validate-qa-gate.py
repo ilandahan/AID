@@ -19,17 +19,38 @@ import json
 import sys
 import os
 from datetime import datetime
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+
+# T7-7 (A-36, A-24): every path below is under the AID project root, resolved the same way
+# as the phase gates (INV-2). Relative to the cwd, a Stop in a subfolder read the wrong
+# project and left stray .aid/qa/ folders. Set by main(); None = AID not in use here.
+ROOT = None
+
+
+def aid(*parts):
+    return os.path.join(str(ROOT), ".aid", *parts)
+
+
+def project_root(input_data):
+    """The gates' AID project root for this call, or None when AID is not in use."""
+    sys.path.insert(0, str(HERE))
+    import aid_hooks                      # noqa: E402  (bundled beside this file)
+    root = aid_hooks.resolve_project_root(input_data)
+    return root if aid_hooks.is_aid_root(root) else None
+
 
 def log_debug(msg):
     """Write debug info to log file"""
-    log_file = ".aid/qa/enforcement.log"
+    log_file = aid("qa", "enforcement.log")
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
     with open(log_file, "a") as f:
         f.write(f"[{datetime.now().isoformat()}] {msg}\n")
 
 def get_current_task():
     """Get current task from .aid/context.json"""
-    context_file = ".aid/context.json"
+    context_file = aid("context.json")
     if os.path.exists(context_file):
         try:
             with open(context_file) as f:
@@ -49,8 +70,7 @@ def check_qa_passed(task_id):
         return True  # No task tracking, allow
 
     # Check 1: Look for QA review file with PASS verdict
-    review_pattern = f".aid/qa/{task_id}-review"
-    qa_dir = ".aid/qa"
+    qa_dir = aid("qa")
 
     if os.path.exists(qa_dir):
         for filename in os.listdir(qa_dir):
@@ -65,12 +85,12 @@ def check_qa_passed(task_id):
                     pass
 
     # Check 2: Look for .qa-passed marker file
-    marker_file = f".aid/qa/{task_id}.qa-passed"
+    marker_file = aid("qa", f"{task_id}.qa-passed")
     if os.path.exists(marker_file):
         return True
 
     # Check 3: Check state.json for qa_status
-    state_file = ".aid/state.json"
+    state_file = aid("state.json")
     if os.path.exists(state_file):
         try:
             with open(state_file) as f:
@@ -86,7 +106,7 @@ def check_qa_passed(task_id):
 
 def is_in_development_phase():
     """Check if currently in development phase (Phase 4)"""
-    state_file = ".aid/state.json"
+    state_file = aid("state.json")
     if os.path.exists(state_file):
         try:
             with open(state_file) as f:
@@ -102,7 +122,7 @@ def has_qa_criteria_file(task_id):
     """Check if QA criteria file exists for this task"""
     if not task_id:
         return False
-    qa_file = f".aid/qa/{task_id}.yaml"
+    qa_file = aid("qa", f"{task_id}.yaml")
     return os.path.exists(qa_file)
 
 def main():
@@ -111,6 +131,13 @@ def main():
         input_data = json.load(sys.stdin)
     except:
         input_data = {}
+    if not isinstance(input_data, dict):
+        input_data = {}
+
+    global ROOT
+    ROOT = project_root(input_data)
+    if ROOT is None:
+        sys.exit(0)  # AID not in use here: allow, and create nothing (T7-7)
 
     log_debug(f"Stop hook triggered. Input keys: {list(input_data.keys())}")
 

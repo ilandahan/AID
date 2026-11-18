@@ -33,9 +33,10 @@ Before advancing to the next phase, ALL of the following must be true:
 
 ## Enforcement
 
-The write and bash phase gates are hooks that check every Write/Edit and Bash call against
-the current phase. Since 3.0.8 they **block by default** in an AID project. Folders without
-AID are never touched.
+The write and bash phase gates are hooks that check every Write, Edit, MultiEdit,
+NotebookEdit, Bash and PowerShell call against the current phase (PowerShell has its own
+rules; see [SECURITY-MODEL.md](SECURITY-MODEL.md#the-powershell-tool)). Since 3.0.8 they
+**block by default** in an AID project. Folders without AID are never touched.
 
 | Level | On a violation |
 |-------|----------------|
@@ -51,7 +52,8 @@ case-insensitive, and an unknown value counts as `block`:
 ```
 
 Lowering a gate relaxes only the phase rules. Writes to AID's own control files (such as
-this config file and `.claude/settings.json`) are refused at every level.
+this config file and `.claude/settings.json`) are refused at every level. So is any
+`aid_session.py` call from the PowerShell tool.
 
 The gates are a guardrail, not a sandbox. See [SECURITY-MODEL.md](SECURITY-MODEL.md) for
 what they guarantee and how to add a hard boundary.

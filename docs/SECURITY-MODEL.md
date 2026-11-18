@@ -36,6 +36,7 @@ counts as `block`:
 
 Lowering a gate relaxes only the **phase rules**: writing source and running code before
 Phase 4. **Writes to AID's control files are refused at every level and in every phase.**
+So is any `aid_session.py` call from the PowerShell tool (see below).
 Only you should change the config file. When you lower a gate, the next session warns that
 enforcement is weaker than in the previous session.
 
@@ -45,7 +46,35 @@ enforcement is weaker than in the previous session.
 |-------|--------------|--------------------|
 | **A. Permission deny rules** | At session start AID adds deny rules for its control files to the project's `.claude/settings.json`: `Edit(/.aid/hooks/**)`, `Edit(/.aid/pipeline/ESCALATION.json)`, `Edit(/.claude/settings.json)`, `Edit(/.claude/settings.local.json)` and `Edit(/.claude/hooks/**)`. `.aid/state.json` is deliberately NOT in this list: Claude Code merges `Edit` deny paths into the sandbox's `denyWrite`, which would stop AID's own `aid_session.py` from writing it. `state.json` is protected instead by layer C (the Write and Bash gates, in every phase and at every level) plus the ask rules. Since 3.0.8 AID also adds **ask** rules for the commands that change the phase (`aid_session.py approve`, `advance`, `jump` and `init`, including `init --repair`), so Claude Code asks you before a phase moves, in every permission mode. In `-p`, headless or dontAsk sessions nobody can answer the prompt, so Claude Code denies these calls: phase changes need an interactive session. | Claude Code applies these rules itself, whatever any hook returns: "PreToolUse hook decisions don't bypass permission rules" ([permissions](https://code.claude.com/docs/en/permissions.md#precedence-among-rules-hooks-and-mods)). They cover the Write and Edit tools, file commands Claude Code recognises in Bash (`cat`, `head`, `tail`, `sed`, `tee`) and redirect targets (`>`, `>>`, `2>`). |
 | **B. Integrity baseline** | At session start AID records the gate configuration and the deny and ask rules (under `~/.aid/integrity/`, or `$AID_HOME/integrity/`). Every gated call compares them with that record. If AID's `.aid` folder disappears mid-session, Claude's writes and commands are refused until the folder is restored, or until you resume the session, run `/clear` or restart Claude Code. | A change made mid-session that would switch a gate off is denied on the next call, at the level the session started with. |
-| **C. The Write and Bash gates** | By default, before Phase 4, writes are allowed only under `docs/`, `.aid/`, `.claude/`, `features/`, `testing/` and `tests/`, and Bash is limited to an allow-list of commands that do not run project code (`ls`, `cat`, `grep`, `git status`/`log`/`diff`/`add`/`commit`, `mkdir` and similar). The project can change these lists in `phase_gate_rules`. In every phase and at every level, writes to the control files (the files above, the project `.aid/state.json`, and your user-level `~/.claude/settings.json`) are refused. The only writer of `.aid/state.json` is AID's `aid_session.py`, run as one plain Bash command. | Out-of-phase work by a cooperating agent is refused, with a reason that tells it what to do instead. Claude cannot use the Write tool to rewrite AID's configuration. |
+| **C. The Write and Bash gates** | By default, before Phase 4, writes are allowed only under `docs/`, `.aid/`, `.claude/`, `features/`, `testing/` and `tests/`, Bash is limited to an allow-list of commands that do not run project code (`ls`, `cat`, `grep`, `git status`/`log`/`diff`/`add`/`commit`, `mkdir` and similar), and PowerShell commands are refused (see below). The project can change these lists in `phase_gate_rules`. In every phase and at every level, writes to the control files (the files above, the project `.aid/state.json`, and your user-level `~/.claude/settings.json`) are refused. The only writer of `.aid/state.json` is AID's `aid_session.py`, run as one plain Bash command. | Out-of-phase work by a cooperating agent is refused, with a reason that tells it what to do instead. Claude cannot use the Write tool to rewrite AID's configuration. |
+
+The Write gate sees every file-editing tool: Write, Edit, MultiEdit and NotebookEdit. For
+NotebookEdit it checks `notebook_path`, and when a call carries both `file_path` and
+`notebook_path` it checks both. The Bash gate also sees the PowerShell tool.
+
+### The PowerShell tool
+
+On Windows with Git Bash and a claude.ai or Console account, Claude Code's PowerShell tool
+"is on by default", and "When the tool is enabled, Claude treats PowerShell as the primary
+shell" ([tools reference](https://code.claude.com/docs/en/tools-reference.md#powershell-tool)).
+On Windows without Git Bash it is enabled automatically and is the only shell. On Linux,
+macOS and WSL it is opt-in. Since 3.0.8 AID's command gate handles it with its own rules:
+
+- **By default (`phase_gate_bash` at `block`), no PowerShell command runs before Phase 4.**
+  AID's read-only list is defined in bash syntax, and PowerShell reads the same text
+  differently. Claude uses the Bash tool for read-only commands, or the Read, Grep and Glob
+  tools. On Windows without Git Bash there is no Bash tool
+  ([hooks](https://code.claude.com/docs/en/hooks.md#powershell)), so before Phase 4 Claude
+  has no shell; you can still run commands yourself with `!`.
+- **A PowerShell command that mentions `aid_session` is refused, in every phase and at
+  every level** (even one that only reads the file). Claude Code's ask rules are per tool:
+  "a `Bash` rule doesn't restrict the PowerShell tool" (same page), so AID's ask rules would
+  not stop a phase change made there. Claude runs these commands with the Bash tool, where
+  Claude Code asks you before a phase moves, or you type them with `!`. This check is best
+  effort: a command that builds the name at run time is not caught.
+- **From Phase 4 on**, a PowerShell command whose text names a control file is refused, even
+  one that only reads it (Claude can read with the Read tool or Bash). This is best effort,
+  as for Bash: a path built at run time is not caught.
 
 ## What AID does not promise
 
@@ -58,6 +87,11 @@ These limits are accepted on purpose. The next section lists what covers them.
   includes deleting both `.aid/` and the integrity records. AID's Phase 4+ check of Bash
   commands that name a control file is best effort. If you lower `phase_gate_bash` to
   `warn` or `log`, code can run from Phase 0, so this limit applies from then on.
+  PowerShell commands have the same limit: from Phase 4, or from Phase 0 if
+  `phase_gate_bash` is lowered, AID's check of a PowerShell command that names a control
+  file is best effort. The Claude Code docs do not say whether
+  `Edit` deny rules or redirect checks apply to PowerShell commands, so AID does not count
+  on them there.
 - **`cp` and `mv` into a protected file.** Claude Code does not document that `Edit` deny
   rules cover these commands, so AID makes no such claim. AID's own Bash gate refuses them
   before Phase 4, and from Phase 4 only as part of the best-effort check.

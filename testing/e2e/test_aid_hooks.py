@@ -1598,3 +1598,208 @@ def test_t3_a3_near_miss_session_call_gets_a_specific_reason(acp):
     acp.start('s1')
     v = acp.bash('python "{}" review 1 PARTIAL --note "Missing NFRs, add later"'.format(SESSION_FWD))
     assert v[0] == 'DENY' and 'letters, digits, spaces' in v[1], v
+
+
+
+# ===========================================================================
+# T7 (T7-acceptance.md): hook coverage (NotebookEdit, MultiEdit, PowerShell),
+# manifest, QA gate anchored to the project root.
+# ===========================================================================
+
+PLUGIN_JSON = os.path.join(REPO_ROOT, '.claude-plugin', 'plugin.json')
+
+
+def _matches(matcher, tool):
+    """Claude Code's documented rule: only letters, digits, _ - space , | = exact list."""
+    import re
+    assert re.fullmatch(r'[A-Za-z0-9_\- ,|]*', matcher), 'regex matchers are not used by AID'
+    return tool in [m.strip() for m in re.split(r'[|,]', matcher)]
+
+
+def test_t7_1_pretooluse_matchers_cover_every_writing_and_shell_tool():
+    """WHY (A-22): matchers `Write|Edit` and `Bash` are exact lists, so NotebookEdit and the
+    PowerShell tool (on by default on Windows with Git Bash) reached no gate at all."""
+    with open(PLUGIN_JSON, encoding='utf-8') as f:
+        entries = json.load(f)['hooks']['PreToolUse']
+
+    def gates(tool):
+        return [e['hooks'][0]['args'][-1] for e in entries if _matches(e['matcher'], tool)]
+    for tool in ('Write', 'Edit', 'MultiEdit', 'NotebookEdit'):
+        assert gates(tool) == ['phase-gate-write'], tool
+    for tool in ('Bash', 'PowerShell'):
+        assert gates(tool) == ['phase-gate-bash'], tool
+    for tool in ('Read', 'Glob', 'Grep'):
+        assert gates(tool) == [], tool
+
+
+def _nb(acp, tool_input, tool='NotebookEdit'):
+    return decision(spawn(acp.P, 'PreToolUse', 'phase_gate_write', acp.H, {
+        'session_id': 's1', 'cwd': str(acp.P), 'tool_name': tool, 'tool_input': tool_input}))
+
+
+def test_t7_2_notebook_edit_is_gated_by_notebook_path(acp):
+    acp.start('s1')
+    assert _nb(acp, {'notebook_path': '.aid/state.json', 'new_source': 'x'})[0] == 'DENY'
+    assert _nb(acp, {'notebook_path': 'src/a.ipynb', 'new_source': 'x'})[0] == 'DENY'   # Phase 1
+    assert _nb(acp, {'notebook_path': 'docs/a.ipynb', 'new_source': 'x'}) == ('ALLOW', None)
+
+
+def test_t7_2_decoy_file_path_cannot_hide_a_protected_notebook_path(acp):
+    """WHY (T1 open MINOR): the gate read `file_path or notebook_path`, so a harmless
+    file_path beside a protected notebook_path was the only path checked."""
+    acp.start('s1')
+    acp.state(5)
+    v = _nb(acp, {'file_path': 'docs/x.md', 'notebook_path': '.aid/state.json', 'new_source': 'x'})
+    assert v[0] == 'DENY' and 'state.json' in v[1], v
+    v = _nb(acp, {'file_path': '.aid/state.json', 'notebook_path': 'docs/a.ipynb', 'new_source': 'x'})
+    assert v[0] == 'DENY', v
+
+
+def test_t7_2_non_string_notebook_path_fails_closed(acp):
+    acp.start('s1')
+    assert _nb(acp, {'notebook_path': ['.aid/state.json'], 'new_source': 'x'})[0] == 'DENY'
+
+
+def _ps(acp, cmd, sid='s1'):
+    return decision(spawn(acp.P, 'PreToolUse', 'phase_gate_bash', acp.H, {
+        'session_id': sid, 'cwd': str(acp.P), 'tool_name': 'PowerShell', 'tool_input': {'command': cmd}}))
+
+
+@pytest.mark.parametrize('cmd', ['git status', 'Get-ChildItem', 'Get-Content README.md', 'npm test'])
+def test_t7_3_powershell_runs_nothing_before_the_execute_phase(acp, cmd):
+    """WHY (D1): the read-only list is bash grammar; PowerShell parses backslash, backtick,
+    $() and & differently, so reusing it would be unsound."""
+    acp.start('s1')
+    v = _ps(acp, cmd)
+    assert v[0] == 'DENY' and 'PowerShell' in v[1] and 'Bash tool' in v[1], v
+
+
+def test_t7_3_powershell_allows_an_empty_command(acp):
+    acp.start('s1')
+    assert _ps(acp, '   ') == ('ALLOW', None)
+
+
+def test_t7_3_powershell_follows_the_gate_level(clean_tmp):
+    acp = AC(clean_tmp, {'enforcement': {'phase_gate_write': 'log', 'phase_gate_bash': 'log'}})
+    acp.start('s1')
+    assert _ps(acp, 'git status')[0] == 'ALLOW'
+
+
+@pytest.mark.parametrize('phase', [1, 4, 5])
+@pytest.mark.parametrize('cmd', [
+    'python "{s}" approve', 'python "{s}" advance', 'py "{s}" init developer 2',
+    'python "{s}" review 1 PASS', "& python ('aid_sess'+'ion.py') approve",
+    'python C:/x/AID_SESSION.PY jump developer 3', 'python C:/x/aid_ses`sion.py advance'])
+def test_t7_4_aid_session_never_runs_from_powershell(acp, phase, cmd):
+    """WHY (D2): `Bash(...)` ask rules do not cover the PowerShell tool, so the user would not
+    be asked to confirm a phase change made there."""
+    acp.start('s1')
+    acp.state(phase)
+    v = _ps(acp, cmd.format(s=SESSION_FWD))
+    assert v[0] == 'DENY' and 'Bash tool' in v[1] and 'ask' in v[1], v
+
+
+def test_t7_4_powershell_session_refusal_blocks_at_log_level(clean_tmp):
+    acp = AC(clean_tmp, {'enforcement': {'phase_gate_write': 'log', 'phase_gate_bash': 'log'}})
+    acp.start('s1')
+    assert _ps(acp, 'python "{}" approve'.format(SESSION_FWD))[0] == 'DENY'
+
+
+@pytest.mark.parametrize('cmd', [
+    'Set-Content -Path .aid\\state.json -Value x', 'Set-Content -Path .a`id\\state.json -Value x',
+    '"x" | Out-File .aid/state.json', 'Remove-Item .claude\\settings.json',
+    'Copy-Item x.json .aid\\hooks\\config.json',
+    # T7 review r1: an escaped quote hid the rest; colon parameters, .NET calls, streams.
+    'Write-Host "a`"b"; Set-Content .aid\\state.json x', "[IO.File]::WriteAllText('.aid\\state.json','x')",
+    'Set-Content -Path:.aid\\state.json x', 'Set-Content -Path .aid\\state.json:ads x',
+    'Set-Content -Path .AID\\HOOKS\\config.json x'])
+@pytest.mark.parametrize('level', ['block', 'log'])
+def test_t7_5_powershell_control_files_refused_from_the_execute_phase(clean_tmp, cmd, level):
+    acp = AC(clean_tmp, {'enforcement': {'phase_gate_write': level, 'phase_gate_bash': level}})
+    acp.start('s1')
+    acp.state(4)
+    v = _ps(acp, cmd)
+    assert v[0] == 'DENY' and 'control file' in v[1], v
+
+
+@pytest.mark.parametrize('cmd', [
+    'Get-ChildItem -Recurse | Where-Object { $_.Length -gt 1kb }',
+    'npm test; if ($LASTEXITCODE) { exit 1 }', 'git status', 'Set-Content src\\a.ts -Value x'])
+def test_t7_5_powershell_ordinary_commands_run_from_the_execute_phase(acp, cmd):
+    acp.start('s1')
+    acp.state(4)
+    assert _ps(acp, cmd) == ('ALLOW', None)
+
+
+def test_t7_6_manifest_version_license_and_layout():
+    """WHY (A-44): non-SPDX license string, and a root brace indented 4 spaces."""
+    raw = open(PLUGIN_JSON, 'rb').read().decode('utf-8').replace('\r\n', '\n')
+    data = json.loads(raw)
+    assert data['version'] == '3.0.8'
+    assert data['license'] == 'LicenseRef-AID-Community-License-1.0'
+    assert raw == json.dumps(data, indent=2, ensure_ascii=False) + '\n'
+
+
+def _qa_env(home):
+    env = dict(os.environ, HOME=str(home), USERPROFILE=str(home), AID_HOME=str(Path(home) / '.aid'))
+    env.pop('CLAUDE_PROJECT_DIR', None)
+    env.pop('CLAUDE_CONFIG_DIR', None)
+    return env
+
+
+def _qa(cwd, home):
+    return subprocess.run([sys.executable, QA_HOOK], input=json.dumps({'cwd': str(cwd)}),
+                          capture_output=True, text=True, timeout=60, cwd=str(cwd), env=_qa_env(home))
+
+
+def test_t7_7_qa_gate_creates_nothing_outside_an_aid_project(clean_tmp):
+    """WHY (A-36): the gate wrote ./.aid/qa/enforcement.log into whatever the cwd was."""
+    E, H = clean_tmp / 'empty', clean_tmp / 'H'
+    E.mkdir()
+    H.mkdir()
+    p = _qa(E, H)
+    assert p.returncode == 0 and p.stdout.strip() == '', (p.stdout, p.stderr)
+    assert list(E.iterdir()) == []
+
+
+def test_t7_7_qa_gate_from_a_subfolder_uses_the_project_root(clean_tmp):
+    """WHY (A-24, A-36): from P/docs the gate read P/docs/.aid (nothing), so it never blocked,
+    and it left a stray P/docs/.aid/qa/."""
+    P, H = clean_tmp / 'P', clean_tmp / 'H'
+    (P / '.aid' / 'qa').mkdir(parents=True)
+    (P / 'docs').mkdir()
+    H.mkdir()
+    (P / '.aid' / 'state.json').write_text('{"current_phase": 4}', encoding='utf-8')
+    (P / '.aid' / 'context.json').write_text('{"current_task": {"key": "T-1"}}', encoding='utf-8')
+    (P / '.aid' / 'qa' / 'T-1.yaml').write_text('x: 1\n', encoding='utf-8')
+    D = P / 'docs'
+    p = _qa(D, H)
+    assert p.returncode == 0, p.stderr
+    assert json.loads(p.stdout).get('decision') == 'block'
+    assert not (D / '.aid').exists()
+    assert (P / '.aid' / 'qa' / 'enforcement.log').is_file()
+    (P / '.aid' / 'qa' / 'T-1.qa-passed').write_text('', encoding='utf-8')
+    p = _qa(D, H)
+    assert p.returncode == 0 and p.stdout.strip() == '', p.stdout
+
+
+@pytest.mark.parametrize('cmd, refused', [
+    ('python "/nowhere/AID_SESSION x/../AID_SESSION.PY" jump developer 5', True),
+    # Canonical and matched by an ask rule: recognised, and left to the user's prompt.
+    ('python "/nowhere/aid_session tools/aid_session.py" approve', False),
+    ('python /nowhere/aid_session_bin/run.py --x aid_session.py advance', False)])
+def test_t3_ci_every_aid_session_occurrence_is_judged(cmd, refused):
+    """WHY (T3 CI on Linux): only the FIRST "aid_session" was judged; when it was a directory
+    name the subcommand after the real script was missed and the call was not refused."""
+    assert aid_guard._confirmed_intent(cmd)
+    assert bool(aid_guard.confirmed_form_verdict(cmd)) is refused
+
+
+def test_t7_review_powershell_tool_name_in_any_case(acp):
+    """Defence in depth: the dispatcher must not fall back to the Bash rules for 'powershell'."""
+    acp.start('s1')
+    acp.state(5)
+    v = decision(spawn(acp.P, 'PreToolUse', 'phase_gate_bash', acp.H, {
+        'session_id': 's1', 'cwd': str(acp.P), 'tool_name': 'powershell',
+        'tool_input': {'command': 'python "{}" approve'.format(SESSION_FWD)}}))
+    assert v[0] == 'DENY' and 'PowerShell' in v[1], v

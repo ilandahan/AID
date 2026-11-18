@@ -60,6 +60,11 @@ To lower a gate for one project, set its level in `.aid/hooks/config.json` (`blo
 Lowering a gate relaxes only the phase rules. Writes to AID's own control files are refused
 at every level.
 
+The bash gate now also covers Claude Code's PowerShell tool, which is on by default on
+Windows. Before Phase 4 every PowerShell command is refused (Claude uses the Bash tool or
+Read, Grep and Glob instead), and `aid_session.py` must always run through the Bash tool.
+See [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md#the-powershell-tool).
+
 AID's gates are a guardrail for a cooperating agent, not a sandbox.
 [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md) explains what they guarantee and what they
 do not, and how to add the Claude Code sandbox or managed settings for a hard boundary.
