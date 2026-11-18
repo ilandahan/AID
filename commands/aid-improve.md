@@ -8,71 +8,112 @@ Run the improvement analysis cycle.
 
 ## Purpose
 
-Analyze collected feedback, suggest skill updates, promote insights to Claude Memory.
+Analyze collected feedback and propose skill learnings and memory entries. AID's own write
+commands (`memory-sync`, `memory-apply`) run only after the user confirms them.
 
 ## Requirements
 
-- At least 3 pending feedback items in `~/.aid/feedback/pending/`
-- Or use `--force` to run with fewer (will warn about limited data)
+- At least 3 feedback entries. Count the entries in the `memory-feedback` output (step 2);
+  if there are fewer than 3, stop unless the user passed `--force`.
+
+Feedback text is redacted (best effort) when it is written and again when it is read. See
+"Privacy" below.
 
 ## Flow
 
-1. **Gather Data**:
-   - Load all files from `~/.aid/feedback/pending/`
-   - Load current skills from `~/.aid/skills/`
-   - Load trends from `~/.aid/metrics/trends.json`
+Every step that runs a command is ONE Bash call, in exactly the shape shown:
 
-2. **Analyze** (Sub-Agent):
-   - Cluster feedback by role/phase
-   - Identify recurring patterns
-   - Generate improvement suggestions
-   - Score confidence for each suggestion
+- lower-case `python`, single spaces, the subcommand bare;
+- no `;`, `&&`, pipes, redirects, `$( )` or loops;
+- never retry in another spelling, and never work around a refusal or a declined prompt;
+- if `${CLAUDE_PLUGIN_ROOT}` was not replaced by a real path, this is not a plugin
+  install. Do not substitute another path. The user can run the command themselves by
+  typing it with a leading `!`.
 
-3. **Present Suggestions**:
-   ```
-   Improvement Analysis Complete
-   
-   Based on 5 feedback sessions (avg rating: 3.8)
-   
-   SKILL UPDATES SUGGESTED:
-   
-   1. [Developer Skill] Add section on error handling
-      Confidence: 85%
-      Reason: 3/5 sessions mentioned need for better error handling
-      
-      [Approve] [Edit] [Reject]
-   
-   2. [Development Phase] Emphasize incremental commits
-      Confidence: 72%
-      Reason: Pattern of large commits causing review issues
-      
-      [Approve] [Edit] [Reject]
-   
-   MEMORY CANDIDATES:
-   
-   1. "When implementing auth, always start with session management"
-      Category: Developer
-      Confidence: 80%
-      
-      [Promote to Memory] [Skip]
+1. **Preview** (writes nothing, no prompt):
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-preview
    ```
 
-4. **Apply Changes**:
-   - Update approved skill files
-   - Promote approved memory entries
-   - Archive processed feedback to `~/.aid/feedback/processed/`
+   It prints the memory entries a sync would add and the current proposal queue. Show
+   the output.
 
-5. **Summary**:
+2. **Analyze** (sub-agent): get the feedback, redacted (writes nothing, no prompt):
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-feedback
    ```
-   ✅ Improvement cycle complete
-   
-   Changes applied:
-   - 2 skill updates
-   - 1 new memory entry
-   
-   Feedback archived: 5 sessions
-   Next improvement suggested: ~1 week
+
+   Count its entries; if there are fewer than 3, stop unless the user passed `--force`.
+
+   Spawn `aid:memory-analysis-agent` (fallback: `memory-analysis-agent`; tools: Read, Grep,
+   Glob) and pass it:
+
+   - `{{FEEDBACK_DATA}}`: the `memory-feedback` output. Do not paste raw files from the
+     pending folder: files written before redaction existed may still hold unredacted text.
+   - `{{CURRENT_SKILLS}}` (optional, may be empty): section headers from
+     `skills/memory-system/references/`.
+   - `{{TREND_DATA}}` (optional, may be empty).
+   - `{{MEMORY_ENTRIES}}` (optional, may be empty): the output of
+     `python -m memory_system --memories` run from `memory-system/`, or leave it empty.
+
+   The agent writes no files. It returns JSON with proposals only.
+
+3. **Queue the proposals** (no prompt): save the agent's JSON to
+   `.aid/improve/proposals.json` with the Write tool, then run:
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-queue
    ```
+
+   It takes no argument: it reads `<project>/.aid/improve/proposals.json` itself.
+
+   Each proposal is redacted and added to `$AID_HOME/recommendations/queue.json`. A
+   proposal whose target is not an allowed learnings file is skipped, and the output says
+   so.
+
+4. **Show the queue**: run `memory-preview` again (step 1) and show each proposal with
+   its id, target file and proposed text. Ask the user which ones to apply and which to
+   drop.
+
+5. **Apply or drop, one proposal at a time**, only for items the user picked:
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-apply <id>
+   ```
+
+   - Claude Code asks the user to confirm this call. If the user declines, nothing changes.
+   - It only APPENDS the proposal's redacted text to
+     `skills/memory-system/references/roles/<role>/cumulative.md` or
+     `skills/memory-system/references/phases/<phase>/cumulative.md`. Any other target is
+     refused.
+   - It writes the copy of `skills/memory-system/references/...` inside the installed
+     plugin. A plugin update can replace that copy.
+   - An applied proposal moves to `$AID_HOME/recommendations/applied.json`.
+   - Skill-wide recommendations (no learnings file) are shown but cannot be applied by
+     the tool.
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-reject <id>
+   ```
+
+   - No prompt. The proposal moves to `$AID_HOME/recommendations/rejected.json`.
+
+   If a command refuses (non-zero exit), show its reason to the user verbatim.
+
+6. **Write memory entries** (only if the user wants the entries shown in the preview):
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-sync
+   ```
+
+   Claude Code asks the user to confirm this call. It writes the entries to AID's local
+   memory, `$AID_HOME/memory/slots.json` (default `~/.aid/memory/`). Nothing is sent to
+   Claude's built-in memory. In `-p`/headless sessions nobody can answer the prompt, so
+   the call is denied.
+
+7. **Summary**: list what was applied, rejected and synced, from the command output.
 
 ## Usage
 
@@ -88,6 +129,24 @@ Force with limited data:
 ## Notes
 
 - Run weekly or after 5+ sessions
-- All changes require user approval
+- AID's own write commands (`memory-sync`, `memory-apply`) run only after the user confirms them
+  in Claude Code's prompt. `memory-apply` is also used by `/aid-recommendations`. Before Phase
+  4 the phase gate also refuses other writes outside the project. From Phase 4 on, AID does
+  not stop other code from editing these files.
 - Memory entries follow format: `AID:{ROLE}:{PHASE}:{TYPE} {insight}`
 - See `memory-system/docs/IMPROVEMENT-FLOW.md` for full process
+
+## Privacy
+
+Redaction is best effort. It replaces e-mail addresses, URLs (including git remotes),
+absolute paths, `file.ext:line` references, common secret tokens, the project's own
+names (cwd and project-root folder names, git remote owner and repo) and the OS user name
+with placeholders: `[email]`, `[url]`, `[path]`, `[file-ref]`, `[token]`, `[project]`, `[user]`. It
+does not catch a person's or company's name written as plain words unless it is one of
+those project names. Very generic folder names (docs, app, src, ...) and project names
+shorter than 4 characters are not removed. When files are read later, only the current
+project's names are known.
+
+Feedback is stored locally in `$AID_HOME`. AID has no collection service of its own. When
+you run `/aid-improve`, the redacted feedback is sent to Claude as part of the conversation,
+for analysis.

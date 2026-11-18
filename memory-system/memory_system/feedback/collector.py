@@ -10,19 +10,61 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+from functools import lru_cache
 import os
 
-# Configuration
-FEEDBACK_DIR = Path(os.path.expanduser("~/.aid/feedback"))
-PENDING_DIR = FEEDBACK_DIR / "pending"
-PROCESSED_DIR = FEEDBACK_DIR / "processed"
+from .. import paths
+from ..redact import context_names, redact_obj
+from .schema import normalize_entry, read_entries
+
+# Configuration. T8-3: every directory comes from paths.aid_home() ($AID_HOME, else ~/.aid),
+# read on each call; none is fixed at import time.
 SCHEMA_PATH = Path(__file__).parent / "schema.json"
+
+
+def _pending() -> Path:
+    return paths.pending_dir()
+
+
+def _processed() -> Path:
+    return paths.processed_dir()
+
+
+_CONTEXT: Dict[str, str] = {}
+
+
+def set_context(cwd: str, root: Optional[str]) -> None:
+    """aid_session.py passes the project it resolved (the gates' root), so the names of
+    that project are removed whatever the cwd (T8 review r1)."""
+    _CONTEXT.update({"cwd": cwd, "root": root or ""})
+    default_names.cache_clear()
+
+
+def _aid_root(start: Path) -> Optional[str]:
+    """The nearest ancestor that is an AID project (.aid/state.json or .aid/hooks/config.json),
+    never the user-level AID home."""
+    home = paths.aid_home().resolve()
+    for d in [start] + list(start.parents):
+        aid = d / ".aid"
+        if aid.resolve() != home and ((aid / "state.json").is_file() or (aid / "hooks" / "config.json").is_file()):
+            return str(d)
+    return None
+
+
+@lru_cache(maxsize=None)
+def default_names() -> tuple:
+    """This process's project names and user name, removed from feedback text (T8-1). The
+    project is the one aid_session.py passed, else $CLAUDE_PROJECT_DIR, else the nearest AID
+    project above the cwd. Run from an unrelated folder, only the cwd's names are known."""
+    cwd = _CONTEXT.get("cwd") or os.getcwd()
+    root = _CONTEXT.get("root") or os.environ.get("CLAUDE_PROJECT_DIR") or _aid_root(Path(cwd).resolve())
+    return tuple(sorted(context_names(cwd, root)))
 
 
 def ensure_directories():
     """Create feedback directories if they don't exist."""
-    PENDING_DIR.mkdir(parents=True, exist_ok=True)
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    _pending().mkdir(parents=True, exist_ok=True)
+    _processed().mkdir(parents=True, exist_ok=True)
 
 
 def generate_feedback_id() -> str:
@@ -111,7 +153,7 @@ def create_feedback_entry(
 
 def save_feedback_entry(entry: Dict[str, Any]) -> Path:
     """
-    Save a feedback entry to the pending directory.
+    Save a feedback entry to the pending directory, REDACTED (T8-1: before it is written).
 
     Args:
         entry: The feedback entry to save
@@ -120,78 +162,45 @@ def save_feedback_entry(entry: Dict[str, Any]) -> Path:
         Path to the saved file
     """
     ensure_directories()
-
+    entry = redact_obj(entry, default_names(), skip_keys=("timestamp", "id", "session_id"))
     filename = f"{entry['timestamp'][:10]}_{entry['id'][:8]}.json"
-    filepath = PENDING_DIR / filename
-
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(entry, f, indent=2, ensure_ascii=False)
-
+    filepath = _pending() / filename
+    tmp = filepath.with_suffix(".tmp")
+    tmp.write_text(json.dumps(entry, indent=2, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, filepath)
     return filepath
 
 
 def load_pending_feedback() -> List[Dict[str, Any]]:
-    """
-    Load all pending feedback entries.
-
-    Returns:
-        List of feedback entries
-    """
-    ensure_directories()
-
-    entries = []
-    for filepath in PENDING_DIR.glob("*.json"):
-        with open(filepath, 'r', encoding='utf-8') as f:
-            entries.append(json.load(f))
-
-    return sorted(entries, key=lambda x: x['timestamp'])
+    """All pending entries, normalised and redacted (T8-3: the one reader)."""
+    return read_entries([_pending()], default_names())
 
 
 def mark_feedback_processed(entry_id: str) -> bool:
     """
-    Move a feedback entry from pending to processed.
-
-    Args:
-        entry_id: ID of the feedback entry
+    Move a feedback entry from pending to processed. The id is the normalised one (the
+    entry's own id, or its file name for writers that store none).
 
     Returns:
         True if successful, False if not found
     """
     ensure_directories()
-
-    for filepath in PENDING_DIR.glob("*.json"):
-        with open(filepath, 'r', encoding='utf-8') as f:
-            entry = json.load(f)
-
-        if entry['id'] == entry_id:
-            dest = PROCESSED_DIR / filepath.name
-            filepath.rename(dest)
+    for filepath in _pending().glob("*.json"):
+        try:
+            raw = json.loads(filepath.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        e = normalize_entry(raw, filepath)
+        if e is not None and e["id"] == entry_id:
+            os.replace(filepath, _processed() / filepath.name)
             return True
-
     return False
 
 
 def load_feedback_by_session(session_id: str) -> List[Dict[str, Any]]:
-    """
-    Load all feedback entries for a specific session.
-
-    Args:
-        session_id: Session ID to filter by
-
-    Returns:
-        List of feedback entries for the session
-    """
-    entries = []
-
-    for directory in [PENDING_DIR, PROCESSED_DIR]:
-        if directory.exists():
-            for filepath in directory.glob("*.json"):
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    entry = json.load(f)
-                if entry['session_id'] == session_id:
-                    entries.append(entry)
-
-    return sorted(entries, key=lambda x: x['timestamp'])
+    """All entries (pending and processed) of one session."""
+    return [e for e in read_entries([_pending(), _processed()], default_names())
+            if e["session_id"] == session_id]
 
 
 def load_feedback_by_date_range(
@@ -200,51 +209,28 @@ def load_feedback_by_date_range(
     include_processed: bool = True
 ) -> List[Dict[str, Any]]:
     """
-    Load feedback entries within a date range.
-
-    Args:
-        start_date: Start date (YYYY-MM-DD)
-        end_date: End date (YYYY-MM-DD)
-        include_processed: Whether to include processed entries
-
-    Returns:
-        List of feedback entries in the date range
+    Load feedback entries within a date range (YYYY-MM-DD, inclusive).
     """
-    entries = []
-    directories = [PENDING_DIR]
-
-    if include_processed:
-        directories.append(PROCESSED_DIR)
-
-    for directory in directories:
-        if directory.exists():
-            for filepath in directory.glob("*.json"):
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    entry = json.load(f)
-
-                entry_date = entry['timestamp'][:10]
-                if start_date <= entry_date <= end_date:
-                    entries.append(entry)
-
-    return sorted(entries, key=lambda x: x['timestamp'])
+    dirs = [_pending()] + ([_processed()] if include_processed else [])
+    return [e for e in read_entries(dirs, default_names())
+            if start_date <= e["timestamp"][:10] <= end_date]
 
 
 def get_feedback_stats() -> Dict[str, Any]:
     """
-    Get basic statistics about collected feedback.
-
-    Returns:
-        Dictionary with feedback statistics
+    Get basic statistics about collected feedback. ``total_entries`` is the key the CLI
+    reads (T8-3: it printed 0 because only ``total_count`` existed); both are returned.
     """
-    pending = list(PENDING_DIR.glob("*.json")) if PENDING_DIR.exists() else []
-    processed = list(PROCESSED_DIR.glob("*.json")) if PROCESSED_DIR.exists() else []
-
+    pending = list(_pending().glob("*.json")) if _pending().exists() else []
+    processed = list(_processed().glob("*.json")) if _processed().exists() else []
+    total = len(pending) + len(processed)
     return {
         "pending_count": len(pending),
         "processed_count": len(processed),
-        "total_count": len(pending) + len(processed),
-        "pending_dir": str(PENDING_DIR),
-        "processed_dir": str(PROCESSED_DIR)
+        "total_count": total,
+        "total_entries": total,
+        "pending_dir": str(_pending()),
+        "processed_dir": str(_processed())
     }
 
 
@@ -579,36 +565,8 @@ def record_phase_gate_feedback(
 
 
 if __name__ == "__main__":
-    # Test the collector
-    print("Testing Feedback Collector...")
-
-    # Create a test entry
-    test_entry = create_feedback_entry(
-        session_id="test-session-123",
-        phase="2-tech-spec",
-        role="developer",
-        interaction_type="decision",
-        decision={
-            "topic": "Database selection",
-            "topic_category": "technology",
-            "chosen": "PostgreSQL",
-            "alternatives": ["MongoDB", "MySQL"],
-            "rationale": "Team familiarity and ACID compliance",
-            "confidence": "high"
-        },
-        feedback={
-            "rating": 5,
-            "verbal": "Great recommendation!",
-            "skipped": False
-        }
-    )
-
-    print(f"Created test entry: {test_entry['id']}")
-
-    # Save it
-    filepath = save_feedback_entry(test_entry)
-    print(f"Saved to: {filepath}")
-
-    # Get stats
-    stats = get_feedback_stats()
-    print(f"Stats: {stats}")
+    # Demo only: builds an entry and prints it. It never writes to the real ~/.aid (T8-5).
+    demo = create_feedback_entry(session_id="demo", phase="2-tech-spec", role="developer",
+                                 interaction_type="decision",
+                                 feedback={"rating": 5, "verbal": "Great recommendation!"})
+    print(json.dumps(demo, indent=2))

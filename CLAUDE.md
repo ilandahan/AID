@@ -548,7 +548,7 @@ AID includes a learning system that improves Claude's assistance over time.
 | Command | Description |
 |---------|-------------|
 | `/aid-improve` | Run learning cycle (weekly) |
-| `/aid-memory` | Manage Claude Memory entries |
+| `/aid-memory` | Manage AID's local memory entries |
 | `/aid-reset` | Reset memory system |
 | `/aid-analyze` | Full quality analysis with metrics and patterns |
 | `/aid-dashboard` | Generate quality dashboard report |
@@ -567,12 +567,34 @@ python -m memory_system --analyze
 # Generate dashboard
 python -m memory_system --dashboard --days 14
 
-# Sync learnings to memory
+# Preview what a memory sync would add to AID's local memory (writes nothing)
 python -m memory_system --sync-memory
+
+# Generate recommendations and queue them; list the queue
+python -m memory_system --recommendations
+python -m memory_system --pending
 
 # Show status
 python -m memory_system --status
 ```
+
+The CLI has no write flag. Writes go through the plugin, one Bash call each, exactly in
+this shape:
+
+- `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-preview` - plan and queue, writes nothing
+- `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-sync` - write AID's local memory
+  (`$AID_HOME/memory/slots.json`); Claude Code asks the user to confirm
+- `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-apply <id>` - append one queued
+  proposal to a role or phase `cumulative.md`; Claude Code asks the user to confirm
+- `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-feedback` - the feedback, redacted, as JSON
+  (input for the analysis agent)
+- `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-queue` - queue the analysis agent's
+  proposals from `<project>/.aid/improve/proposals.json` (no argument; redacted, no prompt)
+- `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-reject <id>` - drop one proposal
+
+"Claude Memory" in AID means that local file; nothing is sent to Claude's built-in memory.
+Feedback text is redacted (best effort) when written and again when read. See
+`commands/aid-improve.md`.
 
 Docs: `memory-system/docs/` (USER-GUIDE.md, COMMANDS.md, AGENT.md, MEMORY.md,
 IMPROVEMENT-FLOW.md, TROUBLESHOOTING.md).
@@ -624,7 +646,7 @@ Claude loads skills from `.claude/skills/` and agents from `.claude/agents/` bas
 
 - Project state: `.aid/state.json` (phase tracking)
 - Session state: `~/.aid/state.json` (role, session info)
-- Feedback: `~/.aid/feedback/pending/`
+- Feedback: `$AID_HOME/feedback/pending/` (default `~/.aid/feedback/pending/`)
 
 ### Memory System Documentation
 

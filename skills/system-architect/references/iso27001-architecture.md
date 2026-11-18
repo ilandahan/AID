@@ -62,7 +62,7 @@ Reference guide for implementing ISO 27001:2022 controls in software architectur
 | A.8.8 | Management of technical vulnerabilities | SAST, DAST, patching |
 | A.8.9 | Configuration management | IaC, security baselines |
 | A.8.10 | Information deletion | Data retention policies |
-| A.8.11 | Data masking | PII masking, anonymization |
+| A.8.11 | Data masking | PII masking, de-identification |
 | A.8.12 | Data leakage prevention | DLP policies, egress filtering |
 | A.8.15 | Logging | Centralized audit logging |
 | A.8.16 | Monitoring activities | SIEM, alerting |
@@ -535,7 +535,7 @@ security-checks:
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
 │  │ Development │  │   Staging   │  │ Production  │             │
 │  ├─────────────┤  ├─────────────┤  ├─────────────┤             │
-│  │ • Fake data │  │ • Anonymized│  │ • Real data │             │
+│  │ • Fake data │  │ • Masked    │  │ • Real data │             │
 │  │ • No PII    │  │   data      │  │ • Full audit│             │
 │  │ • Relaxed   │  │ • Prod-like │  │ • Strict    │             │
 │  │   security  │  │   security  │  │   security  │             │
@@ -550,7 +550,7 @@ security-checks:
 │                                                                 │
 │  Data Isolation:                                                │
 │  • Production data NEVER in dev/staging                        │
-│  • Use synthetic/anonymized data for testing                   │
+│  • Use synthetic or masked data for testing                    │
 │  • Separate databases per environment                          │
 │                                                                 │
 │  Access Control:                                                │

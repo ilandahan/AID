@@ -22,7 +22,7 @@ memory-system/           # Add to your AID repo
 │   ├── prompts.md      # UI prompt templates
 │   ├── SUB-AGENT.md    # Analysis sub-agent spec
 │   ├── IMPROVEMENT-FLOW.md
-│   ├── MEMORY.md       # Claude Memory integration
+│   ├── MEMORY.md       # AID's local memory
 │   ├── MEMORY-INIT.md  # Memory initialization
 │   ├── USER-GUIDE.md   # End-user guide
 │   ├── TROUBLESHOOTING.md
@@ -104,7 +104,8 @@ Provide feedback on the session (1-5 rating + notes).
 /aid improve
 ```
 
-Analyzes feedback, suggests skill updates, promotes insights to Claude Memory.
+Analyzes feedback and proposes skill updates and memory entries. AID's own write commands
+run only after you confirm them.
 
 ## Commands
 
@@ -115,7 +116,7 @@ Analyzes feedback, suggests skill updates, promotes insights to Claude Memory.
 | `/aid status` | Show current state |
 | `/aid end` | End phase, collect feedback |
 | `/aid improve` | Run improvement analysis |
-| `/aid memory list` | Show Claude Memory entries |
+| `/aid memory list` | Show AID's local memory entries |
 | `/aid memory stats` | Memory usage statistics |
 | `/aid skill view [name]` | View skill content |
 | `/aid reset` | Full system reset |
@@ -141,7 +142,8 @@ Analyzes feedback, suggests skill updates, promotes insights to Claude Memory.
 1. **Feedback Collection**: At phase end, user rates (1-5) and describes what worked/didn't
 2. **Pattern Detection**: Sub-agent clusters feedback, identifies recurring themes
 3. **Skill Updates**: Suggestions to update role/phase skills based on patterns
-4. **Memory Promotion**: High-value insights promoted to Claude Memory for cross-session learning
+4. **Memory Promotion**: High-value insights can be written to AID's local memory
+   (`$AID_HOME/memory/slots.json`) after the user confirms
 
 ## Roles & Phases
 
@@ -160,9 +162,10 @@ Analyzes feedback, suggests skill updates, promotes insights to Claude Memory.
 
 Each combination has a skill file that Claude loads automatically.
 
-## Claude Memory Integration
+## AID's Local Memory
 
-The system uses Claude Memory (30 slots) for persistent learning:
+The system uses AID's local memory (30 slots, in `$AID_HOME/memory/slots.json`) for
+persistent learning. Nothing is sent to Claude's built-in memory:
 
 | Category | Slots | Purpose |
 |----------|-------|---------|
@@ -178,7 +181,7 @@ Entries follow format: `AID:{ROLE}:{PHASE}:{TYPE} {insight}`
 
 ## Starter Memory Entries
 
-Initialize Claude Memory with these 20 entries:
+Suggested entries (examples only; AID's local memory starts empty; entries are added only by `/aid-improve` (`memory-sync`, which you confirm).):
 
 **Universal (5):**
 ```
@@ -222,17 +225,38 @@ AID:QA:ALL:REGRESSION Keep regression suite fast and reliable
 - [Commands Reference](docs/COMMANDS.md) - All commands detailed
 - [Agent Behavior](docs/AGENT.md) - How the agent works
 - [Improvement Flow](docs/IMPROVEMENT-FLOW.md) - Learning cycle implementation
-- [Memory Management](docs/MEMORY.md) - Claude Memory integration
+- [Memory Management](docs/MEMORY.md) - AID's local memory
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues & solutions
 - [Migration Guide](docs/MIGRATION.md) - Adding to existing AID setup
 - [Error Handling](docs/ERROR-HANDLING.md) - Error codes & recovery
 
 ## Privacy
 
-- Feedback is stored locally in `~/.aid/`
-- Only anonymized patterns promoted to Claude Memory
-- No project names, file paths, or specific content in memory
-- User controls what gets promoted (manual approval)
+- Feedback is stored locally in `$AID_HOME/feedback/pending/` (default
+  `~/.aid/feedback/pending/`). Only `aid_session.py end` (via `/aid-end`) and
+  `aid_session.py approve` (via `/phase-approve`) write it.
+- Feedback text is redacted (best effort) before it is written and again whenever it is
+  read, so older files are redacted again when they are read.
+- Redaction replaces e-mail addresses, URLs (including git remotes), absolute paths
+  (Windows, UNC, POSIX, `~/`), `file.ext:line` references, common secret tokens (GitHub,
+  `sk-`, Slack, AWS keys, JWTs, long hex/base64), the project's own names (cwd and
+  project-root folder names, git remote owner and repo) and the OS user name. Placeholders:
+  `[email]`, `[url]`, `[path]`, `[file-ref]`, `[token]`, `[project]`, `[user]`.
+- It does NOT catch a person's or company's name written as plain words unless it is one of
+  those project names. Very generic folder names (docs, app, src, ...) and project names
+  shorter than 4 characters are not removed. A project's names are known only when feedback
+  is written or read from inside that project, so when files are read later, only the
+  current project's names are known.
+- "Claude Memory" here means AID's local memory, the file `$AID_HOME/memory/slots.json`
+  (default `~/.aid/memory/`). Nothing is sent to Claude's built-in memory.
+- AID's own write commands (`memory-sync`, `memory-apply`) run only after you confirm
+  them in Claude Code's prompt. `memory-apply` is also used by `/aid-recommendations`.
+  Before Phase 4 the phase gate also refuses other writes outside the project. From
+  Phase 4 on, AID does not stop other code from editing these files.
+  `python -m memory_system --sync-memory` only previews.
+- Feedback is stored locally in `$AID_HOME`. AID has no collection service of its own. When
+  you run `/aid-improve`, the redacted feedback is sent to Claude as part of the
+  conversation, for analysis.
 
 ## Integration with AID Methodology
 

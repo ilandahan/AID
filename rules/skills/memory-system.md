@@ -36,21 +36,31 @@ When `/aid-improve` is invoked, spawn the memory analysis sub-agent:
 
 ```
 Task(
-  subagent_type: "general-purpose",
-  model: "opus",
+  subagent_type: "aid:memory-analysis-agent",   # fallback: "memory-analysis-agent";
+                                               # tools: Read, Grep, Glob (no Write)
+  model: "inherit",
   prompt: [Read agents/memory-analysis-agent.md],
   description: "Memory system improvement analysis"
 )
 ```
 
+The agent only PROPOSES (JSON, no files). Queue, apply and memory writes follow
+`commands/aid-improve.md`: `aid_session.py memory-queue`, then `memory-apply <id>` or
+`memory-reject <id>` per proposal the user picks, then `memory-sync` if wanted. Claude Code
+asks the user to confirm `memory-apply` and `memory-sync`. AID's own write commands (`memory-sync`, `memory-apply`) run only after you confirm
+them in Claude Code's prompt. `memory-apply` is also used by `/aid-recommendations`.
+Before Phase 4 the phase gate also refuses other writes outside the project. From
+Phase 4 on, AID does not stop other code from editing these files. "Claude Memory" means AID's local memory,
+`$AID_HOME/memory/slots.json`; nothing is sent to Claude's built-in memory.
+
 ### Data to Pass
 
 | Variable | Source |
 |----------|--------|
-| `{{FEEDBACK_DATA}}` | Contents of `~/.aid/feedback/pending/*.json` |
+| `{{FEEDBACK_DATA}}` | The output of `aid_session.py memory-feedback` (the feedback, redacted, as JSON). Never paste raw pending files: files written before redaction existed may hold unredacted text. |
 | `{{CURRENT_SKILLS}}` | Section headers from `skills/memory-system/references/` |
 | `{{TREND_DATA}}` | Contents of `~/.aid/metrics/trends.json` |
-| `{{MEMORY_ENTRIES}}` | Current AID:* Claude Memory entries |
+| `{{MEMORY_ENTRIES}}` | Current AID:* entries in AID's local memory (`$AID_HOME/memory/slots.json`) |
 
 ---
 
@@ -63,7 +73,7 @@ Task(
 | `state.json` | Phase tracking | `.aid/state.json` (project) |
 | `context.json` | Work context | `.aid/context.json` (project) |
 | `state.json` | Session state | `~/.aid/state.json` (user) |
-| `feedback/pending/` | Unprocessed feedback | `~/.aid/feedback/pending/` |
+| `feedback/pending/` | Unprocessed feedback | `$AID_HOME/feedback/pending/` (default `~/.aid/feedback/pending/`) |
 | `feedback/processed/` | Archived feedback | `~/.aid/feedback/processed/` |
 
 ### Update Triggers
@@ -95,6 +105,8 @@ Update `.aid/context.json` when:
 1. **Always collect rating (1-5)** at session end
 2. **Track revision count** during session
 3. **Never include project-specific data** (names, code, companies)
+4. **Never write a feedback JSON file yourself.** The only writers are
+   `aid_session.py end` (via `/aid-end`) and `aid_session.py approve` (via `/phase-approve`)
 
 ### OPTIONAL
 
@@ -104,7 +116,13 @@ Update `.aid/context.json` when:
 
 ---
 
-## Anonymization Rules
+## Feedback Privacy (redaction is best effort)
+
+Feedback text is redacted before it is written and again whenever it is read. E-mails,
+URLs, absolute paths, `file.ext:line` references, common secret tokens, the project's own
+names (cwd and project-root folder names, git remote owner and repo) and the OS user name are
+replaced with placeholders. A person's or company's name written as plain words is NOT caught
+unless it is one of those project names, so still leave these out.
 
 ### NEVER Include
 

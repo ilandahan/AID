@@ -5,7 +5,9 @@ Generates skill update recommendations based on detected patterns.
 Part of the AID Memory System sub-agent.
 """
 
+import hashlib
 import json
+import re
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -16,21 +18,89 @@ import os
 try:
     from ..analysis.metrics import MetricsCalculator
     from ..analysis.patterns import PatternDetector
-    from ..feedback.collector import load_pending_feedback, load_feedback_by_date_range
+    from ..feedback.collector import load_pending_feedback, load_feedback_by_date_range, default_names
+    from .. import paths
+    from ..redact import redact_obj
 except ImportError:
     from analysis.metrics import MetricsCalculator
     from analysis.patterns import PatternDetector
-    from feedback.collector import load_pending_feedback, load_feedback_by_date_range
+    from feedback.collector import load_pending_feedback, load_feedback_by_date_range, default_names
+    import paths
+    from redact import redact_obj
 
-# Configuration
-RECOMMENDATIONS_DIR = Path(os.path.expanduser("~/.aid/recommendations"))
-QUEUE_FILE = RECOMMENDATIONS_DIR / "queue.json"
-APPLIED_FILE = RECOMMENDATIONS_DIR / "applied.json"
+# T8-2 (D3): an approved proposal may only APPEND to one of these learnings files, inside
+# this plugin's own skills/memory-system/references/. Nothing else is ever written.
+REFS_ROOT = Path(__file__).resolve().parents[3] / "skills" / "memory-system" / "references"
+_TARGET = re.compile(r"^(roles|phases)/([a-z0-9-]+)/cumulative\.md$")
+_ROLE_DIRS = {"pm": "product-manager", "product-manager": "product-manager", "qa": "qa-engineer",
+              "qa-engineer": "qa-engineer", "lead": "tech-lead", "tech-lead": "tech-lead",
+              "developer": "developer", "dev": "developer", "data-scientist": "data-scientist"}
+_PHASE_DIRS = ("discovery", "prd", "tech-spec", "breakdown", "development", "qa-ship")
+
+
+# Configuration. T8-3: from paths.aid_home() on every call ($AID_HOME, else ~/.aid).
+def _queue_file() -> Path:
+    return paths.recommendations_dir() / "queue.json"
+
+
+def _applied_file() -> Path:
+    return paths.recommendations_dir() / "applied.json"
+
+
+def _rejected_file() -> Path:
+    return paths.recommendations_dir() / "rejected.json"
+
+
+def _read_list(path: Path) -> List[Dict[str, Any]]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return [r for r in data if isinstance(r, dict)] if isinstance(data, list) else []
+
+
+def _write_list(path: Path, data: List[Dict[str, Any]]):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def ensure_directories():
     """Create recommendations directories if they don't exist."""
-    RECOMMENDATIONS_DIR.mkdir(parents=True, exist_ok=True)
+    paths.recommendations_dir().mkdir(parents=True, exist_ok=True)
+
+
+def target_for(target_skill: str) -> Optional[str]:
+    """The learnings file a recommendation may be applied to, or None (a skill-wide
+    recommendation is shown to the user but cannot be applied by the tool)."""
+    t = str(target_skill or "")
+    if t.startswith("role-") and t[5:] in _ROLE_DIRS:
+        return "roles/{}/cumulative.md".format(_ROLE_DIRS[t[5:]])
+    if t.startswith("aid-") and t[4:] in _PHASE_DIRS:
+        return "phases/{}/cumulative.md".format(t[4:])
+    return None
+
+
+def resolve_target(rel: Any, refs_root: Optional[Path] = None) -> Optional[Path]:
+    """The real file for an allowed relative target, or None. Allowed: exactly
+    ``roles|phases/<name>/cumulative.md`` that exists under the references root, after
+    resolving symlinks (no ``..``, no absolute path, no other file)."""
+    root = (refs_root or REFS_ROOT).resolve()
+    if not isinstance(rel, str):
+        return None
+    rel = rel.replace("\\", "/")
+    prefix = "skills/memory-system/references/"
+    if rel.startswith(prefix):
+        rel = rel[len(prefix):]
+    if not _TARGET.match(rel):
+        return None
+    path = (root / rel).resolve()
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return None
+    return path if path.is_file() else None
 
 
 class RecommendationGenerator:
@@ -235,7 +305,7 @@ class RecommendationGenerator:
                 current_guidance="Current transparency approach",
                 proposed_change="Always use full transparency format. "
                                "Include detailed rationale and all alternatives considered.",
-                rationale=f"{verbosity['detail_requests']} detail requests vs {verbosity['verbose_signals']} verbose complaints",
+                rationale=f"{verbosity.get('detail_signals', 0)} detail requests vs {verbosity.get('verbose_signals', 0)} verbose complaints",
                 supporting_data={
                     "verbose_complaints": verbosity['verbose_signals'],
                     "detail_requests": verbosity['detail_signals'],
@@ -294,21 +364,22 @@ class RecommendationGenerator:
         rationale: str,
         supporting_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Create a recommendation dictionary."""
-        return {
-            "id": str(uuid.uuid4()),
-            "generated_at": datetime.utcnow().isoformat() + "Z",
+        """Create a recommendation dictionary: redacted (T8-1), with an id derived from its
+        content so the same recommendation is queued once however often it is generated."""
+        rec = redact_obj({
             "priority": priority,
             "target_skill": target_skill,
+            "target_file": target_for(target_skill),
             "section": section,
             "current_guidance": current_guidance,
             "proposed_change": proposed_change,
             "rationale": rationale,
             "supporting_data": supporting_data,
-            "auto_apply": False,
-            "requires_review": True,
-            "status": "pending"
-        }
+        }, default_names())
+        rec["id"] = _content_id(rec)
+        rec.update({"generated_at": datetime.utcnow().isoformat() + "Z", "auto_apply": False,
+                    "requires_review": True, "status": "pending"})
+        return rec
 
     def _category_to_skill(self, category: str) -> str:
         """Map a topic category to a skill name."""
@@ -389,94 +460,86 @@ class RecommendationGenerator:
 
 def save_recommendations(recommendations: List[Dict[str, Any]]) -> Path:
     """
-    Save recommendations to the queue file.
-
-    Args:
-        recommendations: List of recommendations
-
-    Returns:
-        Path to the queue file
+    Add recommendations to the queue, once each (by id), redacted (T8-4). An id that was
+    already applied or rejected is not queued again.
     """
-    ensure_directories()
-
-    # Load existing queue
-    existing = []
-    if QUEUE_FILE.exists():
-        with open(QUEUE_FILE, 'r', encoding='utf-8') as f:
-            existing = json.load(f)
-
-    # Merge (avoid duplicates by ID)
-    existing_ids = {r['id'] for r in existing}
+    queue = _read_list(_queue_file())
+    seen = {r.get("id") for r in queue + _read_list(_applied_file()) + _read_list(_rejected_file())}
     for rec in recommendations:
-        if rec['id'] not in existing_ids:
-            existing.append(rec)
-
-    # Save updated queue
-    with open(QUEUE_FILE, 'w', encoding='utf-8') as f:
-        json.dump(existing, f, indent=2, ensure_ascii=False)
-
-    return QUEUE_FILE
+        if isinstance(rec, dict) and rec.get("id") and rec["id"] not in seen:
+            queue.append(redact_obj(rec, default_names(), skip_keys=("id", "generated_at")))
+            seen.add(rec["id"])
+    _write_list(_queue_file(), queue)
+    return _queue_file()
 
 
 def load_recommendation_queue() -> List[Dict[str, Any]]:
+    """Pending recommendations. Reading creates nothing."""
+    return _read_list(_queue_file())
+
+
+def _find(queue: List[Dict[str, Any]], rec_id: str) -> Optional[int]:
+    """Index of the one queued recommendation whose id is ``rec_id`` or starts with it (8+
+    characters, as the report prints). None when missing or ambiguous."""
+    rec_id = str(rec_id or "")
+    if len(rec_id) < 8:
+        return None
+    hits = [i for i, r in enumerate(queue) if str(r.get("id", "")).startswith(rec_id)]
+    return hits[0] if len(hits) == 1 else None
+
+
+def apply_recommendation(rec_id: str, refs_root: Optional[Path] = None) -> Dict[str, Any]:
     """
-    Load pending recommendations from the queue.
-
-    Returns:
-        List of pending recommendations
+    T8-2 (D3): append ONE queued recommendation to its learnings file and move it to
+    applied.json. Called only through ``aid_session.py memory-apply``, which Claude Code
+    asks the user to confirm. Refuses (``ok`` False, nothing changed) an unknown id or a
+    recommendation without an allowed target.
     """
-    ensure_directories()
+    queue = load_recommendation_queue()
+    i = _find(queue, rec_id)
+    if i is None:
+        return {"ok": False, "reason": "no single queued recommendation has id {!r}".format(rec_id)}
+    rec = queue[i]
+    path = resolve_target(rec.get("target_file"), refs_root)
+    if path is None:
+        return {"ok": False, "reason": "recommendation {} has no allowed target (only "
+                "skills/memory-system/references/roles|phases/<name>/cumulative.md); apply it "
+                "by hand if you want it".format(rec.get("id"))}
+    if rec.get("id") != _content_id(rec):
+        return {"ok": False, "reason": "recommendation {!r} does not match its content (the queue "
+                "was edited); run memory-preview and confirm the id it shows".format(rec.get("id"))}
+    clean = redact_obj(rec, default_names(), skip_keys=("id", "generated_at"))
+    block = "\n## Applied learning ({}, recommendation {})\n\n- {}\n  - Why: {}\n".format(
+        datetime.utcnow().strftime("%Y-%m-%d"), clean["id"], _one_line(clean.get("proposed_change")),
+        _one_line(clean.get("rationale")))
+    with open(path, "a", encoding="utf-8", newline="") as f:
+        f.write(block)
+    queue.pop(i)
+    clean.update({"status": "applied", "applied_at": datetime.utcnow().isoformat() + "Z"})
+    _write_list(_queue_file(), queue)
+    _write_list(_applied_file(), _read_list(_applied_file()) + [clean])
+    return {"ok": True, "id": clean.get("id"), "target": str(rec.get("target_file"))}
 
-    if not QUEUE_FILE.exists():
-        return []
 
-    with open(QUEUE_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+def _content_id(rec: Dict[str, Any]) -> str:
+    """The id a recommendation's CONTENT gives it. memory-apply checks it, so the id the user
+    confirms in Claude Code's prompt fixes exactly what is appended: the target file and
+    both texts that are written (T8 review r1 and r2)."""
+    key = "|".join(str(rec.get(k)) for k in
+                   ("target_skill", "target_file", "section", "proposed_change", "rationale"))
+    return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
+
+
+def _one_line(value: Any) -> str:
+    """Plain text on one line: no newlines and no leading Markdown heading, quote or list
+    marks, so an applied proposal cannot add headings or structure to a learnings file."""
+    text = " ".join(str(value if value is not None else "").split())
+    return re.sub(r"^[#>*+\s-]+", "", text)[:1000]
 
 
 def mark_recommendation_applied(rec_id: str) -> bool:
-    """
-    Mark a recommendation as applied.
-
-    Args:
-        rec_id: ID of the recommendation
-
-    Returns:
-        True if successful
-    """
-    ensure_directories()
-
-    # Load queue
-    queue = load_recommendation_queue()
-
-    # Find and remove from queue
-    rec = None
-    for i, r in enumerate(queue):
-        if r['id'] == rec_id:
-            rec = queue.pop(i)
-            rec['status'] = 'applied'
-            rec['applied_at'] = datetime.utcnow().isoformat() + "Z"
-            break
-
-    if not rec:
-        return False
-
-    # Save updated queue
-    with open(QUEUE_FILE, 'w', encoding='utf-8') as f:
-        json.dump(queue, f, indent=2, ensure_ascii=False)
-
-    # Add to applied
-    applied = []
-    if APPLIED_FILE.exists():
-        with open(APPLIED_FILE, 'r', encoding='utf-8') as f:
-            applied = json.load(f)
-
-    applied.append(rec)
-
-    with open(APPLIED_FILE, 'w', encoding='utf-8') as f:
-        json.dump(applied, f, indent=2, ensure_ascii=False)
-
-    return True
+    """Kept for callers of the old API: applies the recommendation (see apply_recommendation)."""
+    return apply_recommendation(rec_id)["ok"]
 
 
 def generate_recommendations_from_feedback(
@@ -541,46 +604,51 @@ def save_recommendation(recommendation: Dict[str, Any]) -> Path:
 
 
 def approve_recommendation(rec_id: str) -> bool:
-    """
-    Approve and apply a recommendation.
-
-    Args:
-        rec_id: ID of the recommendation
-
-    Returns:
-        True if successful
-    """
-    return mark_recommendation_applied(rec_id)
+    """Approve = apply (see apply_recommendation)."""
+    return apply_recommendation(rec_id)["ok"]
 
 
-def reject_recommendation(rec_id: str) -> bool:
-    """
-    Reject a recommendation (remove from queue without applying).
-
-    Args:
-        rec_id: ID of the recommendation
-
-    Returns:
-        True if successful
-    """
-    ensure_directories()
-
-    # Load queue
+def reject_recommendation(rec_id: str, reason: str = "") -> bool:
+    """Move a queued recommendation to rejected.json without applying it."""
     queue = load_recommendation_queue()
-
-    # Find and remove from queue
-    for i, r in enumerate(queue):
-        if r['id'] == rec_id:
-            queue.pop(i)
-            break
-    else:
+    i = _find(queue, rec_id)
+    if i is None:
         return False
-
-    # Save updated queue
-    with open(QUEUE_FILE, 'w', encoding='utf-8') as f:
-        json.dump(queue, f, indent=2, ensure_ascii=False)
-
+    rec = queue.pop(i)
+    rec.update({"status": "rejected", "rejected_at": datetime.utcnow().isoformat() + "Z"})
+    _write_list(_queue_file(), queue)
+    _write_list(_rejected_file(), _read_list(_rejected_file()) + [rec])
     return True
+
+
+def queue_proposals(data: Any) -> Dict[str, Any]:
+    """
+    T8-2 (D3): queue the memory-analysis agent's proposals (its JSON output, or the list in
+    its ``suggestions``). Each proposal is redacted; one whose target is not an allowed
+    learnings file is skipped. Nothing is applied here.
+    """
+    items = data.get("suggestions", []) if isinstance(data, dict) else data
+    queued, skipped = [], []
+    for s in items if isinstance(items, list) else []:
+        if not isinstance(s, dict):
+            continue
+        target = s.get("target") if isinstance(s.get("target"), dict) else {}
+        rel = target.get("file") or s.get("target_file")
+        text = s.get("content") or s.get("proposed_change")
+        if resolve_target(rel) is None or not isinstance(text, str) or not text.strip():
+            skipped.append(str(rel))
+            continue
+        rel = str(rel).replace("\\", "/").replace("skills/memory-system/references/", "")
+        rec = redact_obj({"priority": s.get("priority", "medium"), "target_skill": "memory-system",
+                          "target_file": rel, "section": target.get("section", "Learnings"),
+                          "current_guidance": "", "proposed_change": text,
+                          "rationale": s.get("rationale", ""), "supporting_data": {}}, default_names())
+        rec["id"] = _content_id(rec)
+        rec.update({"generated_at": datetime.utcnow().isoformat() + "Z", "auto_apply": False,
+                    "requires_review": True, "status": "pending", "source": "memory-analysis-agent"})
+        queued.append(rec)
+    save_recommendations(queued)
+    return {"queued": [r["id"] for r in queued], "skipped_targets": skipped}
 
 
 def format_recommendations_report(recommendations: List[Dict[str, Any]]) -> str:

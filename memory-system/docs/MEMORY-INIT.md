@@ -1,6 +1,12 @@
 # AID Memory System - Memory Initialization
 
-> Implementation guide for initializing Claude Memory with starter entries.
+> Implementation guide for initializing AID's local memory with starter entries.
+>
+> **Note (T8):** "Claude Memory" in AID means a LOCAL file, `$AID_HOME/memory/slots.json`
+> (default `~/.aid/memory/`). Nothing is sent to Claude's built-in memory, and AID does not
+> call `memory_user_edits`. The `memory_user_edits` examples below describe an earlier design
+> and are not used. Entries are written only by `aid_session.py memory-sync`, which Claude
+> Code asks the user to confirm. See `MEMORY.md`.
 
 ---
 
@@ -275,7 +281,7 @@ try:
     memory_user_edits(command="add", control=entry)
 except Exception as e:
     display(f"""
-    ⚠️ Failed to add to Claude Memory.
+    ⚠️ Failed to add to AID's local memory.
     
     Entry saved to retry queue.
     Error: {str(e)}
@@ -339,7 +345,7 @@ def init_memory_system():
     
     # 4. Add missing entries
     if missing:
-        display(f"Adding {len(missing)} starter entries to Claude Memory...")
+        display(f"Adding {len(missing)} starter entries to AID's local memory...")
         added = add_missing_entries(missing)
         display(f"✅ Added {len(added)} entries.")
     

@@ -25,11 +25,9 @@ First-time setup of the memory system. Creates runtime directories and copies te
    └── logs/
    ```
 
-2. Copies skill templates from `memory-system/skills/`
+2. Initializes configuration files from `memory-system/templates/`
 
-3. Initializes configuration files from `memory-system/templates/`
-
-4. Initializes Claude Memory with 20 starter entries (if not present)
+3. AID's local memory starts empty; entries are added only by `/aid-improve` (`memory-sync`, which you confirm).
 
 ## Usage
 
@@ -50,7 +48,7 @@ Created:
 - ~/.aid/skills/ (copied from repo)
 - ~/.aid/metrics/
 
-Claude Memory: 20 starter entries added
+AID local memory: empty (entries are added only by /aid-improve, after you confirm)
 
 Ready! Use /aid start to begin a session.
 ```

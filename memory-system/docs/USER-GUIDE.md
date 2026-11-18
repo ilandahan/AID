@@ -11,7 +11,7 @@ AID Memory is a **learning system** that helps Claude get better at helping you 
 1. **Collects feedback** at the end of each work phase
 2. **Identifies patterns** in what works and what doesn't
 3. **Updates skills** with proven insights
-4. **Promotes top patterns** to permanent Claude Memory
+4. **Proposes top patterns** for AID's local memory (`~/.aid/memory/slots.json`); AID's own write commands run only after you confirm them
 
 **Result**: Each session benefits from learnings across all your previous sessions.
 
@@ -28,7 +28,8 @@ AID Memory is a **learning system** that helps Claude get better at helping you 
 This creates your personal `~/.aid/` directory with:
 - Skill files for each role and phase
 - Configuration for feedback collection
-- 20 starter Claude Memory entries
+
+AID's local memory starts empty; entries are added only by `/aid-improve` (`memory-sync`, which you confirm).
 
 ### Starting a Session
 
@@ -182,39 +183,42 @@ You'll see:
 
 2. **Review Each Suggestion**
    
-   For each pattern found, you decide:
-   - **Approve** ✓ - Add to skills
-   - **Edit** 📝 - Modify before adding
-   - **Reject** ✗ - Don't add
-   - **Skip** ⏭️ - Decide later
+   The analysis agent only proposes. Its proposals are queued, and for each one you decide:
+   - **Apply** ✓ - Append it to a role or phase `cumulative.md`
+     (`aid_session.py memory-apply <id>`; Claude Code asks you to confirm)
+   - **Reject** ✗ - Drop it (`aid_session.py memory-reject <id>`)
+   - **Skip** ⏭️ - Leave it in the queue and decide later
 
 3. **Apply Changes**
    
-   Approved changes update:
-   - Skill files (cumulative.md)
-   - Claude Memory (if meets promotion criteria)
+   Only the changes you confirm are written:
+   - Skill learnings files (`cumulative.md`, append only)
+   - AID's local memory, through `aid_session.py memory-sync` (Claude Code asks you to confirm)
 
 4. **Summary**
    ```
    ✅ Improvement Complete!
    
    • 2 skill file updates
-   • 1 Claude Memory update
+   • 1 AID local memory update
    
    Changes take effect next session. 🚀
    ```
 
 ---
 
-## Claude Memory Integration
+## AID's Local Memory
+
+"Claude Memory" in AID means a local file, `$AID_HOME/memory/slots.json` (default
+`~/.aid/memory/`). Nothing is sent to Claude's built-in memory.
 
 ### What Gets Promoted
 
-Patterns are promoted to Claude Memory when:
+Patterns can be written to AID's local memory when:
 - Used in **5+ sessions**
 - Average rating **≥ 4.0** when used
 - Average revisions **≤ 2.0** when used
-- You **approve** the promotion
+- You **confirm** the write (`memory-sync`) in the Claude Code prompt
 
 ### Memory Entry Format
 
@@ -351,24 +355,35 @@ All data stored under `~/.aid/`:
 
 ### What's Collected
 
-- Role and phase (no project names)
+- Role and phase
 - Rating (1-5)
 - Revision count
-- Generic qualitative feedback
+- What worked and what to improve, as you typed it, redacted (best effort)
 
-### What's NOT Collected
+### What Redaction Removes (Best Effort)
 
-- Project names
-- Company names
-- Code snippets
-- File paths
-- Domain-specific details
+Feedback text is redacted before it is written and again whenever it is read. These are
+replaced with placeholders (`[email]`, `[url]`, `[path]`, `[file-ref]`, `[token]`, `[project]`, `[user]`):
+
+- E-mail addresses and URLs (including git remotes)
+- Absolute paths (Windows, UNC, POSIX, `~/`) and `file.ext:line` references
+- Common secret tokens (GitHub, `sk-`, Slack, AWS keys, JWTs, long hex/base64)
+- The project's own names (cwd and project-root folder names, git remote owner and repo)
+  and your OS user name
+
+It does NOT catch a person's or company's name written as plain words unless it is one of
+those project names. Very generic folder names (docs, app, src, ...) and project names
+shorter than 4 characters are not removed. A project's names are known only when feedback
+is written or read from inside that project, so when files are read later, only the
+current project's names are known.
+Do not type names you want to keep private.
 
 ### Where Data Lives
 
-- All data stays in `~/.aid/` on your system
-- Claude Memory entries are in your Anthropic account
-- Nothing is sent externally
+- Feedback is stored locally in `$AID_HOME`. AID has no collection service of its own. When
+  you run `/aid-improve`, the redacted feedback is sent to Claude as part of the
+  conversation, for analysis.
+- AID's local memory entries are in `~/.aid/memory/slots.json`, not in your Anthropic account
 
 ### Deleting Data
 

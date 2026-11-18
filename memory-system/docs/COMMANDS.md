@@ -13,7 +13,7 @@
 | `/aid status` | Show current state |
 | `/aid end` | Complete phase, collect feedback |
 | `/aid improve` | Run improvement analysis |
-| `/aid memory list` | Show Claude Memory entries |
+| `/aid memory list` | Show AID's local memory entries |
 | `/aid memory stats` | Show memory statistics |
 | `/aid skill view [type]` | View skill content |
 | `/aid skill edit [type]` | Edit skill file |
@@ -35,7 +35,7 @@ Initializes the AID Memory System for first-time use.
 3. Initializes skill files for all roles and phases
 4. Creates empty feedback directories
 5. Sets up metrics tracking files
-6. Adds 20 starter entries to Claude Memory
+6. AID's local memory starts empty; entries are added only by `/aid-improve` (`memory-sync`, which you confirm).
 
 **Output:**
 ```
@@ -119,7 +119,8 @@ Completes the current phase and collects feedback.
 1. Display phase summary (deliverables, revision count)
 2. Request quality rating (1-5) - **required**
 3. Request qualitative feedback (optional)
-4. Save anonymized feedback file
+4. Save feedback with `aid_session.py end`, which redacts the text (best effort) before
+   writing it to `$AID_HOME/feedback/pending/`
 5. Update statistics
 6. Suggest next steps
 
@@ -137,19 +138,23 @@ Runs the improvement analysis sub-agent.
 - At least 3 pending feedback items recommended
 - No active session (run `/aid end` first)
 
-**Flow:**
-1. Gather all pending feedback
-2. Run pattern analysis (sub-agent)
-3. Present suggestions one by one
-4. User approves/rejects each suggestion
-5. Apply approved changes
-6. Archive processed feedback
+**Flow:** (see `commands/aid-improve.md` for the exact calls)
+1. Preview: `aid_session.py memory-preview` (writes nothing)
+2. Get the redacted feedback: `aid_session.py memory-feedback` (JSON, writes nothing)
+3. Run pattern analysis (`memory-analysis-agent`, proposals only, writes no files)
+4. Save its JSON to `.aid/improve/proposals.json`, then queue it: `aid_session.py memory-queue`
+   (no argument; it reads that file itself)
+5. Show the queue; the user picks proposals
+6. Apply one: `aid_session.py memory-apply <id>` (Claude Code asks the user to confirm;
+   it only appends to a role or phase `cumulative.md`), or drop one:
+   `aid_session.py memory-reject <id>`
+7. Optionally write memory entries: `aid_session.py memory-sync` (Claude Code asks the
+   user to confirm)
 
 **User actions for each suggestion:**
-- **Approve** ✓ - Apply the change
-- **Edit** 📝 - Modify before applying
-- **Reject** ✗ - Don't apply
-- **Skip** ⏭️ - Decide later
+- **Apply** ✓ - `memory-apply <id>`, confirmed in the Claude Code prompt
+- **Reject** ✗ - `memory-reject <id>`
+- **Skip** ⏭️ - Leave it in the queue and decide later
 
 ---
 
@@ -157,11 +162,11 @@ Runs the improvement analysis sub-agent.
 
 ### `/aid memory list`
 
-Shows all AID:* entries in Claude Memory.
+Shows all AID:* entries in AID's local memory (`$AID_HOME/memory/slots.json`).
 
 **Output:**
 ```
-📝 AID Claude Memory Entries (12/30 used)
+📝 AID Local Memory Entries (12/30 used)
 
 Universal:
   1. AID:ALL:ALL:DO Confirm understanding before producing deliverable
@@ -184,7 +189,7 @@ Shows memory slot allocation and usage statistics.
 
 **Output:**
 ```
-📊 Claude Memory Statistics
+📊 AID Local Memory Statistics
 
 Slot Allocation:
 • Universal: 5/5 (100%)
@@ -279,13 +284,13 @@ Resets the AID Memory System.
 
 **What is preserved:**
 - Skill files (including cumulative.md learnings)
-- Claude Memory entries
+- AID's local memory entries
 - Configuration preferences
 
 **Confirmation required:**
 ```
 ⚠️ This will delete all feedback and reset statistics.
-Skill files and Claude Memory will be preserved.
+Skill files and AID's local memory will be preserved.
 
 Type 'RESET' to confirm: ___
 ```

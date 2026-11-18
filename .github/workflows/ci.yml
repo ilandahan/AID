@@ -32,6 +32,11 @@ jobs:
         run: |
           FH="$(mktemp -d)"
           HOME="$FH" USERPROFILE="$FH" AID_HOME="$FH/.aid" python -m pytest testing/e2e -q -p no:cacheprovider
+      - name: Run memory-system unit tests with a throwaway home
+        working-directory: memory-system
+        run: |
+          FH="$(mktemp -d)"
+          HOME="$FH" USERPROFILE="$FH" AID_HOME="$FH/.aid" python -m pytest -q -p no:cacheprovider
 
   node-test:
     name: node --test (pipeline-orchestrator)

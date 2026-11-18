@@ -396,7 +396,8 @@ During Phase 4 (Development), track significant interactions to trigger periodic
 │  User rates (1-5) or skips                                      │
 │       │                                                         │
 │       ▼                                                         │
-│  If rated: Save to feedback/pending/                            │
+│  If rated: keep it for the next /aid-end (aid_session.py end    │
+│  is the only writer; never write feedback/pending/ by hand)     │
 │  Reset interaction_count to 0                                   │
 │  Update last_quality_check timestamp                            │
 │  Continue working                                               │

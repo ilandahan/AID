@@ -1,6 +1,12 @@
 # AID Memory System - Migration Guide
 
 > How to add the Memory System to an existing AID methodology installation.
+>
+> **Note (T8):** "Claude Memory" in AID means a LOCAL file, `$AID_HOME/memory/slots.json`
+> (default `~/.aid/memory/`). Nothing is sent to Claude's built-in memory, and AID does not
+> call `memory_user_edits`. The `memory_user_edits` examples below describe an earlier design
+> and are not used. Entries are written only by `aid_session.py memory-sync`, which Claude
+> Code asks the user to confirm. See `MEMORY.md`.
 
 ---
 
@@ -10,7 +16,7 @@ This guide covers:
 1. Adding Memory System to existing AID repo
 2. Migrating existing learnings to the new format
 3. Updating workflows to include feedback collection
-4. Integrating with existing Claude Memory entries
+4. Integrating with existing AID's local memory entries
 
 ---
 
@@ -18,7 +24,7 @@ This guide covers:
 
 Before migrating:
 - [ ] Existing AID methodology installation
-- [ ] Access to Claude Code with Claude Memory enabled
+- [ ] Access to Claude Code
 - [ ] Backup of any existing customizations
 
 ---
@@ -79,7 +85,7 @@ cp -r ~/.aid/skills ~/.aid/skills.backup
 
 ---
 
-## Step 3: Migrate Existing Claude Memory
+## Step 3: Migrate Existing AID's local memory
 
 ### Check Current Entries
 
@@ -97,7 +103,7 @@ If you don't have AID:* entries yet:
 /aid init
 ```
 
-This adds 20 starter entries if they don't exist.
+AID's local memory starts empty; entries are added only by `/aid-improve` (`memory-sync`, which you confirm).
 
 ### Preserve Custom Entries
 
@@ -199,7 +205,7 @@ Add from Memory System:
 
 ---
 
-## Step 6: Set Up Claude Memory Slots
+## Step 6: Set Up AID's local memory Slots
 
 ### Review Slot Allocation
 
@@ -251,7 +257,7 @@ For teams sharing skill improvements:
 ### Migration Checklist for Teams
 
 - [ ] Each member runs `/aid init`
-- [ ] Verify Claude Memory has 20 AID:* entries
+- [ ] Note: AID's local memory starts empty; entries are added only by `/aid-improve` (`memory-sync`, which you confirm).
 - [ ] Test feedback collection with a sample session
 - [ ] Run first `/aid improve` cycle
 - [ ] Update team documentation
@@ -264,7 +270,7 @@ For teams sharing skill improvements:
 
 Memory System requires:
 - Claude Code with file system access
-- Claude Memory (memory_user_edits tool)
+- AID's local memory (`$AID_HOME/memory/slots.json`)
 - JSON file read/write capability
 
 ### Directory Locations
@@ -295,7 +301,7 @@ If migration causes issues:
 # Remove Memory System
 rm -rf ~/.aid/
 
-# Remove Claude Memory entries (optional)
+# Remove AID's local memory entries (optional)
 # Use memory_user_edits to remove AID:* entries
 
 # Restore backup
@@ -336,7 +342,7 @@ cp ~/.aid/state.json.backup ~/.aid/state.json
 4. Verify feedback created:
    ```bash
    ls ~/.aid/feedback/pending/
-   # Should see FB-*.json file
+   # Should see a new *.json file
    ```
 
 ### Test Improvement Flow
@@ -352,7 +358,7 @@ cp ~/.aid/state.json.backup ~/.aid/state.json
 
 ### Test Memory Integration
 
-1. Check Claude Memory:
+1. Check AID's local memory:
    ```
    /aid memory list
    ```

@@ -44,7 +44,7 @@ This creates:
 - ~/.aid/ directory structure
 - Default config.yaml and state.json
 - All skill files
-- 20 starter Claude Memory entries
+- No memory entries: AID's local memory starts empty; entries are added only by `/aid-improve` (`memory-sync`, which you confirm).
 
 **If init fails:**
 ```bash
@@ -114,20 +114,21 @@ ls ~/.aid/feedback/pending/
 
 **Validate each file:**
 ```bash
-# Check if valid JSON
-cat ~/.aid/feedback/pending/FB-*.json | python -m json.tool
+# Check if valid JSON (one file at a time)
+python -m json.tool ~/.aid/feedback/pending/<file>.json
+# Feedback files are named *.json
 ```
 
 **Remove corrupted files:**
 ```bash
 # Move to backup
 mkdir -p ~/.aid/backup/corrupted
-mv ~/.aid/feedback/pending/FB-CORRUPT.json ~/.aid/backup/corrupted/
+mv ~/.aid/feedback/pending/<corrupt-file>.json ~/.aid/backup/corrupted/
 ```
 
 ---
 
-### 4. Claude Memory Out of Sync
+### 4. AID Local Memory Out of Sync
 
 **Symptoms:**
 - `/aid memory list` shows different entries than expected
@@ -137,8 +138,8 @@ mv ~/.aid/feedback/pending/FB-CORRUPT.json ~/.aid/backup/corrupted/
 **Solution:**
 
 **Step 1: View actual memory**
-```
-memory_user_edits(command="view")
+```bash
+cat ~/.aid/memory/slots.json
 ```
 
 **Step 2: Compare with tracking**
@@ -220,29 +221,9 @@ The system listens for:
 - done, approved, complete this phase, phase gate
 - finished, looks good, ship it
 
-**Manual feedback:**
-If phase gate skipped, create feedback manually:
-```json
-// ~/.aid/feedback/pending/FB-{timestamp}.json
-{
-  "$schema": "aid-feedback-v1",
-  "id": "FB-MANUAL-001",
-  "timestamp": "2025-01-15T10:00:00Z",
-  "context": {
-    "role": "product-manager",
-    "phase": "discovery"
-  },
-  "metrics": {
-    "rating": 4,
-    "revisions": 2
-  },
-  "qualitative": {
-    "what_worked": "...",
-    "what_didnt": "...",
-    "user_note": "..."
-  }
-}
-```
+**Missed feedback:**
+Do not create a feedback file by hand. Run `/aid-end` (it calls `aid_session.py end`, which
+redacts the text and writes the file). `/phase-approve` also stores its rating.
 
 ---
 
@@ -265,12 +246,9 @@ The system shows entries by score. Consider:
 - Are all 30 entries still relevant?
 - Are there duplicates or outdated patterns?
 
-**Manual cleanup:**
-```
-memory_user_edits(command="view")
-# Find line number of entry to remove
-memory_user_edits(command="remove", line_number=X)
-```
+**Cleanup:**
+Preview with `aid_session.py memory-preview`. Writes go only through
+`aid_session.py memory-sync`, which Claude Code asks you to confirm.
 
 **After removal:**
 ```
@@ -287,7 +265,7 @@ memory_user_edits(command="remove", line_number=X)
 | `Invalid state.json` | Corrupted state file | Reset or repair state.json |
 | `Skill file missing: X` | Skill file deleted/moved | Run `/aid skill sync` |
 | `Feedback parse error` | Corrupted feedback file | Remove corrupted file |
-| `Memory sync failed` | Claude Memory API error | Retry, check connection |
+| `Memory sync failed` | Could not write `~/.aid/memory/slots.json`, or the prompt was declined | Check the reason shown; re-run `/aid-improve` |
 | `Not enough feedback` | <3 feedback items | Wait for more sessions |
 | `Promotion rejected` | Entry doesn't meet criteria | Review criteria, try later |
 | `Slot allocation full` | Category has no room | Replace lower-scoring entry |
@@ -310,7 +288,7 @@ This will:
 2. Reset state.json to defaults
 3. Reset trends.json
 4. Keep skill files (including cumulative.md learnings)
-5. Keep Claude Memory entries
+5. Keep AID's local memory entries
 
 ### Export Before Reset
 
@@ -348,7 +326,7 @@ cat ~/.aid/metrics/trends.json
 
 ### Count Feedback Files
 ```bash
-ls ~/.aid/feedback/pending/ | grep "^FB-" | wc -l
+ls ~/.aid/feedback/pending/*.json
 ```
 
 ### Check Memory Entries

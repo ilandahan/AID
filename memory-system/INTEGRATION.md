@@ -129,10 +129,10 @@ See: `memory-system/docs/COMMANDS.md#status`
 ```markdown
 # /aid memory [list|stats]
 
-Manage Claude Memory entries.
+Manage entries in AID's local memory (`$AID_HOME/memory/slots.json`).
 
 ## Subcommands
-- `list` - Show all AID entries in Claude Memory
+- `list` - Show all AID entries in AID's local memory
 - `stats` - Show slot usage by category
 
 ## Implementation

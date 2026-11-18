@@ -32,12 +32,17 @@ except ImportError:
     )
 
 # Configuration
-REPORTS_DIR = Path(os.path.expanduser("~/.aid/reports"))
+# T8-3: $AID_HOME, else ~/.aid, read on every call.
+from .. import paths
+
+
+def _reports_dir():
+    return paths.reports_dir()
 
 
 def ensure_directories():
     """Create reports directories if they don't exist."""
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    _reports_dir().mkdir(parents=True, exist_ok=True)
 
 
 class QualityDashboard:
@@ -417,11 +422,11 @@ class QualityDashboard:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 
         if format == "json":
-            filepath = REPORTS_DIR / f"quality-report_{timestamp}.json"
+            filepath = _reports_dir() / f"quality-report_{timestamp}.json"
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(self.generate_full_report(), f, indent=2, ensure_ascii=False)
         else:
-            filepath = REPORTS_DIR / f"quality-report_{timestamp}.md"
+            filepath = _reports_dir() / f"quality-report_{timestamp}.md"
             with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(self.generate_markdown_report())
 

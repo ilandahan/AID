@@ -315,7 +315,7 @@ environments/
 | Environment | Data | Access | Deployment |
 |-------------|------|--------|------------|
 | Development | Synthetic/Mock | All devs | Manual |
-| Staging | Anonymized prod copy | All devs | Auto on develop merge |
+| Staging | Masked prod copy (PII removed) | All devs | Auto on develop merge |
 | Production | Real data | Restricted | Manual approval required |
 
 ### A.12.6 Logging and Monitoring

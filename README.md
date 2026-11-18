@@ -342,7 +342,22 @@ templates live in `agent-assets/`; see `agent-assets/AGENT-STANDARD.md` to add y
   error logs, session markers and pipeline artifacts under the project's `.aid/` directory,
   and small per-session integrity records (hashes and gate levels) under
   `~/.aid/integrity/` (or `$AID_HOME/integrity/`). Project content and paths may contain personal data. The learning system stores feedback
-  locally in `~/.aid/`; see [memory-system privacy](memory-system/README.md#privacy).
+  locally in `$AID_HOME/feedback/pending/` (default `~/.aid/feedback/pending/`); see
+  [memory-system privacy](memory-system/README.md#privacy).
+- Feedback text is redacted (best effort) before it is written and again when it is read.
+  E-mail addresses, URLs, absolute paths, `file.ext:line` references, common secret tokens,
+  the project's own names (folder names, git remote owner and repo) and the OS user name
+  are replaced with placeholders. A person's or company's name written as plain words is not
+  caught unless it is one of those project names. Project names shorter than 4 characters
+  are not removed, and when files are read later, only the current project's names are known.
+- "Claude Memory" in AID means a local file, `$AID_HOME/memory/slots.json` (default
+  `~/.aid/memory/`). Nothing is sent to Claude's built-in memory. AID's own write commands (`memory-sync`, `memory-apply`) run only after you confirm
+  them in Claude Code's prompt. `memory-apply` is also used by `/aid-recommendations`.
+  Before Phase 4 the phase gate also refuses other writes outside the project. From
+  Phase 4 on, AID does not stop other code from editing these files.
+- Feedback is stored locally in `$AID_HOME`. AID has no collection service of its own. When
+  you run `/aid-improve`, the redacted feedback is sent to Claude as part of the
+  conversation, for analysis.
 - No AID-hosted collection service is configured by this plugin. Local artifacts remain until
   the user removes them; this repository does not enforce a local retention period.
 - External services used by the remaining optional workflows are listed below. These setup
@@ -354,7 +369,6 @@ templates live in `agent-assets/`; see `agent-assets/AGENT-STANDARD.md` to add y
 | GitHub | Repository content, commits, issues and pull requests used by the configured GitHub MCP workflows. See [GitHub setup](integrations/github/README.md). |
 | Atlassian Jira and Confluence | Issue, project and documentation content sent to the configured Atlassian site when those workflows run. See [Jira setup](integrations/jira/README.md) and the MCP templates. |
 | Google AI Studio / Google Vertex AI, or AI/ML API (AIMLAPI) | The optional visual-generation skill describes sending generation prompts, source images or sketches and edit instructions to the selected provider. See [visual-generation setup](skills/nano-banana-visual/SKILL.extended.md). |
-| Claude Memory | The learning workflow can promote anonymized patterns with manual user approval. Its documented privacy rules exclude project names, file paths and specific project content. See [memory privacy](memory-system/README.md#privacy). |
 | User-selected websites and application endpoints | Chrome DevTools workflows navigate and test the configured target; browser requests and form submissions reach that target. See [browser-testing setup](integrations/chrome-devtools/README.md). |
 
 AID does not set the retention policy for these third-party services. Their own account
@@ -692,7 +706,7 @@ AID provides **44 slash commands** organized by workflow.
 | Command | Description |
 |---------|-------------|
 | `/aid-improve` | Run learning cycle (requires 3+ feedback) |
-| `/aid-memory` | Manage Claude Memory entries |
+| `/aid-memory` | Manage AID's local memory entries |
 | `/aid-analyze` | Full quality analysis with metrics |
 | `/aid-dashboard` | Generate quality dashboard report |
 | `/aid-recommendations` | View/manage skill update recommendations |

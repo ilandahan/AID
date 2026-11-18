@@ -188,7 +188,8 @@ When this command is invoked:
    - Claude Code will ask the user to confirm this call. That prompt is the real human
      sign-off. If the user declines, nothing changes and the phase stays unapproved.
    - The script sets `phase_approved` and `feedback_provided` and prints what it did. Show
-     that output. If it refuses (non-zero exit), show its reason to the user verbatim.
+     that output. It also stores the rating from `--note` as a redacted pending feedback
+     entry in `$AID_HOME/feedback/pending/`. If it refuses (non-zero exit), show its reason to the user verbatim.
    - Never retry in another spelling, never work around a refusal or a declined prompt, and
      never edit `.aid/state.json` yourself.
 7. Display next steps

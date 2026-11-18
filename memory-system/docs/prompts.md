@@ -151,7 +151,7 @@ Found:
 • {positive_count} positive patterns to reinforce ✅
 • {negative_count} negative patterns to address ⚠️
 • {skill_suggestions_count} skill update recommendations
-• {memory_candidates_count} Claude Memory candidates
+• {memory_candidates_count} AID local memory candidates
 
 Review recommendations one by one? [Yes] [Just summary]
 ```
@@ -181,7 +181,8 @@ Proposed change:
 │ {diff_preview}                                              │
 └─────────────────────────────────────────────────────────────┘
 
-[Approve ✓] [Edit 📝] [Reject ✗] [Skip ⏭️]
+[Apply ✓] [Reject ✗] [Skip ⏭️]
+(Apply runs `aid_session.py memory-apply <id>`; Claude Code asks the user to confirm.)
 ```
 
 ### Improvement Complete
@@ -190,7 +191,7 @@ Proposed change:
 
 Summary of changes:
 • {skill_updates_count} skill file updates
-• {memory_updates_count} Claude Memory updates
+• {memory_updates_count} AID local memory updates
 
 Feedback processed: {feedback_count}
 Patterns identified: {patterns_count}
@@ -242,7 +243,7 @@ Error details: {error_message}
 
 ### Memory List Header
 ```
-📝 AID Claude Memory Entries ({used}/{total} used)
+📝 AID Local Memory Entries ({used}/{total} used)
 
 Universal:
 {universal_entries}
@@ -256,7 +257,7 @@ Phase-specific:
 
 ### Memory Stats
 ```
-📊 Claude Memory Statistics
+📊 AID Local Memory Statistics
 
 Slot Allocation:
 • Universal: {universal_used}/{universal_max}
@@ -307,7 +308,7 @@ Run /aid start to begin a session.
 ### Reset Confirmation
 ```
 ⚠️ This will delete all feedback and reset statistics.
-Skill files and Claude Memory will be preserved.
+Skill files and AID's local memory will be preserved.
 
 Type 'RESET' to confirm: ___
 ```

@@ -1,6 +1,13 @@
 # AID Memory System - Improvement Flow
 
 > Complete implementation guide for the `/aid improve` command.
+>
+> The exact commands are in `commands/aid-improve.md`. The pseudo-code below shows the
+> logic. AID's own write commands (`memory-sync`, `memory-apply`) run only after you confirm
+> them in Claude Code's prompt. `memory-apply` is also used by `/aid-recommendations`.
+> Before Phase 4 the phase gate also refuses other writes outside the project. From
+> Phase 4 on, AID does not stop other code from editing these files.
+> The analysis sub-agent only proposes.
 
 ---
 
@@ -14,16 +21,14 @@
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ Step 1: Gather Data                                             │
-│ • Load all feedback from ~/.aid/feedback/pending/               │
-│ • Load current skill files                                      │
-│ • Load trends.json                                              │
-│ • Load memory-tracking.json                                     │
+│ • aid_session.py memory-feedback: redacted feedback as JSON     │
+│ • Optional: skill section headers, trends, memory entries       │
 └─────────────────────┬───────────────────────────────────────────┘
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ Step 2: Prepare Sub-Agent Input                                 │
-│ • Format feedback batch (anonymized)                            │
+│ • Format feedback batch (redacted, best effort)                 │
 │ • Summarize current skills                                      │
 │ • List current memory entries                                   │
 │ • Include trend data                                            │
@@ -49,25 +54,22 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │ Step 5: Review Suggestions One-by-One                           │
 │ • Present each suggestion with evidence                         │
-│ • User: [Approve ✓] [Edit 📝] [Reject ✗] [Skip ⏭️]              │
+│ • User: [Apply ✓] [Reject ✗] [Skip ⏭️]                          │
 │ • Track decisions                                               │
 └─────────────────────┬───────────────────────────────────────────┘
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ Step 6: Apply Approved Changes                                  │
-│ • Update skill files (cumulative.md)                            │
-│ • Update Claude Memory (if approved)                            │
-│ • Update memory-tracking.json                                   │
+│ • memory-apply <id>: append to cumulative.md (user confirms)    │
+│ • memory-reject <id>: drop a proposal                           │
+│ • memory-sync: write AID's local memory (user confirms)         │
 └─────────────────────┬───────────────────────────────────────────┘
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ Step 7: Archive & Update State                                  │
-│ • Create batch summary in processed/                            │
-│ • Archive or delete pending feedback                            │
-│ • Update trends.json                                            │
-│ • Reset state counters                                          │
+│ • Not implemented: do not do this by hand                       │
 └─────────────────────┬───────────────────────────────────────────┘
                       │
                       ▼
@@ -82,64 +84,27 @@
 
 ## Step 1: Gather Data
 
-```python
-def gather_data():
-    # Load pending feedback
-    feedback_files = glob("~/.aid/feedback/pending/FB-*.json")
-    feedback_batch = [load_json(f) for f in feedback_files]
-    
-    # Load current skills
-    skills = {
-        "roles": load_all_role_skills(),
-        "phases": load_all_phase_skills()
-    }
-    
-    # Load metrics
-    trends = load_json("~/.aid/metrics/trends.json")
-    memory_tracking = load_json("~/.aid/metrics/memory-tracking.json")
-    
-    return {
-        "feedback": feedback_batch,
-        "skills": skills,
-        "trends": trends,
-        "memory_tracking": memory_tracking
-    }
+One Bash call (writes nothing, no prompt):
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-feedback
 ```
+
+It prints the feedback as JSON, read through the memory system's one reader and redacted
+(best effort), so older files are redacted again when they are read. Never glob or open raw
+files in `$AID_HOME/feedback/pending/`. Count the entries; if there are fewer than 3, stop
+unless the user passed `--force`.
 
 ---
 
 ## Step 2: Prepare Sub-Agent Input
 
-```python
-def prepare_subagent_input(data):
-    # Simplify feedback for analysis (already anonymized)
-    simplified_feedback = [
-        {
-            "id": fb["id"],
-            "role": fb["context"]["role"],
-            "phase": fb["context"]["phase"],
-            "rating": fb["metrics"]["rating"],
-            "revisions": fb["metrics"]["revisions"],
-            "what_worked": fb["qualitative"]["what_worked"],
-            "what_didnt": fb["qualitative"]["what_didnt"],
-            "note": fb["qualitative"]["user_note"]
-        }
-        for fb in data["feedback"]
-    ]
-    
-    # Summarize current skills (just section headers)
-    skills_summary = summarize_skills(data["skills"])
-    
-    # List current memory entries
-    memory_entries = get_aid_memory_entries()
-    
-    return {
-        "feedback_batch": simplified_feedback,
-        "current_skills_summary": skills_summary,
-        "current_memory_entries": memory_entries,
-        "recent_trends": data["trends"]["recent_averages"]
-    }
-```
+- `{{FEEDBACK_DATA}}`: the `memory-feedback` output from Step 1.
+- `{{CURRENT_SKILLS}}` (optional, may be empty): section headers from
+  `skills/memory-system/references/`.
+- `{{TREND_DATA}}` (optional, may be empty).
+- `{{MEMORY_ENTRIES}}` (optional, may be empty): the output of
+  `python -m memory_system --memories` run from `memory-system/`, or leave it empty.
 
 ---
 
@@ -185,7 +150,7 @@ Found:
 • {positive_count} positive patterns to reinforce ✅
 • {negative_count} negative patterns to address ⚠️
 • {skill_suggestions_count} skill update recommendations
-• {memory_candidates_count} Claude Memory candidates
+• {memory_candidates_count} AID local memory candidates
 
 Review recommendations one by one? [Yes] [Just summary]
 ```
@@ -200,7 +165,7 @@ For each suggestion, present:
 📌 Recommendation {current}/{total}: Skill Update
 
 Type: Update cumulative.md
-Target: skills/roles/product-manager/cumulative.md
+Target: skills/memory-system/references/roles/product-manager/cumulative.md
 Section: High-Confidence Patterns
 Confidence: 85%
 
@@ -224,24 +189,21 @@ Proposed change:
 │ +   (Evidence: 4 sessions, 4.3 avg rating)                  │
 └─────────────────────────────────────────────────────────────┘
 
-[Approve ✓] [Edit 📝] [Reject ✗] [Skip ⏭️]
+[Apply ✓] [Reject ✗] [Skip ⏭️]
 ```
 
 ### User Actions
 
 ```python
 def handle_user_action(action, suggestion):
-    if action == "approve":
+    if action == "apply":
+        # aid_session.py memory-apply <id>; Claude Code asks the user to confirm
         apply_suggestion(suggestion)
         return "approved"
     
-    elif action == "edit":
-        edited = prompt_for_edit(suggestion)
-        apply_suggestion(edited)
-        return "approved_with_edits"
-    
     elif action == "reject":
-        log_rejection(suggestion, reason=prompt_for_reason())
+        # aid_session.py memory-reject <id>; moves it to rejected.json
+        reject_suggestion(suggestion)
         return "rejected"
     
     elif action == "skip":
@@ -253,132 +215,50 @@ def handle_user_action(action, suggestion):
 
 ## Step 6: Apply Approved Changes
 
+### Queue the Proposals
+
+Save the agent's JSON to `.aid/improve/proposals.json` with the Write tool, then run (no
+argument, no prompt; it reads that file itself and redacts each proposal):
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-queue
+```
+
 ### Apply Skill Update
 
-```python
-def apply_skill_update(suggestion):
-    filepath = suggestion["target_file"]
-    section = suggestion["target_section"]
-    content = suggestion["content"]
-    
-    # Read current file
-    skill_file = load(filepath)
-    
-    # Find section
-    section_start = find_section(skill_file, section)
-    
-    # Insert/modify content
-    updated = insert_at_section(skill_file, section_start, content)
-    
-    # Add metadata
-    updated = add_update_metadata(updated, suggestion["evidence"])
-    
-    # Save
-    save(filepath, updated)
+One Bash call per proposal the user picked:
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-apply <id>
 ```
+
+- Claude Code asks the user to confirm. If the user declines, nothing changes.
+- It only APPENDS the proposal's redacted text to
+  `skills/memory-system/references/roles/<role>/cumulative.md` or
+  `skills/memory-system/references/phases/<phase>/cumulative.md`. Any other target is
+  refused.
+- It writes the copy of `skills/memory-system/references/...` inside the installed plugin.
+  A plugin update can replace that copy.
+- The proposal moves from `$AID_HOME/recommendations/queue.json` to `applied.json`.
+- Skill-wide recommendations (no learnings file) are shown but cannot be applied by the tool.
 
 ### Apply Memory Update
 
-```python
-def apply_memory_update(suggestion):
-    entry = suggestion["entry"]
-    action = suggestion["action"]  # "add" or "replace"
-    
-    if action == "add":
-        memory_user_edits(command="add", control=entry)
-    
-    elif action == "replace":
-        line_number = suggestion["replace_line"]
-        memory_user_edits(
-            command="replace",
-            line_number=line_number,
-            replacement=entry
-        )
-    
-    # Update tracking
-    update_memory_tracking(entry, action)
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-sync
 ```
+
+- Claude Code asks the user to confirm. In `-p`/headless sessions it is denied.
+- It writes the entries shown by `memory-preview` to AID's local memory,
+  `$AID_HOME/memory/slots.json`. Nothing is sent to Claude's built-in memory.
+- Memory entries are built only from redacted text.
 
 ---
 
 ## Step 7: Archive & Update State
 
-### Create Batch Summary
-
-```python
-def archive_batch(feedback_batch, analysis, decisions):
-    batch_summary = {
-        "id": f"BATCH-{timestamp}",
-        "processed_at": now_iso(),
-        "feedback_count": len(feedback_batch),
-        "feedback_ids": [fb["id"] for fb in feedback_batch],
-        "analysis_summary": {
-            "patterns_found": len(analysis["patterns"]),
-            "suggestions_made": len(analysis["suggestions"]),
-            "approved": sum(1 for d in decisions if d == "approved"),
-            "rejected": sum(1 for d in decisions if d == "rejected"),
-            "skipped": sum(1 for d in decisions if d == "skipped")
-        }
-    }
-    
-    save(f"~/.aid/feedback/processed/BATCH-{timestamp}.json", batch_summary)
-```
-
-### Update Trends
-
-```python
-def update_trends(feedback_batch, trends):
-    # Calculate new averages
-    new_avg_rating = average([fb["metrics"]["rating"] for fb in feedback_batch])
-    new_avg_revisions = average([fb["metrics"]["revisions"] for fb in feedback_batch])
-    
-    # Update rolling averages
-    trends["recent_averages"]["rating"] = rolling_average(
-        trends["recent_averages"]["rating"],
-        new_avg_rating
-    )
-    trends["recent_averages"]["revisions"] = rolling_average(
-        trends["recent_averages"]["revisions"],
-        new_avg_revisions
-    )
-    
-    # Add to history
-    trends["history"].append({
-        "date": today(),
-        "feedback_count": len(feedback_batch),
-        "avg_rating": new_avg_rating,
-        "avg_revisions": new_avg_revisions
-    })
-    
-    save("~/.aid/metrics/trends.json", trends)
-```
-
-### Reset State Counters
-
-```python
-def reset_state_counters():
-    state = load("~/.aid/state.json")
-    
-    state["statistics"]["pending_feedback_count"] = 0
-    state["statistics"]["sessions_since_last_improvement"] = 0
-    state["statistics"]["last_improvement_run"] = now_iso()
-    state["notifications"]["improvement_suggested"] = False
-    state["notifications"]["reason"] = None
-    
-    save("~/.aid/state.json", state)
-```
-
-### Delete/Archive Pending Feedback
-
-```python
-def cleanup_pending_feedback(feedback_files):
-    for filepath in feedback_files:
-        # Option A: Delete
-        delete(filepath)
-        
-        # Option B: Move to processed
-        # move(filepath, filepath.replace("pending", "processed"))
-```
+Not implemented: no command archives feedback, writes `processed/` batches, updates
+`trends.json` or resets `~/.aid/state.json` counters. Do not do this by hand.
 
 ---
 
@@ -389,7 +269,7 @@ def cleanup_pending_feedback(feedback_files):
 
 Summary of changes:
 • {skill_updates_count} skill file updates
-• {memory_updates_count} Claude Memory updates
+• {memory_updates_count} AID local memory updates
 
 Feedback processed: {feedback_count}
 Patterns identified: {patterns_count}
@@ -446,20 +326,11 @@ except Exception as e:
     return
 ```
 
-### File Write Error
+### Apply Refused or Declined
 
-```python
-try:
-    apply_skill_update(suggestion)
-except IOError as e:
-    display(f"""
-    ⚠️ Error saving {suggestion['target_file']}
-    
-    This change was not applied. Other changes will continue.
-    Error details: {str(e)}
-    """)
-    continue  # Continue with other suggestions
-```
+If `memory-apply <id>` exits non-zero, or the user declines the prompt, show the reason
+verbatim. The change was not applied and the proposal stays in the queue. Do not retry in
+another spelling and do not edit the file another way. Continue with other suggestions.
 
 ---
 

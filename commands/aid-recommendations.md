@@ -20,18 +20,22 @@ This command loads:
 ## Process
 
 1. **Load recommendations**
-   - Read pending recommendations from memory system
-   - Sort by impact score (highest first)
+   - Run `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-preview` and show its
+     queue, ordered by priority
 
 2. **Display recommendations**
-   - Show each recommendation with context
-   - Show which sessions/feedback generated it
-   - Show estimated impact
+   - Show each recommendation: id, priority, target file and proposed change
 
 3. **User actions**
-   - Accept — apply the recommendation
-   - Reject — dismiss with reason
-   - Defer — revisit later
+   - Accept — `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-apply <id>`.
+     Claude Code asks the user to confirm. It only appends to a role or phase
+     `cumulative.md` in `skills/memory-system/references/`; anything else is refused.
+     Skill-wide recommendations (no learnings file) are shown but cannot be applied by the tool.
+   - Reject — `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-reject <id>` (no prompt)
+   - Defer — leave it in the queue (`$AID_HOME/recommendations/queue.json`)
+
+   Run each command exactly in that shape (see `commands/aid-improve.md`). Never edit a
+   skill file another way, and never work around a refusal or a declined prompt.
 
 ## Output
 
@@ -40,12 +44,12 @@ AID Skill Recommendations
 
 Pending: [N] recommendations
 
-1. [HIGH IMPACT] Update Phase 4 TDD guidance
+1. [HIGH] Update Phase 4 TDD guidance
    Source: 3 sessions reported weak test assertions
    Suggestion: Add assertion strength examples to test-driven skill
    Action: accept / reject / defer
 
-2. [MEDIUM IMPACT] Improve Phase 1 user story format
+2. [MEDIUM] Improve Phase 1 user story format
    Source: 2 sessions had unclear acceptance criteria
    Suggestion: Add Gherkin examples to aid-prd skill
    Action: accept / reject / defer

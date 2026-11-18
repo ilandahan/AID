@@ -94,7 +94,7 @@ Load and internalize:
 3. ~/.aid/skills/phases/{phase}/SKILL.md
 4. ~/.aid/skills/phases/{phase}/cumulative.md
 
-Claude Memory (AID:* entries) is automatically available
+AID's local memory (AID:* entries in `$AID_HOME/memory/slots.json`) is read when present
 ```
 
 ### Step 6: Update State & Begin
@@ -124,7 +124,7 @@ During work, actively apply guidance from:
 - Role cumulative.md (learned patterns)
 - Phase SKILL.md (phase requirements)
 - Phase cumulative.md (phase learnings)
-- Claude Memory AID:* entries
+- AID:* entries in AID's local memory
 
 ### Track Revisions (Internal Counter)
 ```python
@@ -219,44 +219,12 @@ Additional notes? (optional): ___
 # User can skip by saying "none" or pressing enter
 ```
 
-### Step 4: Save Feedback File
-```python
-# Generate feedback file
-feedback = {
-  "$schema": "aid-feedback-v1",
-  "version": "1.0",
-  "id": f"FB-{timestamp}",
-  "timestamp": now_iso(),
-  
-  "context": {
-    "role": current_role,      # e.g., "product-manager"
-    "phase": current_phase     # e.g., "discovery"
-    # NO project name, NO domain details
-  },
-  
-  "metrics": {
-    "rating": user_rating,
-    "revisions": revision_count,
-    "time_to_approval_minutes": calculate_duration()
-  },
-  
-  "qualitative": {
-    "what_worked": user_what_worked or "",
-    "what_didnt": user_what_didnt or "",
-    "user_note": user_additional_note or ""
-  },
-  
-  "derived": {
-    "is_low_rating": rating <= 2,
-    "is_high_revision": revisions >= 4,
-    "needs_attention": rating <= 2 or revisions >= 4
-  }
-}
-
-# Save to pending
-filename = f"{timestamp}.json"  # e.g., "2025-01-15-143022.json"
-save(f"~/.aid/feedback/pending/{filename}", feedback)
-```
+### Step 4: Save Feedback
+Do not write a feedback JSON file yourself. Run `/aid-end`, which saves feedback with ONE
+call: `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" end --rating <1-5> --worked "..." --improve "..."`.
+It writes `$AID_HOME/feedback/pending/<timestamp>.json` (default `~/.aid/feedback/pending/`)
+and redacts the text (best effort) before writing. `/phase-approve` (`aid_session.py approve`)
+is the only other writer: it stores its rating as a pending entry too.
 
 ### Step 5: Update State
 ```python
@@ -327,7 +295,14 @@ Statistics:
 
 ---
 
-## 5. Anonymization Rules
+## 5. Feedback Privacy (redaction is best effort)
+
+Feedback text is redacted before it is written and again whenever it is read. Redaction
+replaces e-mails, URLs, absolute paths, `file.ext:line` references, common secret tokens, the
+project's own names (folder names, git remote owner and repo) and the OS user name with
+placeholders (`[email]`, `[url]`, `[path]`, `[file-ref]`, `[token]`, `[project]`, `[user]`). It does not
+catch a person's or company's name written as plain words unless it is one of those project
+names. So when you condense the user's answers, still leave these out.
 
 ### NEVER include in feedback:
 - ❌ Project name or identifier

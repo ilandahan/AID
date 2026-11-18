@@ -20,7 +20,7 @@ Start fresh by removing all runtime data. Use when troubleshooting or starting o
 - Local skill modifications
 
 This will NOT delete:
-- Claude Memory entries (manage separately)
+- AID's local memory entries in `~/.aid/memory/` (manage separately)
 - Repository files in `memory-system/`
 
 ## Flow
@@ -36,7 +36,7 @@ This will NOT delete:
    - Session history
    - Skill modifications
    
-   Claude Memory entries will NOT be affected.
+   AID's local memory entries will NOT be affected.
    
    Type 'RESET' to confirm:
    ```

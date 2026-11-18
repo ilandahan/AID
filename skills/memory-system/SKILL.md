@@ -28,8 +28,9 @@ On `/aid-improve`, spawn the **memory-analysis-agent**:
 
 ```
 Task(
-  subagent_type: "general-purpose",
-  model: "opus",
+  subagent_type: "aid:memory-analysis-agent",   # fallback: "memory-analysis-agent";
+                                               # tools: Read, Grep, Glob (no Write)
+  model: "inherit",
   prompt: [Read ../../agents/memory-analysis-agent.md],
   description: "Memory system improvement analysis"
 )
@@ -37,10 +38,12 @@ Task(
 
 Pass:
 ```
-{{FEEDBACK_DATA}} - Contents of ~/.aid/feedback/pending/*.json
+{{FEEDBACK_DATA}} - The output of `aid_session.py memory-feedback` (the feedback,
+                    redacted, as JSON). Never paste raw pending files: files written
+                    before redaction existed may hold unredacted text.
 {{CURRENT_SKILLS}} - Section headers from skills/memory-system/references/
 {{TREND_DATA}} - Contents of ~/.aid/metrics/trends.json
-{{MEMORY_ENTRIES}} - Current AID:* Claude Memory entries
+{{MEMORY_ENTRIES}} - Current AID:* entries in AID's local memory ($AID_HOME/memory/slots.json)
 ```
 
 Agent returns:
@@ -142,15 +145,12 @@ Revisions made: {revision_count}
 MUST get rating before proceeding
 ```
 3. Request qualitative feedback (optional): What worked well? What could be improved? Additional notes?
-4. Save feedback file:
-```
-Save to ~/.aid/feedback/pending/{timestamp}.json:
-{
-  "context": { "role": "...", "phase": "..." },
-  "metrics": { "rating": N, "revisions": N },
-  "qualitative": { "what_worked": "...", "what_didnt": "..." }
-}
-```
+4. Save feedback: Do NOT write a feedback JSON file yourself. `/aid-end` saves it with ONE Bash call,
+`python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" end --rating <1-5> --worked "..." --improve "..."`
+(see `commands/aid-end.md` for the exact shape). The script redacts the text (best effort)
+and writes `$AID_HOME/feedback/pending/` (default `~/.aid/feedback/pending/`). The only
+other writer is `aid_session.py approve` (via `/phase-approve`), which stores its rating as a
+pending entry too.
 5. Update state:
 ```
 Update ~/.aid/state.json:
@@ -161,20 +161,49 @@ Update ~/.aid/state.json:
 ```
 
 ## Improvement Flow (`/aid-improve`)
-1. Gather data: all files from `~/.aid/feedback/pending/`; current skills from `skills/memory-system/references/`; trends from `~/.aid/metrics/trends.json`.
-2. Spawn analysis agent:
-```
-Task(
-  subagent_type: "general-purpose",
-  model: "opus",
-  prompt: [../../agents/memory-analysis-agent.md with variables],
-  description: "Analyze feedback and suggest improvements"
-)
-```
-3. Present suggestions with approval buttons: `[Approve] [Edit] [Reject]` for each skill update; `[Promote to Memory] [Skip]` for each memory candidate.
-4. Apply changes: update approved skill files; add approved memory entries; archive processed feedback to `~/.aid/feedback/processed/`.
+Follow `commands/aid-improve.md` exactly. Each command is ONE Bash call in exactly the shape
+shown there (lower-case `python`, single spaces, no `;`, `&&`, pipes or redirects). Never retry
+in another spelling and never work around a refusal or a declined prompt. If
+`${CLAUDE_PLUGIN_ROOT}` was not replaced by a real path, this is not a plugin install; do not
+substitute another path.
 
-## Anonymization Rules
+1. Preview (writes nothing, no prompt): `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-preview`
+2. Get the feedback, redacted, as JSON (writes nothing, no prompt):
+   `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-feedback`. Use this output as
+   `{{FEEDBACK_DATA}}`; never open raw pending files. If it has fewer than 3 entries, stop
+   unless the user passed `--force`.
+3. Spawn the analysis agent (below). It only PROPOSES: it returns JSON and writes no files.
+4. Save that JSON to `.aid/improve/proposals.json` with the Write tool, then queue it
+   (redacted, no prompt): `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-queue`
+   (no argument: it reads `<project>/.aid/improve/proposals.json` itself).
+   A proposal whose target is not an allowed file is skipped.
+5. Show the queue and let the user pick.
+6. For each proposal the user picks:
+   - apply: `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-apply <id>`. Claude
+     Code asks the user to confirm. It only APPENDS to
+     `skills/memory-system/references/roles/<role>/cumulative.md` or
+     `.../phases/<phase>/cumulative.md`; anything else is refused.
+   - drop: `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-reject <id>` (no prompt).
+   Skill-wide recommendations (no learnings file) are shown but cannot be applied by the tool.
+7. If the user wants the memory entries: `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-sync`.
+   Claude Code asks the user to confirm. It writes AID's local memory,
+   `$AID_HOME/memory/slots.json`; nothing is sent to Claude's built-in memory. In
+   `-p`/headless sessions it is denied.
+
+AID's own write commands (`memory-sync`, `memory-apply`) run only after you confirm
+them in Claude Code's prompt. `memory-apply` is also used by `/aid-recommendations`.
+Before Phase 4 the phase gate also refuses other writes outside the project. From
+Phase 4 on, AID does not stop other code from editing these files.
+
+## Feedback Privacy (redaction is best effort)
+Redaction is best effort. Feedback text is redacted before it is written and again whenever
+it is read. E-mails, URLs, absolute paths, `file.ext:line` references, common secret tokens,
+the project's own names (cwd and project-root folder names, git remote owner and repo) and
+the OS user name are replaced with `[email]`, `[url]`, `[path]`, `[file-ref]`, `[token]`,
+`[project]` or `[user]`. A person's or company's name written as plain words is NOT caught unless it is one
+of those project names, and very generic folder names (docs, app, src, ...) are not removed.
+So when you condense the user's answers:
+
 NEVER include in feedback:
 - ❌ Project name or identifier
 - ❌ Company name

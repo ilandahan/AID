@@ -125,7 +125,9 @@ letters, digits, spaces and `. _ : -` (no commas, apostrophes, slashes or parent
 drop other characters. Leave a flag out entirely when its text would be empty (an empty `""`
 is refused); `--review-note` and the review `--note` are optional.
 
-Writes `~/.aid/feedback/pending/<timestamp>.json` (read by `/aid-improve`) and updates
+Writes `$AID_HOME/feedback/pending/<timestamp>.json` (default `~/.aid/feedback/pending/`,
+read by `/aid-improve`). The `--worked`, `--improve` and `--review-note` text is redacted
+(best effort) before it is written. Never write a feedback file yourself. The script also updates
 project-local `.aid/state.json`: `status: ended`, `subagent_review.phase_[N]`. The script is
 the only writer of `.aid/state.json`; never edit that file yourself. If the script refuses
 (non-zero exit with a reason), show the reason to the user verbatim; do not retry in another
@@ -212,8 +214,14 @@ Review implementation for:
 
 - Sub-agent review is MANDATORY - cannot be skipped; it runs in the background so the user never waits on it
 - Review verdict gates the phase transition only, never the feedback save
-- Feedback is stored locally, never sent externally
+- Feedback is stored locally in `$AID_HOME`. AID has no collection service of its own. When
+  you run `/aid-improve`, the redacted feedback is sent to Claude as part of the
+  conversation, for analysis.
 - Need 3+ feedback items before `/aid improve` works
-- Feedback is anonymized before any analysis
+- Feedback text is redacted (best effort) before it is written, and again whenever it is read.
+  E-mails, URLs, absolute paths, `file.ext:line` references, common secret tokens, the
+  project's own names (folder names, git remote owner and repo) and the OS user name are
+  replaced with placeholders. A person's or company's name written as plain words is not
+  caught unless it is one of those project names, so do not type names you want kept private
 - See `phase-enforcement` skill for review checklists
 - See `memory-system/docs/AGENT.md#phase-gate` for details

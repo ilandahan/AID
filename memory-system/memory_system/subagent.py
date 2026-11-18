@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 import os
 import argparse
+import sys
 
 # Support both relative imports (when used as package) and direct imports (when used standalone)
 try:
@@ -45,10 +46,12 @@ try:
     from .recommendations.generator import (
         RecommendationGenerator,
         load_recommendation_queue,
+        save_recommendations,
         format_recommendations_report,
         approve_recommendation,
         reject_recommendation
     )
+    from . import paths
 except ImportError:
     from feedback.collector import (
         FeedbackCollector,
@@ -69,19 +72,22 @@ except ImportError:
     from recommendations.generator import (
         RecommendationGenerator,
         load_recommendation_queue,
+        save_recommendations,
         format_recommendations_report,
         approve_recommendation,
         reject_recommendation
     )
+    import paths
 
-# Configuration
-STATE_DIR = Path(os.path.expanduser("~/.aid"))
-AGENT_STATE_FILE = STATE_DIR / "agent_state.json"
+
+# Configuration. T8-3: $AID_HOME, else ~/.aid, read on every call.
+def _state_file() -> Path:
+    return paths.aid_home() / "agent_state.json"
 
 
 def ensure_directories():
     """Create necessary directories."""
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    paths.aid_home().mkdir(parents=True, exist_ok=True)
 
 
 class LearningSubAgent:
@@ -104,9 +110,11 @@ class LearningSubAgent:
 
     def _load_state(self) -> Dict[str, Any]:
         """Load agent state."""
-        if AGENT_STATE_FILE.exists():
-            with open(AGENT_STATE_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+        if _state_file().exists():
+            try:
+                return json.loads(_state_file().read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                pass
 
         return {
             "last_analysis": None,
@@ -118,8 +126,7 @@ class LearningSubAgent:
 
     def _save_state(self):
         """Save agent state."""
-        with open(AGENT_STATE_FILE, 'w', encoding='utf-8') as f:
-            json.dump(self.state, f, indent=2, ensure_ascii=False)
+        _state_file().write_text(json.dumps(self.state, indent=2, ensure_ascii=False), encoding="utf-8")
 
     # =========================================================================
     # Session End Operations
@@ -158,19 +165,17 @@ class LearningSubAgent:
         Returns:
             Saved feedback entry
         """
-        collector = FeedbackCollector()
-
-        return collector.collect_feedback(
-            session_id=session_id,
-            role=role,
-            phase=phase,
-            rating=rating,
+        # T8-3: FeedbackCollector has no collect_feedback (AttributeError); use collect().
+        collector = FeedbackCollector(session_id=session_id, phase=phase, role=role)
+        decision = ({"topic": decision_topic, "chosen": decision_outcome}
+                    if decision_topic or decision_outcome else None)
+        return collector.collect(
             interaction_type=interaction_type,
-            decision_topic=decision_topic,
-            decision_outcome=decision_outcome,
-            debate_details=debate_details,
-            user_comment=user_comment,
-            context=context
+            decision=decision,
+            debate=debate_details,
+            feedback={"rating": rating, "verbal": user_comment,
+                      "skipped": rating is None and not user_comment},
+            metadata=context
         )
 
     # =========================================================================
@@ -262,6 +267,9 @@ class LearningSubAgent:
         # Generate recommendations
         rec_generator = RecommendationGenerator(metrics, patterns, entries)
         recommendations = rec_generator.generate_all_recommendations()
+        # T8-4: generated recommendations are queued (they were never saved, so --pending
+        # was always empty). Queuing applies nothing.
+        save_recommendations(recommendations)
 
         # Update state
         self.state["last_recommendations"] = datetime.utcnow().isoformat() + "Z"
@@ -357,22 +365,15 @@ class LearningSubAgent:
     # Memory Operations
     # =========================================================================
 
-    def sync_to_memory(self, days: Optional[int] = None) -> Dict[str, Any]:
+    def sync_to_memory(self, days: Optional[int] = None, approve: bool = False) -> Dict[str, Any]:
         """
-        Sync learnings to Claude Memory.
-
-        Analyzes feedback patterns and syncs significant learnings
-        to Claude Memory slots for long-term retention.
-
-        Args:
-            days: Number of days to analyze
-
-        Returns:
-            Sync results
+        Plan (default, writes nothing) or write the learnings for AID's LOCAL memory
+        ($AID_HOME/memory). ``approve=True`` is passed only by ``aid_session.py memory-sync``,
+        which Claude Code asks the user to confirm (T8-2).
         """
         analysis_days = days or self.days
 
-        result = sync_memory_from_feedback(days=analysis_days)
+        result = sync_memory_from_feedback(days=analysis_days, approve=approve)
 
         if result.get("synced"):
             self.state["last_sync"] = datetime.utcnow().isoformat() + "Z"
@@ -473,8 +474,36 @@ class LearningSubAgent:
 # CLI Interface
 # =============================================================================
 
+def _days(value: str) -> int:
+    """--days within 1-3650 (a huge value overflowed the date arithmetic)."""
+    d = int(value)
+    if not 1 <= d <= 3650:
+        raise argparse.ArgumentTypeError("--days must be 1-3650")
+    return d
+
+
+def print_sync_result(result: Dict[str, Any]):
+    """Shared by the CLI preview and aid_session.py memory-preview / memory-sync."""
+    if result.get("synced"):
+        print("Memories added: {}".format(len(result.get("memories_added", []))))
+        for mem in result.get("memories_added", []):
+            print("  - [{}] {}".format(mem["category"], mem["content"]))
+        return
+    planned = result.get("planned") or []
+    if planned:
+        print("Would add {} entr{}:".format(len(planned), "y" if len(planned) == 1 else "ies"))
+        for mem in planned:
+            print("  - [{}] {}".format(mem["category"], mem["content"]))
+    print(result.get("reason", "Nothing to sync"))
+
+
 def main():
     """CLI entry point for the sub-agent."""
+    for stream in (sys.stdout, sys.stderr):      # Windows consoles: emoji in reports
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
     parser = argparse.ArgumentParser(
         description="AID Learning Mode Sub-Agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -501,7 +530,9 @@ Examples:
     parser.add_argument(
         "--sync-memory",
         action="store_true",
-        help="Sync learnings to Claude Memory"
+        help="Preview the entries a memory sync would add to AID's local memory "
+             "($AID_HOME/memory). Writes nothing; the write is aid_session.py memory-sync, "
+             "which asks the user to confirm"
     )
     parser.add_argument(
         "--recommendations",
@@ -526,11 +557,11 @@ Examples:
     parser.add_argument(
         "--memories",
         action="store_true",
-        help="Show current Claude Memory entries"
+        help="Show AID's local memory entries ($AID_HOME/memory)"
     )
     parser.add_argument(
         "--days",
-        type=int,
+        type=_days,
         default=30,
         help="Number of days to analyze (default: 30)"
     )
@@ -602,17 +633,9 @@ Examples:
             print(report)
 
     elif args.sync_memory:
-        print("Syncing learnings to Claude Memory...")
+        print("Memory sync preview (dry run, nothing is written)")
         print("=" * 60)
-        result = agent.sync_to_memory(days=args.days)
-
-        if result.get("synced"):
-            print(f"\nSync successful!")
-            print(f"Memories added: {len(result.get('memories_added', []))}")
-            for mem in result.get("memories_added", []):
-                print(f"  - [{mem['category']}] {mem['content'][:50]}...")
-        else:
-            print(f"\nSync skipped: {result.get('reason', 'Unknown reason')}")
+        print_sync_result(agent.sync_to_memory(days=args.days))
 
     elif args.recommendations:
         print("Generating skill update recommendations...")
@@ -624,9 +647,9 @@ Examples:
             print(f"\nGenerated {len(recs)} recommendations")
 
             for rec in recs[:5]:
-                print(f"\n[{rec['priority'].upper()}] {rec['target_skill']}")
-                print(f"  Section: {rec['section']}")
-                print(f"  {rec['rationale'][:80]}...")
+                print(f"\n[{str(rec.get('priority', '?')).upper()}] {rec.get('target_skill', '?')}")
+                print(f"  Section: {rec.get('section', '?')}")
+                print(f"  {str(rec.get('rationale', ''))[:80]}...")
         else:
             print(result.get("message", "No recommendations generated"))
 
@@ -637,10 +660,11 @@ Examples:
 
         if pending:
             for rec in pending:
-                print(f"\n[{rec['priority'].upper()}] {rec['id'][:8]}")
-                print(f"  Skill: {rec['target_skill']}")
-                print(f"  Section: {rec['section']}")
-                print(f"  Rationale: {rec['rationale'][:60]}...")
+                print(f"\n[{str(rec.get('priority', '?')).upper()}] {str(rec.get('id', ''))[:16]}")
+                print(f"  Skill: {rec.get('target_skill', '?')}")
+                print(f"  Learnings file: {rec.get('target_file') or '(none; cannot be applied)'}")
+                print(f"  Section: {rec.get('section', '?')}")
+                print(f"  Proposed: {str(rec.get('proposed_change', ''))[:200]}")
         else:
             print("No pending recommendations")
 
@@ -674,7 +698,7 @@ Examples:
         print(json.dumps(stats, indent=2, ensure_ascii=False))
 
     elif args.memories:
-        print("Claude Memory Entries")
+        print("AID memory entries (local, $AID_HOME/memory)")
         print("=" * 60)
         memories = agent.get_memories()
 

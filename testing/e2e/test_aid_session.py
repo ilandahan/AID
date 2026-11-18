@@ -46,7 +46,7 @@ def run(args, cwd=None):
 
 
 @pytest.fixture()
-def project(tmp_path):
+def project(tmp_path, monkeypatch):
     """An empty project dir plus an isolated HOME, so feedback never touches the real one."""
     # T3 (owner 2026-11-17): the project marker makes tmp_path the AID root the script
     # resolves (A2: it uses the hooks' root resolution), and the first state is `init`
@@ -55,8 +55,10 @@ def project(tmp_path):
     (tmp_path / '.aid' / 'hooks' / 'config.json').write_text('{}', encoding='utf-8')
     home = tmp_path / 'home'
     home.mkdir()
-    os.environ['HOME'] = str(home)
-    os.environ['USERPROFILE'] = str(home)
+    # T8-3: aid_session.py honours $AID_HOME, so it is isolated too (and restored after).
+    monkeypatch.setenv('HOME', str(home))
+    monkeypatch.setenv('USERPROFILE', str(home))
+    monkeypatch.setenv('AID_HOME', str(home / '.aid'))
     yield tmp_path
 
 

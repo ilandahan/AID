@@ -1,6 +1,11 @@
-# AID Memory System - Claude Memory Management
+# AID Memory System - Local Memory Management
 
-> Guide for managing Claude Memory entries within the AID Memory System.
+> Guide for managing entries in AID's local memory within the AID Memory System.
+>
+> "Claude Memory" in AID means a LOCAL file, `$AID_HOME/memory/slots.json` (default
+> `~/.aid/memory/`). Nothing is sent to Claude's built-in memory. Entries are written only by
+> `aid_session.py memory-sync`, which Claude Code asks the user to confirm, and are built
+> only from redacted feedback text.
 
 ---
 
@@ -30,7 +35,7 @@ AID:{ROLE}:{PHASE}:{TYPE} {insight}
 
 ## Slot Allocation
 
-Total Claude Memory slots: **30**
+Total AID local memory slots: **30**
 
 | Category | Max Slots | Description |
 |----------|-----------|-------------|
@@ -90,14 +95,14 @@ AID:QA:QA:DO Use real DB/Redis in tests, minimize mocking
 
 ## Promotion Criteria
 
-Patterns from feedback analysis can be promoted to Claude Memory when **ALL** criteria are met:
+Patterns from feedback analysis can be written to AID's local memory when **ALL** criteria are met:
 
 | Criterion | Threshold | Description |
 |-----------|-----------|-------------|
 | Occurrences | ≥5 sessions | Pattern appeared in 5+ sessions |
 | Avg Rating | ≥4.0 | When pattern was applied |
 | Avg Revisions | ≤2.0 | When pattern was applied |
-| Human Approved | Yes | User approved during /aid improve |
+| Human Confirmed | Yes | User confirmed the `memory-sync` prompt during /aid improve |
 | Fits Limit | ≤200 chars | Entry fits character limit |
 | Not Duplicate | Unique | Not already in memory |
 | Context-Free | Yes | No project-specific references |
@@ -151,7 +156,7 @@ Replaced entries are logged in `memory-tracking.json` under `retirement_history`
 
 Output:
 ```
-📝 AID Claude Memory Entries (20/30 used)
+📝 AID Local Memory Entries (20/30 used)
 
 Universal (5/5):
   1. AID:ALL:ALL:DO Confirm understanding before producing deliverable
@@ -180,7 +185,7 @@ Learned (0/10):
 
 Output:
 ```
-📊 Claude Memory Statistics
+📊 AID Local Memory Statistics
 
 Slot Allocation:
 • Universal: 5/5 (100%)
@@ -235,33 +240,24 @@ Structure:
 
 ## Manual Memory Management
 
-### Add Entry
+### Preview (writes nothing)
 
-```python
-memory_user_edits(command="add", control="AID:DEV:DEV:DO New pattern here")
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-preview
 ```
 
-### Remove Entry
+`python -m memory_system --sync-memory` is also preview-only; the CLI has no write flag.
 
-```python
-memory_user_edits(command="remove", line_number=15)
+### Write Entries
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-sync
 ```
 
-### Replace Entry
-
-```python
-memory_user_edits(
-    command="replace",
-    line_number=15,
-    replacement="AID:DEV:DEV:DO Updated pattern here"
-)
-```
-
-### View Current
-
-```python
-memory_user_edits(command="view")
-```
+Claude Code asks the user to confirm this call, in every permission mode. In
+`-p`/headless sessions nobody can answer, so it is denied. Run it exactly in this shape
+(lower-case `python`, single spaces, no `;`, `&&`, pipes or redirects). Never retry in
+another spelling, and never edit `slots.json` by hand to work around a declined prompt.
 
 ---
 
@@ -295,7 +291,7 @@ memory_user_edits(command="view")
 
 ### Check Sync Status
 
-At session start, the system compares `memory-tracking.json` with actual Claude Memory. If discrepancies are found:
+At session start, the system compares `memory-tracking.json` with `$AID_HOME/memory/slots.json`. If discrepancies are found:
 
 ```
 ⚠️ Memory tracking out of sync.
@@ -313,4 +309,4 @@ Rebuilding tracking file...
 /aid memory sync
 ```
 
-This rebuilds `memory-tracking.json` from actual Claude Memory state.
+This rebuilds `memory-tracking.json` from the state of `$AID_HOME/memory/slots.json`.

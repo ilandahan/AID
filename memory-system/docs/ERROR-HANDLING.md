@@ -52,10 +52,10 @@ MESSAGE:
 "⚠️ Default files missing. Creating minimal files..."
 ```
 
-#### E1.3: Claude Memory API Unavailable
+#### E1.3: Local Memory File Unavailable
 
 ```
-WHEN: memory_user_edits fails
+WHEN: $AID_HOME/memory/slots.json cannot be read or written
 IMPACT: Cannot add starter entries
 SEVERITY: Medium (non-blocking)
 
@@ -66,7 +66,7 @@ HANDLING:
 4. Retry on next session start
 
 MESSAGE:
-"⚠️ Cannot access Claude Memory right now.
+"⚠️ Cannot access AID's local memory right now.
 System will continue and retry next session."
 ```
 
@@ -196,28 +196,34 @@ IMPACT: Feedback lost
 SEVERITY: High
 
 HANDLING:
-1. Retry with different filename
-2. Save to alternative location
-3. Keep in session for manual save
+1. Show the script's reason verbatim
+2. Keep the answers in the conversation so the user can re-run /aid-end
+3. Never write a feedback file by hand: aid_session.py end and approve are the only writers
 4. Never silently lose feedback
 
 MESSAGE:
 "❌ Cannot save feedback file.
-Data displayed below for manual backup.
-[feedback content]"
+Reason: {script output}
+Re-run /aid-end when the problem is fixed."
 ```
 
-#### E4.3: Anonymization Failure
+#### E4.3: Redaction Missed Something
 
 ```
-WHEN: feedback contains identifiable info that should be removed
+WHEN: feedback contains identifiable info that redaction did not catch
 IMPACT: Privacy concern
 SEVERITY: High
 
+CONTEXT:
+Redaction is best effort. It replaces e-mails, URLs, absolute paths, file.ext:line
+references, common secret tokens, the project's own names and the OS user name. It does
+not catch a person's or company's name written as plain words unless it is one of the
+project's names.
+
 HANDLING:
-1. Apply strict filtering
-2. When in doubt, remove more
-3. Log what was removed (without the actual content)
+1. When condensing the user's answers, leave such names out
+2. If a name is already in a pending file, tell the user; the file is in
+   $AID_HOME/feedback/pending/ and the user can remove it
 ```
 
 ---
@@ -272,47 +278,37 @@ IMPACT: Suggestion not applied
 SEVERITY: Medium
 
 HANDLING:
-1. Log failure
-2. Show manual update instructions
-3. Continue with other suggestions
-4. Mark suggestion as "pending manual"
+1. aid_session.py memory-apply <id> refused, or the user declined the prompt
+2. Show the refusal reason verbatim
+3. Do not retry in another spelling and do not edit the file another way
+4. The proposal stays in the queue; continue with other suggestions
 
 MESSAGE:
-"⚠️ Cannot update {skill_file}
-
-Manual update:
-Open {skill_file}
-Add:
-{content}
+"⚠️ Proposal {id} was not applied.
+{reason}
 
 [Continue to next]"
 ```
 
 ---
 
-### Category 6: Claude Memory Errors
+### Category 6: Local Memory Errors
 
 #### E6.1: Memory Add Failed
 
 ```
-WHEN: memory_user_edits(add) fails
+WHEN: aid_session.py memory-sync fails, or the user declined the prompt
 IMPACT: Entry not added to memory
 SEVERITY: Medium
 
 HANDLING:
-1. Retry once
-2. Log to pending promotions
-3. Suggest manual add
-4. Continue improvement flow
+1. Show the reason verbatim
+2. Do not retry in another spelling and do not write slots.json another way
+3. Continue improvement flow
 
 MESSAGE:
-"⚠️ Cannot add to Claude Memory now.
-
-Entry saved for retry:
-{entry}
-
-For manual add:
-memory_user_edits(command='add', control='{entry}')"
+"⚠️ Could not write to AID's local memory.
+{reason}"
 ```
 
 #### E6.2: Memory Full
@@ -328,7 +324,7 @@ HANDLING:
 3. If not, explain and keep in cumulative.md
 
 MESSAGE:
-"📊 Claude Memory full (30/30 slots)
+"📊 AID's local memory full (30/30 slots)
 
 New entry (score: {new_score}):
 {new_entry}
@@ -357,7 +353,7 @@ HANDLING:
 3. Report discrepancies
 
 MESSAGE:
-"🔄 Syncing tracking with Claude Memory
+"🔄 Syncing tracking with AID's local memory
 
 Found {missing} missing entries
 Found {extra} untracked entries
@@ -373,19 +369,19 @@ Tracking updated."
 |-------|---------------|-----------------|
 | E1.1 Directory | ❌ | mkdir command |
 | E1.2 Missing files | ✅ | - |
-| E1.3 Memory API | ✅ (retry later) | - |
+| E1.3 Memory file | ✅ (retry later) | - |
 | E2.1 JSON corrupt | ✅ (default) | Review backup |
 | E2.2 Write failed | ✅ (alt location) | Fix permissions |
 | E2.3 File not found | ✅ (create) | - |
 | E3.1 Invalid state | ✅ (correct) | - |
 | E3.2 Concurrent | ✅ (merge) | Conflict review |
 | E4.1 Missing rating | ❌ | User input |
-| E4.2 Save failed | ✅ (backup) | Copy from backup |
-| E4.3 Anonymization | ✅ (strict filter) | - |
+| E4.2 Save failed | ❌ | Re-run /aid-end |
+| E4.3 Redaction miss | ❌ | Remove the name |
 | E5.1 Not enough | ❌ | Wait for more |
 | E5.2 Analysis failed | ✅ (retry) | - |
-| E5.3 Skill update | ❌ | Manual edit |
-| E6.1 Memory add | ✅ (retry) | Manual add |
+| E5.3 Skill update | ❌ | User decision |
+| E6.1 Memory add | ❌ | User decision |
 | E6.2 Memory full | ❌ | User decision |
 | E6.3 Out of sync | ✅ (rebuild) | - |
 

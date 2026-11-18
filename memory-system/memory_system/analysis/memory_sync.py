@@ -13,16 +13,31 @@ import os
 
 # Support both relative imports (when used as package) and direct imports (when used standalone)
 try:
-    from ..feedback.collector import load_feedback_by_date_range
+    from ..feedback.collector import load_feedback_by_date_range, default_names
     from .patterns import PatternDetector
+    from .. import paths
+    from ..redact import redact
 except ImportError:
-    from feedback.collector import load_feedback_by_date_range
+    from feedback.collector import load_feedback_by_date_range, default_names
     from analysis.patterns import PatternDetector
+    import paths
+    from redact import redact
 
-# Configuration
-MEMORY_DIR = Path(os.path.expanduser("~/.aid/memory"))
-SLOTS_FILE = MEMORY_DIR / "slots.json"
-SYNC_LOG_FILE = MEMORY_DIR / "sync_log.json"
+
+# Configuration. T8-3: from paths.aid_home() on every call ($AID_HOME, else ~/.aid).
+def _slots_file() -> Path:
+    return paths.memory_dir() / "slots.json"
+
+
+def _sync_log_file() -> Path:
+    return paths.memory_dir() / "sync_log.json"
+
+
+def _write_json(path: Path, data: Any):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, path)
 
 # Memory slot allocation (from AID spec: 30 slots total)
 SLOT_ALLOCATION = {
@@ -36,22 +51,27 @@ SLOT_ALLOCATION = {
 
 def ensure_directories():
     """Create memory directories if they don't exist."""
-    MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+    paths.memory_dir().mkdir(parents=True, exist_ok=True)
 
 
 class MemorySlotManager:
     """Manage Claude Memory slots for AID learnings."""
 
     def __init__(self):
-        """Initialize the slot manager."""
-        ensure_directories()
+        """Initialize the slot manager. Reading creates nothing (T8-2: a dry run writes no file)."""
         self.slots = self._load_slots()
 
     def _load_slots(self) -> Dict[str, Any]:
         """Load current slot allocation."""
-        if SLOTS_FILE.exists():
-            with open(SLOTS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+        if _slots_file().exists():
+            try:
+                data = json.loads(_slots_file().read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                data = None
+            if isinstance(data, dict):
+                # T8 review r1: keep only well-formed categories (a list of entry objects).
+                return {c: ([e for e in data.get(c) if isinstance(e, dict) and "content" in e]
+                            if isinstance(data.get(c), list) else []) for c in SLOT_ALLOCATION}
 
         # Initialize empty slots
         return {
@@ -64,8 +84,7 @@ class MemorySlotManager:
 
     def _save_slots(self):
         """Save slot allocation to file."""
-        with open(SLOTS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(self.slots, f, indent=2, ensure_ascii=False)
+        _write_json(_slots_file(), self.slots)
 
     def get_slot_usage(self) -> Dict[str, Dict[str, int]]:
         """Get current slot usage statistics."""
@@ -108,7 +127,7 @@ class MemorySlotManager:
             current_entries.pop(0)
 
         entry = {
-            "content": content,
+            "content": redact(content, default_names()),      # T8-1: never raw text
             "added_at": datetime.utcnow().isoformat() + "Z",
             "metadata": metadata or {}
         }
@@ -226,101 +245,74 @@ class MemorySyncEngine:
 
         return False
 
-    def sync_to_memory(self) -> Dict[str, Any]:
+    def plan(self) -> List[Dict[str, Any]]:
         """
-        Sync detected patterns to Claude Memory slots.
-
-        Returns:
-            Sync results
+        T8-2: the memory entries a sync WOULD add, redacted, without writing anything.
+        ``aid_session.py memory-preview`` prints this; ``memory-sync`` (which Claude Code asks
+        the user to confirm) writes exactly this list.
         """
         if not self.patterns:
-            return {"synced": False, "reason": "No patterns available"}
+            return []
+        planned = []
 
-        results = {
-            "synced": True,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "memories_added": []
-        }
+        def add(category, content, meta):
+            planned.append({"category": category, "content": redact(content, default_names()),
+                            "metadata": meta})
 
-        # Sync verbosity preference
         verbosity = self.patterns.get('verbosity_preference', {})
         if verbosity.get('confidence') in ['high', 'medium']:
-            pref = verbosity['detected_preference']
+            pref = verbosity.get('detected_preference')
             if pref == 'prefers_concise':
                 content = "User prefers abbreviated transparency after initial interactions"
             elif pref == 'prefers_detailed':
                 content = "User prefers detailed explanations with full rationale"
             else:
                 content = "User prefers balanced communication style"
+            add("user_preferences", content,
+                {"source": "verbosity_detection", "confidence": verbosity['confidence']})
 
-            if self.slot_manager.add_memory(
-                "user_preferences",
-                content,
-                {"source": "verbosity_detection", "confidence": verbosity['confidence']}
-            ):
-                results["memories_added"].append({
-                    "category": "user_preferences",
-                    "content": content
-                })
-
-        # Sync debate learnings
         debates = self.patterns.get('repeated_debates', {})
         if debates.get('patterns_found'):
             for category, data in debates.get('by_category', {}).items():
                 for learning in data.get('learnings', [])[:2]:  # Max 2 per category
-                    content = f"User debates {category} decisions - {learning}"
-                    if self.slot_manager.add_memory(
-                        "decision_patterns",
-                        content,
-                        {"source": "debate_analysis", "category": category}
-                    ):
-                        results["memories_added"].append({
-                            "category": "decision_patterns",
-                            "content": content
-                        })
+                    add("decision_patterns", f"User debates {category} decisions - {learning}",
+                        {"source": "debate_analysis", "category": category})
 
-        # Sync role-specific learnings
         role_mismatch = self.patterns.get('role_mismatch', {})
         if role_mismatch.get('patterns_found'):
             for mismatch in role_mismatch.get('mismatched_roles', []):
-                role = mismatch['role']
+                role = mismatch.get('role', 'unknown')
                 weak_topics = mismatch.get('weak_topics', [])
-
                 if weak_topics:
-                    content = f"When assisting {role} role, focus on: {', '.join(weak_topics)}"
+                    content = f"When assisting {role} role, focus on: {', '.join(map(str, weak_topics))}"
                 else:
                     content = f"User role {role} needs tailored communication style"
+                add("skill_adjustments", content, {"source": "role_mismatch", "role": role})
 
-                if self.slot_manager.add_memory(
-                    "skill_adjustments",
-                    content,
-                    {"source": "role_mismatch", "role": role}
-                ):
-                    results["memories_added"].append({
-                        "category": "skill_adjustments",
-                        "content": content
-                    })
-
-        # Sync rating trends
         phase_struggles = self.patterns.get('phase_struggles', {})
         if phase_struggles.get('patterns_found'):
             for phase_data in phase_struggles.get('struggling_phases', []):
-                phase = phase_data['phase']
-                content = f"User rates {phase} phase lower ({phase_data['average_rating']}) - needs more support"
+                phase = phase_data.get('phase')
+                add("feedback_trends",
+                    f"User rates {phase} phase lower ({phase_data.get('average_rating')}) - needs more support",
+                    {"source": "phase_analysis", "phase": phase})
+        return planned
 
-                if self.slot_manager.add_memory(
-                    "feedback_trends",
-                    content,
-                    {"source": "phase_analysis", "phase": phase}
-                ):
-                    results["memories_added"].append({
-                        "category": "feedback_trends",
-                        "content": content
-                    })
-
-        # Log the sync
+    def sync_to_memory(self) -> Dict[str, Any]:
+        """
+        Write the planned entries to the memory slots. Called ONLY through
+        ``aid_session.py memory-sync``, which Claude Code asks the user to confirm (T8-2).
+        """
+        planned = self.plan()
+        if not planned:
+            return {"synced": False, "reason": "No patterns available"}
+        results = {"synced": True, "timestamp": datetime.utcnow().isoformat() + "Z",
+                   "memories_added": []}
+        for item in planned:
+            if self.slot_manager.add_memory(item["category"], item["content"], item["metadata"]):
+                results["memories_added"].append({"category": item["category"],
+                                                  "content": item["content"]})
         self._log_sync(results)
-
         return results
 
     def _log_sync(self, results: Dict[str, Any]):
@@ -328,44 +320,41 @@ class MemorySyncEngine:
         ensure_directories()
 
         log = []
-        if SYNC_LOG_FILE.exists():
-            with open(SYNC_LOG_FILE, 'r', encoding='utf-8') as f:
-                log = json.load(f)
-
+        if _sync_log_file().exists():
+            try:
+                log = json.loads(_sync_log_file().read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                log = []
         log.append(results)
-
-        # Keep last 100 entries
-        log = log[-100:]
-
-        with open(SYNC_LOG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(log, f, indent=2, ensure_ascii=False)
+        _write_json(_sync_log_file(), log[-100:])     # keep the last 100
 
     def get_sync_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent sync history."""
-        if not SYNC_LOG_FILE.exists():
+        if not _sync_log_file().exists():
             return []
-
-        with open(SYNC_LOG_FILE, 'r', encoding='utf-8') as f:
-            log = json.load(f)
+        try:
+            log = json.loads(_sync_log_file().read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
 
         return log[-limit:]
 
 
-def sync_memory_from_feedback(days: int = 30) -> Dict[str, Any]:
+def sync_memory_from_feedback(days: int = 30, approve: bool = False) -> Dict[str, Any]:
     """
-    Convenience function to sync memory from recent feedback.
-
-    Args:
-        days: Number of days of feedback to analyze
-
-    Returns:
-        Sync results
+    T8-2: without ``approve`` this is a DRY RUN: it returns the planned (redacted) entries
+    and writes nothing. ``approve=True`` is passed only by ``aid_session.py memory-sync``,
+    the call Claude Code asks the user to confirm.
     """
     engine = MemorySyncEngine(days=days)
 
     if not engine.should_sync():
-        return {"synced": False, "reason": "No significant patterns to sync"}
-
+        return {"synced": False, "dry_run": not approve, "planned": [],
+                "reason": "No significant patterns to sync"}
+    if not approve:
+        return {"synced": False, "dry_run": True, "planned": engine.plan(),
+                "reason": "Dry run: nothing written. To write these entries, run /aid-improve "
+                          "(it uses aid_session.py memory-sync, which asks you to confirm)."}
     return engine.sync_to_memory()
 
 
@@ -404,32 +393,7 @@ def add_context_memory(content: str, metadata: Optional[Dict] = None) -> bool:
 
 
 if __name__ == "__main__":
-    print("Testing Memory Sync...")
-    print("=" * 60)
-
-    # Show current state
+    # Read-only demo: it never writes to the real memory (T8-5).
     memories = get_current_memories()
-    print("\nCurrent Memory Usage:")
     for category, usage in memories['usage'].items():
         print(f"  {category}: {usage['used']}/{usage['max']} slots")
-
-    print("\nFormatted Memories:")
-    for mem in memories['formatted']:
-        print(f"  - {mem}")
-
-    # Test adding a memory
-    print("\nAdding test memory...")
-    success = add_context_memory(
-        "Working on authentication feature",
-        {"project": "test-project"}
-    )
-    print(f"Add result: {success}")
-
-    # Show updated state
-    memories = get_current_memories()
-    print("\nUpdated Memory Usage:")
-    for category, usage in memories['usage'].items():
-        print(f"  {category}: {usage['used']}/{usage['max']} slots")
-
-    print("\n" + "=" * 60)
-    print("Memory sync test complete.")

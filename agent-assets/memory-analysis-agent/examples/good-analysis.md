@@ -179,7 +179,7 @@ Every suggestion includes:
 - Pattern ID reference
 - Occurrence count
 - Rating/revision metrics
-- Supporting quotes (anonymized)
+- Supporting quotes, redacted: no names, paths, e-mails or `file:line` references
 
 ### ✅ Appropriate Confidence Scores
 

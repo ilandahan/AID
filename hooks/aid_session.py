@@ -29,6 +29,14 @@ Usage (T3: this script is the ONLY writer of .aid/state.json, a protected file):
   aid_session.py advance                approved phase -> next phase               [confirmed]
   aid_session.py end --rating N [--worked TEXT] [--improve TEXT]
       [--review passed|partial|failed|skipped] [--review-note TEXT]
+  aid_session.py memory-preview [--days N]  what a memory sync would add, and the queue
+  aid_session.py memory-feedback [--days N] the feedback, redacted, as JSON (input for the analysis agent)
+  aid_session.py memory-sync [--days N]     write those entries to $AID_HOME/memory    [confirmed]
+  aid_session.py memory-queue              queue the analysis agent's proposals from
+                                            <project>/.aid/improve/proposals.json
+  aid_session.py memory-apply <id>          append ONE queued proposal to its learnings file [confirmed]
+  aid_session.py memory-reject <id>         drop a queued proposal
+  T8: feedback text is redacted before it is written (memory_system/redact.py, best effort).
   [confirmed] = Claude Code asks the user first: SessionStart installs permission ask rules
   for exactly these calls (aid_guard.ASK_RULES), and the phase gate refuses any other
   spelling of them. Menus and numbering come from references/role-phase-terminology.json.
@@ -37,6 +45,7 @@ Usage (T3: this script is the ONLY writer of .aid/state.json, a protected file):
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -65,7 +74,43 @@ def project_state_file():
         env_dir = os.environ.get("CLAUDE_PROJECT_DIR")
         root = Path(env_dir) if env_dir and os.path.isdir(env_dir) else Path.cwd()
     return Path(root) / ".aid" / "state.json"
-FEEDBACK_DIR = Path.home() / ".aid" / "feedback" / "pending"
+MEMORY_PKG = HERE.parent / "memory-system"
+
+
+def feedback_dir():
+    """T8-3: $AID_HOME, else ~/.aid (the feedback dir used to ignore $AID_HOME)."""
+    home = os.environ.get("AID_HOME")
+    return (Path(home) if home else Path.home() / ".aid") / "feedback" / "pending"
+
+
+def _memory_system():
+    """The bundled memory_system package (memory-system/ beside hooks/)."""
+    if str(MEMORY_PKG) not in sys.path:
+        sys.path.insert(0, str(MEMORY_PKG))
+    import memory_system                   # noqa: F401  (bundled with the plugin)
+    from memory_system.feedback import collector
+    # T8 review r1: the reader removes the names of THIS project (the gates' root), not
+    # only of the cwd.
+    collector.set_context(os.getcwd(), str(STATE_FILE.parent.parent))
+    return memory_system
+
+
+def redactor():
+    """T8-1: redact() bound to this project's names, or None when the package is missing
+    (the caller then stores no free text at all: fail closed)."""
+    try:
+        _memory_system()
+        from memory_system.redact import context_names, redact
+    except ImportError:
+        return None
+    names = context_names(os.getcwd(), str(STATE_FILE.parent.parent))
+    return lambda text: redact(text, names) if text else text
+
+
+def _clean(red, text):
+    if not text:
+        return text
+    return red(text) if red else "[not stored: redaction unavailable]"
 
 # Menu numbers are DERIVED from the terminology file, never hardcoded. The menus used to be
 # hand-copied into commands/aid-start.md, and the copy drifted: data-scientist was a fully
@@ -277,6 +322,14 @@ def cmd_approve(args):
     if args.note:
         state["phase_approval_note"] = args.note
     save_json(STATE_FILE, state)
+    # T8 D5: the /phase-approve rating reaches the learning loop as a REDACTED pending entry.
+    m = re.search(r"\brating\s*([1-5])\b", args.note or "", re.I)
+    ts = now_iso()
+    red = redactor()
+    save_json(feedback_dir() / ("approve-" + ts.replace(":", "-") + ".json"), {
+        "source": "phase-approve", "timestamp": ts, "role": _clean(red, state.get("role")),
+        "phase": state.get("current_phase"), "phase_display": _clean(red, state.get("phase_display")),
+        "rating": int(m.group(1)) if m else None, "note": _clean(red, args.note or "")})
     print("✅ Phase {} ({}) approved.".format(state["current_phase"], PHASE_NAMES[state["current_phase"]]))
 
 
@@ -364,22 +417,23 @@ def cmd_end(args):
             pass
 
     ts = now_iso()
+    red = redactor()                       # T8-1: redact BEFORE anything is written
     review = {"status": args.review, "timestamp": ts}
     if args.review_note:
-        review["note"] = args.review_note
+        review["note"] = _clean(red, args.review_note)
 
     feedback = {
         "timestamp": ts,
-        "role": state.get("role"),
+        "role": _clean(red, state.get("role")),
         "phase": state.get("current_phase", state.get("phase")),
-        "phase_display": state.get("phase_display"),
+        "phase_display": _clean(red, state.get("phase_display")),
         "rating": args.rating,
-        "worked_well": args.worked or "",
-        "to_improve": args.improve or "",
+        "worked_well": _clean(red, args.worked or ""),
+        "to_improve": _clean(red, args.improve or ""),
         "duration_minutes": duration,
         "subagent_review": review,
     }
-    fb_path = FEEDBACK_DIR / (ts.replace(":", "-") + ".json")
+    fb_path = feedback_dir() / (ts.replace(":", "-") + ".json")
     save_json(fb_path, feedback)
 
     phase_n = state.get("current_phase", state.get("phase"))
@@ -396,7 +450,89 @@ def cmd_end(args):
         print(f"Duration: {duration} min")
     print(f"Rating: {args.rating}/5")
     print(f"Sub-agent review: {args.review}")
-    print(f"Feedback saved: {fb_path}")
+    print(f"Feedback saved (redacted): {fb_path}")
+
+
+# ---------------------------------------------------------------------------
+# T8 (amendment A1): the ONE entry point for writes to AID's learning memory. memory-sync
+# and memory-apply are confirmed by the user (aid_guard.ASK_RULES); the memory_system CLI
+# itself only previews.
+# ---------------------------------------------------------------------------
+
+def _queue_lines(queue):
+    if not queue:
+        return ["Proposal queue: empty"]
+    lines = ["Proposal queue ({}):".format(len(queue))]
+    for r in queue:
+        lines.append("  {}  [{}] -> {}".format(str(r.get("id", ""))[:16], r.get("priority", "?"),
+                                              r.get("target_file") or "(no learnings file; cannot be applied)"))
+        lines.append("      {}".format(str(r.get("proposed_change", ""))[:300]))
+    return lines
+
+
+def cmd_memory_preview(args):
+    _memory_system()
+    from memory_system.subagent import LearningSubAgent, print_sync_result
+    from memory_system.recommendations.generator import load_recommendation_queue
+    print("Memory sync preview (nothing is written):")
+    print_sync_result(LearningSubAgent(days=args.days).sync_to_memory(days=args.days, approve=False))
+    print("\n".join([""] + _queue_lines(load_recommendation_queue())))
+
+
+def cmd_memory_feedback(args):
+    """T8: the analysis agent's input. Redacted entries from the one reader, so the agent
+    never needs to open raw pending files (old ones may predate redaction)."""
+    _memory_system()
+    from datetime import timedelta
+    from memory_system.feedback.collector import load_feedback_by_date_range
+    end = datetime.now()
+    entries = load_feedback_by_date_range((end - timedelta(days=args.days)).strftime("%Y-%m-%d"),
+                                          end.strftime("%Y-%m-%d"))
+    print(json.dumps(entries, indent=2, ensure_ascii=False))
+
+
+def cmd_memory_sync(args):
+    _memory_system()
+    from memory_system.subagent import LearningSubAgent, print_sync_result
+    print_sync_result(LearningSubAgent(days=args.days).sync_to_memory(days=args.days, approve=True))
+
+
+def cmd_memory_queue(args):
+    _memory_system()
+    from memory_system.recommendations.generator import queue_proposals
+    # T8 review r1: the file is found from the PROJECT root, not passed: the phase gate
+    # accepts no path argument before Phase 4, and a relative path would follow the cwd.
+    path = STATE_FILE.parent / "improve" / "proposals.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        sys.exit("memory-queue: cannot read {}: {}".format(path, e))
+    result = queue_proposals(data)
+    print("Queued {} proposal(s): {}".format(len(result["queued"]), ", ".join(result["queued"]) or "-"))
+    named = [t for t in result["skipped_targets"] if t not in ("None", "")]
+    unnamed = len(result["skipped_targets"]) - len(named)
+    if named:
+        print("Not queued, target is not an allowed learnings file: " + ", ".join(named))
+    if unnamed:
+        print("Not queued: {} proposal(s) with no target file (memory candidates come from "
+              "memory-preview / memory-sync instead)".format(unnamed))
+
+
+def cmd_memory_apply(args):
+    _memory_system()
+    from memory_system.recommendations.generator import apply_recommendation
+    result = apply_recommendation(args.id)
+    if not result["ok"]:
+        sys.exit("memory-apply refused: " + result["reason"])
+    print("✅ Applied {} to {}".format(result["id"], result["target"]))
+
+
+def cmd_memory_reject(args):
+    _memory_system()
+    from memory_system.recommendations.generator import reject_recommendation
+    if not reject_recommendation(args.id):
+        sys.exit("memory-reject: no single queued proposal has id {!r}".format(args.id))
+    print("Rejected {}".format(args.id))
 
 
 def main():
@@ -446,6 +582,24 @@ def main():
     e.add_argument("--review", default="skipped", choices=["passed", "partial", "failed", "skipped"])
     e.add_argument("--review-note", default=None)
     e.set_defaults(fn=cmd_end)
+
+    def days(value):
+        d = int(value)
+        if not 1 <= d <= 3650:
+            raise argparse.ArgumentTypeError("--days must be 1-3650")
+        return d
+
+    for name, fn in (("memory-preview", cmd_memory_preview), ("memory-sync", cmd_memory_sync),
+                     ("memory-feedback", cmd_memory_feedback)):
+        m = sub.add_parser(name)
+        m.add_argument("--days", type=days, default=30)
+        m.set_defaults(fn=fn)
+    mq = sub.add_parser("memory-queue")
+    mq.set_defaults(fn=cmd_memory_queue)
+    for name, fn in (("memory-apply", cmd_memory_apply), ("memory-reject", cmd_memory_reject)):
+        m = sub.add_parser(name)
+        m.add_argument("id")
+        m.set_defaults(fn=fn)
 
     args = p.parse_args()
     STATE_FILE = project_state_file()

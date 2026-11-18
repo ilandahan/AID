@@ -1,16 +1,18 @@
 ---
-description: "Manage Claude Memory entries for AID"
+description: "Manage AID's local memory entries"
 ---
 
 # /aid memory
 
-Manage Claude Memory entries for AID.
+Manage AID's local memory entries. "Claude Memory" in AID means a LOCAL file,
+`$AID_HOME/memory/slots.json` (default `~/.aid/memory/`). Nothing is sent to Claude's
+built-in memory.
 
 ## Subcommands
 
 ### /aid memory list
 
-Show all AID-related entries in Claude Memory.
+Show all AID-related entries in AID's local memory.
 
 ```
 AID Memory Entries
@@ -71,6 +73,7 @@ Entries from feedback: 3
 ## Notes
 
 - AID entries use prefix `AID:` for easy identification
-- Learned entries can be promoted via `/aid improve`
-- Manual management available via Claude Memory interface
+- Learned entries can be added via `/aid improve`: `aid_session.py memory-sync` writes them,
+  and Claude Code asks the user to confirm
+- Do not edit `slots.json` by hand
 - See `memory-system/docs/MEMORY.md` for slot allocation details

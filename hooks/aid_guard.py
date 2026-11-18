@@ -83,7 +83,10 @@ DENY_RULES = (
 # denies it where nobody can answer (-p). ONE constant: SessionStart installs these rules
 # (layer A) and the Bash gate allows the subcommands only in a spelling they match (T3-4b:
 # rule matching is case-sensitive, measured in T3-P1, while Windows runs `PYTHON` too).
-CONFIRMED_SUBCOMMANDS = ("approve", "advance", "jump", "init")    # init incl. --repair (A2)
+# T8 (A1): memory-sync and memory-apply write AID's learning memory and skill learnings
+# files; the user confirms those too.
+CONFIRMED_SUBCOMMANDS = ("approve", "advance", "jump", "init",    # init incl. --repair (A2)
+                         "memory-sync", "memory-apply")
 _INTERPRETERS = ("python", "python3", "py")
 ASK_RULES = tuple("Bash({} *aid_session.py {}*)".format(i, s)
                   for s in CONFIRMED_SUBCOMMANDS for i in _INTERPRETERS)
@@ -136,11 +139,12 @@ def confirmed_form_verdict(command):
     if _CANONICAL_CALL.match(raw) and any(
             fnmatch.fnmatchcase(bare, r[len("Bash("):-1]) for r in ASK_RULES):
         return None
-    return ("this aid_session.py call changes the AID phase, so the user must confirm it, and "
+    return ("this aid_session.py call changes the AID phase or AID's learning memory, so the "
+            "user must confirm it, and "
             "Claude Code only asks in the exact form: lower-case python, python3 or py, single "
             "spaces, the subcommand bare (not quoted), e.g. python \"{}\" approve. Quoted "
             "values (--note \"...\") may contain only letters, digits, spaces and . _ : - . "
-            "Run it in that form; do not change the phase any other way"
+            "Run it in that form; do not make the change any other way"
             ).format(str(SESSION_SCRIPT).replace("\\", "/"))
 
 

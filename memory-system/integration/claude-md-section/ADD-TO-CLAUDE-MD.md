@@ -17,7 +17,7 @@ AID includes a learning system that improves Claude's assistance over time by co
 | `/aid status` | Show current state |
 | `/aid end` | End phase and provide feedback |
 | `/aid improve` | Run learning cycle (weekly) |
-| `/aid memory list` | Show Claude Memory entries |
+| `/aid memory list` | Show AID's local memory entries |
 
 ### Session Flow
 
@@ -48,19 +48,23 @@ At phase end (`/aid end`):
 2. Ask for rating (1-5)
 3. Ask: "What worked well?"
 4. Ask: "What could be improved?"
-5. Save to `~/.aid/feedback/pending/`
+5. Save with ONE call: `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" end ...`
+   (see `commands/aid-end.md`). It redacts the text (best effort) and writes
+   `$AID_HOME/feedback/pending/`. Never write a feedback JSON file by hand.
 
 ### Improvement Cycle
 
 When `/aid improve` is called:
 1. Analyze pending feedback (need 3+ items)
 2. Detect patterns across sessions
-3. Suggest skill updates
-4. Promote insights to Claude Memory
+3. Propose skill updates (the analysis agent only proposes)
+4. The user applies chosen proposals and memory entries; Claude Code asks the user to
+   confirm each write (`aid_session.py memory-apply <id>`, `aid_session.py memory-sync`)
 
-### Claude Memory Entries
+### AID Local Memory Entries
 
-AID uses Claude Memory for persistent cross-session learning.
+AID uses a local file, `$AID_HOME/memory/slots.json` (default `~/.aid/memory/`), for
+persistent cross-session learning. Nothing is sent to Claude's built-in memory.
 Entry format: `AID:{ROLE}:{PHASE}:{TYPE} {insight}`
 
 Categories and slots:

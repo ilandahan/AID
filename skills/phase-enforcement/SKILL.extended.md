@@ -330,7 +330,8 @@ const PHASE_OUTPUT_FOLDERS = {
 │  At EVERY phase completion:                                     │
 │  1. Run /aid end to collect user feedback                       │
 │  2. Rating (1-5) + What worked + What to improve                │
-│  3. Save to ~/.aid/feedback/pending/                            │
+│  3. /aid end saves it via aid_session.py end (redacted, best    │
+│     effort); never write feedback files by hand                 │
 │  4. Use feedback in /aid improve for skill enhancement          │
 └─────────────────────────────────────────────────────────────────┘
 ```

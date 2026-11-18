@@ -311,7 +311,7 @@ MEMORY CANDIDATES:
 
 ## Memory Promotion Format
 
-When insights are promoted to Claude Memory:
+When insights are written to AID's local memory (`$AID_HOME/memory/slots.json`, after the user confirms `memory-sync`):
 
 ```
 AID:{SKILL}:{PHASE}:{TYPE} {insight}
