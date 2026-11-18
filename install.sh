@@ -461,12 +461,40 @@ preinstall_mcp_servers() {
     log_success "MCP servers cached"
 }
 
-# Step 10: Install breather (session boundaries + status line, user-scope)
+# Step 10: breather (session boundaries + status line, user-scope). T11: OPT-IN.
+# It installs into ~/.claude (every project on this machine), and its session-start
+# instructions tell Claude to fetch today's calendar events through any connected calendar
+# connector. So it runs only after an explicit yes, or with --with-breather.
+WITH_BREATHER=0
+for arg in "$@"; do
+    [ "$arg" = "--with-breather" ] && WITH_BREATHER=1
+done
+
 setup_breather() {
     echo ""
     echo "═══════════════════════════════════════════════════════"
-    echo "[STEP 10/10] Installing breather (session break offers)..."
+    echo "[STEP 10/10] breather (optional: session break offers)"
     echo "═══════════════════════════════════════════════════════"
+    echo "breather installs into ~/.claude for EVERY project on this machine (hooks + status line)."
+    echo "At session start it tells Claude to fetch today's calendar events through any connected"
+    echo "calendar connector (Google Calendar / Gmail, Microsoft 365 / Outlook) and to record the"
+    echo "meeting times locally. See integrations/breather/README.md."
+
+    if [ "$WITH_BREATHER" != "1" ]; then
+        if [ -t 0 ]; then
+            read -r -p "Install breather? [y/N] " answer || answer=""
+        else
+            answer=""
+            echo "(no terminal to ask: skipping)"
+        fi
+        case "$answer" in
+            [yY]|[yY][eE][sS]) ;;
+            *)
+                log_info "breather skipped. Install later with /breather-start, or: node integrations/breather/install.mjs"
+                return 0
+                ;;
+        esac
+    fi
 
     if node integrations/breather/install.mjs; then
         log_success "breather installed to ~/.claude (all projects, active after Claude Code restart)"

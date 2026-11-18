@@ -358,6 +358,7 @@ templates live in `agent-assets/`; see `agent-assets/AGENT-STANDARD.md` to add y
 - Feedback is stored locally in `$AID_HOME`. AID has no collection service of its own. When
   you run `/aid-improve`, the redacted feedback is sent to Claude as part of the
   conversation, for analysis.
+- **Breather and your calendar.** breather is optional and installs into `~/.claude`, so once installed it is active in **every** project on the machine. In the first session of each day, and again on each prompt until you answer or skip its day-plan question, its instructions tell Claude to fetch **today's calendar events** automatically, before answering and without asking you, through any connector available in the session. It names Google Calendar / Gmail and Microsoft 365 / Outlook as examples: it asks only for today's events, but a Gmail or Outlook connector may also have access to your mail. The events go into the conversation (and so to the model and through that connector), and the meeting start times are saved under `~/.claude/state/breather/`. It also adds hooks and a status line to `~/.claude/settings.json`; see [integrations/breather/README.md](integrations/breather/README.md) for everything it does. To keep this off, do not install breather, or remove it with `/breather-stop` (uninstall). The installers ask before installing it (default No). See [integrations/breather/README.md](integrations/breather/README.md).
 - No AID-hosted collection service is configured by this plugin. Local artifacts remain until
   the user removes them; this repository does not enforce a local retention period.
 - External services used by the remaining optional workflows are listed below. These setup
@@ -487,9 +488,11 @@ claude plugin install aid@AID
 /breather-start          # one time, activates it
 ```
 
-The plugin carries the installer; `/breather-start` runs it. The clone route is the one
-exception — `install.sh`, `install.bat` and `/setup` run it for you at step 10, so there is
-nothing to activate. Either way, restart Claude Code afterwards so the hooks register, then
+The plugin carries the installer; `/breather-start` runs it. On the clone route,
+`install.sh`, `install.bat` and `/setup` offer it at step 10 and install it only if you say
+yes (default No; `install.sh --with-breather` or `install.bat /breather` skip the question).
+It reads your calendar: see [Data handling and privacy](#data-handling-and-privacy).
+Either way, restart Claude Code afterwards so the hooks register, then
 confirm with `/hooks`. A blank status line usually means the workspace trust dialog is still
 waiting.
 

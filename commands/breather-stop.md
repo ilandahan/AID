@@ -31,8 +31,9 @@ node <installer-path> --uninstall
 ```
 
 Installer path (first match wins):
-- `${CLAUDE_PLUGIN_ROOT}/integrations/breather/install.mjs` (plugin install)
-- `./integrations/breather/install.mjs` (AID repo root)
+- `${CLAUDE_PLUGIN_ROOT}/integrations/breather/install.mjs` only (plugin install). Never run an
+  `install.mjs` from the current folder; outside a plugin install, ask the user to run it
+  themselves with a leading `!` from their own AID checkout.
 
 Removes `~/.claude/skills/breather`, `~/.claude/hooks/breather`, and the
 breather entries in `settings.json` (hooks + statusLine). Confirm with the

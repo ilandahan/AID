@@ -1,0 +1,17 @@
+{
+  "upstream": "https://github.com/ilandahan/breather",
+  "commit": "fea541d539c2d06c22406fd800977f52e8295a2a",
+  "note": "install.mjs is upstream's install.mjs at this commit, byte for byte. To update: copy it from upstream at a new commit, review the decoded diff, then regenerate this file (see README.md).",
+  "install_mjs_sha256": "2f96cc5384fb1aa10b5c2b85890a354a6b0bc2a798cf5f6a02aedbfafba05cd2",
+  "files": {
+    "hooks/activity.mjs": "0515857681a91f287924542cd7aaca52c738bf3a9e838843303a041459e3889d",
+    "hooks/clock.mjs": "a4e6e2a28cb9d652863e8c0c8b15ace328e0539971e2888c61c9aaa81351e927",
+    "hooks/mark.mjs": "e6ec56792f1bd5cbd4cbcf9b4394ed7a7828fe6bf05d171e3a1ce1310c148c0a",
+    "hooks/notify.mjs": "c52e769324346643ee6908c110de671b85b745d46b59fe6d57f3e1dcae71a5e7",
+    "hooks/presence.mjs": "2cbe83774bdb4e863320596196c57f75a1f265a84a0fbf18319c25abd30ad80c",
+    "hooks/session-open.mjs": "731db4106da50f892503429080c570f82ff553c0a6f2909cab8c164ec453eb9d",
+    "hooks/statusline.mjs": "5f3326a0e556a24a4e084b99d4d7c369ae5b7f2cc23660c0619a26913b69de2b",
+    "skills/SKILL.md": "6c24373329643f6d4bcb729fd4aca2b9d46a12132334891a8f3db93c748a1557",
+    "skills/references/handoff-template.md": "caa2369d610c15feec8cf6913ddc9fa3160274ef2d2dacfcc40702e9fd250241"
+  }
+}

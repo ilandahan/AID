@@ -12,6 +12,12 @@ versions are not maintained.
 The `version` field in `.claude-plugin/plugin.json` identifies the release you
 are running; please include it in your report.
 
+## Breather (optional, user-wide)
+
+breather is optional and installs into `~/.claude`, so once installed it is active in **every** project on the machine. In the first session of each day, and again on each prompt until you answer or skip its day-plan question, its instructions tell Claude to fetch **today's calendar events** automatically, before answering and without asking you, through any connector available in the session. It names Google Calendar / Gmail and Microsoft 365 / Outlook as examples: it asks only for today's events, but a Gmail or Outlook connector may also have access to your mail. The events go into the conversation (and so to the model and through that connector), and the meeting start times are saved under `~/.claude/state/breather/`. It also adds hooks and a status line to `~/.claude/settings.json`; see [integrations/breather/README.md](integrations/breather/README.md) for everything it does. To keep this off, do not install breather, or remove it with `/breather-stop` (uninstall).
+
+The vendored installer is pinned: `integrations/breather/PAYLOAD.lock.json` records the upstream commit and the SHA-256 of the installer and of every file it writes, and a test checks them.
+
 ## Reporting a Vulnerability
 
 Please do not put vulnerability details in a public GitHub issue.

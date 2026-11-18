@@ -47,9 +47,13 @@ Walk through the entire AID installation and configuration step-by-step.
      script's output; if it refuses (non-zero exit), show its reason verbatim. Never write
      `.aid/state.json` yourself: `aid_session.py` is its only writer.
 
-4. **Install breather** (session boundaries)
-   - Run `node integrations/breather/install.mjs` (works from the AID repo root;
-     in a linked project, run it from the AID install directory)
+4. **Offer breather** (optional: session boundaries). Ask the user first and install only on
+   an explicit yes; the default is No. Tell them this before they answer:
+   breather is optional and installs into `~/.claude`, so once installed it is active in **every** project on the machine. In the first session of each day, and again on each prompt until you answer or skip its day-plan question, its instructions tell Claude to fetch **today's calendar events** automatically, before answering and without asking you, through any connector available in the session. It names Google Calendar / Gmail and Microsoft 365 / Outlook as examples: it asks only for today's events, but a Gmail or Outlook connector may also have access to your mail. The events go into the conversation (and so to the model and through that connector), and the meeting start times are saved under `~/.claude/state/breather/`. It also adds hooks and a status line to `~/.claude/settings.json`; see [integrations/breather/README.md](../integrations/breather/README.md) for everything it does. To keep this off, do not install breather, or remove it with `/breather-stop` (uninstall).
+
+   If the user says yes:
+   - Run `node integrations/breather/install.mjs` only from the root of the user's own AID
+     checkout (the one `/setup` is installing), never from another project's folder
    - Installs user-scope to `~/.claude`: presence tracking, break offers,
      handoffs, and the rest/usage status line — active in every project
    - Safe to re-run; it never replaces an existing custom statusLine

@@ -296,14 +296,30 @@ echo     Run "npm run cucumber" to execute feature files
 
 echo.
 echo ===============================================================
-echo [STEP 10/10] Installing breather (session break offers)...
+echo [STEP 10/10] breather (optional: session break offers)
 echo ===============================================================
+REM T11: OPT-IN. It installs into %USERPROFILE%\.claude for every project, and its session-start
+REM instructions tell Claude to fetch today's calendar events through any connected calendar
+REM connector. It runs only after an explicit yes, or with the /breather argument.
+echo breather installs into %USERPROFILE%\.claude for EVERY project (hooks + status line).
+echo At session start it tells Claude to fetch today's calendar events through any connected
+echo calendar connector (Google Calendar / Gmail, Microsoft 365 / Outlook) and record the
+echo meeting times locally. See integrations\breather\README.md.
+set "BREATHER_ANSWER=N"
+echo %* | findstr /I /C:"/breather" >nul && set "BREATHER_ANSWER=Y"
+if /I not "%BREATHER_ANSWER%"=="Y" set /p "BREATHER_ANSWER=Install breather? [y/N] "
+if /I "%BREATHER_ANSWER%"=="Y" goto :breather_install
+if /I "%BREATHER_ANSWER%"=="YES" goto :breather_install
+echo [SKIP] breather not installed. Install later with /breather-start, or: node integrations\breather\install.mjs
+goto :breather_done
+:breather_install
 call node integrations\breather\install.mjs
 if %errorlevel% equ 0 (
     echo [OK] breather installed to %USERPROFILE%\.claude - all projects, active after Claude Code restart
 ) else (
     echo [WARNING] breather install failed - run manually: node integrations\breather\install.mjs
 )
+:breather_done
 
 REM Pre-install MCP servers for faster startup
 echo.

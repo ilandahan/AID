@@ -8,15 +8,23 @@ disable-model-invocation: true
 Install (or re-enable) breather: presence tracking across sessions, break
 offers at safe moments, handoffs, and the rest/usage status line.
 
+## Before installing
+
+Tell the user what breather does and get a yes first. breather is optional and installs into `~/.claude`, so once installed it is active in **every** project on the machine. In the first session of each day, and again on each prompt until you answer or skip its day-plan question, its instructions tell Claude to fetch **today's calendar events** automatically, before answering and without asking you, through any connector available in the session. It names Google Calendar / Gmail and Microsoft 365 / Outlook as examples: it asks only for today's events, but a Gmail or Outlook connector may also have access to your mail. The events go into the conversation (and so to the model and through that connector), and the meeting start times are saved under `~/.claude/state/breather/`. It also adds hooks and a status line to `~/.claude/settings.json`; see [integrations/breather/README.md](../integrations/breather/README.md) for everything it does. To keep this off, do not install breather, or remove it with `/breather-stop` (uninstall).
+
 ## Process
 
-1. **Locate the installer** (first match wins):
-   - `${CLAUDE_PLUGIN_ROOT}/integrations/breather/install.mjs` (plugin install)
-   - `./integrations/breather/install.mjs` (AID repo root)
+1. **Use only the plugin's installer:**
+   `${CLAUDE_PLUGIN_ROOT}/integrations/breather/install.mjs`. Never run an
+   `install.mjs` found in the current folder: a repository could ship its own, and it would
+   run with write access to `~/.claude/settings.json`. If `${CLAUDE_PLUGIN_ROOT}` was not
+   replaced by a real path, this is not a plugin install: ask the user to run
+   `node integrations/breather/install.mjs` themselves, with a leading `!`, from their own
+   AID checkout.
 
 2. **Run it:**
    ```bash
-   node <installer-path>
+   node "${CLAUDE_PLUGIN_ROOT}/integrations/breather/install.mjs"
    ```
    Installs user-scope to `~/.claude` (skills/breather, hooks/breather,
    settings.json hooks + statusLine, with a settings backup). Active in
