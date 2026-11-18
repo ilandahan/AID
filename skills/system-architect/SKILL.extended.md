@@ -138,6 +138,87 @@ interface DataHandlingRules {
 }
 ```
 
+## PRIORITY 3: Agent Architecture (AID 3.1)
+
+AID 3.1 adds an agentic layer to every project. The architect designs tech spec Section 9
+"Agent Architecture" for the level chosen in PRD §1.5 Solution Shape, and traces every
+item to PRD §7A Agentic Design (7A.1 Charter, 7A.2 Tools & Permissions, 7A.3 Context & Data,
+7A.4 Failure Modes & Guardrails, 7A.5 Why-Chain, 7A.6 Eval Plan, 7A.7 Telemetry & Traces,
+7A.8 Rollout & Kill Switch). It ALWAYS applies; at levels 0-1 each concern takes its classic
+form. Full reference: `skills/aid-tech-spec/references/agent-architecture.md`
+
+### Concerns at a Glance
+
+|Concern|Architect's rule|Traces to|
+|---|---|---|
+|Pattern per level|Lowest level that works: 0 process, 1 deterministic service, 2 fixed flow + one LLM call, 3 workflow, 4 agent loop, 5 multi-agent|§1.5, 7A.1|
+|Multi-agent|Only for: separate permission boundaries, contaminating contexts, parallel work, different team ownership|§1.5|
+|Least privilege|Default-deny tool policy as code; credentials scoped to whom the agent acts for; irreversible writes need human approval|7A.2, 7A.3|
+|Guardrails|Enforced outside the model; tool results are untrusted data; red lines fail closed; lethal trifecta checked|7A.4|
+|Trace by default|Every run: actor/on_behalf_of, plan, tool calls, results, escalations, cost, latency, outcome (levels 0-1: logs + audit trail)|7A.7|
+|Evals|Golden set + runner + calibrated judge; pass threshold is a release gate (levels 0-1: test harness)|7A.6|
+|Model choice|Smallest model that passes the gate; pinned version; fallback ends in deterministic code or a human|7A.4, 7A.6|
+|Cost budgets|Per-run cost, token, step and latency limits enforced in code|§1.5 Q5, 7A.7|
+|Kill switch|Runtime flag (no deploy), scoped, degrades to a lower level, tested before autonomy (levels 0-1: feature flag + rollback)|7A.8|
+
+### Patterns per Level
+
+| Level | Shape | Architecture pattern | Classic or agentic form |
+|-------|-------|----------------------|-------------------------|
+| 0 | Process change (no software) | Process design, RACI | Classic |
+| 1 | Deterministic automation | Service, job or rules engine | Classic |
+| 2 | Single LLM call inside a fixed flow | One call with output schema, validator, deterministic fallback | Agentic (light) |
+| 3 | Workflow (several fixed steps, some with LLM calls) | State machine / DAG, checkpoints, human approval steps | Agentic |
+| 4 | Agent (the model chooses the path and the tools) | Agent loop with tool allowlist, step limit, stop conditions | Agentic |
+| 5 | Multi-agent | Orchestrator-workers or hand-off; one shared trace id | Agentic, justified |
+
+Rule: the lowest level that works. Each step up needs a one-sentence reason in PRD §1.5.
+Multi-agent needs one of four reasons: separate permission boundaries; contexts that would
+contaminate each other; genuinely parallel work; ownership by different teams.
+
+### Least Privilege for Agents (7A.2, 7A.3)
+- [ ] Default-deny permission policy, kept as code in the repo and reviewed like code
+- [ ] Each tool has a contract and a risk tag: read/write, reversible or not, human approval or not
+- [ ] The agent acts with the permissions of whom it acts for (7A.1), never a broad service key
+- [ ] Never-do items (7A.1) are blocked in code, not only in the prompt
+- [ ] Multi-agent: each agent has its own permission set; no agent inherits another's tools
+- [ ] Data the model sees matches 7A.3; PII redacted from prompts and traces where possible
+- [ ] Secrets: SSO > OS keystore / secrets manager > env var; never in prompts or plaintext files
+
+### Guardrails (7A.4)
+- [ ] Input, action, output and run guardrails, enforced outside the model
+- [ ] Tool results, documents and web content treated as untrusted data (`rules/general/untrusted-content.md`)
+- [ ] Red lines fail closed: block, record, escalate
+- [ ] Lethal trifecta: if private data + untrusted content + an external channel (outbound tools, URLs/markdown images) are all present, remove one leg or require human approval on outbound actions
+
+### Trace by Default (7A.7)
+- [ ] Every run records: actor/on_behalf_of, plan, tool calls, results, escalations, guardrail hits, cost, latency, outcome
+- [ ] Prompt, tool, model and policy versions are on every trace
+- [ ] Traces are on from the first shadow run, not added after an incident
+- [ ] Levels 0-1: structured logs, audit trail and metrics serve the same purpose
+
+### Cost and Latency Budgets (§1.5 Q5, 7A.7)
+- [ ] Per-run budgets for cost, tokens, steps and p95 latency, from §1.5 Q5
+- [ ] Hard limits enforced in code; breaching one ends the run with an escalation
+- [ ] Monthly spend alert before the limit is reached
+- [ ] Model choice: smallest model that passes the eval gate; pinned version; fallback chain
+
+### Kill Switch (7A.8)
+- [ ] Runtime flag, checked before each run and each write; no deploy needed
+- [ ] Scopes: global, per tool, per tenant
+- [ ] Degrade-to path: a lower ladder level, read-only mode or the human process
+- [ ] Automatic triggers on guardrail metrics, cost and error spikes; an owner on call
+- [ ] Tested before each rollout stage (shadow -> human approval -> autonomous)
+
+### Architect's Questions
+1. What is the lowest ladder level that works, and why not one lower?
+2. On whose behalf does it act, and what is the blast radius of a wrong action?
+3. Which actions are irreversible, and who approves them?
+4. Can we replay any run from its trace?
+5. What stops it, how fast, and what runs instead?
+
+---
+
 ## Core Philosophy
 
 ```
@@ -316,7 +397,8 @@ Save to: `docs/tech-spec/YYYY-MM-DD-[feature].md`
 7. **Security Controls** - Auth, encryption, audit
 8. **Dependencies** - External services, libraries
 9. **Risks & Mitigations** - What could go wrong?
-10. **Rollout Plan** - How do we deploy safely?
+10. **Agent Architecture (tech spec Section 9)** - at the PRD §1.5 level, traced to §7A (never "N/A")
+11. **Rollout & Kill Switch (PRD §7A.8 / Section 9.8)** - Staged rollout and how we stop it
 
 ### Workflow 2: Architecture Design
 

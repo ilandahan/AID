@@ -36,7 +36,10 @@ Process in dependency order (foundations first):
 4. UI / Frontend flows
 5. Integrations
 6. Non-functional requirements (security, performance)
+7. Agentic design: PRD §1.5 Solution Shape, §7A.1-7A.8 and tech spec Section 9 Agent Architecture
 ```
+
+The consolidated spec carries §1.5 (the level and its justifications), every §7A.1-7A.8 subsection and tech spec Section 9 in full; `references/section-mapping-guide.md` lists where each lands. A level that differs between the PRD and tech spec Section 9.1 (e.g. PRD says level 3, the spec builds a level 4 agent) is a contradiction: log it and resolve it with the tech lead, who decides the level.
 
 For each section, write immediately after processing -- do not batch at the end. This prevents information loss (Golden Rule #3: Process in Chunks, Write Immediately).
 
@@ -168,6 +171,30 @@ Every Jira issue MUST have these fields populated before Phase 4:
 
 Never combine both passes. Structure first ensures nothing is missed before investing in detailed descriptions.
 
+Enhancement Template:
+```markdown
+## Summary
+[What this accomplishes]
+
+## Business Context
+[From PRD]
+
+## Technical Implementation
+[From Tech Spec]
+
+## Acceptance Criteria
+- [ ] [Criterion 1]
+- [ ] [Criterion 2]
+
+## Dependencies
+- Blocks: [keys]
+- Blocked By: [keys]
+
+## Reference
+📄 Consolidated Spec: [path]
+📑 Section: [name]
+```
+
 ### Traceability Verification
 
 Before declaring Phase 3 complete:
@@ -186,12 +213,84 @@ Coverage target: 100%. Gaps found -> create missing items -> re-verify.
 
 ---
 
+## Agentic Task Set (AID 3.1, always)
+
+The breakdown ALWAYS carries the eight agentic tasks below, whatever the PRD §1.5 Solution
+Shape level. The level sets their depth, in three tiers (levels 0-1, 2-3, 4-5). At levels
+2-5 they follow tech spec Section 9 "Agent Architecture" and PRD §7A. At levels 0-1 the
+agentic tasks fold into the existing test, logging and release tasks, tagged with their 7A
+item (e.g. a "Write acceptance and negative tests" task tagged `7A.6`); no separate task is
+needed when an existing one already covers the item.
+
+### The Eight Tasks
+
+Every task obeys the "< 4 hr" rule (Rule #2 and the Sizing Rules above): the "Split into"
+column lists the subtasks a typical project needs, each under 4 hours. Split further when a
+subtask would exceed 4 hours.
+
+| # | Task | Source | Level 2-5 content | Level 0-1 (folded into existing task) | Split into (each < 4 hr) |
+|---|------|--------|-------------------|----------------------------------------|--------------------------|
+| 1 | Golden set | PRD 7A.6, tech spec 9.5 | Grow from the Phase 1 seed cases (size and source from 7A.6), tag slices, version in `tests/evals/golden/`, hold out a test split (QA owns it; in parallel, complete before the Phase 5 gate) | Acceptance test data | Collect cases; label and adjudicate; split and version |
+| 2 | Eval harness + release gate | PRD 7A.6, 7A.5, tech spec 9.5 | Runner in CI, scorers, LLM judge calibrated (Cohen's kappa >= 0.7 against human labels), threshold as a failing CI check | Acceptance tests wired as a CI gate | Runner; scorers; judge calibration; CI gate |
+| 3 | Red-team cases | PRD 7A.4, 7A.1, tech spec 9.3 | Adversarial and prompt-injection cases; one check per never-do item verifying the code enforcement; 0 critical/high failures | Negative / abuse-case tests | Injection cases; never-do checks; abuse cases |
+| 4 | Telemetry & traces | PRD 7A.7, tech spec 9.4 | Emit the trace schema, dashboards for quality, cost per successful task, latency, escalation rate, guardrail metrics | Structured logs, metrics, alerts | Trace emission; dashboards; alerts |
+| 5 | Rollout stages | PRD 7A.8 | shadow → human approval → autonomous, entry and exit criteria per stage, blind audit of approvals, human-queue capacity check | Staged release plan | Stage criteria; shadow setup; audit sampling |
+| 6 | Kill switch | PRD 7A.8, tech spec 9.8 | Runtime flag, scopes, degrade-to path, automatic triggers, test before autonomy, on-call owner | Feature flag + tested rollback | Flag and degrade path; triggers; kill-switch test |
+| 7 | Permission policy + guardrails (Section 9.2/9.3) | PRD 7A.2, 7A.4, tech spec 9.2, 9.3 | Policy as code, default deny, per-tool risk tags, never-do items blocked in code, guardrails failing closed, human approval on outbound actions where the lethal trifecta is present | Access-control and validation tasks | Policy as code; tool scopes; guardrails |
+| 8 | Data access, redaction, retention (7A.3) | PRD 7A.3, tech spec 9.2 | Data scopes per tool and per agent, redaction before prompts and traces, retention and deletion, model-provider data settings (retention, zero-data-retention, training opt-out, region) | Data-access and retention tasks | Data scopes; redaction; retention and provider settings |
+
+### Dependencies and Ordering
+- seed cases + dev/targeted suite -> eval harness -> prompt/tool/agent tasks; QA grows the golden set in parallel; it must be complete before the Phase 5 gate. The golden set is never a precondition for development (eval-driven, like TDD).
+- Permission policy + guardrails come before any task that gives the model a write tool
+- Red-team cases depend on the guardrails list (tech spec 9.3) and the never-do list (7A.1)
+- Data access, redaction and retention come before telemetry stores any trace
+- Telemetry & traces come before the first shadow run
+- Kill switch is done and tested before the shadow stage goes live (the Phase 5 exit needs it)
+
+### Naming Examples
+- `E3-T01: Curate golden set for refund triage`
+- `E3-T02: Build eval runner and CI release gate`
+- `E3-T03: Write red-team and never-do cases`
+- `E3-T04: Emit run traces and quality dashboard`
+- `E3-T05: Define rollout stages and exit criteria`
+- `E3-T06: Implement and test kill switch`
+- `E3-T07: Write permission policy and guardrails as code`
+- `E3-T08: Set data scopes, redaction and retention`
+
+### Definition of Done for Agentic Stories
+Add to the story template's Definition of Done for any story at level 2-5:
+- [ ] Targeted + regression evals at threshold for the slices it touches
+- [ ] Red-team and never-do checks for those slices pass
+- [ ] Traces recorded for every run (7A.7)
+- [ ] Prompt, tool and policy versions recorded
+- [ ] Kill switch covers this feature (7A.8)
+
+The "eval release gate" (the full gate on the held-out split) is a Phase 5 check, not a
+story's Definition of Done. At levels 0-1, the story's evals are its acceptance tests passing in CI.
+
+### Traceability Check
+| §7A item | Must map to at least one task |
+|----------|-------------------------------|
+| 7A.1 Charter | Task 3 (never-do checks), escalation path in task 5 |
+| 7A.2 Tools & Permissions | Task 7 (permission policy + guardrails) |
+| 7A.3 Context & Data | Task 8 (data access, redaction, retention) |
+| 7A.4 Failure Modes & Guardrails | Task 7 (guardrails) + task 3 (red-team cases) |
+| 7A.5 Why-Chain | Task 2 (eval cases and metrics per WHY) |
+| 7A.6 Eval Plan | Tasks 1 and 2 (golden set, eval harness + gate) |
+| 7A.7 Telemetry & Traces | Task 4 |
+| 7A.8 Rollout & Kill Switch | Tasks 5 and 6 |
+
+---
+
 ## Phase 3 Exit Checklist
 
 - [ ] Consolidated spec written and stakeholder-approved (3a)
 - [ ] All contradictions logged with resolutions (3a)
+- [ ] §1.5 level and §7A carried; level contradictions logged (3a)
 - [ ] Tasks sized under 4 hours with acceptance criteria (3b)
 - [ ] Dependencies mapped and sprint plan created (3b)
+- [ ] Agentic task set present and every §7A item traced to a task (3b)
+- [ ] Agentic stories carry "targeted + regression evals at threshold for the slices it touches" in their Definition of Done (3b)
 - [ ] QA criteria files generated in `.aid/qa/` (3c)
 - [ ] Jira populated with full details at every level (3d)
 - [ ] Traceability verified: 100% PRD and Tech Spec coverage

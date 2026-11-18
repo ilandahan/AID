@@ -73,6 +73,7 @@ For each checklist item:
 - Cite evidence: file:line references
 - No assumptions: if not explicit, it's MISSING
 - Actionable feedback in blocking_issues
+- Agentic items: judge depth by the three tiers in `skills/aid-prd/references/prd-template-extended.md` (levels 0-1, 2-3, 4-5). A section is never "N/A", but at levels 0-1 a one-line cross-reference to where it is already covered (e.g. "7A.6: covered by §4 Gherkin ACs + negative tests") is scored as fully met (PASS)
 
 ---
 
@@ -88,15 +89,19 @@ For each checklist item:
 | Traceability Matrix | `docs/research/*/traceability-matrix.md` |
 
 **Focus:** No solutions, no architecture, no code
+**Agentic:** solution shape hypothesis, variance, error owner
 
 ## Phase 1: PRD
 
 | Deliverable | Location |
 |-------------|----------|
-| Requirements | `docs/prd/*/requirements.md` |
-| Scope Document | `docs/prd/*/scope.md` |
+| PRD (requirements + scope) | `docs/prd/PRD-<feature>.md` |
+| WHY + shape brief | `docs/prd/WHY-SHAPE-BRIEF-<feature>.md` |
+| Seed eval cases | `docs/prd/SEED-EVALS-<feature>.md` |
+| Level ADR | `docs/prd/ADR-SHAPE-<feature>.md` |
 
 **Focus:** No technical implementation, no schemas
+**Agentic:** §1.5 Solution Shape, §7A.1-7A.8, guardrail metric; WHY + shape brief, seed evals, level signed by the tech lead (ADR)
 
 ## Phase 2: Tech Spec
 
@@ -107,6 +112,7 @@ For each checklist item:
 | API Design | `docs/tech-spec/*/api.md` |
 
 **Focus:** No implementation code
+**Agentic:** agent architecture traced to §7A (permission policy, trace schema, eval harness, kill switch)
 
 ## Phase 3: Implementation Plan
 
@@ -117,6 +123,7 @@ For each checklist item:
 | QA Criteria | `.aid/qa/*.yaml` |
 
 **Focus:** Tasks <= 1 day, no TBD items
+**Agentic:** §1.5 level and §7A carried into the consolidated spec (3a); the 8 agentic tasks (3b); targeted + regression evals in DoD
 
 ## Phase 4: Development
 
@@ -126,6 +133,7 @@ For each checklist item:
 | Tests | `tests/**/*`, `*.test.*` |
 
 **Focus:** Code matches spec, tests pass
+**Agentic:** eval-first, traces on, versioned prompts and tools
 
 ## Phase 5: QA & Ship
 
@@ -135,6 +143,7 @@ For each checklist item:
 | Release Notes | `docs/qa/release-notes.md` |
 
 **Focus:** All tests pass, deployment verified
+**Agentic:** eval release gate passed, shadow live, kill switch tested, stage criteria agreed; monitoring
 
 ---
 
@@ -207,6 +216,11 @@ For each checklist item:
 - `[REQUIRED]` No implementation details
 - `[RECOMMENDED]` Executive summary present
 
+### Agentic Layer (scaled to the hypothesised level; never "N/A")
+- `[REQUIRED]` Solution shape hypothesis section: a first level on the ladder (0-5)
+- `[REQUIRED]` Variance: how much the problem varies from case to case
+- `[REQUIRED]` Error owner: who bears the cost of an error, and is it reversible
+
 ## Expected Files
 
 - `docs/research/*/research-report.md` (required)
@@ -257,9 +271,23 @@ For each checklist item:
 - `[REQUIRED]` No technical implementation details
 - `[RECOMMENDED]` Diagrams or wireframes
 
+### Agentic Layer (scaled to the §1.5 level; never "N/A")
+- `[CRITICAL]` §1.5 Solution Shape: level chosen (0-5), every step up justified; multi-agent only with one of the 4 justifications
+- `[CRITICAL]` §7A.1 Charter, 7A.2 Tools & Permissions, 7A.3 Context & Data, 7A.4 Failure Modes & Guardrails, 7A.5 Why-Chain, 7A.6 Eval Plan, 7A.7 Telemetry & Traces, 7A.8 Rollout & Kill Switch all present, none "N/A", scaled to the level
+- `[CRITICAL]` 7A.5 Why-Chain complete: every WHY has a requirement, an eval and a metric
+- `[CRITICAL]` §1.4 metrics: North Star / supporting / guardrail, with at least one guardrail metric
+
+### Phase 1 Flow (A9)
+- `[CRITICAL]` WHY + shape brief present (`docs/prd/WHY-SHAPE-BRIEF-<feature>.md`): WHY statement, Why-Chain seeds, answers to the 6 shape questions, level hypothesis with a one-line reason, error owner, never-do list, approvals
+- `[CRITICAL]` Seed eval cases present (`docs/prd/SEED-EVALS-<feature>.md`): 20-30 cases (input, expected behaviour, never-do flag, source), or at levels 0-1 a cross-reference to where they are covered (e.g. the §4 Gherkin ACs). Expert-written cases are tagged `source: SME:<role>` and kept distinct from real examples. Fewer than 20 passes only when `INSUFFICIENT_EXAMPLES` is resolved: real examples collected, SME cases added, or a recorded PM + tech lead decision to proceed with fewer
+- `[CRITICAL]` §1.5 level signed by the tech lead after the shaping session: the ADR is at `docs/prd/ADR-SHAPE-<feature>.md`, and §1.5 has the line `Signed level: [n] - by [tech lead], [date], ADR link` with the same level (not PROPOSED)
+
 ## Expected Files
 
-- `docs/prd/*.md` (required)
+- `docs/prd/PRD-<feature>.md` (required)
+- `docs/prd/WHY-SHAPE-BRIEF-<feature>.md` (required)
+- `docs/prd/SEED-EVALS-<feature>.md` (required; at levels 0-1 it may be a cross-reference)
+- `docs/prd/ADR-SHAPE-<feature>.md`: the tech lead's ADR signing the §1.5 level (required)
 - Updated traceability matrix (required)
 
 ## Auto-FAIL
@@ -268,6 +296,7 @@ For each checklist item:
 - No scope boundaries
 - Contains database schemas or API specs
 - No link to research
+- §1.5 or any §7A section missing or "N/A"
 
 ---
 
@@ -309,6 +338,14 @@ For each checklist item:
 - `[REQUIRED]` Links to PRD (REQ-XXX)
 - `[REQUIRED]` Technical IDs (TECH-XXX)
 
+### Agentic Layer (scaled to the §1.5 level; never "N/A")
+- `[CRITICAL]` Agent architecture section; orchestration pattern matches the §1.5 level; every item traces to its §7A item
+- `[CRITICAL]` Tool contracts and permission policy (policy as code where possible), per 7A.2
+- `[REQUIRED]` Trace schema (actor/on_behalf_of, plan, tool calls, results, escalations, cost, latency, outcome), per 7A.7
+- `[REQUIRED]` Lethal trifecta checked (private data + untrusted content + an external channel): if all three are present, one leg removed or outbound actions need human approval (9.3)
+- `[REQUIRED]` Eval harness design (golden set storage, runner, judge), per 7A.6
+- `[REQUIRED]` Kill-switch mechanism (7A.8); model choice and fallbacks; cost and latency budgets
+
 ## Expected Files
 
 - `docs/tech-spec/*.md` (required)
@@ -322,6 +359,7 @@ For each checklist item:
 - No security section
 - Missing database schema
 - No link to PRD
+- No agent architecture traced to §7A
 
 ---
 
@@ -335,6 +373,7 @@ For each checklist item:
 - `[CRITICAL]` consolidated-spec.md exists
 - `[CRITICAL]` Contradictions resolved
 - `[REQUIRED]` Resolutions documented with rationale
+- `[REQUIRED]` §1.5 level and §7A carried into the consolidated spec
 
 ### Task Breakdown (3b)
 - `[CRITICAL]` All tasks < 4 hours
@@ -363,6 +402,15 @@ For each checklist item:
 - `[REQUIRED]` Technical risks identified
 - `[RECOMMENDED]` Mitigation strategies
 
+### Agentic Layer (scaled to the §1.5 level; never "N/A")
+The checklist covers 8 agentic tasks. At levels 0-1 they fold into the existing test, logging and release tasks, tagged with their 7A item (scored as met).
+- `[CRITICAL]` Tasks for the golden set, the eval harness and gate, and red-team cases
+- `[REQUIRED]` Tasks for telemetry and traces
+- `[REQUIRED]` Tasks for rollout stages and the kill switch
+- `[REQUIRED]` Task for the permission policy + guardrails (9.2/9.3)
+- `[REQUIRED]` Task for data access, redaction, retention (7A.3)
+- `[CRITICAL]` Definition of Done for agentic stories includes "Targeted + regression evals at threshold for the slices it touches" (the eval release gate is checked in Phase 5)
+
 ## Expected Files
 
 - `docs/implementation-plan/*.md` (required)
@@ -376,6 +424,7 @@ For each checklist item:
 - No QA criteria files
 - Missing consolidated spec
 - Unresolved contradictions
+- No targeted + regression evals in the Definition of Done
 
 ---
 
@@ -421,6 +470,12 @@ For each checklist item:
 - `[REQUIRED]` Commits reference task IDs
 - `[REQUIRED]` PR links to plan
 
+### Agentic Layer (scaled to the §1.5 level; never "N/A")
+- `[CRITICAL]` Eval-first: eval cases written before the prompt or agent change. Evidence required: the RED run report on the previous version, or commit order showing the evals committed before the prompt/agent change. No evidence = FAIL
+- `[REQUIRED]` Traces on by default
+- `[REQUIRED]` Prompts and tools versioned
+- `[CRITICAL]` Regression eval (dev/targeted suite + never-do checks) runs on every change and passes; developers never tune on QA's held-out split
+
 ## Expected Artifacts
 
 - Source code
@@ -434,6 +489,7 @@ For each checklist item:
 - Secrets in code
 - Build errors
 - `must_not` violations
+- Prompt or agent changed without an eval, or regression eval failing
 
 ---
 
@@ -480,6 +536,16 @@ For each checklist item:
 - `[CRITICAL]` Feature flag configured (if using)
 - `[REQUIRED]` Database migrations ready (if needed)
 
+### Agentic Layer (scaled to the §1.5 level; never "N/A")
+Phase 5 exit: the eval release gate passed, shadow stage live, kill switch tested, and the stage criteria agreed. Each later promotion (human approval → autonomous) is a recorded decision by the 7A.8 owner, outside the phase gate: do not require autonomy for this gate.
+- `[CRITICAL]` Eval release gate passed on the held-out split: golden set ≥ the PRD's threshold; red-team 0 critical/high failures plus an overall pass rate ≥ the PRD's target; never-do enforced in code and verified at 100%
+- `[REQUIRED]` LLM judge (when used): Cohen's kappa (or Krippendorff's alpha) ≥ 0.7 against adjudicated human labels on ≥ 50 stratified cases, including failures
+- `[CRITICAL]` Shadow stage live (at level 4, with stubbed write tools); entry and exit criteria agreed for shadow → human approval → autonomous
+- `[CRITICAL]` Kill switch tested, including that the human queue can absorb 100% of the volume (or a throttle); owner on call
+- `[REQUIRED]` Human approval stage plans a blind audit of a sample of approved items
+- `[REQUIRED]` Monitoring: quality drift, cost per successful task, escalation rate, escalation response time against the 7A.1 SLA, guardrail metrics
+- `[REQUIRED]` Offline vs online evals defined, naming the online label sources and their lag
+
 ## Expected Files
 
 - Release notes
@@ -494,3 +560,4 @@ For each checklist item:
 - Blocking bugs open
 - Missing deployment docs
 - No stakeholder approval
+- Eval release gate not passed, shadow not live, or kill switch untested

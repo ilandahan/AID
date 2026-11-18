@@ -69,6 +69,22 @@ criteria:
       acceptable: "Main components designed, some gaps"
       poor: "Major components or integrations missing"
 
+  - id: agentic_architecture
+    name: "Agent Architecture (Agentic Layer)"
+    weight: 3
+    checks:
+      - "Agent architecture section present, orchestration pattern matches the §1.5 level, and every item traces to its §7A item?"
+      - "Tool contracts and a permission policy (policy as code where possible) implement 7A.2 least privilege?"
+      - "Trace schema implements 7A.7 (actor/on_behalf_of, plan, tool calls, results, escalations, cost, latency, outcome)?"
+      - "Guardrails check the lethal trifecta (private data + untrusted content + an external channel): if all three are present, one leg is removed or outbound actions need human approval?"
+      - "Eval harness design (golden set storage, runner, judge) implements 7A.6?"
+      - "Kill-switch mechanism implements 7A.8; model choice, fallbacks and cost/latency budgets defined?"
+      - "Scaled to the §1.5 level tier (0-1, 2-3, 4-5)? Never \"N/A\". At levels 0-1 a one-line cross-reference to where it is already covered (e.g. \"7A.6: covered by §4 Gherkin ACs + negative tests\") is scored as fully met"
+    scoring:
+      excellent: "Every §7A item traced to a concrete design element, scaled to the level (levels 0-1: a one-line cross-reference is fully met)"
+      acceptable: "Architecture traces most §7A items; minor gaps"
+      poor: "No agent architecture, or permission policy, trace schema, eval harness or kill switch missing"
+
 threshold: 7
 max_iterations: 3
 

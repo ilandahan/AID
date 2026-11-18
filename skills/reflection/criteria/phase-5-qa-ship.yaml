@@ -99,6 +99,24 @@ criteria:
       acceptable: "Tests appear independent, not fully verified"
       poor: "Tests depend on execution order or share state"
 
+  - id: agentic_release
+    name: "Eval Release Gate & Rollout (Agentic Layer)"
+    weight: 3
+    checks:
+      - "Eval release gate passed on the held-out split: golden set >= the PRD's threshold; red-team 0 critical/high failures plus overall pass rate >= the PRD's target; never-do enforced in code and verified at 100%?"
+      - "LLM-as-judge: Cohen's kappa (or Krippendorff's alpha) >= 0.7 against adjudicated human labels on >= 50 stratified cases, including failures, when a judge is used?"
+      - "Phase 5 exit: eval release gate passed, shadow stage live, kill switch tested, stage criteria agreed (shadow -> human approval -> autonomous)? Later promotions are recorded 7A.8 owner decisions outside the gate; do not require autonomy for this gate"
+      - "Kill switch test includes that the human queue can absorb 100% of the volume (or a throttle), with an owner on call?"
+      - "At level 4, shadow mode uses stubbed write tools?"
+      - "Human approval stage plans a blind audit of a sample of approved items?"
+      - "Production monitoring for quality drift, cost per successful task, escalation rate, escalation response time against the 7A.1 SLA, and guardrail metrics?"
+      - "Offline vs online evals defined, naming the online label sources and their lag?"
+      - "Scaled to the §1.5 level tier (0-1, 2-3, 4-5)? Never \"N/A\". At levels 0-1 a one-line cross-reference to where it is already covered (e.g. \"7A.6: covered by §4 Gherkin ACs + negative tests\") is scored as fully met"
+    scoring:
+      excellent: "Eval release gate passed, shadow live, kill switch tested, stage criteria agreed, monitoring live (levels 0-1: staged release, tested rollback, monitoring, or a cross-reference to them, is fully met)"
+      acceptable: "Gate passed and shadow live; stage criteria or monitoring have minor gaps"
+      poor: "Eval release gate not passed, shadow not live, kill switch untested, or no monitoring"
+
 threshold: 7
 max_iterations: 3
 

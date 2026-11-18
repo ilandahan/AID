@@ -132,18 +132,15 @@ Act as a Data Scientist across the 6 DS phases below. You are **stack-agnostic**
 **Reference**: `references/model-card-template.md`
 **Reference**: `references/bias-audit-checklist.md`
 
+## Agentic Evaluation (AID 3.1, every project)
+
+The data scientist owns the measurement side of PRD §7A: 7A.6 metrics and judge, the 7A.7 quality metrics, an eval metric for every 7A.5 WHY, and drift. QA owns the golden set and its held-out split in `tests/evals/golden/` (the DS advises on size and slices); the dev/targeted suite is `tests/evals/dev/`. Judge: Cohen's kappa (or Krippendorff's alpha) ≥ 0.7 against adjudicated human labels on ≥ 50 stratified cases, including failures. At levels 0-1: acceptance-test metrics and classic monitoring; never "N/A".
+Timing (A9): seed cases are written in AID Phase 1; QA grows the golden set in parallel with AID Phases 2-4 (it does not block design); the data scientist calibrates the judge in AID Phase 4 (Development), when a judge is introduced. Calibration is a release-gate input, never a precondition for design.
+Detail, and the decision-rights (RACI) table copied from `skills/aid-prd/SKILL.md`: `SKILL.extended.md` → Agentic Evaluation.
+
 ## Phase Number Mapping
 
-DS phase rule files (`phase-1-eda.md` through `phase-6-production.md`) use DS numbering (1-6); `.aid/state.json` uses AID numbering (0-5). When reading state or enforcing phase gates, always translate DS → AID with this table:
-
-| DS Phase | DS Name | AID Phase | AID Name |
-|---|---|---|---|
-| 1 | EDA | 0 | Discovery |
-| 2 | Feasibility | 1 | PRD |
-| 3 | Experiment Planning | 2 | Tech Spec |
-| 4 | ML Architecture | 3 | Impl Plan |
-| 5 | Development | 4 | Development |
-| 6 | Production | 5 | QA & Ship |
+DS phase rule files (`phase-1-eda.md` … `phase-6-production.md`) use DS numbering (1-6); `.aid/state.json` uses AID numbering (0-5). Translate DS n → AID n−1: EDA → 0 Discovery, Feasibility → 1 PRD, Experiment Planning → 2 Tech Spec, ML Architecture → 3 Impl Plan, Development → 4 Development, Production → 5 QA & Ship.
 
 ## Iron Rules
 
@@ -165,13 +162,7 @@ At the start of any new project or task, ask:
 
 Adapt all code examples, library choices, and tooling recommendations to the user's answer. Never assume a stack. Never default to a specific framework unprompted.
 
-## Communication Style
-
-- Lead with business impact, support with technical evidence
-- Quantify uncertainty — confidence intervals, not point estimates
-- Distinguish correlation from causation in all analysis
-- Be explicit about model limitations and failure modes
-- When presenting options: state trade-offs, don't just list choices
+Communication style: `SKILL.extended.md` → Communication Style.
 
 ## Handoff Checklist
 
@@ -190,6 +181,7 @@ Adapt all code examples, library choices, and tooling recommendations to the use
 - [ ] Evaluation metrics defined and aligned with business KPIs
 - [ ] Evaluation slices defined
 - [ ] Train/val/test split strategy documented
+- [ ] Eval metric for every 7A.5 WHY; pass threshold set (7A.6)
 
 ### Phase 4 → 5
 - [ ] Architecture documented with rationale
@@ -203,6 +195,7 @@ Adapt all code examples, library choices, and tooling recommendations to the use
 - [ ] Experiment tracked (config, data version, artifacts)
 - [ ] Prompt test suite passing (if applicable)
 - [ ] No data leakage confirmed
+- [ ] LLM judge calibrated against human labels (if a judge is used)
 
 ### Phase 6 → Production
 - [ ] Monitoring and alerting configured (all 4 signal categories)
@@ -210,6 +203,7 @@ Adapt all code examples, library choices, and tooling recommendations to the use
 - [ ] Bias audit complete and approved
 - [ ] Rollback procedure tested
 - [ ] Deploy-time metrics recorded as baseline
+- [ ] Drift monitoring on quality, cost, escalation rate and guardrail metrics
 
 ## Anti-Patterns
 
@@ -224,6 +218,8 @@ Adapt all code examples, library choices, and tooling recommendations to the use
 | One-shot evaluation | Hidden failure modes | Evaluate on slices, edge cases, adversarial |
 | Ignoring class imbalance | Misleading accuracy | Use F1/AUC-ROC, check confusion matrix |
 | Prompt-and-pray | Unreliable LLM outputs | Version, test, and review prompts like code |
+| Uncalibrated LLM judge | Scores no one can trust | Calibrate against human labels before it gates release |
+| Tuning on the golden set | Eval overfits, gate means nothing | Gate on QA's held-out split |
 
 ## References
 

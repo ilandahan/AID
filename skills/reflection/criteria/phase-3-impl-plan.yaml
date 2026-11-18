@@ -216,6 +216,23 @@ criteria:
       acceptable: "Basic documentation tasks"
       poor: "Documentation not planned"
 
+  - id: agentic_tasks
+    name: "Agentic Tasks & Evals in DoD (Agentic Layer)"
+    weight: 3
+    sub_phase: "3b"
+    checks:
+      - "Breakdown includes tasks for the golden set, the eval harness and gate, and red-team cases?"
+      - "Breakdown includes telemetry and traces tasks?"
+      - "Breakdown includes rollout stages and kill switch tasks?"
+      - "Breakdown includes permission policy + guardrails (9.2/9.3) and data access, redaction, retention (7A.3) tasks?"
+      - "3a: the §1.5 level and §7A carried into the consolidated spec?"
+      - "Definition of Done for agentic stories includes 'Targeted + regression evals at threshold for the slices it touches'? (The eval release gate is a Phase 5 check, not a Phase 3 DoD item)"
+      - "Scaled to the §1.5 level tier (0-1, 2-3, 4-5)? Never \"N/A\". At levels 0-1 a one-line cross-reference to where it is already covered (e.g. \"7A.6: covered by §4 Gherkin ACs + negative tests\") is scored as fully met"
+    scoring:
+      excellent: "All 8 agentic tasks planned and targeted + regression evals in DoD, scaled to the level (levels 0-1: folded into existing test, logging and release tasks, tagged with their 7A item, is fully met)"
+      acceptable: "Most agentic tasks present; minor gaps"
+      poor: "Eval, red-team, telemetry or rollout tasks missing, or no targeted + regression evals in DoD"
+
 # Thresholds by sub-phase
 thresholds:
   "3a": 7

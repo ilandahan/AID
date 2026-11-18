@@ -70,7 +70,7 @@ Enforces AID phase gates with mandatory quality feedback collection. Claude MUST
 ```markdown
 **SUB-AGENT TASK: PRD Review**
 
-Review the PRD document at: [docs/prd/YYYY-MM-DD-feature.md]
+Review the PRD document at: [docs/prd/PRD-<feature>.md]
 
 **Checklist - ALL must pass:**
 1. [ ] Problem statement is clear and specific
@@ -81,9 +81,14 @@ Review the PRD document at: [docs/prd/YYYY-MM-DD-feature.md]
 6. [ ] Scope boundaries are explicit (what's in/out)
 7. [ ] Stakeholders identified
 8. [ ] No implementation details (that belongs in Tech Spec)
+9. [ ] §1.5 Solution Shape present, with the line "Signed level: [n] - by [tech lead], [date], ADR link" (not PROPOSED)
+10. [ ] §7A.1-7A.8 all present and scaled to the level (never "N/A"; at levels 0-1 a one-line cross-reference is fine)
+11. [ ] WHY + shape brief exists: `docs/prd/WHY-SHAPE-BRIEF-<feature>.md`
+12. [ ] Seed evals exist: `docs/prd/SEED-EVALS-<feature>.md` (20-30 cases, or a cross-reference at levels 0-1; `INSUFFICIENT_EXAMPLES` resolved)
+13. [ ] Level ADR exists and matches §1.5: `docs/prd/ADR-SHAPE-<feature>.md`
 
 **Return Format:**
-- PASS: All 8 items checked, ready for Tech Spec
+- PASS: All 13 items checked, ready for Tech Spec
 - PARTIAL: [List items that need minor fixes]
 - FAIL: [List critical missing items]
 
@@ -369,9 +374,14 @@ const PHASE_OUTPUT_FOLDERS = {
 ## Gate Check Requirements
 
 ### Phase 1 → Phase 2 Gate
-- [ ] PRD exists in `docs/prd/YYYY-MM-DD-[feature].md`
+- [ ] PRD exists in `docs/prd/PRD-<feature>.md`
 - [ ] All user stories defined
 - [ ] Acceptance criteria complete
+- [ ] §1.5 Solution Shape with "Signed level: [n] - by [tech lead], [date], ADR link"
+- [ ] §7A.1-7A.8 present and scaled to the level (never "N/A")
+- [ ] WHY + shape brief: `docs/prd/WHY-SHAPE-BRIEF-<feature>.md`
+- [ ] Seed evals: `docs/prd/SEED-EVALS-<feature>.md` (`INSUFFICIENT_EXAMPLES` resolved)
+- [ ] Level ADR: `docs/prd/ADR-SHAPE-<feature>.md`
 - [ ] **⚠️ SUB-AGENT REVIEW PASSED** (mandatory)
 - [ ] **Feedback collected** via `/aid end`
 

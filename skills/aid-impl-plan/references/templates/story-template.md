@@ -92,6 +92,7 @@ Then {error handling outcome}
 - {Item 2}
 
 ## Definition of Done
+- [ ] Targeted + regression evals at threshold for the slices it touches (PRD §7A.6 thresholds, incl. never-do and red-team checks for those slices), scaled to the §1.5 level; at levels 0-1 this is the acceptance test suite. The full eval release gate is a Phase 5 check.
 - [ ] All acceptance criteria pass
 - [ ] Unit tests written (80%+ coverage)
 - [ ] Integration tests pass

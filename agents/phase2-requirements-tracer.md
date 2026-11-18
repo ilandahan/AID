@@ -94,7 +94,7 @@ Coverage scoring uses strict definitions:
 |-------|-----------|-------------------|
 | FULLY_COVERED | Tech spec provides a clear, complete technical path for the requirement | Specific section references with content that addresses every aspect of the requirement |
 | PARTIALLY_COVERED | Tech spec addresses some aspects but leaves gaps | Section references for covered parts + explicit description of what is missing |
-| NOT_COVERED | Tech spec contains no mention or technical approach for the requirement | Confirmation that all 8 template sections were searched |
+| NOT_COVERED | Tech spec contains no mention or technical approach for the requirement | Confirmation that all 9 template sections were searched |
 
 Do NOT inflate coverage. If the tech spec vaguely mentions a topic without defining a technical approach, that is PARTIALLY_COVERED at best.
 
@@ -201,7 +201,7 @@ Follow these steps in exact order:
 
 1. **Extract atomic requirements** — Parse the PRD document and enumerate every user story (US-XXX), acceptance criterion, non-functional requirement, dependency, and success metric. Create a numbered inventory.
 
-2. **Map the tech spec structure** — Identify the tech spec's major sections and subsections. Note which template sections are present and which are missing (from the 8-section template: Overview, Architecture, API Design, Data Model, Security, Error Handling, Non-Functional Requirements, Risks & Mitigations).
+2. **Map the tech spec structure** — Identify the tech spec's major sections and subsections. Note which template sections are present and which are missing (from the 9-section template: Overview, Architecture, API Design, Data Model, Security, Error Handling, Non-Functional Requirements, Risks & Mitigations, Agent Architecture). Agent Architecture items trace to PRD §7A.1-7A.8.
 
 3. **Trace forward (PRD to Tech Spec)** — For each atomic requirement from step 1, search the tech spec for corresponding coverage. Record the section reference(s), assign a coverage score (FULLY_COVERED / PARTIALLY_COVERED / NOT_COVERED), and rate your confidence (HIGH / MEDIUM / LOW).
 

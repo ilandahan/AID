@@ -41,6 +41,8 @@ Typical sections to look for:
 15. Appendices
 ```
 
+AID 3.1 PRDs (template `aid-prd/references/prd-template-extended.md`) also always carry §1.4 Success Metrics (North Star / supporting / guardrail), §1.5 Solution Shape and §7A Agentic Design (7A.1-7A.8).
+
 ### Tech Spec (Phase 2)
 
 Typical sections to look for:
@@ -65,6 +67,8 @@ Typical sections to look for:
 17. Appendices
 ```
 
+AID 3.1 tech specs always carry Section 9 Agent Architecture (9.1-9.8; template `aid-tech-spec/references/agent-architecture.md`).
+
 ---
 
 ## Section Relationship Mapping
@@ -82,6 +86,16 @@ Typical sections to look for:
 | - | Non-Functional Requirements | Performance, Security | NFRs constrain tech choices |
 | - | Acceptance Criteria | Testing Strategy | Criteria drive test cases |
 | - | Dependencies | Third-Party Integrations | PRD deps become tech integrations |
+| Solution Shape Hypothesis | §1.5 Solution Shape | 9.1 Orchestration Pattern | Hypothesis → chosen level → pattern; carry the level and its justifications |
+| - | §1.4 Success Metrics (guardrail) | 9.4 Trace Schema, 9.7 Cost & Latency Budgets | Guardrails and cost per successful task become dashboards and limits |
+| - | 7A.1 Charter | 9.1 Orchestration Pattern, 9.2 Tool Contracts & Permission Policy | Never-do and escalation carried verbatim |
+| - | 7A.2 Tools & Permissions | 9.2 Tool Contracts & Permission Policy | Every tool and risk tag carried |
+| - | 7A.3 Context & Data | 9.2 Tool Contracts & Permission Policy | Data scopes, retention, model-provider data handling carried |
+| - | 7A.4 Failure Modes & Guardrails | 9.3 Guardrails, 9.6 Model Choice & Fallbacks | Red lines, injection exposure, lethal trifecta carried |
+| - | 7A.5 Why-Chain | 9.5 Eval Harness | Every WHY keeps its requirement, eval and metric |
+| - | 7A.6 Eval Plan | 9.5 Eval Harness | Golden set, thresholds, judge calibration carried |
+| - | 7A.7 Telemetry & Traces | 9.4 Trace Schema | Trace fields and dashboards carried |
+| - | 7A.8 Rollout & Kill Switch | 9.8 Kill Switch | Stages (shadow → human approval → autonomous), criteria, kill switch, on-call owner carried |
 
 ---
 
@@ -206,6 +220,9 @@ These section pairs often contain contradictions:
 | Scope (In) | System Components | Missing components |
 | Scope (Out) | System Components | Extra components built |
 | Timeline | Deployment Strategy | Unrealistic deployment |
+| §1.5 Solution Shape level | 9.1 Orchestration Pattern | Different level (e.g. PRD level 3, spec builds a level 4 agent); log it, the tech lead decides |
+| 7A.1 never-do, 7A.2 tools | 9.2 Permission Policy | A never-do action reachable through a granted tool |
+| 7A.8 Rollout & Kill Switch | 9.8 Kill Switch | Degrade-to path missing or human queue cannot absorb the volume |
 
 ### Contradiction Check Template
 
@@ -252,12 +269,15 @@ Verify each source section is represented:
 - [ ] Problem Statement → Consolidated Section [X]
 - [ ] User Stories → Consolidated Section [X]
 - [ ] Acceptance Criteria → Consolidated Section [X]
+- [ ] §1.5 Solution Shape (level + justifications) → Consolidated Section [X]
+- [ ] §7A.1-7A.8 Agentic Design (each subsection) → Consolidated Section [X]
 ...
 
 ### Tech Spec
 - [ ] Architecture → Consolidated Section [X]
 - [ ] Data Models → Consolidated Section [X]
 - [ ] API Contracts → Consolidated Section [X]
+- [ ] Section 9 Agent Architecture (9.1-9.8) → Consolidated Section [X]
 ...
 
 All sections accounted for: [Yes/No]

@@ -66,6 +66,19 @@ criteria:
       acceptable: "Failures are loud overall; no new silent paths, minor context gaps"
       poor: "Adds a silent catch or default that swallows a failure relative to baseline"
 
+  - id: eval_regression
+    name: "Eval Regression (Agentic Layer)"
+    weight: 2
+    checks:
+      - "Regression eval runs on this change: dev/targeted suite green (the 7A.6 release gate runs later on QA's held-out split)?"
+      - "Never-do checks from 7A.1 still pass (enforced in code; evals verify the enforcement at 100%)?"
+      - "Traces still emitted for changed agent/LLM paths?"
+      - "Scaled to the §1.5 level tier (0-1, 2-3, 4-5)? Never \"N/A\". At levels 0-1 a one-line cross-reference to where it is already covered (e.g. \"7A.6: covered by §4 Gherkin ACs + negative tests\") is scored as fully met"
+    scoring:
+      excellent: "Regression eval green; never-do checks pass; traces intact (levels 0-1: a cross-reference to the tests is fully met)"
+      acceptable: "Eval passes with a minor drop within tolerance; traces intact"
+      poor: "Eval regression, never-do failure, or traces lost"
+
 threshold: 8.0
 max_iterations: 3
 

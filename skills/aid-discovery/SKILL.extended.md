@@ -36,6 +36,11 @@ description: AID Phase 1 - Research & PRD guidance. Use this skill when validati
 - **Format**: Quantified, measurable outcomes
 - **Quality bar**: Specific numbers or clear criteria, not vague improvements
 
+### 4. Solution Shape Hypothesis
+- **Description**: A first guess at the level on the solution-shape ladder (0 process change, 1 deterministic automation, 2 single LLM call inside a fixed flow, 3 workflow, 4 agent, 5 multi-agent)
+- **Format**: "Solution Shape Hypothesis" section of the research report (template in `SKILL.md`)
+- **Quality bar**: Based on how much cases vary and who bears an error; names the lowest level that might work. PRD §1.5 confirms or changes it
+
 ## Role-Specific Guidance
 
 ### For Product Managers
@@ -104,6 +109,7 @@ Before requesting approval to proceed:
 - What's the target state?
 - How will we know we're done?
 - What's the minimum viable outcome?
+- What must NOT get worse while we improve this (a guardrail)?
 
 ### Technical Feasibility
 - Is this technically feasible?
@@ -111,6 +117,12 @@ Before requesting approval to proceed:
 - Do we have the required skills?
 - What infrastructure is needed?
 - Are there existing solutions to leverage?
+
+### Solution Shape
+- How much does the problem vary from case to case? (Can every path be listed in advance?)
+- Who bears the cost of an error, and is it reversible?
+- Does it need judgement over unstructured input (free text, documents, images)?
+- Would a process change alone (level 0) solve most of it?
 
 ## Problem Statement Template
 
@@ -170,6 +182,7 @@ Hand off:
 - Success metrics
 - Any constraints identified
 - Initial scope boundaries
+- Solution shape hypothesis (input to PRD §1.5)
 
 ---
 

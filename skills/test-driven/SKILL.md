@@ -40,6 +40,25 @@ RED (Write failing test) -> GREEN (Make pass) -> REFACTOR (Clean up) -> REPEAT
 | GREEN | Minimal code to pass | No extra features |
 | REFACTOR | Clean up | Tests still pass |
 
+## Eval-Driven Cycle (LLM Components)
+
+The RED-GREEN-REFACTOR counterpart for prompts, tools and agents (PRD §1.5 Solution Shape levels 2-5). At levels 0-1 the classic TDD cycle above is the eval.
+
+```
+RED (failing eval) -> CHANGE (prompt/tool/agent) -> GREEN (dev suite passes) -> NO REGRESSION (never-do + dev suite) -> REPEAT
+```
+
+| Step | Action | Rule |
+|------|--------|------|
+| RED | Add new-behaviour cases to the dev/targeted suite | Must fail on the current version |
+| CHANGE | Edit the prompt, tool definition or agent; bump its version | One change at a time |
+| GREEN | Iterate on the dev/targeted suite | Passes; tune on this suite only |
+| NO REGRESSION | Re-run the dev suite and all never-do checks | Zero never-do failures |
+
+QA owns the golden set and its held-out split (`tests/evals/golden/`); developers iterate in `tests/evals/dev/` and propose additions through a QA-reviewed PR. The release gate (golden set ≥ the PRD's threshold) runs on the held-out split, which developers never tune on. Never-do is enforced in code and evals verify it at 100%. The judge is calibrated (kappa ≥ 0.7) and never grades outputs of its own prompt/model.
+
+Detail (evals vs unit tests, case format, thresholds, judge calibration): `SKILL.extended.md` → Eval-Driven Cycle.
+
 ## BDD Test Execution (Cucumber)
 
 Cucumber executes the acceptance criteria written during Phase 1 (PRD). Each `.feature` file in `features/` becomes an executable test.
@@ -143,39 +162,7 @@ describe('calculateTotal', () => {
 
 ## GUI Testing (DevTools MCP)
 
-Drive the real UI through `mcp.devtools` and assert on resulting URL/text. Full operation set (navigation, forms, visual, accessibility, performance): `references/gui-testing-mcp.md`.
-
-```typescript
-describe('Login Page', () => {
-  test('successful login redirects to dashboard', async () => {
-    await mcp.devtools.navigate('http://localhost:3000/login');
-    await mcp.devtools.type('#email', 'user@example.com');
-    await mcp.devtools.type('#password', 'SecurePass123!');
-    await mcp.devtools.click('#submit-btn');
-    await mcp.devtools.waitForNavigation();
-    expect(await mcp.devtools.getCurrentUrl()).toBe('http://localhost:3000/dashboard');
-  });
-
-  test('shows error for invalid credentials', async () => {
-    await mcp.devtools.navigate('http://localhost:3000/login');
-    await mcp.devtools.type('#password', 'wrong');
-    await mcp.devtools.click('#submit-btn');
-    await mcp.devtools.waitForSelector('.error-message');
-    expect(await mcp.devtools.getText('.error-message')).toBe('Invalid email or password');
-  });
-});
-```
-
-## Test File Organization
-
-```
-tests/
-  unit/services/, utils/, models/
-  integration/api/, repositories/
-  e2e/flows/, visual/, accessibility/
-  factories/
-  setup/database.ts, mcp.ts
-```
+Drive the real UI through `mcp.devtools` and assert on resulting URL/text. Full operation set (navigation, forms, visual, accessibility, performance): `references/gui-testing-mcp.md`. Worked example and the test file layout: `SKILL.extended.md`.
 
 ## Document-to-Test Mapping (Gherkin-First)
 
@@ -237,3 +224,6 @@ Detail and fixes: `references/anti-patterns.md`. Review gate: `references/review
 | Order-dependent tests | Flaky | Make independent |
 | Over-mocking | Miss bugs | Real integrations (<20% mocking) |
 | Weak assertions | False positives | Assert exact values |
+| Eval written after the prompt change | Proves nothing | Eval first, watch it fail |
+| Repeated runs to "prove" a never-do | A 1-in-20 breach slips through | Enforce in code; evals verify it |
+| Uncalibrated LLM judge | Scores without meaning | Calibrate against human labels |

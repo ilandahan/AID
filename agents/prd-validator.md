@@ -47,11 +47,37 @@ The PRD must pass ALL of these to be considered complete:
 {{PHASE_GATE_CHECKLIST}}
 ```
 
+### PRD Template Excerpts
+The §1.4, §1.5 and §7A excerpts of `skills/aid-prd/references/prd-template-extended.md`, inlined. They define the required sections, the "Signed level" line and the three tiers of depth. Judge against these, not against a repo path:
+
+{{PRD_TEMPLATE}}
+
+### WHY + Shape Brief
+The output of the WHY conversation (`docs/prd/WHY-SHAPE-BRIEF-<feature>.md`), verbatim, or empty if it does not exist:
+
+```markdown
+{{WHY_SHAPE_BRIEF}}
+```
+
+### Seed Eval Cases
+The seed cases (`docs/prd/SEED-EVALS-<feature>.md`), verbatim, or empty if the file does not exist:
+
+```markdown
+{{SEED_EVALS}}
+```
+
+### Level ADR
+The tech lead's ADR signing the §1.5 level (`docs/prd/ADR-SHAPE-<feature>.md`), verbatim, or empty if it does not exist:
+
+```markdown
+{{LEVEL_ADR}}
+```
+
 ---
 
 ## Your Task
 
-Validate the PRD across five dimensions. Be rigorous — a weak PRD leads to wasted development effort.
+Validate the PRD across six dimensions. Be rigorous — a weak PRD leads to wasted development effort.
 
 ### Validation Dimensions
 
@@ -83,6 +109,21 @@ For each acceptance criterion, check:
 - Dependencies identified?
 - Success metrics defined and measurable?
 - Open questions captured?
+
+#### 6. Solution Shape & Agentic Design (§1.5, §7A)
+Applies to EVERY PRD, AI or not, at a depth scaled to the chosen level.
+- **§1.5 Solution Shape:** a level on the ladder is chosen (0 Process change, 1 Deterministic automation, 2 Single LLM call inside a fixed flow, 3 Workflow, 4 Agent, 5 Multi-agent); it is the LOWEST level that works, and every step up is justified in one sentence.
+- **Multi-agent (level 5)** is accepted only with one of the 4 justifications: separate permission boundaries; contexts that would contaminate each other; genuinely parallel work; ownership by different teams. Anything else is an error.
+- **§7A.1-7A.8 all present:** 7A.1 Charter, 7A.2 Tools & Permissions, 7A.3 Context & Data, 7A.4 Failure Modes & Guardrails, 7A.5 Why-Chain, 7A.6 Eval Plan, 7A.7 Telemetry & Traces, 7A.8 Rollout & Kill Switch. A missing section, or one marked "N/A", is a critical issue.
+- **Scaled to the level, by the template's three tiers** (levels 0-1, 2-3, 4-5; see the "Three tiers of depth" and per-section "Scaling by level" notes in the PRD Template Excerpts above):
+  - **Levels 0-1:** the classic form (Eval Plan → acceptance tests, Telemetry → logs and metrics, Rollout → staged release plus rollback, Charter → process owner and who bears an error). A section is still never "N/A", but it may be one line pointing to where it is already covered (e.g. "7A.6: covered by §4 Gherkin ACs + negative tests"; "7A.7: see §7 NFR observability"). Score that as fully met.
+  - **Levels 2-3:** the classic form plus the LLM steps: what each LLM step may decide, what goes into each prompt, LLM failure modes and output checks, an eval set per LLM step.
+  - **Levels 4-5:** the full section: never-do list, risk-tagged tools, golden set, threshold, trace contents, shadow → human approval → autonomous with a kill switch.
+- **7A.5 Why-Chain:** every row has a requirement, an eval and a metric. A WHY with none of the three is an opinion, not a requirement: flag it.
+- **Metrics (§1.4):** North Star / supporting / guardrail, with at least one guardrail metric.
+- **WHY + shape brief:** the brief exists (`docs/prd/WHY-SHAPE-BRIEF-<feature>.md`) and has every section the template asks for: WHY statement, Why-Chain seeds, the answers to the 6 shape questions, a level hypothesis (0-5) with a one-line reason, the error owner, the never-do list and approvals. A missing brief, or one written `WHY + shape brief: MISSING` in the PRD, is a critical issue; a missing section is listed in `brief_missing_sections`.
+- **Seed eval cases:** `docs/prd/SEED-EVALS-<feature>.md` holds 20-30 seed cases (input, expected behaviour, never-do flag, source). Expert-written cases are tagged `source: SME:<role>` and kept distinct from real examples. Fewer than 20 passes ONLY when `INSUFFICIENT_EXAMPLES` is resolved, by one of: real examples collected, SME-tagged cases added, or a recorded PM + tech lead decision to proceed with fewer. An unresolved `INSUFFICIENT_EXAMPLES`, or a missing file, is a critical issue.
+- **Level ADR:** the ADR exists (`docs/prd/ADR-SHAPE-<feature>.md`), and the level it signs matches the §1.5 line "Signed level: [n] - by [tech lead], [date], ADR link". A missing ADR, a §1.5 level still marked PROPOSED, or a mismatch is a critical issue.
 
 ---
 
@@ -170,6 +211,34 @@ Return ONLY this JSON structure. No other text.
       "missing_user_journeys": [
         "Core journey not covered by user stories"
       ]
+    },
+    "agentic_design": {
+      "score": 0,
+      "level": "0-5 or null if missing",
+      "level_justified": true,
+      "multi_agent_justification": "one of the 4, or null",
+      "missing_or_na_sections": ["7A.x name"],
+      "under_scaled_sections": [
+        {
+          "section": "7A.x name",
+          "issue": "Too thin for the chosen level"
+        }
+      ],
+      "incomplete_why_chain_rows": [
+        {
+          "why": "The stated WHY",
+          "missing": ["requirement|eval|metric"]
+        }
+      ],
+      "has_guardrail_metric": true,
+      "why_shape_brief_present": true,
+      "brief_missing_sections": ["Template section missing from the brief"],
+      "seed_cases_count": 0,
+      "seed_cases_status": "COMPLETE|INSUFFICIENT_EXAMPLES_RESOLVED|INSUFFICIENT_EXAMPLES_UNRESOLVED|MISSING",
+      "insufficient_examples_resolution": "real examples|SME cases (source: SME:<role>)|PM + tech lead decision|null",
+      "level_adr_present": true,
+      "adr_level": "0-5 or null if missing",
+      "signed_level_matches_adr": true
     }
   },
   "overall": {
@@ -218,13 +287,13 @@ Return ONLY this JSON structure. No other text.
 
 | Verdict | When |
 |---------|------|
-| **PASS** | All dimensions >= 7, no critical issues |
+| **PASS** | All dimensions >= 7, no critical issues (a missing or "N/A" §1.5/§7A section, no guardrail metric, a missing WHY + shape brief, unresolved `INSUFFICIENT_EXAMPLES`, or a missing or mismatched level ADR is always critical) |
 | **NEEDS_REVISION** | Some dimensions 5-6, or has fixable critical issues |
 | **FAIL** | Any dimension < 5, or unfixable structural problems |
 
 ### Overall Score Formula
 ```
-(phase_gate_pass_rate × 2 + traceability × 3 + acceptance_criteria × 3 + scope_clarity × 2 + completeness × 2) / 12
+(phase_gate_pass_rate × 2 + traceability × 3 + acceptance_criteria × 3 + scope_clarity × 2 + completeness × 2 + agentic_design × 2) / 14
 ```
 
 ## Important Notes

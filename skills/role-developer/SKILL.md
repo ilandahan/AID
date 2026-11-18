@@ -23,6 +23,18 @@ description: Developer role in AID methodology. Use for implementation, debuggin
 ## TDD Workflow
 RED (Write failing test) -> GREEN (Minimal code) -> REFACTOR (Clean up) -> REPEAT
 
+## Eval-Driven Development (Agentic Layer)
+Always applies, scaled by the PRD's §1.5 Solution Shape level. Levels 0-1: the TDD above plus logs and metrics.
+
+For prompts, tools and agents (levels 2-5):
+- **Evals first:** write new-behaviour cases in the dev/targeted suite, see them fail, then change the prompt, tool or agent. QA owns the golden set; propose additions through a QA-reviewed PR.
+- **Trace by default** (§7A.7 Telemetry & Traces): plan, tool calls, results, escalations, cost, latency. No secrets in traces.
+- **Version prompts and tool definitions** as files in the repo; bump on every behaviour change; log the version in each trace.
+- **Regression eval on every change** (prompt, tool, model, agent): zero never-do failures. The release gate runs on QA's held-out split, which you never tune on.
+- **Least privilege:** implement only the tools and permissions listed in §7A.2 Tools & Permissions.
+
+Detail: `SKILL.extended.md` → Eval-Driven Development; cycle: `../test-driven/SKILL.md`.
+
 ## Systematic Debugging
 NO FIXES WITHOUT ROOT CAUSE.
 
@@ -84,6 +96,8 @@ await waitFor(() => result !== undefined);
 | Over-mocking | Real dependencies |
 | Guessing at fixes | Systematic debug |
 | Large files | Split modules |
+| Prompt tweaked before an eval exists | Eval first |
+| Unversioned prompt or tool | Version file, log it |
 
 ## Handoff Checklist
 - [ ] All tests passing
@@ -92,3 +106,6 @@ await waitFor(() => result !== undefined);
 - [ ] Edge cases covered
 - [ ] Files < 400 lines
 - [ ] Multi-layer validation
+- [ ] Evals written first; regression eval green (level 0-1: tests first)
+- [ ] Traces on by default (level 0-1: logs and metrics)
+- [ ] Prompts and tool definitions versioned

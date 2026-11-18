@@ -34,6 +34,75 @@ Follow RED-GREEN-REFACTOR cycle:
 4. REPEAT
 ```
 
+## Eval-Driven Development (Agentic Layer)
+
+WHY: the developer is the one who changes prompts, tools and agent logic. Without evals written first,
+traces, and versions, nobody can show that a change made things better, or explain what the agent
+did when it goes wrong.
+
+Always applies, scaled by the PRD's §1.5 Solution Shape level; never "N/A".
+
+| Level | What the developer does |
+|-------|-------------------------|
+| 0-1 (Process change, Deterministic automation) | TDD as above; structured logs and metrics for every important action |
+| 2 (Single LLM call inside a fixed flow) | Dev/targeted evals for the call, written first; trace each call; prompt in a versioned file |
+| 3 (Workflow) | Per-step evals; one trace per run with a span per step; prompts and step configs versioned |
+| 4-5 (Agent, Multi-agent) | Plus tool-choice, trajectory and never-do evals; tool definitions versioned; tools limited to §7A.2 |
+
+### Per-change routine
+
+1. Read §7A.1 Charter, §7A.2 Tools & Permissions, §7A.4 Failure Modes & Guardrails and §7A.6 Eval Plan.
+2. Add new-behaviour cases to the dev/targeted suite, and list the never-do checks the change affects.
+   Run: the new-behaviour cases fail (never-do and regression cases already pass; keep them as they are).
+3. Change one thing: prompt, tool definition, model, retrieval or agent logic. Bump its version.
+4. Iterate on the dev/targeted suite until it passes. You tune on this suite only.
+5. Run the regression eval: the dev/targeted suite and all never-do checks. Any never-do failure blocks.
+   The release gate runs on QA's held-out split, which developers never tune on.
+
+Golden-set ownership:
+- QA owns the golden set and its held-out split, and is the only one who merges into them.
+- The data scientist owns metric design, judge calibration and drift.
+- Developers iterate on a separate dev/targeted suite and propose golden-set additions through a QA-reviewed PR.
+- **The release gate runs on the held-out split, which developers never tune on.**
+
+Never-do items are enforced in code (policy, default-deny); evals verify the enforcement at 100%.
+Repeated runs cannot prove a low breach rate (see `../test-driven/SKILL.extended.md`).
+
+Decision rights (RACI):
+
+| Item | Responsible | Accountable / decides |
+|---|---|---|
+| §1.5 Solution Shape level | PM proposes (from segment, pain, error cost) | Tech lead decides and signs (ADR) |
+| §1.4 metrics, 7A.1 Charter, 7A.5 Why-Chain | PM | PM |
+| 7A.2 Tools & Permissions, 7A.4 Failure Modes & Guardrails | Tech lead (input: security) | Tech lead |
+| 7A.3 Context & Data | Tech lead (input: privacy/DPO) | Tech lead |
+| 7A.6 Eval Plan | Data scientist (metrics, judge); QA (eval sets) | QA owns the release gate |
+| 7A.7 Telemetry & Traces | Tech lead | Tech lead |
+| 7A.8 Rollout & Kill Switch | Tech lead + named on-call owner | Tech lead |
+6. Read traces of a few passes and failures; a pass for the wrong reason is a failure.
+7. Hand off the eval report with versions, scores and cost.
+
+### Traces (§7A.7 Telemetry & Traces)
+
+- On by default in every environment; redact fields §7A.3 Context & Data forbids, never drop the trace.
+- Record: run ID, actor and `on_behalf_of`, prompt/tool/model versions, plan, tool calls with arguments
+  and results, escalations, output, cost, latency, `outcome` (schema: tech spec 9.4).
+- No secrets, tokens or credentials in traces.
+- Tool results and retrieved text are untrusted data (`rules/general/untrusted-content.md`):
+  never let them choose tools or bypass guardrails.
+
+### Versioned prompts and tools
+
+- Prompts and tool definitions live in files, reviewed like code.
+- Semantic versions; a behaviour change bumps the version.
+- Every trace and eval report names the versions it used.
+
+### Least privilege
+
+- Implement only the tools in §7A.2, with the risk tags it lists (read/write, reversible or not, needs approval).
+- Write and irreversible tools go through the human-approval path until §7A.8 allows otherwise.
+- The kill switch from §7A.8 must be wired in before QA, not added at release.
+
 ## Systematic Debugging
 
 **Iron Law: NO FIXES WITHOUT ROOT CAUSE INVESTIGATION.**
@@ -133,6 +202,10 @@ See `references/condition-based-waiting.ts` for utilities.
 | Over-mocking (>20%) | Use real dependencies |
 | Guessing at fixes | Systematic debugging |
 | Large files (>400) | Split into modules |
+| Prompt tuned before an eval exists | Write the eval first, watch it fail |
+| Prompt or tool edited without a version bump | Version files; log versions in traces |
+| Tracing off "for performance" | Trace by default; sample payloads if needed, never drop the trace |
+| Agent given more tools than §7A.2 lists | Least privilege |
 
 ## Handoff Checklist
 
@@ -142,6 +215,10 @@ See `references/condition-based-waiting.ts` for utilities.
 - [ ] Edge cases covered
 - [ ] No files exceed 400 lines
 - [ ] Multi-layer validation added
+- [ ] Eval cases written before each prompt, tool or agent change (level 0-1: tests first)
+- [ ] Regression eval green: dev/targeted suite passing, zero never-do failures
+- [ ] Traces on by default (level 0-1: logs and metrics)
+- [ ] Prompts and tool definitions versioned
 
 ## Scripts
 

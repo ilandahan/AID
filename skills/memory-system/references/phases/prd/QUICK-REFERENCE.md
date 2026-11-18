@@ -9,7 +9,7 @@
 
 **Phase**: 1 - PRD
 **Command**: `/prd [feature-name]`
-**Output**: `docs/prd/YYYY-MM-DD-[feature-name].md`
+**Output**: `docs/prd/PRD-<feature>.md`
 
 ## Cumulative Learnings
 

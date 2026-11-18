@@ -159,7 +159,7 @@ An override does not change the recorded verdict: it means the user will decide 
 
 ### Phase 1 (PRD) Review Prompt
 ```
-Review PRD at docs/prd/[feature].md for:
+Review PRD at docs/prd/PRD-<feature>.md for:
 - Problem statement clarity
 - User stories format
 - Acceptance criteria completeness

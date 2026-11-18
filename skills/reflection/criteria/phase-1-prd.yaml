@@ -68,6 +68,24 @@ criteria:
       acceptable: "Main scenarios covered, some gaps"
       poor: "Major scenarios or personas missing"
 
+  - id: agentic_design
+    name: "Solution Shape & Agentic Design (Agentic Layer)"
+    weight: 3
+    checks:
+      - "§1.5 Solution Shape picks a ladder level (0-5) and justifies every step up in one sentence?"
+      - "Level 5 (Multi-agent) only with one of the 4 justifications (separate permission boundaries, contaminating contexts, genuinely parallel work, different owning teams)?"
+      - "§7A.1 Charter, 7A.2 Tools & Permissions, 7A.3 Context & Data, 7A.4 Failure Modes & Guardrails, 7A.5 Why-Chain, 7A.6 Eval Plan, 7A.7 Telemetry & Traces, 7A.8 Rollout & Kill Switch all present, none \"N/A\"?"
+      - "7A.5 Why-Chain complete: every WHY row has a requirement, an eval and a metric?"
+      - "§1.4 metrics have North Star / supporting / guardrail, with at least one guardrail metric?"
+      - "Scaled to the §1.5 level tier (0-1, 2-3, 4-5)? Never \"N/A\". At levels 0-1 a one-line cross-reference to where it is already covered (e.g. \"7A.6: covered by §4 Gherkin ACs + negative tests\") is scored as fully met"
+      - "WHY + shape brief present (docs/prd/WHY-SHAPE-BRIEF-<feature>.md): WHY statement, Why-Chain seeds, answers to the 6 shape questions, level hypothesis, error owner, never-do list, approvals?"
+      - "Seed eval cases present (docs/prd/SEED-EVALS-<feature>.md): 20-30 cases, or a cross-reference at levels 0-1?"
+      - "§1.5 level signed by the tech lead (ADR) after the shaping session?"
+    scoring:
+      excellent: "Justified level signed by the tech lead (ADR); WHY + shape brief and seed evals present; all eight §7A sections scaled to it; complete Why-Chain; guardrail metric defined"
+      acceptable: "All sections, the brief and the seed evals present; minor gaps in scaling or Why-Chain rows"
+      poor: "§1.5 or any §7A section missing or \"N/A\", Why-Chain incomplete, no guardrail metric, no WHY + shape brief, no seed evals, or the level not signed by the tech lead"
+
 threshold: 7
 max_iterations: 3
 

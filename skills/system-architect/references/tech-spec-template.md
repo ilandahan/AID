@@ -6,7 +6,7 @@
 - **Date:** YYYY-MM-DD
 - **Status:** Draft | In Review | Approved | Implemented
 - **Reviewers:** [List]
-- **PRD Reference:** docs/prd/YYYY-MM-DD-[feature].md
+- **PRD Reference:** docs/prd/PRD-<feature>.md
 
 ---
 

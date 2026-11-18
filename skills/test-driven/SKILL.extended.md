@@ -106,6 +106,124 @@ User Request: "Write tests for feature X"
 | **GREEN** | Write minimal code to pass | No extra features |
 | **REFACTOR** | Clean up code | Tests still pass |
 
+## Eval-Driven Cycle (LLM Components)
+
+WHY: an LLM component's output varies from run to run, so a single passing example proves little.
+An eval set with a threshold, written before the change, is the only honest RED and GREEN.
+
+Sources in the PRD: §1.5 Solution Shape (the level), §7A.1 Charter (never-do list),
+§7A.4 Failure Modes & Guardrails, §7A.6 Eval Plan (golden set, red-team cases, threshold, judge calibration).
+
+### Scaling by level (never "N/A")
+
+| Level | Eval form |
+|-------|-----------|
+| 0 Process change | Acceptance checks on the new process |
+| 1 Deterministic automation | Classic TDD and Cucumber; the acceptance tests are the eval |
+| 2 Single LLM call inside a fixed flow | Golden set for the call; deterministic code around it keeps classic TDD |
+| 3 Workflow | Per-step evals plus an end-to-end golden set |
+| 4 Agent | Plus tool-choice and trajectory evals (right tools, right order, escalates when it should) |
+| 5 Multi-agent | Plus per-agent and hand-off evals |
+
+### The cycle in detail
+
+**Who owns which set.** QA owns the golden set and its held-out split, and is the only one who
+merges into them. The data scientist owns metric design, judge calibration and drift. Developers
+iterate on a separate dev/targeted suite (`tests/evals/dev/`) and propose golden-set additions
+(`tests/evals/golden/`) through a QA-reviewed PR.
+**The release gate runs on the held-out split, which developers never tune on.**
+
+1. **RED.** Write the new-behaviour cases in the dev/targeted suite, and list every never-do check
+   the change could affect. Run them on the current version: the new-behaviour cases must fail or
+   score below threshold. Never-do and regression cases are expected to pass already; keep them as they are.
+2. **CHANGE.** Make one change: the prompt, a tool definition, the model, retrieval or agent logic.
+   Bump the version of what changed.
+3. **GREEN.** Iterate on the dev/targeted suite until it passes. Tune on this suite only.
+4. **NO REGRESSION.** Run the dev/targeted suite, the red-team set and all never-do checks.
+   The score must not drop versus the last version beyond the agreed noise margin. Any never-do
+   failure blocks. The release gate itself (golden set on the held-out split) is run by QA.
+5. **REFACTOR** (optional). Simplify the prompt or code; re-run step 4.
+
+### Eval case format
+
+```yaml
+id: summarize-no-pii
+source: dev/targeted suite        # or: red-team, never-do (7A.1), bug report #123
+why: 7A.3 "summaries must not include card numbers"
+input_file: tests/evals/dev/inputs/ticket-0412.txt
+checks:
+  - type: rule        # regex / exact / tool-called / tool-not-called
+    must_not_match: '\b\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}\b'
+  - type: judge
+    rubric: tests/evals/rubrics/summary-faithful.md
+    min_score: 4      # on a 1-5 scale
+runs: 5               # measures the quality pass rate; it proves nothing about a rare breach
+enforced_in: output PII filter (code)   # the never-do part is enforced in code; this verifies it
+```
+
+Prefer the cheapest checker that works: rule or schema first, LLM-as-judge only for qualities a rule
+cannot check (faithfulness, tone, helpfulness).
+
+### Non-determinism
+
+- Repeat quality cases (start with 5 runs; more for borderline cases). Report the pass rate, not one result.
+- Fix what you can: temperature, seed where supported, recorded tool responses (fixtures) for
+  tool-using components, so a failure points at the model's behaviour, not a changing backend.
+- **Repeated runs cannot prove a low breach rate.** `runs: 5` with 5/5 passing cannot catch a
+  1-in-20 breach (it passes about 77% of the time). Never-do items are enforced in code (policy,
+  default-deny), and evals verify the enforcement at 100%.
+- A never-do item that can only be enforced by the model needs n ≈ ln(0.05)/ln(1−p) clean runs
+  to show a breach rate below p at 95% confidence (about 59 for 5%, about 299 for 1%). If that is
+  too many, move the item into code or into human approval.
+- When the golden set is small (under ~100 cases), treat a score change of a few points as noise;
+  report a confidence interval or re-run before calling it a regression.
+
+### Thresholds
+
+- The threshold comes from §7A.6 Eval Plan. Do not invent one in Phase 4.
+- **Never-do:** enforced in code (policy, default-deny); evals verify the enforcement at 100%.
+  Repeated runs cannot prove a low breach rate: proving a rate below p at 95% confidence takes
+  n ≈ ln(0.05)/ln(1−p) clean runs (about 59 for 5%).
+- **Red-team:** 0 critical/high failures, plus an overall pass rate ≥ the PRD's target.
+- **Golden set:** ≥ the PRD's threshold, on the held-out split.
+- **LLM judge:** Cohen's kappa (or Krippendorff's alpha) ≥ 0.7 against adjudicated human labels on
+  ≥ 50 stratified cases, including failures. Percent agreement is reported alongside, never alone.
+- A change may not lower the score versus the last released version beyond the noise margin,
+  even if it is still above the threshold.
+
+### LLM-as-judge calibration
+
+The data scientist owns judge calibration.
+
+1. Take ≥ 50 stratified real outputs, including failures, with adjudicated human labels on the same rubric.
+2. Run the judge on the same sample.
+3. Measure Cohen's kappa (or Krippendorff's alpha): ≥ 0.7. Percent agreement is reported alongside, never alone.
+4. Read the disagreements. Fix the rubric or the judge prompt, then re-measure on a fresh sample.
+5. Re-calibrate when the judge model, judge prompt or rubric changes, and periodically on production samples.
+6. The judge never grades outputs of its own prompt/model, and the rubric is not visible to the system under test.
+
+### Evals vs unit tests
+
+| Aspect | Unit test | Eval |
+|--------|-----------|------|
+| Determinism | Same input, same output | Output varies; repeat quality runs |
+| Pass rule | All assertions pass | Pass rate at or above threshold; never-do enforced in code, verified at 100% |
+| Checker | Code assertion | Rule, schema, or calibrated LLM judge |
+| Judge trust | n/a | Calibrate against human labels before trusting it, and again when the judge changes |
+| Speed and cost | Milliseconds, free | Seconds, costs tokens: track eval cost |
+| On failure | Code bug | Code bug, bad case, or judge error: read the trace |
+| Data | Factories | Dev/targeted suite; QA's golden set and held-out split; red-team and injection cases |
+
+### Checklist
+
+- [ ] Eval cases written and failing before the change
+- [ ] Every case cites its source (dev/targeted suite, red-team, §7A.1 never-do, bug)
+- [ ] Never-do items enforced in code; evals verify the enforcement at 100%
+- [ ] Threshold taken from §7A.6
+- [ ] Judge calibrated (kappa ≥ 0.7 on ≥ 50 stratified adjudicated cases), if a judge is used
+- [ ] Dev/targeted suite and never-do checks re-run: no regression; release gate on the held-out split
+- [ ] Prompt, tool and model versions recorded in the eval report
+
 ## Part 1: Backend & API Testing
 
 ### API Contract Testing (from Tech Spec)

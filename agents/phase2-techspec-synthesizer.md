@@ -53,7 +53,7 @@ You have NO knowledge of the conversation that led to this request. You work ONL
 ## Your Task
 
 Produce TWO deliverables:
-1. A comprehensive **Technical Specification** (8 sections) that integrates all specialist outputs
+1. A comprehensive **Technical Specification** (9 sections, including 9. Agent Architecture traced to PRD §7A and scaled by the §1.5 level) that integrates all specialist outputs
 2. An **Architecture Diagram** in Mermaid that visualizes the system
 
 ### Technical Specification Sections
@@ -106,7 +106,7 @@ Return ONLY this JSON structure. No other text.
 
 ```json
 {
-  "report": "## Technical Specification\n\n[Full 8-section technical specification with all traceability IDs, cross-references to specialist outputs, and integration insights]\n\n### 1. Executive Summary\n[Problem, solution, key decisions, tech stack]\n\n### 2. System Architecture\n[Architecture pattern, components, communication]\n\n### 3. Data Architecture\n[Integrated from [DM-XXX], plus cross-cutting concerns]\n\n### 4. API Architecture\n[Integrated from [API-XXX], plus cross-cutting concerns]\n\n### 5. Security Architecture\n[Integrated from [SD-XXX], plus cross-cutting concerns]\n\n### 6. Non-Functional Requirements\n[Integrated from [NFR-XXX], plus cross-cutting concerns]\n\n### 7. Error Handling & Resilience\n[Integrated from [EH-XXX], plus cross-cutting concerns]\n\n### 8. Implementation Roadmap\n[Sprint-level ordering based on dependencies]",
+  "report": "## Technical Specification\n\n[Full 9-section technical specification with all traceability IDs, cross-references to specialist outputs, and integration insights]\n\n### 1. Executive Summary\n[Problem, solution, key decisions, tech stack]\n\n### 2. System Architecture\n[Architecture pattern, components, communication]\n\n### 3. Data Architecture\n[Integrated from [DM-XXX], plus cross-cutting concerns]\n\n### 4. API Architecture\n[Integrated from [API-XXX], plus cross-cutting concerns]\n\n### 5. Security Architecture\n[Integrated from [SD-XXX], plus cross-cutting concerns]\n\n### 6. Non-Functional Requirements\n[Integrated from [NFR-XXX], plus cross-cutting concerns]\n\n### 7. Error Handling & Resilience\n[Integrated from [EH-XXX], plus cross-cutting concerns]\n\n### 8. Implementation Roadmap\n[Sprint-level ordering based on dependencies]\n\n### 9. Agent Architecture\n[Orchestration pattern for the PRD §1.5 level, tool permission policy, guardrails, trace schema, eval harness, model fallbacks, cost/latency budgets, kill switch, each traced to its PRD §7A item; classic forms at levels 0-1]",
   "architectureDiagram": "```mermaid\nflowchart TD\n  subgraph Client\n    A[Web App]\n  end\n  subgraph API Layer\n    B[API Gateway]\n  end\n  subgraph Services\n    C[Service A]\n    D[Service B]\n  end\n  subgraph Data\n    E[(Database)]\n    F[(Cache)]\n  end\n  A --> B\n  B --> C\n  B --> D\n  C --> E\n  D --> F\n```",
   "meta": {
     "total_findings": 0,

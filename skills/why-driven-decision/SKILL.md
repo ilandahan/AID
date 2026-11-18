@@ -72,6 +72,33 @@ Can't answer in 3 seconds -> STOP and clarify.
   ROOT: Reduce overwhelm, create clarity
 ```
 
+## Why-Chain Rule
+
+Every stated WHY becomes three things (PRD §7A.5 Why-Chain, template in `aid-prd/references/prd-template-extended.md`):
+
+| WHY | Requirement | Eval | Metric |
+|---|---|---|---|
+| The stated reason | What we build because of it | The test or eval case that proves it | The production metric that tracks it |
+
+**A WHY that yields none of the three is an opinion, not a requirement.** Turn it into a requirement + eval + metric, or move it to open questions.
+
+## Agentic Lens (Phase 1 entry, ALWAYS)
+
+After the WHY / 5 Whys, the conversation ALWAYS asks the 6 shape questions (PRD §1.5, verbatim):
+
+1. Can every path be enumerated in advance?
+2. How much does the problem vary from case to case?
+3. What does an error cost, and is it reversible?
+4. Does it need judgement over unstructured input?
+5. What latency and cost budget is there?
+6. Who must approve actions?
+
+Then three more (who approves actions is Q6): on whose behalf does the solution act? Who bears the cost of an error? What must never happen?
+
+**Output: the "WHY + shape brief"**, saved as `docs/prd/WHY-SHAPE-BRIEF-<feature>.md` (template in `SKILL.extended.md`): WHY statement, Why-Chain seeds, the answers to the 6 questions, a level HYPOTHESIS (0-5) with a one-line reason (starting from the Phase 0 solution-shape hypothesis in the research report; any change from it is recorded with a reason), the error owner, never-do list and approvals. It is the shared input of every Phase 1 agent (`/prd`).
+
+The level is a **hypothesis**, not a decision: the PM and the tech lead decide it later in the shaping session, and the tech lead signs it as an ADR (A1).
+
 ## Phase-Specific WHY Questions
 
 | Phase | Core Question |
@@ -123,3 +150,5 @@ def test_retry_on_network_timeout(self):
 - [ ] Does every function explain purpose?
 - [ ] Does every test explain what failure it prevents?
 - [ ] Can someone trace back to WHY?
+- [ ] Does every WHY yield a requirement, an eval and a metric (Why-Chain)?
+- [ ] Phase 1: were the 6 shape questions and the 4 agentic questions asked, and is the WHY + shape brief saved?

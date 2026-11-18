@@ -20,7 +20,7 @@
 
 | Document | Path | Date |
 |----------|------|------|
-| PRD | `docs/prd/YYYY-MM-DD-[feature].md` | [Date] |
+| PRD | `docs/prd/PRD-<feature>.md` | [Date] |
 | Tech Spec | `docs/tech-spec/YYYY-MM-DD-[feature].md` | [Date] |
 | Research | `docs/research/[feature]-research.md` | [Date or N/A] |
 

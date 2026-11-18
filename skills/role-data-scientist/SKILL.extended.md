@@ -254,6 +254,81 @@ MONITORING_CONFIG = {
 }
 ```
 
+## Agentic Evaluation (AID 3.1)
+
+Applies to every project, scaled by the PRD §1.5 Solution Shape level. The data scientist owns
+eval metric design, LLM-as-judge calibration and drift monitoring for PRD 7A.6 Eval Plan and
+7A.7 Telemetry & Traces. At levels 0-1 the same work is acceptance-test metrics and classic logs
+and metrics.
+
+Golden-set ownership:
+- QA owns the golden set and its held-out split (`tests/evals/golden/`), and is the only one who merges into them.
+- The data scientist owns metric design, judge calibration and drift.
+- Developers iterate on a separate dev/targeted suite (`tests/evals/dev/`) and propose golden-set additions through a QA-reviewed PR.
+- **The release gate runs on the held-out split, which developers never tune on.**
+
+Timing (A9, no relay; AID phase numbers):
+- The 20-30 seed eval cases are written in Phase 1 (`docs/prd/SEED-EVALS-<feature>.md`); the data scientist may advise on their slices.
+- QA grows the golden set and its held-out split IN PARALLEL with Phases 2-4. It does not block the tech spec or any design work.
+- The golden set must be complete only for the Phase 5 release gate.
+- The data scientist calibrates the LLM judge in Phase 4 (Development), when a judge is introduced. Judge calibration is never a precondition for design.
+
+Decision rights (RACI):
+
+| Item | Responsible | Accountable / decides |
+|---|---|---|
+| §1.5 Solution Shape level | PM proposes (from segment, pain, error cost) | Tech lead decides and signs (ADR) |
+| §1.4 metrics, 7A.1 Charter, 7A.5 Why-Chain | PM | PM |
+| 7A.2 Tools & Permissions, 7A.4 Failure Modes & Guardrails | Tech lead (input: security) | Tech lead |
+| 7A.3 Context & Data | Tech lead (input: privacy/DPO) | Tech lead |
+| 7A.6 Eval Plan | Data scientist (metrics, judge); QA (eval sets) | QA owns the release gate |
+| 7A.7 Telemetry & Traces | Tech lead | Tech lead |
+| 7A.8 Rollout & Kill Switch | Tech lead + named on-call owner | Tech lead |
+
+### 1. Eval Metric Design
+| Metric type | Example | Use when |
+|-------------|---------|----------|
+| Deterministic check | Output matches schema; correct tool called with valid args | Always first: cheap and exact |
+| Task success | Case resolved correctly vs. expected outcome | Every level 2-5 project |
+| Groundedness / faithfulness | Claims supported by retrieved context | RAG or document input |
+| Escalation correctness | Escalated when 7A.1 says it must; did not when it need not | Any human hand-off |
+| Never-do violations | Count of 7A.1 never-do actions attempted | Always; enforced in code, evals verify the enforcement at 100% |
+| Guardrail metric | Wrong-action rate, cost per case, complaint rate | Every metric set needs at least one |
+
+Checklist:
+- [ ] Every 7A.5 WHY maps to an eval metric and a production metric
+- [ ] Each metric has a threshold; the 7A.6 pass threshold is the release gate, run by QA on the held-out split
+- [ ] Never-do rates: repeated runs cannot prove a low breach rate: proving a rate below p at 95% confidence takes n ≈ ln(0.05)/ln(1−p) clean runs (about 59 for 5%)
+- [ ] Results reported per slice, with confidence intervals for small sets
+
+### 2. LLM-as-Judge Calibration
+When: AID Phase 4 (Development), when a judge is introduced; it must pass before the judge gates the Phase 5 release.
+1. Write a rubric with anchored score levels and examples.
+2. Have two people label ≥ 50 stratified cases, including failures, and adjudicate their disagreements; measure their agreement first.
+3. Run the judge on the same cases. Cohen's kappa (or Krippendorff's alpha) ≥ 0.7 against adjudicated
+   human labels on ≥ 50 stratified cases, including failures. Percent agreement is reported alongside, never alone.
+4. Accept the judge only at or above that bar; otherwise fix the rubric or the judge. The judge never
+   grades the outputs of its own prompt or model, and the rubric is not visible to the system under test.
+5. Version the judge model, prompt and rubric; re-calibrate on any change.
+6. In production, spot-check a sample of judged traces against human review each month.
+
+### 3. Golden Set: the Data Scientist's Input (QA owns it)
+QA curates the golden set and its held-out split and is the only one who merges into them. The
+data scientist advises QA on:
+- [ ] Size and stratification, so per-slice scores have usable confidence intervals
+- [ ] Slice tags that match the metric design
+- [ ] Which reviewed production failures and drift findings should be proposed to QA as new cases
+
+### 4. Drift Monitoring
+| Signal | Source | Example alert |
+|--------|--------|---------------|
+| Quality drift | Judge or human scores on sampled traces vs. deploy baseline | Drop > 5 points over 7 days |
+| Input drift | Embedding or category distribution of inputs | New cluster > 10% of traffic |
+| Judge drift | Monthly judge-vs-human agreement | Kappa below 0.7 |
+| Cost | Trace cost per successful task | Above the budget in §1.5 Q5 / Section 9.7 |
+| Escalation rate | Trace escalations | Outside the expected band |
+| Guardrail metrics | Guardrail hits, never-do attempts | Any never-do attempt |
+
 ## Model Card Template
 
 ```markdown
@@ -391,6 +466,8 @@ MONITORING_CONFIG = {
 - [ ] Model card filled out (purpose, limitations, metrics)
 - [ ] Rollback procedures tested
 - [ ] Prompt test suite passing
+- [ ] Eval gate passed; LLM judge calibrated against human labels (if used)
+- [ ] Drift monitoring on quality, cost, escalation rate and guardrail metrics
 
 ### Governance
 - [ ] Data retention and access policies documented

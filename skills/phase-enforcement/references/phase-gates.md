@@ -39,11 +39,16 @@ Detailed requirements for each phase gate in the AID methodology.
 
 | Requirement | Location | Validation |
 |-------------|----------|------------|
-| PRD Document | `docs/prd/YYYY-MM-DD-[feature].md` | File exists |
+| PRD Document | `docs/prd/PRD-<feature>.md` | File exists |
 | Problem Statement | PRD Section 1 | Not empty |
 | User Stories | PRD Section 2 | At least 1 story |
 | Acceptance Criteria | PRD Section 3 | Each story has criteria |
 | Non-Functional Requirements | PRD Section 4 | Defined |
+| Solution Shape | PRD §1.5 | "Signed level: [n] - by [tech lead], [date], ADR link" present (not PROPOSED) |
+| Agentic Design | PRD §7A.1-7A.8 | All eight present, scaled to the level, never "N/A" |
+| WHY + shape brief | `docs/prd/WHY-SHAPE-BRIEF-<feature>.md` | File exists |
+| Seed evals | `docs/prd/SEED-EVALS-<feature>.md` | 20-30 cases (or a cross-reference at levels 0-1); `INSUFFICIENT_EXAMPLES` resolved |
+| Level ADR | `docs/prd/ADR-SHAPE-<feature>.md` | File exists; level matches §1.5 |
 | **Feedback Collected** | `~/.aid/feedback/pending/` | `/aid end` completed |
 
 ### Gate Check Script
@@ -69,7 +74,7 @@ Cannot proceed to Phase 2 (Tech Spec) until:
 
 □ PRD document created
   → Run: /prd [feature-name]
-  → Save to: docs/prd/YYYY-MM-DD-[feature].md
+  → Save to: docs/prd/PRD-<feature>.md
 
 □ Feedback collected
   → Run: /aid end

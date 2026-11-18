@@ -720,6 +720,13 @@ Priority order for assumption testing:
 ### Recommended Direction
 [Which opportunity to pursue and why]
 
+### Solution Shape Hypothesis
+A first guess on the solution-shape ladder (0 process change, 1 deterministic automation, 2 single LLM call inside a fixed flow, 3 workflow, 4 agent, 5 multi-agent; defined in `aid-prd/references/prd-template-extended.md` §1.5). The PRD confirms or changes it.
+- How much the problem varies from case to case: [Low/Medium/High + evidence ID]
+- Who bears the cost of an error, and is it reversible: [Who, how much, reversible?]
+- Hypothesis: level [0-5], because [one sentence]. Lowest level that might work: [level].
+- Evidence still needed to confirm it: [list]
+
 ## 5. Strategic Positioning
 
 ### Value Proposition

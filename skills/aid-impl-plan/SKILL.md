@@ -50,6 +50,7 @@ Before Phase 4:
 - [ ] Every PRD user story → Story in Jira
 - [ ] Every Tech Spec component → Tasks
 - [ ] Every Task has all required fields
+- [ ] Every §7A item → at least one task (agentic tasks present)
 - [ ] Coverage < 100%? Find gaps → Add items → Re-verify
 
 ## Phase 3a: Contradiction Resolution & Consolidation
@@ -82,6 +83,9 @@ Resolution Template:
 **Authority Used:** [Research/PRD/Tech Spec]
 **Rationale:** [Why]
 ```
+
+Agentic carry (always): the consolidated spec carries PRD §1.5, §7A.1-7A.8 and tech spec Section 9 (mapping: `references/section-mapping-guide.md`). A level that differs between PRD §1.5 and Section 9.1 is a contradiction; the tech lead decides.
+- [ ] §1.5 level and §7A carried; level contradictions logged
 
 **Phase 3a Checkpoint:** User approval required before proceeding to 3b.
 
@@ -120,6 +124,16 @@ Risk Template:
 - **Mitigation:** [Strategy]
 - **Contingency:** [Backup plan]
 ```
+
+### Agentic Tasks (ALWAYS, scaled to the PRD §1.5 level)
+Eight tasks, each split into subtasks under 4 hr: 1 golden set (QA, in parallel; never a precondition for development); 2 eval harness + release gate; 3 red-team cases; 4 telemetry & traces; 5 rollout stages; 6 kill switch; 7 permission policy + guardrails (Section 9.2/9.3); 8 data access, redaction, retention (7A.3). Every §7A item maps to at least one. At levels 0-1 they fold into the existing test, logging and release tasks, tagged with their 7A item. Table, splits, ordering and traceability check: `SKILL.extended.md` "Agentic Task Set". Ordering: seed cases + dev/targeted suite -> eval harness -> prompt/tool/agent tasks; QA grows the golden set in parallel; it must be complete before the Phase 5 gate.
+
+### Definition of Done (agentic stories)
+- [ ] Targeted + regression evals at threshold for the slices it touches (the eval release gate is Phase 5)
+- [ ] Red-team and never-do checks for those slices pass
+- [ ] Traces recorded for every run (7A.7)
+- [ ] Prompt, tool and policy versions recorded
+- [ ] Kill switch covers this feature (7A.8)
 
 ## Phase 3c: Success Criteria Generation (QA Gate Setup)
 
@@ -170,29 +184,7 @@ Step 2: Enhance with Full Details — for each issue, add:
 - Test strategy
 - Reference to consolidated spec
 
-Enhancement Template:
-```markdown
-## Summary
-[What this accomplishes]
-
-## Business Context
-[From PRD]
-
-## Technical Implementation
-[From Tech Spec]
-
-## Acceptance Criteria
-- [ ] [Criterion 1]
-- [ ] [Criterion 2]
-
-## Dependencies
-- Blocks: [keys]
-- Blocked By: [keys]
-
-## Reference
-📄 Consolidated Spec: [path]
-📑 Section: [name]
-```
+Enhancement template (Summary, Business Context, Technical Implementation, Acceptance Criteria, Dependencies, Reference): `SKILL.extended.md` "Two-Pass Population".
 
 **Alternative Export:** CSV/JSON for non-Jira users.
 
@@ -220,8 +212,9 @@ Enhancement Template:
 
 ## Exit Criteria (Phase 3 → Phase 4)
 
-- [ ] Phase 3a: Consolidated doc created, user approved
+- [ ] Phase 3a: Consolidated doc created, user approved; §1.5 level and §7A carried; level contradictions logged
 - [ ] Phase 3b: Tasks < 4hr, acceptance criteria, dependencies mapped
+- [ ] Phase 3b: Agentic tasks 1-8 present (or folded at levels 0-1); agentic stories carry the eval DoD above
 - [ ] Phase 3c: QA criteria files generated, human approved
 - [ ] Phase 3d: Jira populated, all issues have full descriptions
 - [ ] Quality Gates: Sub-agent review PASSED

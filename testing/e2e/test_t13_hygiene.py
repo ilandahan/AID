@@ -36,10 +36,11 @@ def test_t13_1_bat_files_are_crlf(bat):
 
 # --- T13-2 (A-41) -----------------------------------------------------------
 
+# Counted on disk (not the git index), so a new, not yet committed file is counted too.
 COUNTS = {
-    "commands": len(tracked("commands/*.md")),
-    "skills": len([p for p in tracked("skills/*/SKILL.md") if len(p.relative_to(REPO).parts) == 3]),
-    "agents": len(tracked("agents/*.md")),
+    "commands": len(list((REPO / "commands").glob("*.md"))),
+    "skills": len(list((REPO / "skills").glob("*/SKILL.md"))),
+    "agents": len(list((REPO / "agents").glob("*.md"))),
 }
 COUNT_FILES = ["README.md", "CLAUDE.md", ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json",
                ".well-known/llms.txt", "llms-full.txt"]

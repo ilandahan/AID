@@ -64,7 +64,7 @@ const PHASE_NAMES = {
 interface ProjectInfo {
   name: string;              // Feature/project name (kebab-case)
   documents: {
-    prd: string | null;              // docs/prd/YYYY-MM-DD-[name].md
+    prd: string | null;              // docs/prd/PRD-<feature>.md
     tech_spec: string | null;        // docs/tech-spec/YYYY-MM-DD-[name].md
     implementation_plan: string | null; // docs/implementation-plan/YYYY-MM-DD-[name].md
   };

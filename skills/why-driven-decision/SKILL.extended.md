@@ -124,6 +124,99 @@ hypothesis, not their need.
 
 ---
 
+## The Why-Chain Rule
+
+The WHY-first rule extends from "know the WHY" to "prove the WHY". Every stated WHY becomes:
+
+1. **A requirement** - what we build because of it;
+2. **An eval** - the acceptance test or eval case that shows the requirement is met;
+3. **A metric** - what tracks it in production (North Star, supporting or guardrail).
+
+**A WHY that yields none of the three is an opinion, not a requirement.** Either make it concrete (requirement + eval + metric) or move it to open questions. It never justifies scope on its own.
+
+This is recorded in PRD §7A.5 Why-Chain (`skills/aid-prd/references/prd-template-extended.md`):
+
+| WHY | Requirement | Eval | Metric |
+|---|---|---|---|
+| Customers contact support 3 times per delayed payment because nobody tells them why | FR-004: state the specific hold reason, citing the ledger record | Golden set of 200 real tickets; the stated reason matches in >= 95% | Contacts per delayed payment; guardrail: wrong-reason rate < 1% |
+
+At levels 0-1 of the solution-shape ladder the eval is an ordinary acceptance test; at levels 2-5 it is an eval case in PRD §7A.6.
+
+---
+
+## The Agentic Lens and the WHY + Shape Brief
+
+At the start of Phase 1, after the WHY / 5 Whys, the conversation ALWAYS continues with the agentic lens. It applies to every project, AI or not: at levels 0-1 the answers are short, never "N/A".
+
+**The 6 shape questions** (PRD §1.5, verbatim):
+
+1. Can every path be enumerated in advance?
+2. How much does the problem vary from case to case?
+3. What does an error cost, and is it reversible?
+4. Does it need judgement over unstructured input?
+5. What latency and cost budget is there?
+6. Who must approve actions?
+
+**Plus three agentic questions** (who approves actions is Q6, not asked twice):
+
+- On whose behalf does the solution act?
+- Who bears the cost of an error?
+- What must never happen?
+
+The answers go into the **WHY + shape brief**, saved as `docs/prd/WHY-SHAPE-BRIEF-<feature>.md`. It is the shared input of every Phase 1 agent: `prd-research-aggregator`, `prd-writer`, `aid:phase1-solution-shaper`, `aid:phase1-charter-drafter` and `aid:phase1-eval-planner` (see `aid-prd/SKILL.md`, "Phase 1 Flow").
+
+**The level in the brief starts from the Phase 0 solution-shape hypothesis** (the "Solution Shape Hypothesis" section of the research report); any change from it is recorded in the brief with a reason. **The level in the brief is a HYPOTHESIS.** `phase1-solution-shaper` tests it against the ladder and proposes the lowest level that works; the PM and the tech lead decide it in the shaping session, and the tech lead signs it as an ADR (A1 decision rights).
+
+### WHY + Shape Brief Template
+
+```markdown
+# WHY + Shape Brief: <feature>
+
+**Date:** YYYY-MM-DD | **PM:** <name> | **Status:** input to /prd (level is a hypothesis)
+
+## 1. WHY statement
+We believe that [CORE BELIEF].
+Therefore, we [HOW WE ACT ON IT].
+Which results in [WHAT WE CREATE].
+Root WHY (5 Whys): [one sentence]
+
+## 2. Why-Chain seeds
+| WHY | Requirement (draft) | Eval idea | Metric idea |
+|---|---|---|---|
+| [stated reason] | [what we build because of it] | [test or eval case that proves it] | [production metric; at least one guardrail] |
+
+## 3. Shape questions (PRD §1.5)
+| # | Question | Answer |
+|---|---|---|
+| 1 | Can every path be enumerated in advance? | |
+| 2 | How much does the problem vary from case to case? | |
+| 3 | What does an error cost, and is it reversible? | |
+| 4 | Does it need judgement over unstructured input? | |
+| 5 | What latency and cost budget is there? | |
+| 6 | Who must approve actions? | |
+
+## 4. Level HYPOTHESIS
+**Phase 0 hypothesis (research report):** [0-5] - [shape name]
+**Level:** [0-5] - [shape name]
+**Reason (one line):** [why this level and not the one below]
+**Change from Phase 0:** [none, or what changed and why]
+Hypothesis only: decided in the shaping session; the tech lead signs the level (ADR).
+
+## 5. On whose behalf it acts
+[the user, team or organisation the solution acts for]
+
+## 6. Error owner
+[who bears the cost of an error, and how much it costs them]
+
+## 7. Never-do list
+- [what must never happen, e.g. "never issue a refund above X without approval"]
+
+## 8. Approvals
+[the Q6 answer in detail: which actions need approval, and by whom; "none" only with a reason]
+```
+
+---
+
 ## Phase-Specific WHY Questions
 
 Each phase of the AID lifecycle has its own core WHY question. The question changes as the
@@ -198,6 +291,7 @@ def test_retry_on_network_timeout(self):
 - [ ] Does every function explain purpose?
 - [ ] Does every test explain what failure it prevents?
 - [ ] Can someone trace back to WHY?
+- [ ] Does every WHY yield a requirement, an eval and a metric (Why-Chain)?
 
 ---
 

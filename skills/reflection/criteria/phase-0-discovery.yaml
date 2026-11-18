@@ -67,6 +67,20 @@ criteria:
       acceptable: "Main areas covered, some gaps"
       poor: "Major stakeholders or competitors missing"
 
+  - id: agentic_solution_shape
+    name: "Solution Shape & Error Ownership (Agentic Layer)"
+    weight: 2
+    checks:
+      - "Is a first solution-shape hypothesis stated on the ladder (level 0-5), with the LOWEST level that could work?"
+      - "Is variance captured: how much does the problem vary from case to case?"
+      - "Is the error owner captured: who bears the cost of an error, and is it reversible?"
+      - "Does the research report have a 'Solution shape hypothesis' section?"
+      - "Scaled to the hypothesised level (0-1, 2-3, 4-5)? Never \"N/A\". At levels 0-1 a one-line cross-reference to where it is already covered is scored as fully met"
+    scoring:
+      excellent: "Ladder hypothesis with reasoning, variance and error owner all captured"
+      acceptable: "Hypothesis present; variance or error owner thin"
+      poor: "No solution-shape hypothesis, or jumps to an agent with no reasoning"
+
 threshold: 7
 max_iterations: 3
 

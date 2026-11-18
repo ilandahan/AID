@@ -57,6 +57,19 @@ criteria:
       acceptable: "Some documentation; partial traceability to spec/task"
       poor: "No headers, no WHY comments, no traceability to the originating spec/task"
 
+  - id: prompt_tool_versioning
+    name: "Versioned Prompts & Tools (Agentic Layer)"
+    weight: 1
+    checks:
+      - "Prompts and tool definitions live in versioned artifacts, not scattered inline literals? A project with no prompts scores this as met with a cross-reference or \"no prompts at level X\""
+      - "Tool contracts follow the tech spec permission policy (least privilege)?"
+      - "Trace hooks present on agent/LLM call paths (traces on by default)?"
+      - "Scaled to the §1.5 level tier (0-1, 2-3, 4-5)? Never \"N/A\". At levels 0-1 a one-line cross-reference to where it is already covered (e.g. \"7A.6: covered by §4 Gherkin ACs + negative tests\") is scored as fully met"
+    scoring:
+      excellent: "Prompts/tools versioned and centralised; trace hooks in place (no prompts: \"no prompts at level X\" or a cross-reference is fully met)"
+      acceptable: "Mostly versioned; a few inline prompts or missing trace hooks"
+      poor: "Inline unversioned prompts/tools or no tracing on agent paths"
+
 # Aligned with kpi_target (>= 9.5) — design pass must clear a high bar before TDD.
 threshold: 8.0
 max_iterations: 3

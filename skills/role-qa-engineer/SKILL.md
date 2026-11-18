@@ -36,6 +36,12 @@ Feature: User Authentication
     Then I should see dashboard
 ```
 
+## Eval Sets & LLM-as-Judge (Agentic Layer)
+
+QA owns the golden set and its held-out split (`tests/evals/golden/`; developers' dev/targeted suite: `tests/evals/dev/`), and is the only one who merges into them; QA owns the release gate, which runs on the held-out split. Sets: golden set, never-do checks (§7A.1), red-team (§7A.4) and prompt injection (`rules/general/untrusted-content.md`). Always applies, scaled by the §1.5 level; at levels 0-1 the eval sets are the acceptance tests.
+Every case cites its source and WHY (§7A.5 Why-Chain); developers' golden-set additions arrive as PRs that QA reviews; the data scientist calibrates the judge. Thresholds, sets and the decision-rights (RACI) table copied from `skills/aid-prd/SKILL.md`: `SKILL.extended.md` → Eval Sets & LLM-as-Judge.
+Timing (A9): seed cases are written in Phase 1 (`docs/prd/SEED-EVALS-<feature>.md`; expert-written cases tagged `source: SME:<role>`, kept distinct from real examples; `INSUFFICIENT_EXAMPLES` resolved before the Phase 1 gate); QA grows the golden set and held-out split IN PARALLEL with Phases 2-4 (never blocking the tech spec); complete only for the Phase 5 release gate. The data scientist calibrates the judge in Phase 4, when a judge is introduced.
+
 ## Flaky Test Prevention
 
 NO ARBITRARY TIMEOUTS.
@@ -132,20 +138,7 @@ Before completion, MUST verify:
 
 ## Test Code Organization
 
-Directory structure (required):
-
-```
-tests/
-├── unit/           # Fast, isolated tests
-│   ├── services/
-│   └── utils/
-├── integration/    # Real dependencies
-│   ├── api/
-│   └── db/
-├── e2e/            # End-to-end flows
-├── fixtures/       # Test data factories
-└── setup/          # Global configuration
-```
+Directory structure (required): `tests/{unit,integration,e2e,fixtures,setup}/`; full tree in `references/code-organization-standards.md`.
 
 | Type | Pattern | Example |
 |---|---|---|
@@ -258,3 +251,7 @@ Organization:
 - [ ] Tests in correct directories (unit/integration/e2e)
 - [ ] File naming follows conventions
 - [ ] ALL existing tests still pass
+
+Eval sets (scaled by §1.5 level; level 0-1: acceptance tests):
+- [ ] Golden set + held-out split, never-do, red-team and prompt-injection sets in place
+- [ ] LLM judge calibrated against human labels (if used)

@@ -44,6 +44,11 @@ description: AID Phase 2 - Technical Specification creation. Use this skill when
 - **Format**: ERD, schema definitions, type definitions
 - **Quality bar**: All fields defined with types and constraints
 
+### 5. Agent Architecture
+- **Description**: Section 9 of the tech spec: how the solution shape chosen in PRD §1.5 is built, with every item traced to its §7A Agentic Design item
+- **Format**: Orchestration pattern, tool contracts, permission policy (as code), guardrails, trace schema, eval harness, model choice and fallbacks, cost and latency budgets, kill switch
+- **Quality bar**: Always present, never "N/A". At levels 0-1 each heading takes its classic form (process/service design, permissions, logging, test harness, rollback). See `references/agent-architecture.md`
+
 ## Role-Specific Guidance
 
 ### For Product Managers
@@ -69,6 +74,8 @@ description: AID Phase 2 - Technical Specification creation. Use this skill when
 - Ensure alignment with standards
 - Validate scalability approach
 - Approve technical direction
+- Own the solution-shape ladder level (PRD §1.5): lowest level that works, each step up justified
+- Approve the agent architecture (Section 9) and the permission policy
 
 ## Common Pitfalls
 
@@ -79,6 +86,9 @@ description: AID Phase 2 - Technical Specification creation. Use this skill when
 | Tight coupling | Hard to test and modify | Design for testability and modularity |
 | Ignoring non-functionals | Performance issues later | Address performance, security, scalability |
 | Unclear contracts | API ambiguity | APIs must be unambiguous with examples |
+| Agent where a workflow works | Cost, risk and latency with no gain | Build the lowest ladder level that works |
+| Section 9 marked "N/A" | Non-AI projects lose logging, rollback, tests | Use the classic form for levels 0-1 |
+| Permissions only in the prompt | Model can be talked out of them | Policy as code, enforced outside the model |
 
 ## Phase Gate Checklist
 
@@ -91,6 +101,9 @@ Before requesting approval to proceed:
 - [ ] Error handling strategy defined
 - [ ] Security considerations addressed
 - [ ] Performance requirements addressed
+- [ ] Agent Architecture (Section 9) filled at the §1.5 level, never "N/A"
+- [ ] Every Section 9 item traces to its §7A item
+- [ ] Level 5 only with one of the four multi-agent justifications
 - [ ] Tech lead has approved
 
 ## Transition to Implementation Phase
@@ -101,6 +114,7 @@ Hand off:
 - Data models
 - Architecture decisions with rationale
 - Any spike/POC results
+- Agent Architecture: permission policy, trace schema, eval harness design, kill switch
 
 ## Tech Spec Template
 
@@ -205,7 +219,23 @@ CREATE TABLE [name] (
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | [Risk 1] | [Impact] | [How to mitigate] |
+
+## 9. Agent Architecture
+
+[Single copy of this section's template, with scaling by level and the classic forms for
+levels 0-1: `references/agent-architecture.md`. Never "N/A". Headings:]
+
+### 9.1 Orchestration Pattern
+### 9.2 Tool Contracts & Permission Policy
+### 9.3 Guardrails
+### 9.4 Trace Schema
+### 9.5 Eval Harness
+### 9.6 Model Choice & Fallbacks
+### 9.7 Cost & Latency Budgets
+### 9.8 Kill Switch
 ```
+
+**Eval timing (A9, no relay):** Section 9.5 designs the eval harness (storage, runner, scorers, judge, gate) from PRD 7A.6 and the 20-30 seed cases written in Phase 1 (`docs/prd/SEED-EVALS-<feature>.md`). The golden set is NOT a precondition for the tech spec: QA grows it and its held-out split IN PARALLEL with Phases 2-4, and it must be complete only for the Phase 5 release gate. The data scientist calibrates the LLM judge in Phase 4, when a judge is introduced; the tech spec only names the judge and the calibration method.
 
 ## Output Location
 

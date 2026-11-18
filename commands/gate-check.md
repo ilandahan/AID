@@ -41,10 +41,15 @@ Performs a diagnostic check to determine if all requirements for the current pha
 ### Phase 1: PRD
 | Check | File/Artifact |
 |-------|---------------|
-| PRD Document | `docs/prd/YYYY-MM-DD-[feature].md` |
+| PRD Document | `docs/prd/PRD-<feature>.md` |
 | User Stories | PRD contains user stories |
 | Acceptance Criteria | Each story has AC |
 | Research Links | Requirements link to research IDs (RES-XXX) |
+| Solution Shape | §1.5 present with the line `Signed level: [n] - by [tech lead], [date], ADR link` filled (not PROPOSED) |
+| Agentic Design | §7A.1-7A.8 all present, scaled to the signed level, none "N/A" |
+| WHY + Shape Brief | `docs/prd/WHY-SHAPE-BRIEF-<feature>.md` |
+| Seed Evals | `docs/prd/SEED-EVALS-<feature>.md`: 20-30 cases, or `INSUFFICIENT_EXAMPLES` resolved (real examples, SME cases tagged `source: SME:<role>`, or a recorded PM + tech lead decision) |
+| Level ADR | `docs/prd/ADR-SHAPE-<feature>.md`, its level matching the §1.5 "Signed level" line |
 | Sub-Agent Review | PRD review PASSED |
 | Feedback | `/aid end` completed |
 

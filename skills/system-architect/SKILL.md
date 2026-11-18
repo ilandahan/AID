@@ -62,16 +62,7 @@ Every tech spec addresses these control domains:
 - A.14 System Development (secure SDLC)
 - A.18 Compliance (audit trails)
 
-### Data Classification
-
-```typescript
-enum DataClassification {
-  PUBLIC = 'public',
-  INTERNAL = 'internal',
-  CONFIDENTIAL = 'confidential',
-  RESTRICTED = 'restricted'
-}
-```
+### Data Classification (enum: `SKILL.extended.md`)
 
 |Classification|Encryption at Rest|Field-Level|MFA Required|Audit|
 |---|---|---|---|---|
@@ -79,6 +70,12 @@ enum DataClassification {
 |Internal|No|No|No|Access|
 |Confidential|Yes|No|Yes|Full|
 |Restricted|Yes|Yes|Yes|Full|
+
+## Priority 3: Agent Architecture (always, scaled by level)
+
+Every design states its PRD §1.5 Solution Shape level and fills tech spec Section 9 Agent Architecture,
+each item traced to PRD §7A; levels 0-1 use the classic form, never "N/A". Detail: `skills/aid-tech-spec/references/agent-architecture.md`;
+concern table (least privilege, guardrails, trace by default, evals, kill switch): `SKILL.extended.md`.
 
 ## Guiding Principles
 
@@ -163,6 +160,7 @@ enum DataClassification {
 3. Can team maintain at 2 AM?
 4. Simpler approach that's 80% as good?
 5. New security risks introduced?
+6. Is there a lower ladder level (PRD §1.5) that works?
 
 ## Anti-Patterns
 
@@ -181,6 +179,7 @@ enum DataClassification {
 - Cargo culting ("Netflix does it")
 - NIH syndrome
 - Silver bullet thinking
+- Agent where a workflow works; agent permissions enforced only in the prompt
 
 ## Workflows
 
@@ -194,7 +193,8 @@ enum DataClassification {
 7. Security Controls
 8. Dependencies
 9. Risks & Mitigations
-10. Rollout Plan
+10. Agent Architecture (tech spec Section 9)
+11. Rollout & Kill Switch (PRD §7A.8 / Section 9.8)
 
 Save to: docs/tech-spec/YYYY-MM-DD-[feature].md
 

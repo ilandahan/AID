@@ -106,6 +106,14 @@ Pre-Release: 1. Complete QA checklist 2. Stakeholder sign-off 3. Prepare release
 Deployment: 1. Deploy to staging 2. Run smoke tests 3. Deploy to production 4. Verify production smoke 5. Enable monitoring
 Post-Release: 1. Monitor errors & performance 2. Gather user feedback 3. Address critical issues 4. Document lessons learned 5. Close project artifacts
 
+## Agentic Release (Eval Gate, Rollout, Monitoring)
+
+Always applies, scaled by the PRD's §1.5 Solution Shape level; never "N/A". At levels 0-1 it is: acceptance tests as the gate, a staged release, a tested rollback plan, and monitoring of the §1.4 metrics. Detail: `SKILL.extended.md` → Agentic Release.
+
+**Eval release gate (§7A.6 Eval Plan)**, on the exact release versions and on QA's held-out split: golden set ≥ the PRD's threshold; red-team 0 critical/high failures plus an overall pass rate ≥ the PRD's target (incl. prompt injection, `rules/general/untrusted-content.md`); never-do enforced in code and verified at 100%; LLM judge kappa ≥ 0.7. Timing (A9): seed cases from Phase 1; QA grew the golden set and held-out split in parallel with Phases 2-4; they must be complete here, for this gate (judge calibrated in Phase 4).
+
+**Phase 5 exit:** the eval release gate passed, shadow stage live, kill switch tested, and the stage criteria agreed. Each later promotion (human approval → autonomous) is a recorded decision by the 7A.8 owner, outside the phase gate. Stages (shadow → human approval → autonomous), the kill-switch test and monitoring (quality drift, cost per successful task, escalation rate and response time, guardrail metrics): `SKILL.extended.md` → Agentic Release.
+
 ## Phase Gate Checklist
 
 ### Cucumber Acceptance Gates (MUST PASS) ⭐
@@ -134,6 +142,7 @@ Post-Release: 1. Monitor errors & performance 2. Gather user feedback 3. Address
 - [ ] Release notes prepared
 - [ ] Stakeholder approval
 - [ ] Deployment instructions verified
+- [ ] Agentic Release: eval release gate passed, shadow live, kill switch tested, stage criteria agreed (level 0-1: staged release, rollback, monitoring)
 
 ## Release Notes Template
 

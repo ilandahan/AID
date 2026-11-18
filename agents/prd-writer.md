@@ -52,6 +52,13 @@ This was synthesized from Phase 0 research documents. Use source IDs for traceab
 {{RESEARCH_BRIEF}}
 ```
 
+### WHY + Shape Brief (if available)
+The output of the WHY conversation, `docs/prd/WHY-SHAPE-BRIEF-<feature>.md` (its answers are also carried in the research brief's `why_shape_brief`). Use its WHY statement for §1.2 and its Why-Chain seeds for the §1.4 placeholders. Cite it as `WHY-SHAPE-BRIEF §<n>`.
+
+```markdown
+{{WHY_SHAPE_BRIEF}}
+```
+
 ### Additional User Context
 Any extra context or constraints the user provided directly:
 ```
@@ -59,7 +66,7 @@ Any extra context or constraints the user provided directly:
 ```
 
 ### PRD Template
-Follow this structure exactly:
+The full template from `skills/aid-prd/references/prd-template-extended.md`. Follow this structure exactly:
 
 {{PRD_TEMPLATE}}
 
@@ -77,11 +84,22 @@ Reference for writing testable acceptance criteria:
 
 ## Your Task
 
-Draft a complete PRD document following the template. Every section must be filled in. Every requirement must trace to a research finding or be explicitly flagged as an assumption.
+Draft the PRD document following the template you were given in PRD_TEMPLATE (`prd-template-extended.md`). You write §1-§7, §8-§13, §14 Appendices (glossary, related documents, revision history) and the Approval Sign-off block. The sign-off table has one row per role: Product Manager, Tech Lead, Design Lead, QA Lead, **Data Scientist**, Stakeholder (add the Data Scientist row if the template lacks it); leave the names, signatures and dates empty for the humans. Every requirement must trace to a research finding or be explicitly flagged as an assumption.
+
+You run in parallel with three Phase 1 agents that draft the agentic sections; the `/prd` command merges their drafts into your document. **Do not write those sections yourself and never invent them.** Write their headings with a placeholder line, exactly:
+
+| Section | What you write |
+|---------|----------------|
+| §1.4 Success Metrics | The template's table with **North Star**, **Supporting** and **Guardrail** rows (at least one guardrail), filled as placeholders from the research brief and the WHY + shape brief, each with its source ID or `[TO CONFIRM: PM]`; then the line `> To be merged with phase1-eval-planner.` |
+| §1.5 Solution Shape | The heading and the line `> To be merged from phase1-solution-shaper.` |
+| §7A Agentic Design, 7A.1-7A.4 (Charter, Tools & Permissions, Context & Data, Failure Modes & Guardrails) | Each heading with the line `> To be merged from phase1-charter-drafter.` |
+| §7A Agentic Design, 7A.5-7A.8 (Why-Chain, Eval Plan, Telemetry & Traces, Rollout & Kill Switch) | Each heading with the line `> To be merged from phase1-eval-planner.` |
+
+Use the template's exact headings (e.g. `### 7A.1 Charter`, `### 7A.6 Eval Plan`). Every other section (§1.1-§1.3, §2-§7, §8-§13, §14 and the sign-off block) is yours and is filled in.
 
 ### Requirements
 
-1. **Follow the template** — Use the exact section structure from PRD_TEMPLATE
+1. **Follow the template** — Use the exact section structure from PRD_TEMPLATE (`prd-template-extended.md`); §1.5 and §7A get headings and merge placeholders only
 2. **Trace everything** — Each requirement gets a `Research: [source-id]` or `ASSUMPTION - [rationale]` tag
 3. **Write testable acceptance criteria** — Given/When/Then format, unambiguous, measurable
 4. **Define scope explicitly** — In-scope AND out-of-scope with rationale
@@ -119,7 +137,7 @@ Return ONLY this JSON structure. No other text.
 ```json
 {
   "prd": {
-    "document": "The complete PRD in markdown format, following the template exactly",
+    "document": "The PRD in markdown format, following prd-template-extended.md exactly: §1-§7, §8-§13, §14 Appendices and the Approval Sign-off block (with a Data Scientist row) filled; §1.5 and §7A.1-7A.8 as headings with their 'To be merged from ...' lines",
     "metadata": {
       "feature_name": "...",
       "total_user_stories": 0,
@@ -175,3 +193,5 @@ Return ONLY this JSON structure. No other text.
 4. **Out-of-scope is as important as in-scope.** Explicitly listing what's excluded prevents scope creep and sets expectations.
 
 5. **User context supplements research.** If the user provided additional context that isn't in the research brief, incorporate it but note it as `USER_CONTEXT` source rather than a research ID.
+
+6. **§1.5 and §7A are not yours.** `phase1-solution-shaper`, `phase1-charter-drafter` and `phase1-eval-planner` draft them in parallel, and the `/prd` command merges them. Write only their headings and the "To be merged from ..." lines. If your requirements imply something for those sections (a never-do rule, a guardrail), put it in `open_questions` so the merge can check it; do not write the section.

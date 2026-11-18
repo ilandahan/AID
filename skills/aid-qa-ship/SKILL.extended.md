@@ -239,6 +239,13 @@ Before requesting approval to ship:
 - [ ] Stakeholder approval obtained
 - [ ] Deployment instructions verified
 
+### Agentic Release Gates (scaled by §1.5 level)
+- [ ] Eval release gate passed on the held-out split (§7A.6 threshold, red-team, never-do)
+- [ ] Shadow stage live
+- [ ] Kill switch tested, including that the human queue can absorb 100% of the volume (or a throttle)
+- [ ] Stage criteria agreed (§7A.8); later promotions are recorded 7A.8 owner decisions, outside the gate
+- [ ] Monitoring live: quality drift, cost per successful task, escalation rate and response time, §1.4 guardrail metrics
+
 ## QA Testing Checklist
 
 ### Functional Testing
@@ -282,6 +289,108 @@ Before requesting approval to ship:
 3. Address critical issues immediately
 4. Document lessons learned
 5. Close out project artifacts
+
+## Agentic Release (Eval Gate, Rollout, Monitoring)
+
+WHY: an LLM component can pass every acceptance test and still drift, overspend or cross a red line
+on live traffic. The eval gate proves it is good enough to start; the staged rollout earns autonomy
+with evidence; monitoring catches decay; the kill switch limits the damage when something slips through.
+
+Sources in the PRD: §1.4 Success Metrics (North Star, supporting, guardrail), §1.5 Solution Shape,
+§7A.1 Charter, §7A.2 Tools & Permissions, §7A.4 Failure Modes & Guardrails, §7A.6 Eval Plan,
+§7A.7 Telemetry & Traces, §7A.8 Rollout & Kill Switch.
+
+### Scaling by level (never "N/A")
+
+| Level | Release gate | Rollout | Stop mechanism | Monitoring |
+|-------|--------------|---------|----------------|------------|
+| 0 Process change | Process acceptance checks | Pilot with one team, then all | Revert to the old process | Process metrics + §1.4 guardrail |
+| 1 Deterministic automation | Acceptance tests (Cucumber) | Staged release (canary or % rollout) | Tested rollback plan / feature flag | Errors, latency, §1.4 metrics |
+| 2 Single LLM call | Eval gate on the call | Shadow → human approval (if output reaches users) → autonomous | Kill switch to a non-LLM fallback | Plus quality drift, cost |
+| 3 Workflow | Eval gate per step + end-to-end | Shadow → human approval → autonomous | Kill switch per workflow | Plus per-step failure rates |
+| 4 Agent | Plus tool-choice, never-do and red-team | Full three stages; shadow uses stubbed write tools; write tools approval-gated first | Kill switch revokes tool access | Plus escalation rate, tool-error rate |
+| 5 Multi-agent | Plus hand-off evals | Stage each agent; the riskiest last | One switch stops all agents | Plus per-agent metrics |
+
+### Eval release gate
+
+Run on the exact versions that will ship (prompt, tool definitions, model, retrieval config).
+QA owns the gate. **The release gate runs on the held-out split, which developers never tune on.**
+
+Timing (A9, no relay): the seed eval cases were written in Phase 1 (`docs/prd/SEED-EVALS-<feature>.md`);
+QA grew the golden set and its held-out split IN PARALLEL with Phases 2-4 (without blocking the tech spec);
+this gate is the first point where they must be complete. The data scientist calibrated the judge in
+Phase 4, when it was introduced.
+
+- [ ] **Golden set:** complete (size and source per §7A.6), and ≥ the PRD's threshold, on the held-out split
+- [ ] Score not lower than the last released version beyond the noise margin
+- [ ] **Red-team:** 0 critical/high failures, plus an overall pass rate ≥ the PRD's target, including
+      prompt-injection cases built from untrusted inputs (web pages, tickets, documents, tool results;
+      see `rules/general/untrusted-content.md`)
+- [ ] **Never-do:** enforced in code (policy, default-deny); evals verify the enforcement at 100%.
+      Repeated runs cannot prove a low breach rate: proving a rate below p at 95% confidence takes
+      n ≈ ln(0.05)/ln(1−p) clean runs (about 59 for 5%)
+- [ ] **LLM judge,** if used: Cohen's kappa (or Krippendorff's alpha) ≥ 0.7 against adjudicated human
+      labels on ≥ 50 stratified cases, including failures. Percent agreement is reported alongside, never alone
+- [ ] The judge never grades the outputs of its own prompt or model, and the rubric is not visible to the system under test
+- [ ] Eval report attached to the release certification, with versions and cost per successful task
+
+A failed gate is a blocker, like a failed @critical scenario. The threshold is never lowered at
+release time to make a build pass; changing it is a PRD change.
+
+### Staged rollout (§7A.8 Rollout & Kill Switch)
+
+| Stage | What it does | Entry criteria | Exit criteria |
+|-------|--------------|----------------|---------------|
+| 1. Shadow | Runs on real inputs; its actions are logged, not executed (at level 4, write tools are stubbed) | Eval gate passed; traces on (§7A.7); dashboards live | Agreement with human decisions at the agreement target in the §7A.8 agreement-target column, over the agreed volume; zero never-do breaches; cost and latency within budget (§1.5 Q5 / Section 9.7) |
+| 2. Human approval | Proposes actions; a human approves each (or each write/irreversible one per §7A.2) | Shadow exit met; kill switch tested in this environment; approvers trained | Approval rate, override reasons, escalation rate and cost within §7A.8 targets for the agreed period; a blind audit of a sample of approved items finds no rubber-stamping; no unresolved guardrail breach |
+| 3. Autonomous | Acts within §7A.2 permissions; escalates per §7A.1 | Approval exit met; kill switch tested again; on-call owner named; rollback rehearsed | No exit: stays under monitoring; any guardrail-metric breach triggers the kill switch or a step back to stage 2 |
+
+Rules:
+- **Phase 5 exit:** the eval release gate passed, shadow stage live, kill switch tested, and the stage
+  criteria agreed. Each later promotion (human approval → autonomous) is a recorded decision by the
+  7A.8 owner, outside the phase gate, with the evidence (numbers, trace samples).
+- Human approval stage: run a blind audit of a sample of approved items (a second reviewer grades
+  them without seeing the approver's decision) to catch approvers who approve without checking.
+- Irreversible or high-risk tools (§7A.2) stay human-approved longer, or permanently, if §7A.8 says so.
+- Stepping back a stage is normal, not a failure.
+
+### Kill switch test (before autonomy)
+
+- [ ] The switch exists as described in §7A.8 and the tech spec (flag, config, or permission revoke)
+- [ ] Triggered in a test: the agent stops acting within the agreed time
+- [ ] The fallback works (human queue, previous version or non-LLM path); no work is lost
+- [ ] The human queue can absorb 100% of the volume, or a throttle limits intake to what it can absorb
+- [ ] In-flight runs end safely (no half-done irreversible action)
+- [ ] The on-call owner can trigger it without a deploy, and knows when to
+- [ ] Test date, who ran it and the result are recorded in the release certification
+
+### Production monitoring
+
+| Signal | How | Alert when |
+|--------|-----|------------|
+| Quality drift | Run the eval rubric or judge on a sample of live traces; compare with the release score | Below the §7A.6 threshold or a sustained drop |
+| Cost | Cost per *successful* task (total spend / tasks with `outcome: success`) and per day, from traces | Above the budget in §1.5 Q5 / Section 9.7 |
+| Latency | P50/P95 from traces | Above budget (§1.5 Q5 / Section 9.7) |
+| Escalation rate | Escalations per run (§7A.1) | Outside the expected band, up or down (too few can mean missed escalations) |
+| Escalation response time | Time from escalation to human pick-up | Above the §7A.1 escalation SLA |
+| Guardrail metrics (§1.4) | As defined in the PRD | Breach: kill switch or step back a stage |
+| Never-do breaches | Rule checks on traces | Any breach: kill switch, incident |
+| Injection attempts | Flags from guardrails (§7A.4) | Spike |
+
+**Offline vs online evals.** Offline evals run the golden set and red-team suite before release.
+Online evals score live traces; name each online label source and its lag (for example: judge on
+sampled traces, minutes; human review of escalations, about a day; customer complaints or
+chargebacks, weeks). Alert on the fast sources; confirm with the slow ones.
+
+Every alert has an owner and a runbook. New failure modes found in production become new golden-set
+or red-team cases (feeding the §7A.6 Eval Plan; QA merges them) before the fix ships.
+
+### Level 0-1 checklist (classic form)
+
+- [ ] Acceptance tests pass (the eval gate)
+- [ ] Staged release (pilot, canary or % rollout) with go/no-go criteria per step
+- [ ] Rollback plan written and tested
+- [ ] Monitoring for errors, latency and the §1.4 metrics, including at least one guardrail metric
 
 ## Release Notes Template
 

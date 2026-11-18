@@ -70,6 +70,25 @@ RED (failing test) → GREEN (make pass) → REFACTOR (clean up) → REPEAT
 | GREEN | Minimal code to pass |
 | REFACTOR | Tests still pass |
 
+## Eval-Driven Development (Agentic Layer)
+
+Always applies, scaled by the PRD's §1.5 Solution Shape level. No part is "N/A". Sources: PRD §7A.1 Charter, §7A.6 Eval Plan, §7A.7 Telemetry & Traces.
+
+| Level | Form in Phase 4 |
+|-------|-----------------|
+| 0-1 (Process change, Deterministic automation) | Ordinary TDD (above) plus structured logs and metrics |
+| 2-3 (Single LLM call, Workflow) | Eval cases per LLM step, traces, versioned prompts |
+| 4-5 (Agent, Multi-agent) | Plus per-tool, trajectory and never-do evals; versioned tool definitions |
+
+Rules (eval-driven = TDD for prompts, tools and agents):
+1. **Evals first.** Before changing a prompt, tool or agent, write the eval cases it must pass in the dev/targeted suite, plus the §7A.1 never-do checks. Run the new-behaviour cases and see them fail (RED). QA owns the golden set; propose additions through a QA-reviewed PR.
+2. **Traces on by default** (§7A.7): every run records the plan, tool calls, results, escalations, cost and latency. Never ship with tracing off.
+3. **Version prompts and tool definitions** in the repo like code. Each trace records the versions it ran with.
+4. **Regression eval on every change** to a prompt, tool, model or agent: zero never-do failures, or no merge. The release gate runs on QA's held-out split, which developers never tune on.
+
+Eval cases live with the code: the dev/targeted suite and never-do checks in `tests/evals/dev/`; QA owns `tests/evals/golden/` (golden set + held-out split). Cycle and judge rules: `../test-driven/SKILL.md`. Detail: `SKILL.extended.md` → Eval-Driven Development.
+Timing (A9): start from the Phase 1 seed cases (`docs/prd/SEED-EVALS-<feature>.md`); QA keeps growing the golden set in parallel (complete only for the Phase 5 gate), so never wait for it. When this phase introduces an LLM judge, the data scientist calibrates it here.
+
 ## Common Pitfalls
 
 | Pitfall | Fix |
@@ -127,6 +146,9 @@ Full rules and per-language examples: `references/documentation-standards.md`
 - [ ] No test-specific logic in prod
 - [ ] Documentation updated
 - [ ] **All tasks passed QA gate**
+- [ ] Eval cases written before each prompt/tool/agent change (level 0-1: tests first)
+- [ ] Traces on by default (level 0-1: logs and metrics)
+- [ ] Prompts and tool definitions versioned; regression eval green on the last change
 
 ## Role Guidance
 
@@ -143,6 +165,7 @@ Full rules and per-language examples: `references/documentation-standards.md`
 - Test results + coverage
 - Known issues (if any)
 - Deployment instructions
+- Latest regression eval report (score vs §7A.6 threshold, never-do results) and the prompt/tool versions
 
 ## Pipeline Integration
 

@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/License-AID%20Community%20v1.0-blue.svg)](LICENSE)
 [![MCP Integrations](https://img.shields.io/badge/MCP-6%20Integrations-green)](#mcp-integrations)
 [![Skills](https://img.shields.io/badge/Skills-28%20Specialized-purple)](#skills-system)
-[![Sub-Agents](https://img.shields.io/badge/Sub--Agents-39-teal)](#sub-agents)
+[![Sub-Agents](https://img.shields.io/badge/Sub--Agents-42-teal)](#sub-agents)
 [![Tests](https://img.shields.io/badge/Tests-228-brightgreen)](#testing)
 [![Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet)](#install-as-a-plugin)
 
@@ -27,6 +27,7 @@
 - [Research & Methodology](#research--methodology)
 - [Key Features](#key-features)
 - [Phase Gate System](#phase-gate-system)
+- [Agentic projects (3.1)](#agentic-projects-31)
 - [Sub-Agents](#sub-agents)
 - [MCP Integrations](#mcp-integrations)
 - [Nano Banana Pro (Visual AI)](#nano-banana-pro-visual-ai)
@@ -42,6 +43,24 @@
 ---
 
 ## What's New
+
+### 3.1.0 — the agentic layer
+
+Every phase now asks whether an agent is the right solution shape, on whose behalf it acts,
+what it may never do, how we know it is good enough (evals), what it did (traces), and how
+it is rolled out safely. It applies to every project, scaled to its level on the
+solution-shape ladder; for a non-AI product each section takes its classic form, and no
+section is "N/A".
+
+- PRD: new §1.5 Solution Shape and §7A Agentic Design (7A.1-7A.8); §1.4 metrics gain
+  North Star / supporting / guardrail.
+- Tech Spec: an agent architecture traced to every §7A item.
+- Impl Plan, Development, QA & Ship: eval-driven development, an eval release gate, and a
+  staged rollout with a tested kill switch.
+- Gates: the reflection criteria, `phase-review-agent`, `prd-validator` and
+  `phase2-techspec-pm-reviewer` check the agentic deliverables of each phase.
+
+Three new agents for the PRD phase (42 in all); no new skills or commands. See [Agentic projects (3.1)](#agentic-projects-31).
 
 ### 3.0.8 — phase gates block by default
 
@@ -94,7 +113,7 @@ override-with-reason and the `subagent_review` record in state are all unchanged
 | **Cucumber / BDD** | `cucumber-bdd` skill with step-definition guides for **JS, Python, Java, Ruby and Go**. Phase 1 acceptance criteria are written as Gherkin, so the PRD and the test suite are the same artifact. Runs via `npm run cucumber`. |
 | **Automated dev pipeline** | `pipeline-orchestrator` drives a 12-step state machine: DEVELOP → CODE_REVIEW → AR_DESIGN → TDD → AR_FUNCTION → VISUAL_QA → TEST_REVIEW → PHASE_GATE → AR_ACCEPTANCE → API_TESTS → E2E_TESTS → CERTIFICATION, with hard iteration caps and escalation instead of infinite retry loops. All scored review gates (code review, test review, autoresearch KPI) are unified at 9.5/10, and the E2E step pre-checks that E2E tests actually exist before claiming a pass — if none do, it asks you to create or explicitly skip them. |
 | **Autoresearch runner** | `autoresearch` performs bounded keep/revert improvement: snapshot → one focused edit → score → keep **only if strictly better**, else revert. Every edit is reversible and the loop always terminates. |
-| **39 registered sub-agents** | Independent, context-free specialists: 8 reviewers (code, tests, visual QA, phase gates, QA validation, reflection, feedback analysis), 2 builders (developer, test-engineer) and 29 phase specialists covering Phase 0 discovery, Phase 2 architecture, Phase 3 breakdown, Phase 4 sprint work, Phase 5 release and the PRD pipeline. All invocable by name. |
+| **Registered sub-agents (39 at that release)** | Independent, context-free specialists: 8 reviewers (code, tests, visual QA, phase gates, QA validation, reflection, feedback analysis), 2 builders (developer, test-engineer) and 29 phase specialists covering Phase 0 discovery, Phase 2 architecture, Phase 3 breakdown, Phase 4 sprint work, Phase 5 release and the PRD pipeline. All invocable by name. |
 | **Quality Check on every output** | The `reflection` skill scores WHY alignment, phase compliance, correctness, security and completeness before you see the result. |
 | **WHY-first foundation** | `why-driven-decision` loads before everything else — no implementation without an articulated purpose. |
 | **Learning system** | `memory-system` collects session feedback and turns recurring patterns into concrete skill improvements, with a Python CLI for analysis and dashboards. |
@@ -306,11 +325,49 @@ Before each phase transition, a **sub-agent must review** all deliverables:
 
 ---
 
+## Agentic projects (3.1)
+
+Every AID project picks a level on the **solution-shape ladder** in its PRD (§1.5 Solution
+Shape): the LOWEST level that works, with every step up justified in one sentence.
+
+| Level | Shape |
+|---|---|
+| 0 | Process change (no software) |
+| 1 | Deterministic automation |
+| 2 | Single LLM call inside a fixed flow |
+| 3 | Workflow (several fixed steps, some with LLM calls) |
+| 4 | Agent (the model chooses the path and the tools) |
+| 5 | Multi-agent (only for separate permission boundaries, contaminating contexts, genuinely parallel work, or different owning teams) |
+
+**§7A Agentic Design** follows the NFRs: 7A.1 Charter, 7A.2 Tools & Permissions, 7A.3 Context &
+Data, 7A.4 Failure Modes & Guardrails, 7A.5 Why-Chain, 7A.6 Eval Plan, 7A.7 Telemetry &
+Traces, 7A.8 Rollout & Kill Switch. All eight are always filled, at a depth scaled to the
+level (at level 0-1 the Eval Plan is acceptance tests, Telemetry is logs and metrics, Rollout
+is a staged release plus rollback). The Why-Chain turns every WHY into a requirement, an eval
+and a metric; every metric set has at least one guardrail metric.
+
+- **Phase 1 flow:** the PM writes a WHY + shape brief (`docs/prd/WHY-SHAPE-BRIEF-<feature>.md`);
+  `/prd` fans out the PRD writer and three Phase 1 drafters in parallel; the merge adds 20-30
+  seed eval cases (`docs/prd/SEED-EVALS-<feature>.md`); after a PM + tech lead shaping session
+  the tech lead signs the level as an ADR (`docs/prd/ADR-SHAPE-<feature>.md`).
+- **Eval-driven development** (Phase 4): eval cases are written before the prompt or agent
+  changes, like TDD; traces are on by default; prompts and tools are versioned; a regression
+  eval runs on every change.
+- **Eval release gate** (Phase 5): the 7A.6 threshold is met, and the red-team suite and the
+  never-do checks pass.
+- **Staged rollout** (Phase 5): shadow, then human approval, then autonomous, with entry and
+  exit criteria per stage, a kill switch tested before autonomy, and production monitoring of
+  quality drift, cost, escalation rate and guardrail metrics.
+
+Per-phase deliverables: [docs/PHASE-GATES.md](docs/PHASE-GATES.md#agentic-deliverables-31).
+
+---
+
 ## Sub-Agents
 
-AID ships **39 registered sub-agents**: 8 reviewers (below), 2 builders (`developer`,
-`test-engineer` - spawned by the pipeline DEVELOP and TDD steps) and 29 phase specialists
-(`phase0-*` discovery, `phase2-*` architecture, `phase3-*` breakdown, `phase4-*` sprint
+AID ships **42 registered sub-agents**: 8 reviewers (below), 2 builders (`developer`,
+`test-engineer` - spawned by the pipeline DEVELOP and TDD steps) and 32 phase specialists
+(`phase0-*` discovery, `phase1-*` PRD shaping (solution shape, charter, eval plan), `phase2-*` architecture, `phase3-*` breakdown, `phase4-*` sprint
 work, `phase5-*` release, and the `prd-*` pipeline) invocable by name for isolated
 clean-room work. Each runs with **no knowledge of the conversation
 that produced the work** - that isolation is the point. An agent with no attachment to the
@@ -750,7 +807,7 @@ hooks - run `npm install` first to exercise them. They **skip**, they do not sil
 | Suite | What it proves |
 |-------|----------------|
 | `test_repo_integrity.py` | Every path the docs promise exists and runs - `python -m memory_system`, `scripts/init-project.sh`, the autoresearch assets, no skill without a `SKILL.md` |
-| `test_agents_and_hooks.py` | All 39 agents are registered with valid frontmatter; every hook in `settings.json` exists and parses; no bare `Bash` in the allow list |
+| `test_agents_and_hooks.py` | All 42 agents are registered with valid frontmatter; every hook in `settings.json` exists and parses; no bare `Bash` in the allow list |
 | `test_link_project_guards.py` | Linking refuses to run against the AID install itself, and refuses to link a source directory that is missing |
 | `test_pipeline_hooks.py` | The Stop hook blocks in the schema Claude Code actually reads, respects `stop_hook_active`, and does not claim a `tsc` pass it never ran |
 | `test_installation.py` | A fresh install produces a working tree |
@@ -791,7 +848,7 @@ claude plugin install aid@AID
 ```
 
 Restart Claude Code, then run `/aid-init` in any project. Every project gets the same 44
-commands, 27 skills and 39 sub-agents, and one command moves them all forward:
+commands, 27 skills and 42 sub-agents, and one command moves them all forward:
 
 ```bash
 claude plugin update aid
@@ -900,7 +957,7 @@ AID/
 │   ├── autoresearch/           # Bounded keep/revert improvement loop
 │   ├── cucumber-bdd/           # Gherkin across 5 languages
 │   └── ... (23 more)
-├── agents/                     # 39 sub-agents - FLAT, one .md each, prompt inlined
+├── agents/                     # 42 sub-agents - FLAT, one .md each, prompt inlined
 │   ├── reflection-agent.md
 │   ├── phase0-problem-validator.md
 │   └── ... (36 more)

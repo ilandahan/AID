@@ -93,6 +93,20 @@ criteria:
       - "Hard block - cannot proceed until PASS"
       - "Max 3 review cycles before escalation"
 
+  - id: agentic_eval_driven
+    name: "Eval-Driven Development (Agentic Layer)"
+    weight: 3
+    checks:
+      - "Eval-first: eval cases written before the prompt or agent change (like TDD)?"
+      - "Traces on by default (7A.7 trace schema)?"
+      - "Prompts and tools versioned?"
+      - "Regression eval runs on every change and is green?"
+      - "Scaled to the §1.5 level tier (0-1, 2-3, 4-5)? Never \"N/A\". At levels 0-1 a one-line cross-reference to where it is already covered (e.g. \"7A.6: covered by §4 Gherkin ACs + negative tests\") is scored as fully met"
+    scoring:
+      excellent: "Evals precede changes, traces on, prompts/tools versioned, regression eval green (levels 0-1: tests first plus a cross-reference is fully met)"
+      acceptable: "Evals and traces present; versioning or regression run incomplete"
+      poor: "Prompt/agent changed without evals, traces off, or unversioned prompts/tools"
+
 threshold: 7
 max_iterations: 3
 

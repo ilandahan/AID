@@ -1,7 +1,7 @@
 # Tech Spec Synthesizer — Reference Template
 
 > **Purpose**: This template is injected into the Tech Spec Synthesizer agent's context.
-> It defines the canonical 8-section structure, diagram conventions, synthesis rules,
+> It defines the canonical 9-section structure, diagram conventions, synthesis rules,
 > technology decision format, and anti-patterns the agent must follow when merging
 > specialist outputs into a unified technical specification.
 
@@ -22,12 +22,18 @@ a source ID prefix:
 | Infrastructure | `INF-` | `[INF-001]` Deployment topology |
 | Performance Engineer | `PERF-` | `[PERF-001]` NFR targets |
 
-The synthesizer merges these into a single spec using the 8-section structure below.
+The synthesizer merges these into a single spec using the 9-section structure below.
 Every claim in the final spec MUST cite its source ID. Unsourced claims are flagged.
+
+**Relationship to the `aid-tech-spec/SKILL.md` template:** this is the multi-specialist form of
+the same 9-section spec. Sections 1-8 are grouped differently here (Section 8 is the
+Implementation Roadmap, with 8.1 Sprint Breakdown and 8.2 dependencies; the SKILL.md form has
+"8. Risks & Mitigations" and no 8.1). "Section 8.1" below means this template's Sprint
+Breakdown. Section 9 is identical in both and defined only in `references/agent-architecture.md`.
 
 ---
 
-## 8-Section Tech Spec Structure
+## 9-Section Tech Spec Structure
 
 ### Section 1: Executive Summary
 
@@ -41,7 +47,7 @@ Every claim in the final spec MUST cite its source ID. Unsourced claims are flag
 | Field | Value |
 |-------|-------|
 | **Feature** | [Name] |
-| **PRD Reference** | `docs/prd/YYYY-MM-DD-[feature].md` |
+| **PRD Reference** | `docs/prd/PRD-<feature>.md` |
 | **Author** | [Name / Agent] |
 | **Date** | YYYY-MM-DD |
 | **Status** | Draft / In Review / Approved |
@@ -540,6 +546,34 @@ graph LR
 
 ---
 
+### Section 9: Agent Architecture
+
+**Purpose**: Show how the solution shape chosen in PRD §1.5 is built, with every item traced to
+its PRD §7A Agentic Design item. ALWAYS present, scaled by level, never "N/A".
+
+**Single copy:** the Section 9 template, the level-scaling table, the classic forms for levels
+0-1, the trace schema and the eval thresholds live only in `references/agent-architecture.md`.
+Emit these headings, each citing its §7A item as listed there:
+
+```markdown
+## 9. Agent Architecture
+### 9.1 Orchestration Pattern
+### 9.2 Tool Contracts & Permission Policy
+### 9.3 Guardrails
+### 9.4 Trace Schema
+### 9.5 Eval Harness
+### 9.6 Model Choice & Fallbacks
+### 9.7 Cost & Latency Budgets
+### 9.8 Kill Switch
+```
+
+**Guidance for the synthesizer**:
+- Cite PRD §7A items (`[PRD 7A.2]`) the way specialist IDs are cited. A missing §7A item is a `[PRD GAP]`.
+- Level 5 needs one of the four multi-agent justifications; otherwise flag a `[SYNTHESIS GAP]`.
+- Every guardrail in 9.3 has an eval case in 9.5; every budget in 9.7 is measured from a 9.4 trace field.
+
+---
+
 ## Architecture Diagram Guide
 
 All diagrams use Mermaid syntax for version-control friendliness and CI rendering.
@@ -912,6 +946,10 @@ Before the synthesizer considers the spec complete, verify all items:
 - [ ] Every auth type in Section 4.5 is implemented in Section 5.1
 - [ ] Every sprint task in Section 8.1 traces to a component or endpoint
 - [ ] Dependency graph in Section 8.2 is consistent with sprint ordering
+- [ ] Section 9 states the PRD §1.5 level and every item cites its §7A item
+- [ ] Every guardrail in Section 9.3 has an eval case in Section 9.5
+- [ ] Every tool in Section 9.2 appears in the trace schema (9.4) and the permission policy
+- [ ] Agentic tasks (golden set, eval harness + gate, red-team, traces, rollout, kill switch) are in Section 8.1
 
 ### Source Traceability
 - [ ] Every factual claim cites a specialist ID `[XX-NNN]`
@@ -921,7 +959,7 @@ Before the synthesizer considers the spec complete, verify all items:
 - [ ] All PRD gaps are flagged with `[PRD GAP]` annotations
 
 ### Completeness
-- [ ] All 8 sections are present and non-empty
+- [ ] All 9 sections are present and non-empty (Section 9 never "N/A")
 - [ ] Technology Stack Decision Log contains all significant choices
 - [ ] Architecture diagrams include: context (C4), container (C4), ER, and dependency graph
 - [ ] Migration plan follows expand-then-contract pattern

@@ -96,16 +96,16 @@ Discovery     PRD      Tech Spec   Impl Plan     Dev       QA & Ship
 
 ### Phase Permissions
 
-| Phase | Allowed | Blocked |
-|-------|---------|---------|
-| 0 Discovery | Research, stakeholders, competitive analysis | PRD, architecture, code |
-| 1 PRD | + Requirements, scope, user stories | Architecture, code, Jira |
-| 2 Tech Spec | + Architecture, schemas, APIs | Code, Jira issues |
-| 3a Consolidation | + Contradiction resolution, consolidate specs | Jira issues, code |
-| 3b Breakdown | + Task decomposition, sprint planning | Jira creation, code |
-| 3c Jira Population | + Jira epics, stories, tasks with full info | Production code |
-| 4 Development | + Code, tests, components | Deployment |
-| 5 QA & Ship | Everything | - |
+| Phase | Allowed | Blocked | Agentic deliverable (3.1, scaled to level, never "N/A") |
+|-------|---------|---------|------------------|
+| 0 Discovery | Research, stakeholders, competitive analysis | PRD, architecture, code | Solution shape hypothesis; variance; who bears an error |
+| 1 PRD | + Requirements, scope, user stories | Architecture, code, Jira | WHY + shape brief; `/prd` fans out the drafters in parallel; §1.5 Solution Shape; §7A.1-7A.8; guardrail metric; seed evals; level ADR signed by the tech lead |
+| 2 Tech Spec | + Architecture, schemas, APIs | Code, Jira issues | Agent architecture traced to §7A (permissions, traces, eval harness, kill switch) |
+| 3a Consolidation | + Contradiction resolution, consolidate specs | Jira issues, code | §1.5 level, §7A.1-7A.8 and tech spec Section 9 carried into the consolidated spec; level contradictions logged |
+| 3b Breakdown | + Task decomposition, sprint planning | Jira creation, code | Agentic tasks 1-8 (golden set, eval harness, red-team, telemetry, rollout, kill switch, permission policy, data); targeted + regression evals in DoD |
+| 3c Jira Population | + Jira epics, stories, tasks with full info | Production code | Agentic tasks and DoD in Jira |
+| 4 Development | + Code, tests, components | Deployment | Eval-first; traces on; versioned prompts and tools |
+| 5 QA & Ship | Everything | - | Eval release gate passed; shadow live; kill switch tested; stage criteria agreed; monitoring |
 
 ---
 
@@ -482,7 +482,7 @@ docs/implementation-plan/ - Phase 3 outputs (Task breakdown)
 # Components - single source of truth. Edit HERE. The plugin loader and every linked
 # project read these same files.
 skills/              - 27 skills
-agents/              - 39 sub-agents. FLAT: one self-contained .md each, prompt inlined.
+agents/              - 42 sub-agents. FLAT: one self-contained .md each, prompt inlined.
                        Never add a subfolder - every .md under agents/ registers as an agent.
 agent-assets/        - Calibration examples + AGENT-STANDARD.md (not scanned as agents)
 commands/            - 44 slash commands

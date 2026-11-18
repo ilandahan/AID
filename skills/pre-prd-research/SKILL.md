@@ -38,7 +38,7 @@ Exit (Gate to PRD):
 - [ ] Problem validated with multiple stakeholders
 - [ ] Root causes identified and verified
 - [ ] Market/competitive landscape understood
-- [ ] Solution space explored
+- [ ] Solution space explored; solution shape hypothesis recorded (level 0-5, case variation, who bears an error)
 - [ ] Strategic positioning defined
 - [ ] Assumptions explicit and tested
 - [ ] Go/No-Go decision justified
