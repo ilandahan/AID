@@ -22,3 +22,6 @@ ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/skills/code-review/SKILL.md:gen
 ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/skills/code-review/references/security-patterns.md:generic-api-key:195
 ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/skills/role-qa-engineer/SKILL.extended.md:generic-api-key:252
 ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/skills/role-qa-engineer/references/security-in-tests.md:stripe-access-token:73
+ecb1c4cb581319af4c9e4dda57b4231df0f9611b:memory-system/tests/test_redact.py:aws-access-token:24
+ecb1c4cb581319af4c9e4dda57b4231df0f9611b:memory-system/tests/test_review_r1.py:gitlab-pat:30
+ecb1c4cb581319af4c9e4dda57b4231df0f9611b:memory-system/tests/test_review_r1.py:stripe-access-token:30
