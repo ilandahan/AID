@@ -388,8 +388,9 @@ export default function Home() {
 }
 EOF
 
-# Create docs placeholders
-cat > docs/PRD.md << 'EOF'
+# Create docs placeholders (the layout AID's commands use: docs/prd/, docs/tech-spec/)
+mkdir -p docs/prd docs/tech-spec
+cat > docs/prd/PRD.md << 'EOF'
 # Product Requirements Document
 
 > Run `/prd` to generate this document.
@@ -410,7 +411,7 @@ cat > docs/PRD.md << 'EOF'
 [To be filled]
 EOF
 
-cat > docs/TECH-SPEC.md << 'EOF'
+cat > docs/tech-spec/TECH-SPEC.md << 'EOF'
 # Technical Specification
 
 > Run `/tech-spec` after PRD is approved to generate this document.
@@ -475,8 +476,8 @@ $PROJECT_NAME/
 ├── .claude/             # Commands (linked to AID)
 ├── skills/              # Skills (linked to AID)
 ├── docs/
-│   ├── PRD.md           # Product Requirements
-│   └── TECH-SPEC.md     # Technical Spec
+│   ├── prd/PRD.md       # Product Requirements
+│   └── tech-spec/TECH-SPEC.md  # Technical Spec
 ├── src/
 │   ├── app/             # Next.js pages
 │   └── components/      # React components

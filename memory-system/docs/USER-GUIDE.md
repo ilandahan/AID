@@ -287,7 +287,6 @@ Shows slot allocation and top performers.
 | Command | Description |
 |---------|-------------|
 | `/aid reset --confirm` | Reset all data |
-| `/aid export` | Export backup |
 
 ---
 

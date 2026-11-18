@@ -481,11 +481,11 @@ docs/implementation-plan/ - Phase 3 outputs (Task breakdown)
 
 # Components - single source of truth. Edit HERE. The plugin loader and every linked
 # project read these same files.
-skills/              - 28 skills
+skills/              - 27 skills
 agents/              - 39 sub-agents. FLAT: one self-contained .md each, prompt inlined.
                        Never add a subfolder - every .md under agents/ registers as an agent.
 agent-assets/        - Calibration examples + AGENT-STANDARD.md (not scanned as agents)
-commands/            - 47 slash commands
+commands/            - 44 slash commands
 rules/               - Rules loaded per skill
 references/          - Shared lookup data (role/phase terminology)
 hooks/               - Phase gate, QA gate, pipeline enforcement
@@ -619,7 +619,7 @@ Phases are displayed using **role-specific language** so each persona sees famil
 | 2 | Solution Review | System Architecture Design | Technical Design | Test Architecture & Framework | Experiment Planning |
 | 3 | Roadmap & Prioritization | Sprint Planning & Task Breakdown | Task Breakdown & Estimation | Test Plan & Case Design | ML Arch & Pipeline Design & Breakdown |
 | 4 | Feature Validation & UAT | Code Review & Architecture Oversight | Implementation & Coding | Test Execution & Automation | Development & Validation |
-| 5 | Launch & Go-to-Market | Release Engineering & Deployment | Bug Fixes & Polish | Release Certification & Sign-off | Deploy to Production & Monitoring |
+| 5 | Launch & Post-Launch | Release Engineering & Deployment | Bug Fixes & Polish | Release Certification & Sign-off | Deploy to Production & Monitoring |
 
 Terminology mapping defined in: `.claude/references/role-phase-terminology.json`
 

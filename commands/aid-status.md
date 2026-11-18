@@ -33,8 +33,8 @@ Improvements:
   Memory entries: 23/38 slots used
 
 Skills Loaded:
-  - developer/SKILL.md (updated 3 days ago)
-  - development/SKILL.md (updated 1 week ago)
+  - roles/developer/QUICK-REFERENCE.md (updated 3 days ago)
+  - phases/development/QUICK-REFERENCE.md (updated 1 week ago)
 
 Recommendations:
   ⚠️ 3 pending feedback items - consider running /aid improve

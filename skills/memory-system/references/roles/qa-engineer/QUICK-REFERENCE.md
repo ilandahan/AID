@@ -1,8 +1,3 @@
----
-name: memory-system-qa-engineer
-description: Reference for the QA Engineer role in the AID lifecycle.
----
-
 # QA Engineer Role Skill
 
 > **Source**: `../role-qa-engineer/SKILL.md`

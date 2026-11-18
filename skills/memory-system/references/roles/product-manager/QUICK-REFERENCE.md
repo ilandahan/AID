@@ -1,8 +1,3 @@
----
-name: memory-system-product-manager
-description: Reference for the Product Manager role in the AID lifecycle.
----
-
 # Product Manager Role Skill
 
 > **Source**: `../role-product-manager/SKILL.md`

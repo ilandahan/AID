@@ -224,4 +224,4 @@ Review implementation for:
   replaced with placeholders. A person's or company's name written as plain words is not
   caught unless it is one of those project names, so do not type names you want kept private
 - See `phase-enforcement` skill for review checklists
-- See `memory-system/docs/AGENT.md#phase-gate` for details
+- See `memory-system/docs/AGENT.md#3-phase-gate-flow-feedback-collection` (section "3. Phase Gate Flow") for details

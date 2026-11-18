@@ -4,213 +4,133 @@ description: "Show current AID phase and its status"
 
 # /phase Command
 
-Navigate to a specific phase in the AI Full Stack Development workflow.
+Show the current AID phase, what it allows, and what it takes to move on.
+
+`/phase` is read-only. It never changes the phase.
 
 ## Usage
 
 ```
-/phase <number>
+/phase
 ```
+
+## Where the Phase Comes From
+
+The current phase is read from the project's `.aid/state.json` (`current_phase`, with
+`phase_name` and the role-specific `phase_display`). If the file does not exist, the
+project has not been initialized: suggest `/aid-init` or `/aid-start`.
+
+Reading `.aid/state.json` is fine. Never write it: only `hooks/aid_session.py` writes it,
+and the phase gates refuse any direct edit.
+
+## Changing the Phase
+
+The phase changes only through the gate commands, in this order:
+
+1. `/gate-check` - check whether the current phase's deliverables are complete (read-only)
+2. `/phase-approve` - human sign-off for the current phase
+3. `/phase-advance` - move to the next phase
+
+There is no way to jump to a phase with `/phase <number>`.
 
 ## Phases
 
-| Phase | Name | Description |
-|-------|------|-------------|
-| 1 | Discovery | Gather requirements, understand context |
-| 2 | PRD Creation | Generate Product Requirements Document |
-| 3 | Technical Spec | Create technical specification |
-| 4 | Jira Breakdown | Generate project structure in Jira |
-| 5 | Development | Implement features (TDD approach) |
-| 6 | Testing & QA | Comprehensive testing |
-| 7 | Code Review | Review and refine |
-| 8 | Deployment | Deploy to production |
+AID has six phases, numbered 0-5. Names follow `references/role-phase-terminology.json`:
+the first column is the phase's base name, the others are what each role sees.
 
-## Examples
+| Phase | Name | Product Manager | Tech Lead | Developer | QA Engineer | Data Scientist |
+|-------|------|-----------------|-----------|-----------|-------------|----------------|
+| 0 | Discovery | Market & Competitive Research | Technology & Architecture Research | Technical Spike & Research | Test Strategy Research | EDA — Data Gathering & Analysis |
+| 1 | PRD | Product Requirements (PRD) | Technical Requirements Report | Feature Specification | Test Requirements & Coverage Plan | Feasibility Assessment |
+| 2 | Tech Spec | Solution Review | System Architecture Design | Technical Design | Test Architecture & Framework | Experiment Planning |
+| 3 | Implementation Plan | Roadmap & Prioritization | Sprint Planning & Task Breakdown | Task Breakdown & Estimation | Test Plan & Case Design | ML Arch & Pipeline Design & Breakdown |
+| 4 | Development | Feature Validation & UAT | Code Review & Architecture Oversight | Implementation & Coding | Test Execution & Automation | Development & Validation |
+| 5 | QA & Ship | Launch & Post-Launch | Release Engineering & Deployment | Bug Fixes & Polish | Release Certification & Sign-off | Deploy to Production & Monitoring |
 
-```bash
-# Start Discovery phase
-/phase 1
-
-# Jump to Development
-/phase 5
-
-# Begin Testing
-/phase 6
+```
+Phase 0 ──► Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4 ──► Phase 5
+Discovery     PRD      Tech Spec   Impl Plan     Dev       QA & Ship
 ```
 
 ## Phase Details
 
-### Phase 1: Discovery
-**Goal:** Understand requirements and context
+### Phase 0: Discovery
+**Goal:** Validate that the problem is worth solving
 
-**Activities:**
-- Review existing documentation
-- Identify stakeholders
-- Define success criteria
-- List assumptions and constraints
+**Allowed:** Research, stakeholders, competitive analysis
 
-**Output:** Discovery summary document
+**Output:** `docs/research/` (research report, traceability matrix)
+
+**Command:** `/discovery`
 
 ---
 
-### Phase 2: PRD Creation
-**Goal:** Document product requirements
+### Phase 1: PRD
+**Goal:** Define what we build and why
 
-**Activities:**
-- Define user stories
-- Specify acceptance criteria
-- Create wireframes/mockups
-- Define MVP scope
+**Allowed:** + Requirements, scope, user stories, Gherkin acceptance criteria
 
-**Output:** `docs/prd/PRD-<feature>.md`
+**Output:** `docs/prd/`
 
 **Command:** `/prd`
 
 ---
 
-### Phase 3: Technical Specification
-**Goal:** Design technical solution
+### Phase 2: Tech Spec
+**Goal:** Design the technical solution
 
-**Activities:**
-- Database schema design
-- API endpoint definitions
-- Component architecture
-- TypeScript interfaces
+**Allowed:** + Architecture, schemas, APIs
 
-**Output:** `docs/tech-specs/TECH-SPEC-<feature>.md`
+**Output:** `docs/tech-spec/`
 
 **Command:** `/tech-spec`
 
-**Skill:** `system-architect`
-
 ---
 
-### Phase 4: Jira Breakdown
-**Goal:** Create project structure
+### Phase 3: Implementation Plan
+**Goal:** Turn the specs into actionable work
 
-**Activities:**
-- Create Epic
-- Break into Stories
-- Define Tasks and Subtasks
-- Estimate effort
+**Allowed:** + Consolidation of PRD and Tech Spec (3a), task breakdown and sprint
+planning (3b), Jira epics, stories and tasks (3c)
 
-**Output:** Jira project with hierarchy
+**Output:** `docs/implementation-plan/`, Jira issues
 
 **Command:** `/jira-breakdown`
 
 ---
 
-### Phase 5: Development
-**Goal:** Implement features
+### Phase 4: Development
+**Goal:** Implement the planned tasks, tests first
 
-**Activities:**
-- TDD: Write tests first
-- Implement components (atoms → pages)
-- API development
-- Database migrations
+**Allowed:** + Code, tests, components
 
-**Skills:**
-- `atomic-design` - Component development
-- `atomic-page-builder` - Page composition
-- `test-driven` - TDD methodology
+**Commands:** `/pipeline`, `/write-tests`, `/code-review`, `/test-review`
 
 ---
 
-### Phase 6: Testing & QA
-**Goal:** Ensure quality
+### Phase 5: QA & Ship
+**Goal:** Validate and release
 
-**Activities:**
-- Unit tests
-- Integration tests
-- E2E tests with Puppeteer
-- Visual regression testing
+**Allowed:** Everything
 
-**Command:** `/test-review`
+**Command:** `/qa-ship`
 
-**Skill:** `test-driven`
-
----
-
-### Phase 7: Code Review
-**Goal:** Review and refine
-
-**Activities:**
-- Code quality review
-- Security review
-- Performance review
-- Documentation review
-
-**Command:** `/code-review`
-
-**Skill:** `code-review`
-
----
-
-### Phase 8: Deployment
-**Goal:** Deploy to production
-
-**Activities:**
-- Build production bundle
-- Run deployment scripts
-- Verify deployment
-- Monitor for issues
-
-## Workflow
+## Example Output
 
 ```
-Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 → Phase 6 → Phase 7 → Phase 8
-   ↓         ↓         ↓         ↓         ↓         ↓         ↓         ↓
-Discovery → PRD → Tech Spec → Jira → Development → Testing → Review → Deploy
+Current phase: 2 - Tech Spec (Solution Review)
+Role: Product Manager
+Source: .aid/state.json
+
+Allowed now: architecture, schemas, APIs
+Blocked until later: code (Phase 4), Jira issues (Phase 3)
+
+Next: /gate-check, then /phase-approve, then /phase-advance
 ```
 
-## Tips
+## Related Commands
 
-- Complete each phase before moving to the next
-- Document decisions in `docs/decisions/`
-- Use skills relevant to each phase
-- Run `/test-review` and `/code-review` frequently in phases 5-7
-
----
-
-## Prompt
-
-```markdown
-**Role**: You are a technical project manager guiding a development workflow through structured phases.
-
-**Task**: Navigate to phase [PHASE_NUMBER] and provide guidance for completing it successfully.
-
-**Context**:
-- Current phase: [PHASE_NUMBER]
-- Project: [PROJECT_NAME]
-- Previous phases completed: [LIST]
-
-**Reasoning**:
-- Each phase builds on previous outputs
-- Use relevant skills and commands for each phase
-- Follow TDD in development phases
-- Document all decisions
-
-**Output Format**:
-1. Phase overview (goal, activities, outputs)
-2. Required skills/commands for this phase
-3. Checklist of deliverables
-4. Transition criteria to next phase
-
-**Stopping Condition**:
-- All phase activities explained
-- Relevant commands and skills identified
-- Clear success criteria defined
-
-**Steps**:
-1. Identify requested phase number
-2. Load phase details from this command reference
-3. Identify required skills (system-architect, atomic-design, test-driven, etc.)
-4. Provide phase-specific guidance
-5. List expected outputs
-6. Define completion criteria
-
----
-Phase: [PHASE_NUMBER]
-Project: [PROJECT_NAME]
----
-```
+- `/gate-check` - check readiness to advance
+- `/phase-approve` - approve the current phase
+- `/phase-advance` - move to the next phase
+- `/aid-status` - phase and session state

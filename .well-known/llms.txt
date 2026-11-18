@@ -34,7 +34,7 @@
 > - Context tracking (session continuity)
 > - MCP integrations (Jira, GitHub, Chrome)
 > - Specialized skills (atomic-design, TDD, code-review)
-> - 21 slash commands
+> - 44 slash commands
 
 # Technology Stack
 > Next.js 16, React 19, TypeScript, PostgreSQL, Prisma, Jest

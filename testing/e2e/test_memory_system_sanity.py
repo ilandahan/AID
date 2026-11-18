@@ -21,7 +21,7 @@ class TestMemorySystemStructure:
         "product-manager", "developer", "qa-engineer", "tech-lead", "data-scientist"
     ])
     def test_role_reference_exists(self, role):
-        skill_path = os.path.join(REFS_DIR, 'roles', role, 'SKILL.md')
+        skill_path = os.path.join(REFS_DIR, 'roles', role, 'QUICK-REFERENCE.md')  # T13: renamed
         cumulative_path = os.path.join(REFS_DIR, 'roles', role, 'cumulative.md')
         assert os.path.isfile(skill_path), f"Missing {skill_path}"
         assert os.path.isfile(cumulative_path), f"Missing {cumulative_path}"
@@ -30,7 +30,7 @@ class TestMemorySystemStructure:
         "discovery", "prd", "tech-spec", "breakdown", "development", "qa-ship"
     ])
     def test_phase_reference_exists(self, phase):
-        skill_path = os.path.join(REFS_DIR, 'phases', phase, 'SKILL.md')
+        skill_path = os.path.join(REFS_DIR, 'phases', phase, 'QUICK-REFERENCE.md')  # T13: renamed
         cumulative_path = os.path.join(REFS_DIR, 'phases', phase, 'cumulative.md')
         assert os.path.isfile(skill_path), f"Missing {skill_path}"
         assert os.path.isfile(cumulative_path), f"Missing {cumulative_path}"

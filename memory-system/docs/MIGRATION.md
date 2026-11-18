@@ -179,8 +179,8 @@ Your existing AID skills likely live in a different structure. Options:
 
 **Option A: Adopt Memory System Structure**
 Move your content into the new structure:
-- Role-specific → `skills/roles/{role}/SKILL.md`
-- Phase-specific → `skills/phases/{phase}/SKILL.md`
+- Role-specific → `skills/roles/{role}/QUICK-REFERENCE.md`
+- Phase-specific → `skills/phases/{phase}/QUICK-REFERENCE.md`
 - Learnings → `skills/*/cumulative.md`
 
 **Option B: Keep Both**

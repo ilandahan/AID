@@ -47,7 +47,7 @@ Initialize a new project with the AI Full Stack Development methodology.
 ├── .mcp.json               # MCP server configuration
 ├── docs/
 │   ├── prd/                # PRD documents
-│   ├── tech-specs/         # Technical specifications
+│   ├── tech-spec/          # Technical specifications
 │   └── decisions/          # Architecture decisions
 ├── skills/                 # AI methodology skills
 │   ├── atomic-design/
@@ -179,7 +179,7 @@ npm run dev
 1. Parse project name and options
 2. Execute `./scripts/init-project.sh` with arguments
 3. Verify structure created:
-   - docs/ (prd, tech-specs, decisions)
+   - docs/ (prd, tech-spec, decisions)
    - src/ (components, pages, api, etc.)
    - tests/ (unit, integration, e2e)
    - skills/ (all 5 skills)

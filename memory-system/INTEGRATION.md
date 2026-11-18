@@ -84,7 +84,7 @@ End current phase and collect feedback.
 6. Offer to continue or stop
 
 ## Implementation
-See: `memory-system/docs/AGENT.md#phase-gate`
+See: `memory-system/docs/AGENT.md#3-phase-gate-flow-feedback-collection`
 ```
 
 **`/aid-improve.md`**

@@ -157,9 +157,9 @@ unless it is one of those project names, so still leave these out.
 When session starts, load references from `skills/memory-system/references/`:
 
 ```
-1. roles/{role}/SKILL.md       - Role quick reference
+1. roles/{role}/QUICK-REFERENCE.md       - Role quick reference
 2. roles/{role}/cumulative.md  - Role learnings
-3. phases/{phase}/SKILL.md     - Phase quick reference
+3. phases/{phase}/QUICK-REFERENCE.md     - Phase quick reference
 4. phases/{phase}/cumulative.md - Phase learnings
 ```
 

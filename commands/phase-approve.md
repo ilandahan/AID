@@ -84,13 +84,13 @@ Before showing the approval prompt, Claude MUST:
 ## Phase Checklists
 
 ### Phase 1: PRD
-- [ ] Requirements documented in `docs/PRD.md`
+- [ ] Requirements documented in `docs/prd/`
 - [ ] User stories defined
 - [ ] Acceptance criteria specified
 - [ ] Scope agreed upon
 
 ### Phase 2: Tech Spec
-- [ ] Technical specification in `docs/TECH-SPEC.md`
+- [ ] Technical specification in `docs/tech-spec/`
 - [ ] Database schema designed
 - [ ] API endpoints defined
 - [ ] Architecture decisions documented
@@ -119,7 +119,7 @@ Before showing the approval prompt, Claude MUST:
 Phase Approval: PRD (Phase 1)
 
 Checklist:
-[x] Requirements documented in docs/PRD.md
+[x] Requirements documented in docs/prd/
 [x] User stories defined
 [x] Acceptance criteria specified
 [x] Scope agreed upon

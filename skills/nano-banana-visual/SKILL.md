@@ -1,7 +1,6 @@
 ---
 name: nano-banana-visual
 description: "[OPTIONAL] AI-powered visual generation using Google Nano Banana Pro. For user flows, architecture diagrams, mockups."
-optional: true
 ---
 
 # Nano Banana Pro Visual Integration

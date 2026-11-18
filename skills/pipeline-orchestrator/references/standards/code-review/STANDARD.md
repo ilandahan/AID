@@ -1,8 +1,3 @@
----
-name: code-review
-description: Comprehensive code review for commits and pull requests. Covers security, TDD, code quality, and documentation standards.
----
-
 # Code Review Skill
 
 Thorough review with emphasis on Security and TDD.

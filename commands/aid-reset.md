@@ -59,14 +59,23 @@ This will NOT delete:
 /aid reset
 ```
 
-## Export Before Reset
+## Back Up Before Reset
 
-To save feedback before reset:
-```
-/aid export
+AID has no export command. To keep your feedback and history, copy the AID data folder
+(`$AID_HOME`, default `~/.aid`) before you reset:
+
+```bash
+# macOS / Linux / Git Bash
+cp -R "${AID_HOME:-$HOME/.aid}" "${AID_HOME:-$HOME/.aid}.backup-$(date +%Y%m%d)"
 ```
 
-This creates a backup file you can review later.
+```powershell
+# Windows PowerShell
+$src = if ($env:AID_HOME) { $env:AID_HOME } else { "$env:USERPROFILE\.aid" }
+Copy-Item -Recurse $src "$src.backup-$(Get-Date -Format yyyyMMdd)"
+```
+
+To restore, copy the backup folder back to `$AID_HOME`.
 
 ## Notes
 

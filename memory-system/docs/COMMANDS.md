@@ -18,7 +18,6 @@
 | `/aid skill view [type]` | View skill content |
 | `/aid skill edit [type]` | Edit skill file |
 | `/aid skill sync` | Sync skills from repo |
-| `/aid export` | Export backup |
 | `/aid reset --confirm` | Reset all data |
 
 ---
@@ -237,9 +236,9 @@ Opens skill file for editing.
 - `type`: Role name or phase name
 
 **Editable files:**
-- `~/.aid/skills/roles/{role}/SKILL.md`
+- `~/.aid/skills/roles/{role}/QUICK-REFERENCE.md`
 - `~/.aid/skills/roles/{role}/cumulative.md`
-- `~/.aid/skills/phases/{phase}/SKILL.md`
+- `~/.aid/skills/phases/{phase}/QUICK-REFERENCE.md`
 - `~/.aid/skills/phases/{phase}/cumulative.md`
 
 ---
@@ -257,17 +256,14 @@ Synchronizes skill files from the AID repository.
 
 ## Admin Commands
 
-### `/aid export`
+### Backing up AID data
 
-Creates a backup of all AID data.
+There is no export command. Copy the AID data folder, `$AID_HOME` (default `~/.aid`), e.g.
+`cp -R "${AID_HOME:-$HOME/.aid}" "${AID_HOME:-$HOME/.aid}.backup"`.
+See `commands/aid-reset.md` for the Windows equivalent.
 
-**Output location:** `~/.aid/export/aid-backup-{date}.zip`
-
-**Contents:**
-- All feedback files (pending and processed)
-- All skill files
-- Configuration files
-- Metrics and tracking files
+The copy holds all feedback (pending and processed), state, metrics and
+AID's local memory.
 
 ---
 

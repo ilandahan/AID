@@ -129,9 +129,9 @@ the phase — the cumulative files are where past improvement cycles land.
 
 ```
 Load from skills/memory-system/references/:
-1. roles/{role}/SKILL.md
+1. roles/{role}/QUICK-REFERENCE.md
 2. roles/{role}/cumulative.md
-3. phases/{phase}/SKILL.md
+3. phases/{phase}/QUICK-REFERENCE.md
 4. phases/{phase}/cumulative.md
 ```
 

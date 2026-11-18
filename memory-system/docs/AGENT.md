@@ -89,9 +89,9 @@ ELSE:
 ### Step 5: Load Skills
 ```
 Load and internalize:
-1. ~/.aid/skills/roles/{role}/SKILL.md
+1. ~/.aid/skills/roles/{role}/QUICK-REFERENCE.md
 2. ~/.aid/skills/roles/{role}/cumulative.md
-3. ~/.aid/skills/phases/{phase}/SKILL.md
+3. ~/.aid/skills/phases/{phase}/QUICK-REFERENCE.md
 4. ~/.aid/skills/phases/{phase}/cumulative.md
 
 AID's local memory (AID:* entries in `$AID_HOME/memory/slots.json`) is read when present

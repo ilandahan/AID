@@ -37,10 +37,10 @@ Sub-agents are powerful because they have **no bias from the main conversation**
 
 | Agent | Purpose | Location |
 |-------|---------|----------|
-| **reflection-agent** | Objective quality evaluation | `agents/reflection-agent/` |
-| **qa-validator-agent** | Task completion validation | `agents/qa-validator-agent/` |
-| **phase-review-agent** | Phase gate validation | `agents/phase-review-agent/` |
-| **aid-test-agent** | AID methodology testing | `agents/aid-test-agent/` |
+| **reflection-agent** | Objective quality evaluation | `agents/reflection-agent.md` |
+| **qa-validator-agent** | Task completion validation | `agents/qa-validator-agent.md` |
+| **phase-review-agent** | Phase gate validation | `agents/phase-review-agent.md` |
+| **aid-test-agent** | AID methodology testing | `agents/aid-test-agent.md` |
 
 ---
 
@@ -64,16 +64,17 @@ Task(
 
 ## Agent File Structure
 
-Each agent follows this structure:
+`agents/` is flat: one self-contained file per agent. Claude Code registers every `.md`
+under `agents/` as an agent, so never add a subfolder there.
 
 ```
-{agent-name}/
-├── SKILL.md           # When/how to spawn (for main agent)
-├── AGENT-PROMPT.md    # The prompt template with {{variables}}
-├── references/        # Supporting documentation
-├── templates/         # Response format schemas
-└── examples/          # Good/bad output examples
+agents/{agent-name}.md          # Frontmatter (name, description, tools, model)
+                                # + the full prompt with {{variables}}, inlined
+agent-assets/{agent-name}/      # Optional: calibration examples (good/bad outputs)
+skills/{skill-name}/SKILL.md    # When/how to spawn (for main agent)
 ```
+
+See `agent-assets/AGENT-STANDARD.md` for the full standard.
 
 ---
 
@@ -88,7 +89,7 @@ Before spawning, replace all `{{VARIABLE}}` placeholders in the prompt:
 ### Example
 
 ```markdown
-# In AGENT-PROMPT.md
+# In agents/<agent-name>.md
 Original Request: {{ORIGINAL_REQUEST}}
 Stated WHY: {{STATED_WHY}}
 ```

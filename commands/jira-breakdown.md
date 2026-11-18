@@ -15,7 +15,7 @@ Generate Jira project structure from technical specification.
 ## What It Does
 
 1. **Reads Tech Spec**
-   - Parses `docs/tech-specs/TECH-SPEC-<feature-name>.md`
+   - Parses `docs/tech-spec/TECH-SPEC-<feature-name>.md`
    - Extracts components and tasks
 
 2. **Generates Hierarchy**

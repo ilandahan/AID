@@ -29,8 +29,8 @@ AID includes a learning system that improves Claude's assistance over time by co
 ### Skills Location
 
 Claude loads skills based on role and phase:
-- Role skills: `memory-system/skills/roles/{role}/SKILL.md`
-- Phase skills: `memory-system/skills/phases/{phase}/SKILL.md`
+- Role skills: `memory-system/skills/roles/{role}/QUICK-REFERENCE.md`
+- Phase skills: `memory-system/skills/phases/{phase}/QUICK-REFERENCE.md`
 
 At session start, read both relevant skill files and apply their guidelines.
 

@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN:-}"
+      }
+    },
+    "jira": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@aashari/mcp-server-atlassian-jira@3.3.0"],
+      "env": {
+        "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL:-}",
+        "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL:-}",
+        "ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN:-}"
+      }
+    },
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@1.12.0"]
+    }
+  }
+}

@@ -26,7 +26,7 @@ Generate a Technical Specification document from a PRD.
    - Security considerations
 
 3. **Saves Document**
-   - Location: `docs/tech-specs/TECH-SPEC-<feature-name>.md`
+   - Location: `docs/tech-spec/TECH-SPEC-<feature-name>.md`
 
 ## Technical Spec Structure
 

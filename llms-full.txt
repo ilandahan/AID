@@ -83,12 +83,12 @@ Required Work:
 - Identify constraints and dependencies
 
 Exit Criteria (ALL required):
-- docs/PRD.md exists and complete
+- PRD exists in docs/prd/ and is complete
 - PRD includes: Problem Statement, Features, User Stories, Acceptance Criteria
 - PRD approved (marker file: .aid/approvals/prd-approved.md)
 
 Artifacts:
-- docs/PRD.md
+- docs/prd/ (the PRD)
 - .aid/approvals/prd-approved.md
 
 Blocked Actions:
@@ -117,12 +117,12 @@ Required Work:
 - Technology choices and rationale
 
 Exit Criteria (ALL required):
-- docs/TECH-SPEC.md exists
+- docs/tech-spec/ has the technical specification
 - Tech Spec includes: Architecture, Data Models, API Endpoints, Components
 - Tech Spec approved
 
 Artifacts:
-- docs/TECH-SPEC.md
+- docs/tech-spec/
 - .aid/approvals/tech-spec-approved.md
 
 Blocked Actions:
@@ -383,20 +383,22 @@ Main Skills (skills/):
 - code-review/SKILL.md
 - test-driven/SKILL.md
 
-Memory System Skills (memory-system/skills/):
+Memory System references (skills/memory-system/references/):
 
-By Role:
-- roles/developer/SKILL.md
-- roles/product-manager/SKILL.md
-- roles/qa-engineer/SKILL.md
-- roles/tech-lead/SKILL.md
+By Role (QUICK-REFERENCE.md + cumulative.md each):
+- roles/developer/
+- roles/product-manager/
+- roles/qa-engineer/
+- roles/tech-lead/
+- roles/data-scientist/
 
-By Phase:
-- phases/discovery/SKILL.md
-- phases/prd/SKILL.md
-- phases/tech-spec/SKILL.md
-- phases/development/SKILL.md
-- phases/qa-ship/SKILL.md
+By Phase (QUICK-REFERENCE.md + cumulative.md each):
+- phases/discovery/
+- phases/prd/
+- phases/tech-spec/
+- phases/breakdown/
+- phases/development/
+- phases/qa-ship/
 
 ================================================================================
 5. MEMORY SYSTEM
@@ -571,14 +573,14 @@ SETUP
 PHASE 1: PRD
 1. /good-morning
 2. /prd user-authentication
-3. Review docs/PRD.md
+3. Review the PRD in docs/prd/
 4. /phase-approve
 5. /phase-advance
 
 PHASE 2: TECH SPEC
 1. /good-morning
 2. /tech-spec user-authentication
-3. Review docs/TECH-SPEC.md
+3. Review the specification in docs/tech-spec/
 4. /phase-approve
 5. /phase-advance
 
@@ -617,8 +619,8 @@ PROJECT LAYOUT
 
 aid-existing/
 ├── .claude/                    # Claude Code integration
-│   └── commands/               # 27 slash commands
-├── skills/                     # 7 expertise skills
+│   └── commands/               # 44 slash commands
+├── skills/                     # 27 skills
 │   ├── phase-enforcement/
 │   ├── context-tracking/
 │   ├── system-architect/
@@ -628,8 +630,8 @@ aid-existing/
 │   └── test-driven/
 ├── memory-system/              # Learning system
 │   ├── skills/
-│   │   ├── roles/              # 4 role skills
-│   │   └── phases/             # 5 phase skills
+│   │   ├── roles/              # 5 role quick references
+│   │   └── phases/             # 6 phase quick references
 │   ├── docs/
 │   └── templates/
 ├── docs/                       # Documentation
@@ -768,8 +770,8 @@ ESSENTIAL FILES
 
 .aid/state.json         Phase tracking
 .aid/context.json       Task/step tracking
-docs/PRD.md             Product requirements
-docs/TECH-SPEC.md       Technical specification
+docs/prd/               Product requirements
+docs/tech-spec/         Technical specification
 docs/JIRA-BREAKDOWN.md  Task breakdown
 CLAUDE.md               AID instructions
 .mcp.json               MCP server config

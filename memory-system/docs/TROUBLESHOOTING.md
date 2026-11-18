@@ -165,8 +165,8 @@ cat ~/.aid/metrics/memory-tracking.json
 
 **Check skill files exist:**
 ```bash
-ls ~/.aid/skills/roles/*/SKILL.md
-ls ~/.aid/skills/phases/*/SKILL.md
+ls ~/.aid/skills/roles/*/QUICK-REFERENCE.md
+ls ~/.aid/skills/phases/*/QUICK-REFERENCE.md
 ```
 
 **Resync from repo:**
@@ -290,20 +290,11 @@ This will:
 4. Keep skill files (including cumulative.md learnings)
 5. Keep AID's local memory entries
 
-### Export Before Reset
+### Back Up Before Reset
 
-```
-/aid export
-```
-
-Creates: `~/.aid/export/aid-backup-{date}.zip`
-
-Contains:
-- All feedback files
-- All skill files
-- state.json
-- trends.json
-- memory-tracking.json
+There is no export command. Copy the AID data folder, `$AID_HOME` (default `~/.aid`), e.g.
+`cp -R "${AID_HOME:-$HOME/.aid}" "${AID_HOME:-$HOME/.aid}.backup"`.
+See `commands/aid-reset.md` for the Windows equivalent.
 
 ---
 
@@ -340,10 +331,11 @@ ls ~/.aid/feedback/pending/*.json
 
 If issues persist:
 
-1. **Export diagnostic info:**
+1. **Collect diagnostic info:**
    ```
-   /aid export --diagnostics
+   /aid-status
    ```
+   and back up `$AID_HOME` (default `~/.aid`) as described above.
 
 2. **Reset and start fresh:**
    ```

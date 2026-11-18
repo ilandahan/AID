@@ -47,7 +47,7 @@ echo
 
 echo "[4] Caps respected (counters <= configured maxima)"
 if [ -f "$state" ] && command -v python >/dev/null 2>&1; then
-  python - "$state" "$ROOT/.aid/pipeline/config.json" <<'PY'
+  caps_out=$(python - "$state" "$ROOT/.aid/pipeline/config.json" <<'PY'
 import json,sys
 st=json.load(open(sys.argv[1]))
 try: cfg=json.load(open(sys.argv[2]))
@@ -63,6 +63,11 @@ ar=(cfg.get("autoresearch") or {})
 rounds=it.get("ar_acceptance_rounds",0); rcap=(ar.get("ar_acceptance") or {}).get("max_acceptance_rounds",2)
 print(("  FAIL  " if rounds>rcap else "  PASS  ")+"ar_acceptance_rounds=%s cap %s"%(rounds,rcap))
 PY
+)
+  echo "$caps_out"
+  # T13-7: these checks print their own lines; count them like the others.
+  fail=$((fail + $(printf '%s\n' "$caps_out" | grep -c '^  FAIL' || true)))
+  pass=$((pass + $(printf '%s\n' "$caps_out" | grep -c '^  PASS' || true)))
 else
   wn "cannot check caps (state.json or python missing)"
 fi
@@ -189,7 +194,7 @@ elif [ -z "$sha_cmd" ]; then
   wn "neither sha256sum nor shasum available — rubric fingerprint check skipped (tooling only)"
 else
   # For each AR mode that recorded a rubric_sha256 for a passing run, recompute the SHA-256 over
-  # the active criteria YAML (+ reflection-agent AGENT-PROMPT.md if locatable) and FAIL on drift.
+  # the active criteria YAML (+ the reflection-agent definition agents/reflection-agent.md if locatable) and FAIL on drift.
   recorded=$(python - "$state" <<'PY'
 import json,sys
 try: st=json.load(open(sys.argv[1]))
@@ -245,4 +250,10 @@ fi
 echo
 
 echo "Summary: $pass PASS / $warn WARN / $fail FAIL"
-[ "$fail" -eq 0 ] && echo "=> Pipeline artifacts look correct." || echo "=> Some expectations not met (see FAIL lines)."
+# T13-7: the exit code reflects the result, so CI and callers can rely on it.
+if [ "$fail" -eq 0 ]; then
+  echo "=> Pipeline artifacts look correct."
+  exit 0
+fi
+echo "=> Some expectations not met (see FAIL lines)."
+exit 1

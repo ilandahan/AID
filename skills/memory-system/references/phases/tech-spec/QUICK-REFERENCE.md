@@ -1,8 +1,3 @@
----
-name: memory-system-tech-spec
-description: "Reference for the Tech Spec phase: technical specification authoring."
----
-
 # Tech Spec Phase Skill
 
 > **Source**: `../aid-tech-spec/SKILL.md`
@@ -14,7 +9,7 @@ description: "Reference for the Tech Spec phase: technical specification authori
 
 **Phase**: 2 - Tech Spec
 **Command**: `/tech-spec`
-**Output**: `docs/TECH-SPEC.md`
+**Output**: `docs/tech-spec/`
 
 ### Entry Criteria
 - PRD phase completed and approved

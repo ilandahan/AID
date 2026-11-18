@@ -31,7 +31,7 @@ Different roles think in different terms. This mapping ensures each persona sees
 | 2 | Solution Review | Review technical approach, ensure it aligns with product vision and user needs | aid-tech-spec, system-architect |
 | 3 | Roadmap & Prioritization | Prioritize features, define milestones, coordinate with stakeholders on timeline | - |
 | 4 | Feature Validation & UAT | Validate implemented features against requirements, conduct user acceptance testing | aid-development, atomic-design, atomic-page-builder |
-| 5 | Launch & Go-to-Market | Prepare release communications, coordinate launch, gather initial user feedback | aid-qa-ship |
+| 5 | Launch & Post-Launch | Prepare release communications, coordinate launch, gather initial user feedback | aid-qa-ship |
 
 ---
 

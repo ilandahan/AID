@@ -1,8 +1,3 @@
----
-name: memory-system-development
-description: "Reference for the Development phase: TDD implementation workflow."
----
-
 # Development Phase Skill
 
 > **Source**: `../aid-development/SKILL.md`

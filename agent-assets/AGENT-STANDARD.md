@@ -8,18 +8,23 @@ All agents live in `agents/` — the official Claude Code location and the singl
 source of truth. Linked projects reach it through a symlink (macOS/Linux) or junction
 (Windows), so editing here updates every linked project at once.
 
-## Every Agent Needs TWO Things
+## Every Agent Is ONE File
 
 | Path | Purpose | Required |
 |------|---------|----------|
-| `agents/{agent-name}.md` | **Definition** — YAML frontmatter that makes Claude Code register the agent | YES |
-| `agents/{agent-name}/` | **Assets** — prompt, references, templates, examples | YES |
+| `agents/{agent-name}.md` | **Definition and prompt** — YAML frontmatter that makes Claude Code register the agent, followed by the full prompt inlined in the body | YES |
+| `agent-assets/{agent-name}/` | **Supporting assets** — calibration examples (`examples/good-*.md`, `examples/bad-*.md`) for maintainers | Optional |
+
+`agents/` is **flat**: one self-contained `<agent-name>.md` per agent and nothing else.
+Claude Code registers EVERY `.md` under `agents/` as an agent, recursively, so a subfolder
+there (prompt fragments, examples, templates) would register as junk agents. Never add one.
 
 Without the `.md` definition file Claude Code does **not** register the agent, and
-`subagent_type="{agent-name}"` fails to resolve. The folder alone is not enough.
+`subagent_type="{agent-name}"` fails to resolve.
 
-The definition is a thin loader that points at `AGENT-PROMPT.md` instead of duplicating
-it, so the prompt stays in exactly one place:
+The prompt is inlined in the definition, not loaded from a separate file. A plugin agent
+runs with the user's project as its working directory, so a relative path to an external
+prompt file would resolve against their code, not the plugin:
 
 ```markdown
 ---
@@ -31,127 +36,108 @@ model: inherit            # inherit | opus | sonnet | haiku
 
 One-line identity statement.
 
-Load before working:
-1. `agents/my-agent/AGENT-PROMPT.md` — authoritative prompt
-2. `agents/my-agent/templates/response.json` — exact response shape
+## Context
+Original Request: {{ORIGINAL_REQUEST}}
+
+## Your Task
+...
+
+## Response Format (JSON)
+...
 ```
 
-`testing/e2e/test_agents_and_hooks.py` enforces this: every agent folder must have a
-matching definition, frontmatter `name` must equal the filename, and every file the
-definition references must exist.
+`testing/e2e/test_agents_and_hooks.py` enforces this: `agents/` must contain only `.md`
+definitions (no folders, no nested `.md`), frontmatter `name` must equal the filename,
+`description` must be substantive, and every repo path the definition references in
+backticks must exist.
 
 ---
 
 ## Key Principle: Agents Have Prompts Only
 
-**Agents contain:** The prompt templates and supporting materials sent TO the sub-agent.
+**Agents contain:** The prompt sent TO the sub-agent, inlined in `agents/{agent-name}.md`.
 
 **Skills contain:** Instructions for WHEN and HOW to spawn the agent.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  skills/{skill-name}/SKILL.md                       │
+│  skills/{skill-name}/SKILL.md                               │
 │  "When to spawn, how to extract variables, response handling"│
 └───────────────────────────┬─────────────────────────────────┘
                             │ tells main agent to spawn
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  agents/{agent-name}/AGENT-PROMPT.md                │
-│  "The actual prompt with {{variables}} sent to sub-agent"   │
+│  agents/{agent-name}.md                                     │
+│  "Frontmatter + the prompt with {{variables}}"              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Standard Agent Structure
+## Standard Layout
 
 ```
-{agent-name}/
-├── AGENT-PROMPT.md       # Primary prompt template (REQUIRED)
-├── references/           # Supporting documentation
-│   └── *.md, *.yaml      # Rules, scenarios, context for prompt
-├── templates/            # Response format schemas
-│   └── *.json            # Expected JSON response structures
-└── examples/             # Calibration examples
-    ├── good-*.md         # What correct output looks like
-    └── bad-*.md          # Anti-patterns to avoid
+agents/                       # FLAT - scanned by Claude Code
+├── {agent-name}.md           # Frontmatter + inlined prompt (REQUIRED)
+└── ...
+
+agent-assets/                 # NOT scanned as agents
+├── AGENT-STANDARD.md         # This document
+└── {agent-name}/             # Optional, per agent
+    └── examples/             # Calibration examples
+        ├── good-*.md         # What correct output looks like
+        └── bad-*.md          # Anti-patterns to avoid
 ```
 
-**Note:** No SKILL.md in agent folders. That belongs in `skills/`.
+**Note:** No SKILL.md next to agents. That belongs in `skills/`.
 
 ---
 
 ## File Purposes
 
-### AGENT-PROMPT.md (Required)
+### agents/{agent-name}.md (Required)
 
-The actual prompt sent to the sub-agent. Contains `{{variables}}` that get replaced.
+The frontmatter registers the agent; the body is the actual prompt sent to the sub-agent.
+It contains `{{variables}}` that the spawning agent fills in.
 
-**Contents:**
+**Frontmatter:**
+- `name` - must equal the filename without `.md`
+- `description` - what it does and when to use it (drives delegation)
+- `tools` - the tool allowlist (omit to inherit all tools)
+- `model` - `inherit`, `opus`, `sonnet` or `haiku`
+
+**Body:**
 - Sub-agent identity and role
 - Context section with variable placeholders
 - Task instructions
-- Evaluation criteria (if applicable)
-- Expected response format (JSON schema)
+- Evaluation criteria, rules and scoring guides it needs (inlined, not linked)
+- Expected response format (JSON schema, inlined)
 
-**Example:**
-```markdown
-# Quality Evaluator
+### agent-assets/{agent-name}/examples/ (Optional)
 
-You are an independent evaluator...
-
-## Context
-Original Request: {{ORIGINAL_REQUEST}}
-Stated WHY: {{STATED_WHY}}
-
-## Your Task
-Evaluate the following output...
-
-## Response Format (JSON)
-```json
-{"score": 0, "pass": false, ...}
-```
-```
-
-### references/ (Optional)
-
-Supporting documentation that provides context for the prompt.
-
-**Examples:**
-- `isolation-rules.md` - Rules for context isolation
-- `scoring-guide.md` - How to score outputs
-- `phase-criteria.yaml` - Phase-specific rules
-
-### templates/ (Recommended)
-
-JSON schemas showing expected response format.
-
-**Examples:**
-- `evaluation-response.json` - Schema for evaluation results
-- `review-report.json` - Schema for review output
-
-### examples/ (Recommended)
-
-Calibration examples showing good and bad outputs.
+Calibration examples showing good and bad outputs, for maintainers tuning the prompt.
 
 **Files:**
 - `good-*.md` - Examples of correct, high-quality responses
-- `bad-*.md` - Anti-patterns and what to avoid
+- `bad-*.md` (or `failed-*.md`) - Anti-patterns and what to avoid
+
+The agent does not load these at runtime. Anything the agent must see goes in its
+definition body.
 
 ---
 
 ## Current Sub-Agents
 
-| Agent | Purpose | Prompt Files |
-|-------|---------|--------------|
-| **aid-test-agent** | Validates AID methodology | AGENT-PROMPT.md |
-| **reflection-agent** | Quality evaluation | AGENT-PROMPT.md, SESSION-REVIEW-PROMPT.md |
-| **qa-validator-agent** | Task completion validation | AGENT-PROMPT.md |
-| **phase-review-agent** | Phase gate validation | AGENT-PROMPT.md, phase-prompts/*.md |
-| **memory-analysis-agent** | Feedback analysis & skill improvement | AGENT-PROMPT.md |
-| **code-review-agent** | Isolated code review (security, quality, docs, architecture) | AGENT-PROMPT.md |
-| **test-review-agent** | Isolated test quality review (assertions, coverage, mocks, independence) | AGENT-PROMPT.md |
-| **visual-qa-agent** | Visual/interaction review of a running app in a real browser | AGENT-PROMPT.md |
+| Agent | Purpose | Definition | Assets |
+|-------|---------|------------|--------|
+| **aid-test-agent** | Validates AID methodology | `agents/aid-test-agent.md` | `agent-assets/aid-test-agent/` |
+| **reflection-agent** | Quality evaluation and session review | `agents/reflection-agent.md` | `agent-assets/reflection-agent/` |
+| **qa-validator-agent** | Task completion validation | `agents/qa-validator-agent.md` | `agent-assets/qa-validator-agent/` |
+| **phase-review-agent** | Phase gate validation (all six phase prompts inlined) | `agents/phase-review-agent.md` | `agent-assets/phase-review-agent/` |
+| **memory-analysis-agent** | Feedback analysis & skill improvement | `agents/memory-analysis-agent.md` | `agent-assets/memory-analysis-agent/` |
+| **code-review-agent** | Isolated code review (security, quality, docs, architecture) | `agents/code-review-agent.md` | `agent-assets/code-review-agent/` |
+| **test-review-agent** | Isolated test quality review (assertions, coverage, mocks, independence) | `agents/test-review-agent.md` | `agent-assets/test-review-agent/` |
+| **visual-qa-agent** | Visual/interaction review of a running app in a real browser | `agents/visual-qa-agent.md` | - |
 
 ---
 
@@ -213,18 +199,18 @@ After:  "Original Request: Add user authentication with email/password"
 
 ## Adding a New Sub-Agent
 
-1. Create folder: `agents/{agent-name}/`
-2. Create `AGENT-PROMPT.md` with the full prompt template
-3. Create `references/` with supporting documentation (if needed)
-4. Create `templates/` with response JSON schemas
-5. Create `examples/` with good/bad examples
-6. **Create the definition `agents/{agent-name}.md`** (frontmatter `name` must
-   equal the filename). Without it Claude Code will not register the agent.
-7. Create the corresponding **skill** in `skills/` that tells the main agent when
+1. **Create the definition `agents/{agent-name}.md`** directly in `agents/` (no
+   subfolder). Frontmatter: `name` (must equal the filename), `description`, `tools`,
+   `model`. Without it Claude Code will not register the agent.
+2. Write the full prompt in the body of that file: identity, `{{variables}}`, task,
+   criteria, and the expected JSON response format. Inline anything the agent must read.
+3. Optionally create `agent-assets/{agent-name}/examples/` with good/bad calibration
+   examples
+4. Create the corresponding **skill** in `skills/` that tells the main agent when
    to spawn it
-8. Add it to this document's agent list
-9. Run `python -m pytest testing/e2e/test_agents_and_hooks.py` — it fails if the
-   definition is missing, misnamed, or points at files that do not exist
+5. Add it to this document's agent list
+6. Run `python -m pytest testing/e2e/test_agents_and_hooks.py` — it fails if `agents/`
+   is not flat, or the definition is misnamed or points at files that do not exist
 
 ---
 
@@ -242,4 +228,4 @@ After:  "Original Request: Add user authentication with email/password"
 - **No duplication** - Each piece of info lives in one place
 - **Clear ownership** - Skills own "when", agents own "what"
 - **Easier maintenance** - Update prompt without touching spawn logic
-- **Isolation enforced** - Agent folder has no "instructions for main agent"
+- **Isolation enforced** - The agent file has no "instructions for main agent"

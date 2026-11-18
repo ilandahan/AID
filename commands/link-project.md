@@ -27,7 +27,7 @@ Parent Folder/
 │   ├── .claude/
 │   │   ├── commands/
 │   │   └── skills/
-│   ├── .mcp.json.example
+│   ├── .mcp.json.mac / .mcp.json.windows / .mcp.json.example
 │   └── ...
 │
 └── my-project/         <- Project to link
@@ -60,9 +60,34 @@ my-project/
 6. **Create .aid Directory** with a fresh `context.json`. Do not write `.aid/state.json`:
    only `aid_session.py` writes it. It is created when the user runs `/aid-start` in the
    linked project: with no `state.json` it runs `init`, which the user confirms.
-7. **Copy .mcp.json.example** to target as `.mcp.json`
+7. **Create `.mcp.json`** in the target: the link scripts copy `.mcp.json.mac` (macOS/Linux)
+   or `.mcp.json.windows` (Windows); for the minimal set, copy `.mcp.json.example` by hand
+   instead (see "MCP Configuration" below)
 8. **Link CLAUDE.md** for methodology instructions
 9. **Show Success** with next steps
+
+## MCP Configuration
+
+`.mcp.json.example` at the AID root holds the MCP servers the integration guides
+document, with the same names, commands and pinned versions:
+
+| Server | How it runs | Environment variables | Guide |
+|--------|-------------|-----------------------|-------|
+| `github` | HTTP, `https://api.githubcopilot.com/mcp/` | `GITHUB_PERSONAL_ACCESS_TOKEN` | `integrations/github/README.md` |
+| `jira` | `npx -y @aashari/mcp-server-atlassian-jira@3.3.0` | `ATLASSIAN_SITE_URL`, `ATLASSIAN_USER_EMAIL`, `ATLASSIAN_API_TOKEN` | `integrations/jira/README.md` |
+| `chrome-devtools` | `npx -y chrome-devtools-mcp@1.12.0` | none | `integrations/chrome-devtools/README.md` |
+
+Every secret in the file is a placeholder such as `"${ATLASSIAN_API_TOKEN:-}"`, which
+Claude Code expands from your environment when it starts the server. **Provide your
+tokens through environment variables, never in the file.** Keep them in your OS keystore
+(macOS Keychain, Windows Credential Manager, Linux libsecret) and export them into the
+shell you start `claude` from; see the integration guides for the exact commands. Never
+replace a placeholder with a real token: `.mcp.json` is gitignored, but a token in a file
+can still leak through backups, copies or a mistaken `git add -f`.
+
+The `link-project.sh` / `link-project.bat` scripts copy the per-OS templates
+`.mcp.json.mac` / `.mcp.json.windows` instead. Those contain the same three servers plus
+`filesystem` and `confluence`, and use the same environment-variable placeholders.
 
 ## Windows Commands (Run as Admin or with Developer Mode)
 

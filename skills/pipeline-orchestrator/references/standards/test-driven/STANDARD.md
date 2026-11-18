@@ -1,8 +1,3 @@
----
-name: test-driven
-description: TDD methodology for production-quality tests. Write tests FIRST driven by PRD, Tech Spec, Implementation Plan. Covers minimal mocking, realistic test data, strong assertions, test independence.
----
-
 # Test-Driven Development Skill
 
 Write tests FIRST, driven by project documents.
