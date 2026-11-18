@@ -1,5 +1,6 @@
 ---
 description: "Start/enable breather - session break offers, presence tracking, status line"
+disable-model-invocation: true
 ---
 
 # /breather-start — Enable Breather

@@ -1,26 +1,24 @@
 ---
 description: "Disable full automation mode - restore confirmation prompts"
+disable-model-invocation: true
 ---
 
-# YOLO Mode - Disable Full Automation
+# YOLO Mode - Restore Permission Prompts
 
-To disable YOLO mode and restore permission prompts:
+To remove allow rules you added with `/yolo`, use the built-in command:
 
 ```
 /permissions
 ```
 
-Then remove these patterns:
-- `Bash(*)`
-- `Edit(*)`
-- `Write(*)`
-- `Read(*)`
+Then delete the rules you no longer want, for example `Bash(npm test)` or `Edit(src/**)`. If
+you ever added broad rules such as `Bash(*)`, `Edit(*)` or `Write(*)`, remove those too.
 
-Or edit `.claude/settings.json` and remove the allowed tools, then restart Claude Code.
+If you started Claude Code with `--dangerously-skip-permissions`, restart it without that flag.
+**Warning:** that flag skips Claude Code's permission prompts for normal tools. AID's ask rules
+for phase changes and memory writes still prompt in every permission mode, and its deny rules
+and phase gates still apply. See `docs/SECURITY-MODEL.md`.
 
 ## Safe Mode Restored
 
-After disabling, you will be asked for confirmation before:
-- Running bash commands
-- Editing files
-- Writing new files
+After this, Claude Code asks before any tool call that no remaining allow rule covers.

@@ -58,8 +58,8 @@ meaningless and the pass is invalid:
   bar easier. Changing a test is changing the ruler. If a test is genuinely wrong, that is
   a TDD-stage concern — STOP and escalate to the user; do not "fix" it here.
 - `{{TEST_COMMAND}}` + coverage tooling — the deterministic scorer.
-- `reflection-agent` (`subagent_type: general-purpose`, `model: opus`) — the quality scorer. **Resolve project→user:** load `../../agents/reflection-agent.md` from `{{WORKSPACE}}/.claude/…` if present, else `~/.claude/…` (the engine ships user-level).
-- `~/.claude/skills/autoresearch/criteria/phase-4b-code-function.yaml` (user-level bundle default; project may override at `{{WORKSPACE}}/.claude/skills/autoresearch/criteria/`) — the criteria.
+- `reflection-agent` (`subagent_type: "aid:reflection-agent"`, (no fallback: if `aid:reflection-agent` does not resolve, STOP this step and tell the user the AID plugin is required; a bare name could pick a project's own copy as the judge)) — the quality scorer. It comes only from the plugin, spawned by name; never load a workspace or user copy.
+- the plugin's `skills/reflection/criteria/phase-4b-code-function.yaml` (never a workspace or user copy) — the criteria.
 - `.aid/state.json`, `.aid/context.json`, `.aid/pipeline/config.json` — read-only metadata.
 - `.mcp.json` and any AID/skill/agent prompt or command file.
 
@@ -144,15 +144,14 @@ The **weighted reflection-agent score** over `phase-4b-code-function.yaml`. Dime
       TDD just left it green) and coverage %. These define the Tier-1 baseline.
    b. Record the baseline set of silent-failure sites (so later diffs only flag NEW ones).
    c. Spawn the reflection-agent for the Tier-2 quality score:
-      - Tool: `Task`, `subagent_type: general-purpose`, `model: opus`. Spawn the subagent
-        named `reflection-agent`.
-      - Load `{{WORKSPACE}}/.claude/agents/reflection-agent.md`
-        and fill its variable contract:
+      - Tool: `Task`, `subagent_type: "aid:reflection-agent"`
+        (no fallback: if `aid:reflection-agent` does not resolve, STOP this step and tell the user the AID plugin is required; a bare name could pick a project's own copy as the judge). The agent brings its own prompt from the plugin.
+      - Pass only its variable contract:
         - `ORIGINAL_REQUEST` — verbatim from `.aid/context.json`.
         - `STATED_WHY` — verbatim from `.aid/context.json`.
         - `PHASE_NUMBER`: 4, `PHASE_NAME`: "Code (function)".
         - `PHASE_CRITERIA` — full contents of
-          `~/.claude/skills/autoresearch/criteria/phase-4b-code-function.yaml` (user-level bundle default; project may override at `{{WORKSPACE}}/.claude/skills/autoresearch/criteria/`).
+          the plugin's `skills/reflection/criteria/phase-4b-code-function.yaml` (never a workspace or user copy).
         - `OUTPUT_TO_EVALUATE` — full current contents of the mutable production files.
         - `FILES_TO_VERIFY` — the mutable set + any files they import/reference.
    d. Compute baseline `composite = quality * (all Tier-1 gates pass ? 1 : 0)`.

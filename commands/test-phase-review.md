@@ -45,7 +45,7 @@ When invoked, spawn a test agent:
 
 ```
 Task(
-  subagent_type: "general-purpose",
+  subagent_type: "general-purpose",   # no AID agent for this job
   prompt: "You are testing the phase-review-agent for accuracy.
 
 OUTPUT TO: .aid/agent-tests/phase-review-test-{timestamp}/

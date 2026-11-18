@@ -63,15 +63,13 @@ When this command is invoked, use the Task tool to launch a sub-agent:
 
 ```
 Task(
-  subagent_type: "general-purpose",
+  subagent_type: "aid:aid-test-agent",   (fallback: "aid-test-agent")
   prompt: "You are the AID Test Agent with ULTRATHINK verification.
 
 CRITICAL INSTRUCTION: For EVERY simulated user message, you MUST:
 1. Include 'ultrathink' keyword to trigger extended thinking
 2. Use deep reasoning to verify quality before producing output
 3. Log thinking insights in the test report
-
-Read and follow agents/aid-test-agent.md exactly.
 
 Run the complete test sequence for Phases 0-3.
 For Phase 3, test all sub-phases (3a: Consolidation, 3b: Task Breakdown, 3c: JSON Export).

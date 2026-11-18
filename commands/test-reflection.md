@@ -47,7 +47,7 @@ When invoked, spawn a test agent:
 
 ```
 Task(
-  subagent_type: "general-purpose",
+  subagent_type: "general-purpose",   # no AID agent for this job
   prompt: "You are testing the reflection-agent for isolation and accuracy.
 
 OUTPUT TO: .aid/agent-tests/reflection-test-{timestamp}/

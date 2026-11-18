@@ -1,5 +1,6 @@
 ---
 description: "Record human sign-off for the current phase"
+disable-model-invocation: true
 ---
 
 # /phase-approve Command

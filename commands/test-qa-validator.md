@@ -44,7 +44,7 @@ When invoked, spawn a test agent:
 
 ```
 Task(
-  subagent_type: "general-purpose",
+  subagent_type: "general-purpose",   # no AID agent for this job
   prompt: "You are testing the qa-validator-agent for accuracy.
 
 OUTPUT TO: .aid/agent-tests/qa-validator-test-{timestamp}/

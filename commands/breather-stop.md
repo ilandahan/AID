@@ -1,5 +1,6 @@
 ---
 description: "Stop breather - snooze offers, skip today, or uninstall completely"
+disable-model-invocation: true
 ---
 
 # /breather-stop — Pause or Remove Breather

@@ -1,5 +1,6 @@
 ---
 description: "Link an existing project to AID so it shares one source of truth"
+disable-model-invocation: true
 ---
 
 # /link-project

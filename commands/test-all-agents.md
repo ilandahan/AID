@@ -30,7 +30,7 @@ When invoked, run all agent tests:
 
 ```
 Task(
-  subagent_type: "general-purpose",
+  subagent_type: "general-purpose",   # no AID agent for this job
   prompt: "Run comprehensive tests for all AID agents.
 
 OUTPUT TO: .aid/agent-tests/full-suite-{timestamp}/

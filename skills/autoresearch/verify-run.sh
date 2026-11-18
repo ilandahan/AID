@@ -205,18 +205,19 @@ PY
   if [ -z "$recorded" ]; then
     wn "state.json records no rubric_sha256 — nothing to verify (fingerprint not yet captured)"
   else
-    # Locate the reflection-agent prompt (workspace-level, never a user-level path).
+    # T10 (D2): the scorer prompt and its criteria come ONLY from this plugin (the folder two
+    # levels above this script), never from the workspace or a user-level copy, so a project
+    # cannot swap its own judge.
+    # -P: through a symlink (link-project), resolve to the real plugin folder, not the project.
+    plugin_root="$(cd -P "$(dirname "$0")/../.." && pwd -P)"
     agent_prompt=""
-    for cand in "$ROOT/.claude/agents/reflection-agent.md"; do
-      [ -r "$cand" ] && { agent_prompt="$cand"; break; }
-    done
-    # Workspace-level criteria dir (per the note above: never a user-level path).
-    cdir="$ROOT/.claude/skills/reflection/criteria"
+    [ -r "$plugin_root/agents/reflection-agent.md" ] && agent_prompt="$plugin_root/agents/reflection-agent.md"
+    cdir="$plugin_root/skills/reflection/criteria"
     while IFS=$'\t' read -r mode rhash cpath; do
       [ -z "$rhash" ] && continue
       yaml=""
-      if [ -n "$cpath" ] && [ -r "$ROOT/$cpath" ]; then yaml="$ROOT/$cpath"
-      elif [ -n "$cpath" ] && [ -r "$cpath" ]; then yaml="$cpath"
+      # A recorded path is used only by its file name, inside the plugin's criteria folder.
+      if [ -n "$cpath" ] && [ -r "$cdir/$(basename "$cpath")" ]; then yaml="$cdir/$(basename "$cpath")"
       else
         case "$mode" in
           *design*)   yaml=$(ls "$cdir"/*design*.yaml 2>/dev/null | head -1) ;;

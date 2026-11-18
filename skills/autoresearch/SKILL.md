@@ -167,8 +167,8 @@ below is identical across modes.
    the baseline dimension scores, `status=baseline`, the baseline snapshot tag, and UTC.
 7. **Record the rubric fingerprint (harness-tamper detection).** At PASS START — once, here in
    setup — compute a SHA-256 fingerprint over the EXACT bytes of the harness inputs that define
-   the score: the active mode's **criteria YAML** plus the reflection-agent's
-   `{{WORKSPACE}}/.claude/agents/reflection-agent.md` (concatenate the files in a
+   the score: the active mode's **criteria YAML** plus the plugin's
+   `agents/reflection-agent.md` (concatenate the files in a
    fixed order, then hash). Record it in `state.json` under
    `state.autoresearch.<mode>.rubric_sha256` and note it in the stop summary. The whole point of
    the keep/revert loop is comparing scores across iterations against a FIXED harness — if the
@@ -198,13 +198,14 @@ For each iteration:
    ```
 4. **Apply the edit.** Edit only the mutable source. Some per-pass files allow a bounded set of
    internal refine rounds before official scoring — follow the file; default is one apply.
-5. **Score via the pass's harness.** **First, re-verify the harness fingerprint** (mid-pass tamper guard): recompute the rubric SHA-256 (criteria YAML + reflection-agent `AGENT-PROMPT.md`, same recipe as setup step 7) and compare it to the recorded `state.autoresearch.<mode>.rubric_sha256`; on mismatch, HALT the pass loudly with status `rubric-tampered` — every score across the change is incomparable — instead of waiting for the out-of-band `verify-run.sh`. Then run the per-pass harness exactly as that file specifies
+5. **Score via the pass's harness.** **First, re-verify the harness fingerprint** (mid-pass tamper guard): recompute the rubric SHA-256 (criteria YAML + the plugin's `agents/reflection-agent.md`, same recipe as setup step 7) and compare it to the recorded `state.autoresearch.<mode>.rubric_sha256`; on mismatch, HALT the pass loudly with status `rubric-tampered` — every score across the change is incomparable — instead of waiting for the out-of-band `verify-run.sh`. Then run the per-pass harness exactly as that file specifies
    (e.g. `design`: reflection-agent only; `function`: `{{TEST_COMMAND}}` + coverage as Tier-1
    gates × reflection quality; `acceptance`: validators + reflection). Compute the **composite**
    per the file's formula. This is the official iteration score.
-   > **reflection-agent harness:** spawn the subagent named `reflection-agent` and load its
-   > prompt from `{{WORKSPACE}}/.claude/agents/reflection-agent.md`. NEVER hardcode
-   > a user-level path (e.g. `~/.claude/skills/reflection/...`) — it does not exist.
+   > **reflection-agent harness:** spawn it by name, `subagent_type: "aid:reflection-agent"`
+   > (no fallback: if `aid:reflection-agent` does not resolve, STOP this step and tell the user the AID plugin is required; a bare name could pick a project's own copy as the judge), passing only its inputs. The scorer and its criteria
+   > come only from the plugin (`agents/reflection-agent.md`, `skills/reflection/criteria/`);
+   > never load a workspace or user copy, so a project cannot replace its own judge.
 6. **Keep or revert (STRICT improvement).**
    - If `composite > best_score` (strictly greater): `status = kept`; set `best_score = composite`;
      leave the edited files on disk; reset `consecutive_reverts = 0`.

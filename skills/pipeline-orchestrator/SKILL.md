@@ -252,7 +252,7 @@ the already-clean band.
 
 **Reviewer resolution.** Resolve `configo:architecture-reviewer` if it is available, else
 `aid:phase2-techspec-pm-reviewer`. Both are plugin agents addressed by NAME — there is no
-`~/.claude/agents/phase2-techspec-pm-reviewer.md` file to fall back to. If neither resolves, log a
+agent file to read and fall back to. If neither resolves, log a
 warning and SKIP to DEVELOP. Skipping is legitimate here precisely because the step is advisory; a
 gated step may never be skipped for a missing reviewer.
 
@@ -390,12 +390,12 @@ Focus on the lowest-scoring categories first.
 
 **CRITICAL: Each sub-agent MUST be spawned as an isolated Agent (sub-agent) using the Agent tool. DO NOT evaluate the code yourself — the whole point is isolated, unbiased review.**
 
-**Path resolution (project → user fallback).** Every `.claude/agents/<name>.md` (agents are FLAT files, one `.md` per agent — there is no `<name>/AGENT-PROMPT.md` layout) and `.claude/skills/reflection/criteria/...` path below is **resolved project-first, then user-level**: if `{{WORKSPACE}}/.claude/<path>` exists use it, else fall back to `~/.claude/<path>` (the user-level default engine). This is what lets the pipeline run in ANY project — the orchestrator, reflection criteria, and the `reflection-agent` / `code-review-agent` / `test-review-agent` prompts all ship at user level and are overridden per-project only when a project provides its own. If neither location has a required agent prompt, skip that step with a logged warning where the step is optional (e.g. VISUAL_QA), or fall back to the user-level `code-review` / `test-driven` skills for review guidance.
+**Agents are spawned by name.** Every review agent below is a plugin agent, spawned as `aid:<name>` (fallback: the bare `<name>` in a repo checkout without the plugin). Its prompt, `tools:` list and model come from the plugin's own `agents/<name>.md`, so the spawn passes only the task inputs (the `{{VARIABLES}}`). Never read an agent file and paste it as the prompt, and never run the job as `general-purpose`: that agent has every tool, whatever the AID agent's `tools:` says. When the `aid:` name resolves, a project cannot replace a reviewer with its own copy (with the bare-name fallback, a project `.claude/agents/<name>.md` would win). Reflection criteria are read from the plugin's `skills/reflection/criteria/`. If a required agent resolves under neither name, skip that step with a logged warning where the step is optional (e.g. VISUAL_QA), or fall back to the `code-review` / `test-driven` skills for review guidance.
 
 **Best-practice standards (how the pipeline knows TDD / review rules).** The methodology the stages follow is resolved **project → engine**:
 - **DEVELOP / TDD** follow the TDD standard: prefer a project-level `test-driven` skill (`{{WORKSPACE}}/.claude/skills/test-driven/`) if present (AID projects ship one); else use the **engine-bundled AID standard** at `<this skill>/references/standards/test-driven/` (`SKILL.md` + `SKILL.extended.md` + `references/`: anti-patterns, test-patterns, test-data-factories, integration-testing, review-checklist, test-writing-guide, gui-testing). These cover RED-GREEN-REFACTOR, minimal mocking, realistic data, strong assertions, test independence.
 - **Test source:** in an AID project, tests are driven by the PRD / Tech-Spec / Impl-Plan (and Cucumber `.feature` files = acceptance criteria). In a non-AID project those don't exist — derive test targets from the **frozen `brief.md`** (original request + WHY + approved plan). Do NOT try to read `docs/prd/…` when it is absent.
-- **CODE_REVIEW** standards = the engine-bundled AID `code-review` skill at `<this skill>/references/standards/code-review/` (a project-level `.claude/skills/code-review/` overrides it); **TEST_REVIEW** = `<this skill>/references/standards/test-driven/references/review-checklist.md` (project `test-driven` skill overrides). **AR passes** use the reflection `criteria/*.yaml`. All of these ship with the engine, so the pipeline carries its own best-practice knowledge in any project.
+- **CODE_REVIEW** standards = the engine-bundled AID `code-review` skill at `<this skill>/references/standards/code-review/` (a project-level `.claude/skills/code-review/` overrides it); **TEST_REVIEW** = `<this skill>/references/standards/test-driven/references/review-checklist.md` (project `test-driven` skill overrides). **AR passes** use the reflection `criteria/*.yaml`. All of these ship with the engine, so the pipeline carries its own best-practice knowledge in any project. **Accepted risk (T10 A3):** a project's own `code-review` or `test-driven` skill changes the standards the reviewers are given; the reviewer agents, their tools and the QA validator stay the plugin's. See `docs/SECURITY-MODEL.md`.
 
 ### When a spawned agent reports no result
 
@@ -451,20 +451,17 @@ See also the table in `SKILL.extended.md` under **Sub-Agent Returned No Usable R
    run here, so the falsifier costs nothing.
 3. Read relevant section from `docs/tech-spec/` → this is `{{TECH_SPEC_EXCERPT}}`. **In a non-AID project `docs/tech-spec/` won't exist — if it is absent or empty, derive the architectural reference from the frozen `.aid/pipeline/<task_id>/brief.md` (ORIGINAL_REQUEST + STATED_WHY + DEVELOP plan), the same source AR_ACCEPTANCE and qa-validator use, and state in `{{TECH_SPEC_EXCERPT}}` that no formal tech-spec exists so the agent reviews the Architecture category against the brief rather than silently scoring it against nothing. Never review architecture against nothing.**
 4. Read `<this skill>/references/standards/code-review/SKILL.md` verbatim (project `.claude/skills/code-review/SKILL.md` if present) → this is `{{CODE_STANDARDS}}`
-5. Read `.claude/agents/code-review-agent.md` (project-first, else `~/.claude/agents/code-review-agent.md`)
-6. Replace all `{{VARIABLE}}` placeholders with extracted values
-7. Spawn the agent:
+5. Spawn the agent by name, passing the extracted values as its `{{VARIABLE}}` inputs (it brings its own prompt; do not read or paste its agent file):
 
 ```
 Agent(
-  subagent_type: "general-purpose",
-  prompt: [the rendered agent .md with all variables replaced],
-  description: "Isolated code review — pipeline step",
-  model: "opus"
+  subagent_type: "aid:code-review-agent",   (fallback: "code-review-agent")
+  prompt: [the inputs only: each {{VARIABLE}} value gathered above],
+  description: "Isolated code review — pipeline step"
 )
 ```
 
-8. Parse the returned JSON response
+6. Parse the returned JSON response
 
 **Parse response — the decision is NOT yours to make. Run the gate:**
 
@@ -575,19 +572,17 @@ never averages against a phantom. If NEITHER produced a score, that is ERROR —
 2. Read all production source files modified in current task → `{{IMPLEMENTATION_FILES}}`
 3. Read corresponding test files → `{{TEST_FILES}}`
 4. Run test command, capture output → `{{TEST_RESULTS}}`
-5. Read `.claude/agents/test-review-agent.md` (project-first, else `~/.claude/agents/test-review-agent.md`), replace variables
-6. Spawn:
+5. Spawn the agent by name, passing these values as its inputs (it brings its own prompt; do not read or paste its agent file):
 
 ```
 Agent(
-  subagent_type: "general-purpose",
-  prompt: [rendered agent .md],
-  description: "Isolated test review — pipeline step",
-  model: "opus"
+  subagent_type: "aid:test-review-agent",   (fallback: "test-review-agent")
+  prompt: [the inputs only: {{TASK_CONTEXT}}, {{IMPLEMENTATION_FILES}}, {{TEST_FILES}}, {{TEST_RESULTS}}],
+  description: "Isolated test review — pipeline step"
 )
 ```
 
-7. Parse the returned JSON response
+6. Parse the returned JSON response
 
 **Parse response — the decision is NOT yours to make. Run the gate:**
 
@@ -627,11 +622,10 @@ numbers and neither invents one from today's config.)
 ### visual-qa-agent
 
 **Prerequisites check (before spawning):**
-1. Verify the agent prompt resolves: resolve `.claude/agents/visual-qa-agent.md`
-   **project-first then user-level** (`{{WORKSPACE}}/.claude/agents/visual-qa-agent.md`,
-   else `~/.claude/agents/visual-qa-agent.md`). If it does NOT resolve in either location
+1. Verify the agent resolves by name: `aid:visual-qa-agent` (fallback: `visual-qa-agent`).
+   If it resolves under neither name
    → log a warning and SKIP VISUAL_QA → advance to TEST_REVIEW (consistent with the documented
-   optional-step behavior). Normally the path resolves (a real prompt ships at user level).
+   optional-step behavior). Normally it resolves (the agent ships with the plugin).
 2. Verify the configured dev server is running: navigate to `{{TARGET_URL}}` with the available browser tooling and inspect the main-document response status. Expect HTTP 200; if navigation fails or the status cannot be verified, treat this prerequisite as unmet. This is a readiness check, not a data-upload step.
 3. Verify Chrome DevTools MCP is available: check for `mcp__chrome-devtools__navigate_page` tool
 4. If any of these fails → skip VISUAL_QA with warning, advance to TEST_REVIEW
@@ -642,19 +636,17 @@ numbers and neither invents one from today's config.)
 2. Read `config.visual_qa.dev_server_url` (default: `http://localhost:5173`) → `{{TARGET_URL}}`
 3. Read `step_summaries.DEVELOP` from state.json → `{{IMPLEMENTATION_SUMMARY}}`
 4. List routes/pages from changed files or tech spec → `{{PAGES_TO_TEST}}`
-5. Read the resolved `visual-qa-agent.md`, replace variables
-6. Spawn:
+5. Spawn the agent by name, passing these values as its inputs (it brings its own prompt; do not read or paste its agent file):
 
 ```
 Agent(
-  subagent_type: "general-purpose",
-  prompt: [rendered agent .md],
-  description: "Isolated visual QA — pipeline step",
-  model: "opus"
+  subagent_type: "aid:visual-qa-agent",   (fallback: "visual-qa-agent")
+  prompt: [the inputs only: {{TASK_CONTEXT}}, {{TARGET_URL}}, {{IMPLEMENTATION_SUMMARY}}, {{PAGES_TO_TEST}}],
+  description: "Isolated visual QA — pipeline step"
 )
 ```
 
-7. Parse the returned JSON response
+6. Parse the returned JSON response
 
 **Parse response — the decision is NOT yours to make. Run the gate:**
 
@@ -713,9 +705,9 @@ Focus on functionality issues first, then craft, then design quality.
 
 ### qa-validator-agent
 
-PHASE_GATE spawns the `qa-validator-agent` via its prompt file (NOT an inline hardcoded prompt),
-resolved **project-first then user-level** — the same resolution code-review-agent / test-review-agent
-use (see "Path resolution" above).
+PHASE_GATE spawns the plugin's `qa-validator-agent` by name, `aid:qa-validator-agent` (fallback
+`qa-validator-agent`), passing only its inputs (see "Agents are spawned by name" above). It is
+never resolved from a project or user copy.
 
 **Step-by-step execution (follow exactly):**
 
@@ -726,23 +718,19 @@ use (see "Path resolution" above).
      `.aid/pipeline/<task_id>/brief.md` (`ORIGINAL_REQUEST` + `STATED_WHY` + DEVELOP plan — the SAME
      source `AR_ACCEPTANCE` uses) → this is `{{ACCEPTANCE_CRITERIA}}`. Never validate against nothing.
 3. Run `git diff --name-only HEAD` → read each changed file's full content → this is `{{CHANGED_FILES}}`
-4. Resolve `.claude/agents/qa-validator-agent.md` **project-first then user-level**
-   (`{{WORKSPACE}}/.claude/agents/qa-validator-agent.md`, else
-   `~/.claude/agents/qa-validator-agent.md`). Read it.
-5. Replace all `{{VARIABLE}}` placeholders — `{{TASK_CONTEXT}}`, `{{ACCEPTANCE_CRITERIA}}`,
-   `{{CHANGED_FILES}}` — with the extracted values.
-6. Spawn the agent:
+4. Spawn the agent by name. Pass only its inputs — `{{TASK_CONTEXT}}`, `{{ACCEPTANCE_CRITERIA}}`,
+   `{{CHANGED_FILES}}` — with the extracted values; it brings its own prompt (do not read or
+   paste its agent file):
 
 ```
 Agent(
-  subagent_type: "general-purpose",
-  prompt: [the rendered agent .md with all variables replaced],
-  description: "QA validation — pipeline PHASE_GATE",
-  model: "opus"
+  subagent_type: "aid:qa-validator-agent",   (fallback: "qa-validator-agent")
+  prompt: [the inputs only: {{TASK_CONTEXT}}, {{ACCEPTANCE_CRITERIA}}, {{CHANGED_FILES}}],
+  description: "QA validation — pipeline PHASE_GATE"
 )
 ```
 
-7. Parse the returned JSON response.
+5. Parse the returned JSON response.
 
 **Parse response — the decision is NOT yours to make. Run the gate:**
 
@@ -772,7 +760,7 @@ DEVELOP — not PHASE_GATE failures. The cost limit remains an additional safety
 These three steps do NOT spawn a review agent that returns a single JSON verdict. Instead they
 invoke the shared **autoresearch runner skill** in the matching mode, which runs the bounded
 keep/revert loop and itself spawns the harness agents — the subagent named `reflection-agent`
-(prompt loaded from `{{WORKSPACE}}/.claude/agents/reflection-agent.md`, else `~/.claude/agents/reflection-agent.md`), and for AR-3
+(spawned by name as `aid:reflection-agent` with no fallback; if it does not resolve, the AR step stops and tells the user; never loaded from a workspace or user copy), and for AR-3
 the phase5-acceptance-validator / phase4-intent-validator:
 
 | Step | Mode | Prompt file | On success | On gap/incomplete |

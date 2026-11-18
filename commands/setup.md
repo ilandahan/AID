@@ -1,5 +1,6 @@
 ---
 description: "Complete guided AID setup, step by step, for new users"
+disable-model-invocation: true
 ---
 
 # /setup — Complete Guided Setup

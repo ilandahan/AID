@@ -94,9 +94,8 @@ Do NOT cherry-pick. Let the agent determine relevance.
 
 ```
 Task(
-  subagent_type: "general-purpose",
-  model: "opus",
-  prompt: [Rendered AGENT-PROMPT.md with variables],
+  subagent_type: "aid:reflection-agent",   (fallback: "reflection-agent")
+  prompt: [the task variables, filled in; the agent brings its own prompt],
   description: "Objective quality evaluation"
 )
 ```

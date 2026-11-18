@@ -46,13 +46,16 @@ Sub-agents are powerful because they have **no bias from the main conversation**
 
 ## Spawning Pattern
 
-All sub-agents use the Task tool:
+All sub-agents are spawned BY NAME with the Task tool. The plugin is `aid`, so
+`agents/<agent-name>.md` is `aid:<agent-name>`; in a repo checkout without the plugin the
+bare name works. The agent's prompt, `tools:` list and model come from its own agent file,
+so the Task prompt passes only the inputs (its `{{VARIABLES}}`). Never run an AID agent's
+job as `general-purpose`: that agent has every tool, whatever the AID agent's `tools:` says.
 
 ```
 Task(
-  subagent_type: "general-purpose",
-  model: "opus",
-  prompt: [Rendered prompt with variables],
+  subagent_type: "aid:<agent-name>",   (fallback: "<agent-name>")
+  prompt: [the task inputs: the agent's {{VARIABLES}}, filled in],
   description: "[Brief description]"
 )
 ```

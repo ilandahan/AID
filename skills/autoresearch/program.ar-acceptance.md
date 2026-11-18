@@ -68,14 +68,12 @@ as read-only inputs to the evaluation:
    for this feature. Do NOT summarize.
 3. **`reflection-agent`** + existing **`phase-5-qa-ship.yaml`**. Its
    `why_alignment` criterion is **weight 3** — that is your "delivers the
-   promised value" signal. **Path resolution (project → user):** resolve both the
-   criteria file `../reflection/criteria/phase-5-qa-ship.yaml` and the
-   agent prompt `../../agents/reflection-agent.md` from
-   `{{WORKSPACE}}/.claude/…` if present, else from the user-level default
-   `~/.claude/…` (the engine ships user-level). Spawn the subagent named
-   `reflection-agent` (Task, `subagent_type: general-purpose`, `model: opus`,
-   AGENT-PROMPT.md with variables filled). Only if `phase-5-qa-ship.yaml` is absent
-   in **both** locations do you **ESCALATE** (criteria file is required). Variable contract:
+   promised value" signal. **The scorer comes only from the plugin:** spawn it by
+   name, `subagent_type: "aid:reflection-agent"` (no fallback: if `aid:reflection-agent` does not resolve, STOP this step and tell the user the AID plugin is required; a bare name could pick a project's own copy as the judge),
+   passing only the variables below; never load a workspace or user copy of the agent.
+   Read the criteria only from the plugin's `skills/reflection/criteria/phase-5-qa-ship.yaml`,
+   never from the workspace. If that file is absent, **ESCALATE** (criteria file is
+   required). Variable contract:
    - `ORIGINAL_REQUEST` / `STATED_WHY` — as above.
    - `PHASE_NUMBER`: 5, `PHASE_NAME`: "QA & Ship".
    - `PHASE_CRITERIA`: contents of `phase-5-qa-ship.yaml`.
@@ -100,7 +98,7 @@ If `phase5-acceptance-validator` and/or `phase4-intent-validator` are **NOT
 present** in the current project (e.g. the project ships only the
 `reflection-agent`), then:
 
-- Fall back to: **`reflection-agent` + `phase-5-qa-ship.yaml` (resolved project→user
+- Fall back to: **`reflection-agent` + `phase-5-qa-ship.yaml` (read from the plugin,
   per item 3) + the tiered acceptance source (item 6).**
 - Derive `pass_rate` **directly from the acceptance criteria** (the tiered source —
   `qa/{{TASK_ID}}.yaml` if present, else brief-derived): walk every criterion, mark
@@ -136,7 +134,7 @@ from the frozen `brief.md`** per the tiered source (item 6, tier 2). Only if
    the wrong thing. Do not proceed on conversation memory alone.
 3. Resolve the acceptance source per the tiered rule (item 6): `.aid/qa/{{TASK_ID}}.yaml`
    if present, else brief-derived. Detect whether `phase5-acceptance-validator`
-   and `phase4-intent-validator` exist (project→user under `../../agents/`). Decide
+   and `phase4-intent-validator` resolve by name (`aid:phase5-acceptance-validator`, `aid:phase4-intent-validator`, or the bare names). Decide
    full-mode vs fallback-mode and note it.
 4. Ensure `.aid/pipeline/autoresearch/{{TASK_ID}}/` exists; if not, create it.
    Read `{{RECORD_FILE}}` (`results.tsv`). If it lacks an acceptance header,

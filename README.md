@@ -696,8 +696,8 @@ AID provides **44 slash commands** organized by workflow.
 | `/pipeline` | Start or resume the automated 12-step dev pipeline |
 | `/pipeline-status` | Show current pipeline state and step history |
 | `/reflect` | Detailed breakdown of the last Quality Check (`--history`, `--strict`, `--explain`) |
-| `/yolo` | Enable full automation (skip confirmations) |
-| `/yolo-off` | Disable full automation (restore confirmations) |
+| `/yolo` | How to allow specific commands without prompts (scoped allow rules) |
+| `/yolo-off` | How to remove the allow rules you added |
 | `/breather-start` | Enable [breather](#breather-knowing-when-to-stop) - break offers, presence tracking, status line |
 | `/breather-stop` | Snooze breather offers, skip today, or uninstall |
 

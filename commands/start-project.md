@@ -1,5 +1,6 @@
 ---
 description: "Initialize a brand new project from scratch"
+disable-model-invocation: true
 ---
 
 # /start-project Command

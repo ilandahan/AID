@@ -31,9 +31,8 @@ Before Phase N -> N+1:
 1. Spawn the **phase-review-agent** using the Task tool:
    ```
    Task(
-     subagent_type: "general-purpose",
-     model: "opus",
-     prompt: [Read ../../agents/phase-review-agent.md, replace {{PHASE_NUMBER}}, {{PHASE_NAME}}, {{PHASE_CHECKLIST}}, {{DELIVERABLES}}],
+     subagent_type: "aid:phase-review-agent",   (fallback: "phase-review-agent")
+     prompt: [the inputs only: {{PHASE_NUMBER}}, {{PHASE_NAME}}, {{PHASE_CHECKLIST}}, {{DELIVERABLES}}],
      description: "Phase gate validation"
    )
    ```

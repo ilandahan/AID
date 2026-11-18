@@ -300,7 +300,7 @@ Task(
   subagent_type: "aid:memory-analysis-agent",   # fallback: "memory-analysis-agent";
                                                # tools: Read, Grep, Glob (no Write)
   model: "inherit",
-  prompt: [Read ../../agents/memory-analysis-agent.md],
+  prompt: [the inputs below, filled in; the agent brings its own prompt],
   description: "Memory system improvement analysis"
 )
 ```

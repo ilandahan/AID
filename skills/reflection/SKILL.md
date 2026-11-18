@@ -40,9 +40,8 @@ DO NOT: ❌ summarize the request; ❌ explain your decisions; ❌ include conve
 
 ```
 Task(
-  subagent_type: "general-purpose",
-  model: "opus",
-  prompt: [Load ../../agents/reflection-agent.md, replace variables],
+  subagent_type: "aid:reflection-agent",   (fallback: "reflection-agent")
+  prompt: [the variables above, filled in; the agent brings its own prompt],
   description: "Objective quality evaluation"
 )
 ```
@@ -94,9 +93,8 @@ On project load or `/good-morning`, spawn session review instead:
 
 ```
 Task(
-  subagent_type: "general-purpose",
-  model: "opus",
-  prompt: [Load ../../agents/reflection-agent.md],
+  subagent_type: "aid:reflection-agent",   (fallback: "reflection-agent")
+  prompt: [Session review: the variables below, filled in],
   description: "Session review - outside perspective"
 )
 ```

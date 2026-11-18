@@ -401,8 +401,8 @@ Review your own changes for:
 ### Automation
 | Command | Purpose |
 |---------|---------|
-| `/yolo` | Enable full automation mode (skip confirmations) |
-| `/yolo-off` | Disable full automation mode (restore confirmations) |
+| `/yolo` | How to allow specific commands without prompts (scoped allow rules) |
+| `/yolo-off` | How to remove the allow rules you added |
 
 ### Wellbeing
 | Command | Purpose |

@@ -23,7 +23,7 @@ against a moving target.
 
 Iteratively improve the production source changed in task `{{TASK_ID}}` to maximize the
 reflection-agent's **Phase-4a Code-Design weighted score**, using
-`~/.claude/skills/autoresearch/criteria/phase-4a-code-design.yaml` (user-level bundle default; a project may override at `{{WORKSPACE}}/.claude/skills/autoresearch/criteria/`).
+the plugin's `skills/reflection/criteria/phase-4a-code-design.yaml` (never a workspace or user copy).
 
 KPIs (each must reach **≥ {{KPI_TARGET}}**):
 
@@ -61,8 +61,8 @@ Do not create, rename, move, or delete any other file.
 
 Treat as read-only — modifying any of these makes the score meaningless:
 
-- the `reflection-agent` (its prompt/templates) — the scorer. **Resolve project→user:** load `../../agents/reflection-agent.md` from `{{WORKSPACE}}/.claude/…` if present, else `~/.claude/…` (the engine ships user-level).
-- `~/.claude/skills/autoresearch/criteria/phase-4a-code-design.yaml` (user-level bundle default; a project may override at `{{WORKSPACE}}/.claude/skills/autoresearch/criteria/`) — the criteria
+- the `reflection-agent` (its prompt/templates) — the scorer. It comes only from the plugin: spawn `aid:reflection-agent` by name (no fallback: if `aid:reflection-agent` does not resolve, STOP this step and tell the user the AID plugin is required; a bare name could pick a project's own copy as the judge); never load a workspace or user copy.
+- the plugin's `skills/reflection/criteria/phase-4a-code-design.yaml` (never a workspace or user copy) — the criteria
 - the reflection `SKILL.md` scoring methodology
 - `{{WORKSPACE}}/.aid/context.json`, `{{WORKSPACE}}/.aid/state.json`, `config.json` — read-only metadata
 - any test files (none should exist yet — if any do, they are OUT of the editable set)
@@ -118,9 +118,8 @@ Other non-negotiables:
    # copy every file in the editable set into that dir, preserving relative paths
    ```
 5. **Score the baseline** by spawning the subagent named `reflection-agent`:
-   - Tool: `Task`, `subagent_type: general-purpose`, `model: opus`, loading the
-     reflection-agent prompt from
-     `{{WORKSPACE}}/.claude/agents/reflection-agent.md`.
+   - Tool: `Task`, `subagent_type: "aid:reflection-agent"` (no fallback: if `aid:reflection-agent` does not resolve, STOP this step and tell the user the AID plugin is required; a bare name could pick a project's own copy as the judge).
+     The agent brings its own prompt from the plugin; pass only the inputs below.
    - Provide:
      - `ORIGINAL_REQUEST`: verbatim from `{{WORKSPACE}}/.aid/context.json`.
      - `STATED_WHY`: exact WHY from `{{WORKSPACE}}/.aid/context.json`.

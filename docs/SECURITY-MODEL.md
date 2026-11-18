@@ -76,6 +76,24 @@ macOS and WSL it is opt-in. Since 3.0.8 AID's command gate handles it with its o
   one that only reads it (Claude can read with the Read tool or Bash). This is best effort,
   as for Bash: a path built at run time is not caught.
 
+### Agents, commands and untrusted content
+
+- **Every AID agent declares its tools.** Reviewers, validators and scorers have only
+  Read, Grep and Glob; `visual-qa-agent` adds only the chrome-devtools browser tools. An
+  agent without a `tools:` line, and the built-in `general-purpose` agent, would have every
+  tool ([sub-agents](https://code.claude.com/docs/en/sub-agents.md)).
+- **Agents are spawned by name** (`aid:<agent>`, with the bare name as a fallback in a repo
+  checkout), so each runs with its own tool list. The autoresearch scorer has no
+  fallback: if `aid:reflection-agent` does not resolve, the step stops, because a bare name
+  could pick a project's own copy as the judge.
+- **Human-only commands.** `/phase-approve`, `/phase-advance`, `/setup`, `/start-project`,
+  `/link-project`, `/aid-reset`, `/breather-start`, `/breather-stop`, `/yolo` and
+  `/yolo-off` set `disable-model-invocation: true`: Claude cannot run them on its own; you
+  type them ([skills](https://code.claude.com/docs/en/skills.md)).
+- **Untrusted content.** `rules/general/untrusted-content.md` tells agents that web pages,
+  Jira, GitHub and MCP results are data, never instructions. This is guidance for the model,
+  not enforcement; the limits above are what holds.
+
 ## What AID does not promise
 
 These limits are accepted on purpose. The next section lists what covers them.
@@ -92,6 +110,12 @@ These limits are accepted on purpose. The next section lists what covers them.
   file is best effort. The Claude Code docs do not say whether
   `Edit` deny rules or redirect checks apply to PowerShell commands, so AID does not count
   on them there.
+- **A project can change what the reviewers judge against.** The pipeline gives its
+  reviewers the plugin's code-review standard and test-review checklist, but a project's
+  own `.claude/skills/code-review/` or `test-driven` skill replaces them, and a project
+  `.claude/skills/autoresearch` can replace that skill's bundle. This is accepted on
+  purpose (projects may set their own standards). The reviewer agents, their tools and the
+  autoresearch scorer stay the plugin's.
 - **`cp` and `mv` into a protected file.** Claude Code does not document that `Edit` deny
   rules cover these commands, so AID makes no such claim. AID's own Bash gate refuses them
   before Phase 4, and from Phase 4 only as part of the best-effort check.

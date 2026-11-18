@@ -1,5 +1,6 @@
 ---
 description: "Advance to the next AID phase"
+disable-model-invocation: true
 ---
 
 # /phase-advance Command

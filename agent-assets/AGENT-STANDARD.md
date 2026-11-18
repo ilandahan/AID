@@ -178,16 +178,18 @@ file (`agents/{agent-name}.md`):
 
 ```
 Task(
-  subagent_type: "reflection-agent",
-  prompt: [the task, with {{variables}} replaced],
+  subagent_type: "aid:reflection-agent",   (fallback: "reflection-agent")
+  prompt: [the task inputs, with {{variables}} filled in],
   description: "[Brief description]"
 )
 ```
 
-The definition loads `AGENT-PROMPT.md` itself, so the prompt does not have to be pasted
-in. Use `subagent_type: "general-purpose"` only for an agent that has no definition
-file — if you find yourself doing that for one of the agents listed above, its
-definition is missing and Claude Code cannot see it.
+The plugin is `aid`, so an agent is `aid:<agent-name>`; the bare name works in a repo
+checkout without the plugin. The definition brings its own prompt, `tools:` list and
+model, so pass only the task inputs. Never run an AID agent's job as
+the built-in `general-purpose` agent: that agent has every tool, whatever the AID agent's
+`tools:` says. The autoresearch scorer is the exception to the fallback: it is spawned only
+as `aid:reflection-agent`.
 
 **CRITICAL:** Sub-agents receive NO conversation context. They evaluate inputs in complete isolation.
 

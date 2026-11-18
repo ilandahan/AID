@@ -172,15 +172,15 @@ When this command is invoked:
 
 If review status is PENDING, Claude will:
 
-1. Load skill: `agents/phase-review-agent.md`
-2. Gather all phase deliverables (files)
-3. Load phase-specific checklist: `agents/phase-review-agent.md{N}.md`
-4. Spawn sub-agent using Task tool:
+1. Gather all phase deliverables (files)
+2. Pick the checklist for phase {N} (the criteria above)
+3. Do not read or paste `agents/phase-review-agent.md`: the named agent brings its own prompt
+   and its read-only `tools:` list
+4. Spawn the phase-review-agent by name with the Task tool:
    ```
    Task(
-     subagent_type: "general-purpose",
-     model: "opus",
-     prompt: [AGENT-PROMPT.md with deliverables],
+     subagent_type: "aid:phase-review-agent",   (fallback: "phase-review-agent")
+     prompt: [phase {N} and its name, the deliverable paths, the checklist],
      description: "Phase {N} review"
    )
    ```

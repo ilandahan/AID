@@ -25,8 +25,8 @@ Per-task flow:
 4. **SPAWN QA SUB-AGENT** (mandatory):
 ```
 Task(
-  subagent_type="general-purpose",
-  prompt="You are a QA Validator. Read .aid/qa/{TASK-ID}.yaml and review modified files. Return JSON with verdict: PASS or FAIL.",
+  subagent_type="aid:qa-validator-agent",   # fallback: "qa-validator-agent"
+  prompt="Task {TASK-ID}. Acceptance criteria: .aid/qa/{TASK-ID}.yaml. Changed files: [paths]. Return JSON with verdict: PASS or FAIL.",
   description="QA validation for {TASK-ID}"
 )
 ```

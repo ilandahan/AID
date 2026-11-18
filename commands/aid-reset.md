@@ -1,5 +1,6 @@
 ---
 description: "Full system reset - clears all runtime data"
+disable-model-invocation: true
 ---
 
 # /aid reset
