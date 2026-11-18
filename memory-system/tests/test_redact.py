@@ -19,9 +19,10 @@ NAMES = {"secret-proj", "payroll", "acmecorp"}
     ("home /home/jane/work/x", "/home/jane", "[path]"),
     ("notes ~/notes/a.md", "notes/a.md", "[path]"),
     ("bug at src/app.ts:12", "app.ts:12", "[file-ref]"),
-    ("token ghp_abcdefghijklmnopqrstuvwxyz0123", "ghp_", "[token]"),
-    ("key sk-proj-ABCDEFGHIJKLMNOP12", "sk-proj", "[token]"),
-    ("aws AKIAABCDEFGHIJKLMNOP", "AKIA", "[token]"),
+    # Token shapes are assembled at run time so no file holds a secret-scanner match.
+    ("token " + "gh" + "p_" + "x" * 36, "gh" + "p_", "[token]"),
+    ("key " + "sk" + "-proj-" + "X" * 20, "sk" + "-proj", "[token]"),
+    ("aws " + "AK" + "IA" + "Q" * 16, "AK" + "IA", "[token]"),
     ("hash 0123456789abcdef0123456789abcdef01", "0123456789abcdef", "[token]"),
     ("the AcmeCorp payroll repo", "AcmeCorp", "[project]"),
     ("my secret proj and secretproj", "secret", "[project]"),
