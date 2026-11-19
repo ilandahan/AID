@@ -37,9 +37,10 @@ echo [OK] npm found
 REM Install npm dependencies
 echo.
 echo [STEP 1/10] Installing npm dependencies...
-call npm install
+REM npm ci: install exactly what package-lock.json pins (no silent upgrades)
+call npm ci
 if %ERRORLEVEL% NEQ 0 (
-    echo [WARNING] npm install had issues, continuing...
+    echo [WARNING] npm ci had issues, continuing...
 )
 
 REM Create .claude directories
@@ -173,15 +174,10 @@ if not exist ".mcp.json" (
     echo [OK] MCP configuration already exists
 )
 
-REM Create .env if not exists
-if not exist ".env" (
-    if exist ".env.example" (
-        copy ".env.example" ".env" >nul
-        echo [OK] Created .env from template
-    )
-) else (
-    echo [OK] .env already exists
-)
+REM No .env is created: tokens never go into a plaintext file.
+REM Preference order: SSO/OAuth, then OS keystore, then environment variable.
+echo [INFO] Tokens: store them in Windows Credential Manager, not in a .env file.
+echo   See INSTALLATION.md, section "MCP Integrations Setup" - OS keystore table.
 
 REM Verify MCP configuration
 echo.
@@ -210,7 +206,7 @@ if not exist "storybook-preview" (
 echo Installing Storybook dependencies (this may take a minute)...
 echo Please wait...
 cd storybook-preview
-call npm install >nul 2>&1
+call npm ci >nul 2>&1
 echo [OK] Storybook dependencies installed
 
 REM Create atomic design component directories

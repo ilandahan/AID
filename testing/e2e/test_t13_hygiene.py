@@ -45,14 +45,26 @@ COUNT_FILES = ["README.md", "CLAUDE.md", ".claude-plugin/plugin.json", ".claude-
                ".well-known/llms.txt", "llms-full.txt"]
 
 
-@pytest.mark.parametrize("rel", COUNT_FILES)
+COUNTS["mcp"] = len(json.loads((REPO / ".mcp.json.example").read_text(encoding="utf-8"))["mcpServers"])
+COUNT_FILES = COUNT_FILES + ["llm.txt", "llms.txt"]
+
+
+@pytest.mark.parametrize("rel", [r for r in COUNT_FILES if (REPO / r).exists()])
 def test_t13_2_counts_match_the_repo(rel):
+    # T15-40 (owner 2026-11-19): case-insensitive ("27 Skills", "44 Slash Commands"), and the
+    # shields badges (Skills-N, MCP-N, Commands-N, Sub--Agents-N) are read too.
     text = (REPO / rel).read_text(encoding="utf-8")
     bad = []
-    for m in re.finditer(r"(?<![~\d])(\d+) (?:slash |review |expertise )?(commands|skills|agents|sub-agents)\b", text):
-        kind = "agents" if m.group(2) in ("agents", "sub-agents") else m.group(2)
+    for m in re.finditer(r"(?i)(?<![~\d])(\d+) (?:slash |review |expertise |specialized |registered )?"
+                         r"(commands|skills|agents|sub-agents)\b", text):
+        word = m.group(2).lower()
+        kind = "agents" if word in ("agents", "sub-agents") else word
         if int(m.group(1)) != COUNTS[kind]:
             bad.append("{} {} (actual {})".format(m.group(1), m.group(2), COUNTS[kind]))
+    for m in re.finditer(r"badge/(Skills|MCP|Commands|Sub--Agents)-(\d+)", text):
+        kind = {"Skills": "skills", "MCP": "mcp", "Commands": "commands", "Sub--Agents": "agents"}[m.group(1)]
+        if int(m.group(2)) != COUNTS[kind]:
+            bad.append("badge {}-{} (actual {})".format(m.group(1), m.group(2), COUNTS[kind]))
     assert bad == [], (rel, bad)
 
 

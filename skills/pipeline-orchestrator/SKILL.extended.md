@@ -211,8 +211,8 @@ Include full output (pass/fail counts, error messages, coverage if available).
 5. Generate certification report
 6. RETRO/SYNTHESIS (terminal, CERTIFICATION → DONE):
    - Write `.aid/pipeline/<task_id>/retro.md` aggregating `step_summaries` + `final_scores` + AR gap reasons (AR_DESIGN/AR_FUNCTION/AR_ACCEPTANCE keep/revert reasons) into a short, human-readable narrative
-   - Invoke the existing user-level retro skill (`~/.claude/skills/retro`) to close the loop
-   - Optionally append a one-line learning to user memory `MEMORY.md`
+   - `retro.md` stays project-local: nothing is written to user-level files or other skills
+   - To keep a learning, tell the user to run `/aid-end` (redacted `aid_session.py end`) or `/aid-improve` (memory-sync, which the user confirms)
    - Report-only — NEVER auto-commits
 
 ---

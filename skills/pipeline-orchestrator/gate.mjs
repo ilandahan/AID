@@ -27,6 +27,12 @@
 // error) — never conflate with the PASS/FIX/ESCALATE/ERROR contract above.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// The command a human is told to run names THIS file (R-03): the copy that ships in the plugin,
+// absolute, forward slashes. Never ~/.claude/skills, which the plugin does not install.
+export const GATE_PATH = fileURLToPath(import.meta.url).replaceAll("\\", "/");
+const RESOLVE_CMD = `node "${GATE_PATH}" --resolve "<reason>". `;
 
 export const STEP_CONFIG = {
   CODE_REVIEW: { threshold: "code_review_pass", counter: "code_review" },
@@ -627,7 +633,7 @@ function main() {
         how_to_resolve:
           "Decide as the human: split the task into one brief per surface, raise " +
           "thresholds.max_surfaces in .aid/pipeline/config.json, or accept this width. Then run: " +
-          'node ~/.claude/skills/pipeline-orchestrator/gate.mjs --resolve "<reason>". ' +
+          RESOLVE_CMD +
           "The Stop hook blocks while this is open.",
       });
       console.error(`gate: wrote ${p} — the Stop hook will block until it is resolved.`);
@@ -807,7 +813,7 @@ function main() {
       how_to_resolve:
         "Decide as the human: raise the code to clear the threshold, lower the threshold in " +
         ".aid/pipeline/config.json, or accept this result. Then run: " +
-        "node ~/.claude/skills/pipeline-orchestrator/gate.mjs --resolve \"<reason>\". " +
+        RESOLVE_CMD +
         "The Stop hook blocks while this is open.",
     });
     console.error(`gate: wrote ${p} — the Stop hook will block until it is resolved.`);

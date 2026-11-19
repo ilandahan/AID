@@ -73,8 +73,8 @@ This creates `~/.aid/` if it doesn't exist, or updates missing files if it does.
 If you have existing customized skill files:
 
 ```bash
-# Backup existing skills
-cp -r ~/.aid/skills ~/.aid/skills.backup
+# Backup your customized references (they live in the plugin, not in ~/.aid)
+cp -r "${CLAUDE_PLUGIN_ROOT}/skills/memory-system/references" ./memory-references.backup
 
 # Run init
 /aid init
@@ -142,9 +142,9 @@ Add Memory System to your standard workflow:
 5. Move to next phase
 
 ### Improvement Cycle (NEW!)
-- Every ~10 sessions: `/aid improve`
+- Every ~10 sessions: `/aid-improve`
 - Review and approve pattern suggestions
-- Skills automatically updated
+- Each approved suggestion is appended to its learnings file only after you confirm it
 ```
 
 ### Updating Team Documentation
@@ -163,7 +163,7 @@ After each phase:
 ## Running Improvements
 
 When prompted (every ~10 sessions):
-1. Run `/aid improve`
+1. Run `/aid-improve`
 2. Review each suggestion
 3. Approve patterns that will help future work
 4. Changes apply to next session
@@ -179,13 +179,13 @@ Your existing AID skills likely live in a different structure. Options:
 
 **Option A: Adopt Memory System Structure**
 Move your content into the new structure:
-- Role-specific → `skills/roles/{role}/QUICK-REFERENCE.md`
-- Phase-specific → `skills/phases/{phase}/QUICK-REFERENCE.md`
-- Learnings → `skills/*/cumulative.md`
+- Role-specific → `skills/memory-system/references/roles/{role}/QUICK-REFERENCE.md`
+- Phase-specific → `skills/memory-system/references/phases/{phase}/QUICK-REFERENCE.md`
+- Learnings → `skills/memory-system/references/*/*/cumulative.md`
 
 **Option B: Keep Both**
 The Memory System can work alongside existing skills:
-- Memory System skills in `~/.aid/skills/`
+- Memory System references in the plugin's `skills/memory-system/references/`
 - Original AID skills in your project
 
 **Option C: Hybrid Approach**
@@ -259,7 +259,7 @@ For teams sharing skill improvements:
 - [ ] Each member runs `/aid init`
 - [ ] Note: AID's local memory starts empty; entries are added only by `/aid-improve` (`memory-sync`, which you confirm).
 - [ ] Test feedback collection with a sample session
-- [ ] Run first `/aid improve` cycle
+- [ ] Run first `/aid-improve` cycle
 - [ ] Update team documentation
 
 ---
@@ -312,8 +312,8 @@ cp -r ~/.aid.backup ~/.aid/
 
 Keep Memory System but restore specific files:
 ```bash
-# Restore just skills
-cp -r ~/.aid/skills.backup/* ~/.aid/skills/
+# Restore just the references
+cp -r ./memory-references.backup/* "${CLAUDE_PLUGIN_ROOT}/skills/memory-system/references/"
 
 # Restore just state
 cp ~/.aid/state.json.backup ~/.aid/state.json
@@ -351,7 +351,7 @@ cp ~/.aid/state.json.backup ~/.aid/state.json
 
 2. Run improvement:
    ```
-   /aid improve
+   /aid-improve
    ```
 
 3. Verify analysis runs and suggestions appear

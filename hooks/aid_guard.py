@@ -49,7 +49,14 @@ PROTECTED_SUFFIXES = (
     "/.claude/hooks/",
     "/.claude/plugins/cache/",
     "/.aid/state.json",           # T3-1: the phase the gates read; only aid_session.py writes it
+    # T15 I-5: these name the installed plugin roots the gate asks about; an agent that
+    # could edit them could register its own folder as an AID plugin root.
+    "/.claude/plugins/known_marketplaces.json",
+    "/.claude/plugins/installed_plugins.json",
 )
+# T15 I-4 (D3): QA verdict markers under a project .aid/qa/ (any depth) are control files.
+# Matched on the case-folded key inside is_protected (the ONE protected set, INV-1).
+_QA_MARKER = re.compile(r"/\.aid/qa/(?:[^/]*/)*(?:[^/]*\.qa-passed|[^/]*-review[^/]*\.json)$")
 # Removing or renaming one of these directories removes protected files with it.
 PROTECTED_PARENTS = ("/.aid", "/.claude", "/.aid/hooks", "/.aid/pipeline", "/.claude/hooks",
                      "/.claude/plugins")
@@ -57,7 +64,12 @@ PROTECTED_PARENTS = ("/.aid", "/.claude", "/.aid/hooks", "/.aid/pipeline", "/.cl
 # (catches python -c "open('.claude/settings.json','w')" and similar). Best effort.
 PROTECTED_LITERALS = (".aid/hooks", ".aid/integrity", "escalation.json",
                       ".claude/settings.json", ".claude/settings.local.json",
-                      ".claude/hooks", ".claude/plugins/cache")
+                      ".claude/hooks", ".claude/plugins/cache",
+                      ".aid/state.json", ".qa-passed")        # T15 I-4 (AC-33 reads stay exempt)
+
+# T15-1: .claude/<dir>/ folders Claude Code loads capabilities from (a phase rule, not a
+# control file; .claude/hooks/ is ALSO a control file via PROTECTED_SUFFIXES).
+CLAUDE_CAPABILITY_DIRS = ("skills", "agents", "commands", "output-styles", "rules", "hooks")
 
 # When the cwd is unknown, a relative target with one of these names may be a control file.
 PROTECTED_BASENAMES = {"settings.json", "settings.local.json", "config.json", "escalation.json",
@@ -86,7 +98,9 @@ DENY_RULES = (
 # T8 (A1): memory-sync and memory-apply write AID's learning memory and skill learnings
 # files; the user confirms those too.
 CONFIRMED_SUBCOMMANDS = ("approve", "advance", "jump", "init",    # init incl. --repair (A2)
-                         "memory-sync", "memory-apply")
+                         "memory-sync", "memory-apply",
+                         "reset", "qa-pass")              # T15 I-1 (D2, D3): 8 x 3 = 24 ask rules
+_T3_SUBCOMMANDS = CONFIRMED_SUBCOMMANDS[:6]     # R4-C3: the set HEAD 2db6933's text check knew
 _INTERPRETERS = ("python", "python3", "py")
 ASK_RULES = tuple("Bash({} *aid_session.py {}*)".format(i, s)
                   for s in CONFIRMED_SUBCOMMANDS for i in _INTERPRETERS)
@@ -95,6 +109,486 @@ ASK_RULES = tuple("Bash({} *aid_session.py {}*)".format(i, s)
 _CANONICAL_CALL = re.compile(
     r"^(?:python|python3|py) (?:\"[^\"\n]+\"|'[^'\n]+'|[^\s\"']+) [A-Za-z0-9._:-]+"
     r"(?: (?:[A-Za-z0-9._:-]+|\"[A-Za-z0-9 ._:-]+\"))*$")
+# T15-3 (R1-C1): characters with which the shell builds a word only at run time.
+_UNRESOLVED = re.compile(r"[$`*?\[{]")
+_PY_INTERP = re.compile(r"^(?:python[0-9.]*|py)(?:\.exe)?$", re.I)
+
+
+def _depth0_segments(text):
+    """Split at ; & | and newlines outside $( ... ) / ( ... ), so `$(cat f) approve` stays whole."""
+    out, cur, depth = [], [], 0
+    for ch in text:
+        depth = depth + 1 if ch == "(" else max(0, depth - 1) if ch == ")" else depth
+        if depth == 0 and ch in ";&|\n":
+            out.append("".join(cur))
+            cur = []
+        else:
+            cur.append(ch)
+    out.append("".join(cur))
+    return out
+
+
+def _heredoc_bodies(command, i, pending):
+    """R3-C2: read the bodies of the heredocs in `pending` ([(delimiter, strip_tabs)]) from
+    index i (just after the newline). Returns (bodies, index after the last body), or None
+    when a delimiter line never appears (R4-C1: the caller fails closed on that text)."""
+    bodies = []
+    for delim, strip in pending:
+        lines, found = [], False
+        while i < len(command):
+            end = command.find("\n", i)
+            end = len(command) if end < 0 else end
+            line = command[i:end].rstrip("\r")
+            i = end + 1
+            if (line.lstrip("\t") if strip else line) == delim:
+                found = True
+                break
+            lines.append(line)
+        if not found:
+            return None
+        bodies.append("\n".join(lines))
+    return bodies, i
+
+
+def _lex(command):
+    """
+    R2-C1, R3-C1, R3-C2: the simple commands of `command`, split the way the shell does it,
+    as dicts {"words", "sep" (what ended it: ; | || & && newline or ""), "bodies" (the
+    heredoc texts it reads)}; None for an unterminated quote (bash runs nothing). Splits at
+    ; & | and newlines outside quotes and ( ), at blanks outside quotes, $( ) and backticks
+    (so `$(which python)` is one word); quotes and escaping backslashes are removed; a
+    `$'...'` word keeps its `$` (it is built at run time). An unquoted `#` that starts a word
+    is a comment up to the newline (R3-C1: `# don't` must not read as an open quote). A
+    heredoc body is kept apart from the commands.
+    R4-C1: a `<<` inside arithmetic (`$(( ))`, `(( ))`) is a shift, not a heredoc; a heredoc
+    whose delimiter line never appears returns None, like an unterminated quote, so the
+    callers fail closed instead of reading the rest of the text as a heredoc body.
+    """
+    segs, words, cur, has = [], [], [], False
+    quote, depth, i, n = None, 0, 0, len(command)
+    subs, tick, pending, bodies = [], False, [], []
+    arith = []                      # R4-C1: per open paren, is it (inside) arithmetic?
+    while i < n:
+        ch = command[i]
+        if quote is None and ch == "#" and (i == 0 or command[i - 1] in " \t\n;&|(") and (
+                not cur or any(subs) or tick or cur[-1] == "("):
+            nl = command.find("\n", i)
+            i = n if nl < 0 else nl
+            continue
+        if (quote is None and ch == "<" and command[i + 1:i + 2] == "<"
+                and command[i + 2:i + 3] != "<" and not any(arith)):
+            m = re.match(r"<<(-?)[ \t]*((?:[^\s;&|<>()]|\\.)+)", command[i:])
+            if m:
+                if cur or has:
+                    words.append("".join(cur))
+                cur, has = [], False
+                delim = re.sub(r"[\"'\\]", "", m.group(2))
+                words.append("<<" + delim)
+                pending.append((delim, bool(m.group(1))))
+                i += m.end()
+                continue
+        if quote is None and ch == "\n" and pending:
+            read = _heredoc_bodies(command, i + 1, pending)
+            if read is None:
+                return None     # R4-C1: no delimiter line: fail closed
+            got, after = read
+            bodies.extend(got)
+            pending = []
+            if cur or has:
+                words.append("".join(cur))
+            cur, has = [], False
+            if depth == 0 and words:
+                segs.append({"words": words, "sep": "\n", "bodies": bodies})
+                words, bodies = [], []
+            i = after
+            continue
+        if quote == "'":
+            if ch == "'":
+                quote = None
+            else:
+                cur.append(ch)
+        elif quote in ('"', "$'"):
+            if ch == "\\" and i + 1 < n and (quote == "$'" or command[i + 1] in '"\\$`\n'):
+                i += 1
+                cur.append(("\\" if quote == "$'" else "") + command[i])  # $'\x5f' stays unresolved
+            elif ch == quote[-1]:
+                quote = None
+            else:
+                cur.append(ch)
+        elif ch == "\\":
+            i += 1
+            if i < n and command[i] != "\n":
+                cur.append(command[i])
+            has = True
+        elif ch == "$" and command[i + 1:i + 2] == "'":
+            cur.append("$")
+            quote, has, i = "$'", True, i + 1
+        elif ch in "'\"":
+            quote, has = ch, True
+        elif ch in " \t" and (any(subs) or tick):
+            cur.append(ch)                  # R3-C3: `$(which python)` stays one word
+        elif ch == "&" and (command[i - 1:i] == ">" or command[i + 1:i + 2] == ">"):
+            cur.append(ch)                  # 2>&1, &> file: a redirection, not a separator
+        elif ch in " \t" or (depth == 0 and ch in ";&|\n"):
+            if cur or has:
+                words.append("".join(cur))
+            cur, has = [], False
+            if ch not in " \t" and words:
+                segs.append({"words": words, "sep": ch, "bodies": bodies})
+                words, bodies = [], []
+            elif ch in "&|" and not words and segs and segs[-1]["sep"] == ch:
+                segs[-1]["sep"] = ch * 2    # && and ||
+        else:
+            if ch == "(":
+                depth += 1
+                subs.append(command[i - 1:i] in ("$", "<", ">"))
+                # `((` opens arithmetic (`$((`, `((`); every paren inside it stays arithmetic.
+                arith.append(any(arith) or command[i + 1:i + 2] == "(")
+            elif ch == ")":
+                depth = max(0, depth - 1)
+                subs = subs[:-1]
+                arith = arith[:-1]
+            elif ch == "`":
+                tick = not tick
+            cur.append(ch)
+        i += 1
+    if quote in ("'", '"', "$'") or pending:
+        return None         # bash refuses an unterminated quote: nothing runs; R4-C1: a
+                            # heredoc that never reaches its delimiter line fails closed
+    if cur or has:
+        words.append("".join(cur))
+    if words or bodies:
+        segs.append({"words": words, "sep": "", "bodies": bodies})
+    return segs
+
+
+def _shell_segments(command):
+    """
+    R2-C1: the simple commands of `command` as lists of words (see _lex), or None for an
+    unterminated quote. A heredoc fed to a shell (`bash <<EOF`) is read as its commands.
+    """
+    lexed = _lex(command)
+    if lexed is None:
+        return None
+    out = []
+    for s in lexed:
+        if s["words"]:
+            out.append(s["words"])
+        k, _ = _interpreter_at(s["words"], _SHELLS, shc=lambda _p: False) if s["words"] else (None, 0)
+        if k is not None and k != "sh-c":
+            for body in s["bodies"]:
+                out.extend(_shell_segments(body) or [])
+    return out
+
+
+# R2-C1: words before the command word of a simple command; shells whose -c runs the rest.
+_CMD_PREFIXES = {"env", "command", "exec", "nohup", "time", "sudo", "nice", "eval", "do", "then",
+                 "else", "if", "while", "until", "!", "{", "&"}
+_SHELLS = re.compile(r"^(?:ba|z|da|k)?sh(?:\.exe)?$", re.I)
+# R2-C2: interpreters that run code given on the command line or on stdin.
+_ANY_INTERP = re.compile(r"^(?:python[0-9.]*|py|node(?:js)?|deno|bun|perl|ruby|php|pwsh|"
+                         r"powershell)(?:\.exe)?$", re.I)
+_INLINE_FLAGS = ("-", "-c", "-e", "--eval", "-p", "--print", "-r", "-command")
+# R3-C1: fail-closed test for text the lexer cannot parse: a python interpreter followed, on
+# the same line, by a word the shell builds at run time.
+_INTERP_THEN_UNRESOLVED = re.compile(r"(?:^|[\s;&|(`])(?:python[0-9.]*|py)(?:\.exe)?[ \t]+[^\n]*[$`*?\[{]",
+                                     re.I)
+_SESSION_WORD = re.compile(r"(?:^|[/\\])aid_session(?:\.py)?(?:$|[^a-z0-9_])")
+
+
+_WRAPPERS = {"timeout", "nice", "ionice", "stdbuf", "winpty", "strace", "ltrace", "taskset",
+             "chrt", "unbuffer", "caffeinate"}
+_RUNNERS = {"uv", "poetry", "pipenv", "conda", "mamba", "micromamba", "pdm", "hatch", "rye", "pixi"}
+
+
+def _interpreter_at(words, interp=None, shc=None):
+    """R2-C1: (index of the command word if it is, or may be, an interpreter matching
+    `interp` (python by default), else None; True when xargs feeds it). The command word
+    comes after VAR= prefixes, env, command, sudo, ..., and after `sh -c` (whose payload
+    `shc` judges: then ("sh-c", xargs)); a word built at run time may be any interpreter.
+    R3-C3: after a wrapper (timeout 60, nice -n 5, winpty, stdbuf -oL, uv/poetry/conda run)
+    its options and their values are skipped up to the interpreter."""
+    interp = interp or _PY_INTERP
+    shc = shc or _unresolved_session_call
+    i, xargs, opts, wrap = 0, False, False, False
+    while i < len(words):
+        w = words[i].lstrip("({!")
+        base = re.split(r"[/\\]", w)[-1]
+        bl = re.sub(r"\.exe$", "", base.lower())
+        if bl in _WRAPPERS:
+            wrap = True
+            i += 1
+            continue
+        if bl in _RUNNERS and i + 1 < len(words) and words[i + 1].lower() in ("run", "exec"):
+            wrap = True
+            i += 2
+            continue
+        if wrap and w and not (interp.match(base) or _SHELLS.match(base) or re.search(r"[$`(]", w)):
+            i += 1                              # an option or option value of the wrapper
+            continue
+        if not w or w.lower() in _CMD_PREFIXES or re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w) or (
+                opts and w.startswith("-")):
+            opts = opts or w.lower() in _CMD_PREFIXES
+            i += 1
+            continue
+        if bl == "xargs":
+            xargs = opts = True
+            i += 1
+            continue
+        if _SHELLS.match(base) and "-c" in words[i + 1:]:
+            j = words.index("-c", i + 1) + 1
+            if j < len(words) and shc(words[j]):
+                return "sh-c", xargs            # bash -c "python \"<s>\" \$X": its payload
+            i, opts, wrap = j, False, False
+            continue
+        if interp.match(base) or re.search(r"[$`(]", w):
+            return i, xargs
+        return None, xargs
+    return None, xargs
+
+
+_PY_VALUE_OPTS = ("-X", "-W", "-Q", "--check-hash-based-pycs")
+_MIN_ARGS = {"jump": 2, "init": 2, "memory-apply": 1, "qa-pass": 1}
+
+
+def _script_operand(words, k):
+    """R3-C3: ("script"|"module", index) of what python (words[k]) runs, skipping its options
+    and the values of -X / -W / -Q / --check-hash-based-pycs; ("code", None) for -c, else
+    (None, None)."""
+    j = k + 1
+    while j < len(words):
+        x = words[j]
+        if x == "--":
+            return ("script", j + 1) if j + 1 < len(words) else (None, None)
+        if x in _PY_VALUE_OPTS:
+            j += 2
+            continue
+        if re.match(r"^-[A-Za-z0-9.]+$", x):
+            for pos, c in enumerate(x[1:], 1):
+                if c == "c":
+                    return "code", None
+                if c == "m":
+                    rest = x[pos + 1:]
+                    if rest:
+                        return "module", j      # -mmod: judged as the whole word
+                    return ("module", j + 1) if j + 1 < len(words) else (None, None)
+                if c in "XWQ":
+                    if pos == len(x) - 1:
+                        j += 1                  # its value is the next word
+                    break
+            j += 1
+            continue
+        if x.startswith("-"):
+            j += 1
+            continue
+        return "script", j
+    return None, None
+
+
+def _brace_alternatives(word, limit=64):
+    """R2-C1: bash brace expansion of {a,b} groups (innermost first, at most `limit`)."""
+    m = re.search(r"\{([^{}]*,[^{}]*)\}", word)
+    if not m:
+        return [word]
+    out = []
+    for part in m.group(1).split(","):
+        out.extend(_brace_alternatives(word[:m.start()] + part + word[m.end():], limit))
+        if len(out) >= limit:
+            break
+    return out[:limit]
+
+
+def _may_name_session(word):
+    """R2-C1/C2: may the shell turn this script operand into an aid_session.py? A variable,
+    `$'...'`, `$(...)`, backticks, `<(...)` or a PowerShell `(...)` may be anything; a glob or
+    brace word only if one of its expansions has a basename that matches aid_session.py."""
+    w = word.lower()
+    # R3-C2: a literal last path component that is not aid_session.py cannot be the session
+    # script, whatever the folder part expands to (`"$HOME/tools/db.py"`, `$(pwd)/manage.py`).
+    # `$S`, `$S.py`, `aid_ses*.py`, an 8.3 name (`AID_SE~1.PY`) and `$(...)` stay in.
+    last = w.split("/")[-1]
+    ansi_c = w.startswith("$") and "\\" in last         # $'..aid\x5fsession.py': escapes
+    last = last if ansi_c else re.split(r"[/\\]", last)[-1]
+    if last and not ansi_c and not re.search(r"[$`(){}*?\[\]~]", last) and last.rstrip(". ") != "aid_session.py":
+        return False
+    if re.search(r"[$`(]", w):
+        return True
+    if not _UNRESOLVED.search(w):
+        return False                        # a literal name: the ordinary checks judge it
+    for alt in _brace_alternatives(w):
+        if re.search(r"\{[^{}]*\.\.[^{}]*\}", alt):
+            return True                     # {a..z} sequence expression
+        if fnmatch.fnmatchcase("aid_session.py", re.split(r"[/\\]", alt)[-1]):
+            return True
+    return False
+
+
+def _unresolved_session_call(command):
+    """
+    T15-3 (R1-C1, R2-C1): an aid_session.py call whose script or subcommand the shell fixes
+    only at run time: `$(echo approve)`, `${A}pprove`, a backtick, `$X`, `aid_ses*.py`,
+    `aid_{session,x}.py`, `$S.py approve`, `$'..aid\\x5fsession.py'`, `python $(cat f) approve`,
+    or xargs feeding the arguments. It may run a confirmed subcommand and is never in the
+    asked spelling, so it counts as one (deny). Judged only inside a simple command whose
+    command word is (or may be) a python interpreter, on its script operand, so `git commit
+    -m "[aid] init"`, `grep aid_session hooks/*.py` and `python gen_{a,b}.py init` are not.
+    R3-C1: text the shell cannot parse (an unterminated quote) fails closed when it names
+    aid_session or puts a run-time-built word after a python interpreter.
+    """
+    segments = _shell_segments(command)
+    if segments is None:
+        flat = re.sub(r"[\"'`\\\s]", "", command).lower()
+        return "aid_session" in flat or bool(_INTERP_THEN_UNRESOLVED.search(command))
+    for words in segments:
+        interp, xargs = _interpreter_at(words)
+        if interp == "sh-c":
+            return True
+        if interp is None:
+            continue
+        # (a) the script names aid_session and the subcommand is built at run time
+        for j in range(interp + 1, len(words)):
+            if _SESSION_WORD.search(words[j].lower()):
+                nxt = next((x for x in words[j + 1:] if not x.startswith("-")), "")
+                if _UNRESOLVED.search(nxt) or (xargs and not re.split(r"[<>]", nxt)[0]):
+                    return True
+                break
+        # (b) the script operand itself is built at run time and may be aid_session.py.
+        # R3-C2/C3: aid_session.py has no top-level options, so only the first word after
+        # the script is its subcommand: a confirmed word with enough arguments to run, or a
+        # word built at run time (`"$C"`), counts; `-k approve`, `--mode init` do not.
+        kind, script = _script_operand(words, interp)
+        if kind == "module":
+            may = bool(re.search(r"[$`(*?\[{]", words[script]))
+        else:
+            may = kind == "script" and _may_name_session(words[script])
+        if may:
+            raw = words[script + 1:]
+            raw = raw[1:] if raw[:1] == ["--"] else raw
+            first = re.split(r"[<>]", re.sub(r"[()`]", "", raw[0]))[0] if raw else ""
+            if first and not first.startswith("-"):
+                if re.search(r"[$`(*?\[{]", raw[0]):
+                    return True                 # the subcommand itself is built at run time
+                more = [x for x in raw[1:] if re.split(r"[<>]", x)[0]]
+                if first.lower() in CONFIRMED_SUBCOMMANDS and (
+                        len(more) >= _MIN_ARGS.get(first.lower(), 0)
+                        or any(re.search(r"[$`*?\[{]", x) for x in more)):
+                    return True
+    return False
+
+
+def _inline_session_call(command):
+    """
+    R2-C2: an interpreter given code on its command line or on stdin (-c, -e, `-`, a heredoc,
+    a pipe) whose text names aid_session and a confirmed subcommand: subprocess.run([...,
+    'aid_session.py', 'init']), runpy with sys.argv, node -e execFileSync(...). That is a
+    confirmed call, never in the asked spelling.
+    """
+    if not _names_confirmed_session(command):
+        return False
+    segs = _lex(command)
+    if segs is None:
+        return False                    # _unresolved_session_call fails closed on this text
+    # R3-C2: only code the interpreter really receives counts: its own -c/-e word (and the
+    # rest of its command), or what reaches its stdin (heredoc, here-string, pipe). An
+    # interpreter word inside a commit message, or a `<<` elsewhere, does not.
+    for n, seg in enumerate(segs):
+        words = seg["words"]
+        k, _ = _interpreter_at(words, _ANY_INTERP, shc=_inline_session_call)
+        if k == "sh-c":
+            return True
+        if k is None:
+            continue
+        rest = words[k + 1:]
+        opts = []
+        for x in rest:
+            if not x.startswith("-") or x == "-":
+                break
+            opts.append(x.lower())
+        nxt = rest[len(opts)] if len(rest) > len(opts) else ""
+        if any(o in _INLINE_FLAGS for o in opts):
+            payload = rest
+        elif nxt in ("", "-") or nxt[:1] == "<":
+            payload = list(seg["bodies"]) + [x for x in rest if x.startswith("<<<")]
+            m = n - 1
+            while m >= 0 and segs[m]["sep"] == "|":
+                payload += segs[m]["words"] + segs[m]["bodies"]
+                m -= 1
+        else:
+            continue
+        if _names_confirmed_session(" ".join(payload)):
+            return True
+    # A shell fed a heredoc or a pipe runs that text as commands.
+    for n, seg in enumerate(segs):
+        k, _ = _interpreter_at(seg["words"], _SHELLS, shc=lambda _p: False)
+        if k not in (None, "sh-c") and any(_inline_session_call(b) for b in seg["bodies"]):
+            return True
+    return False
+
+
+def _names_confirmed_session(text):
+    """R2-C2: does the text (quotes and backslashes ignored) name aid_session and a
+    confirmed subcommand as words?"""
+    cleaned = text.replace('"', "").replace("'", "").replace("\\", "")
+    tokens = set(re.split(r"[^a-z0-9_-]+", cleaned.lower()))
+    return "aid_session" in tokens and bool(tokens & set(CONFIRMED_SUBCOMMANDS))
+
+
+def _session_operand(word):
+    """R4-C3: is this interpreter operand the session script (last path component
+    aid_session.py, any case, trailing dots/spaces ignored) or module (`hooks.aid_session`)?"""
+    last = re.split(r"[/\\]", word.lower())[-1].rstrip(". ")
+    return last == "aid_session.py" or last.split(".")[-1] == "aid_session"
+
+
+def _runs_session(command, powershell=False):
+    """
+    R4-C3: does the command really run aid_session.py with a confirmed subcommand (or one
+    built at run time)? The narrow check behind the gate's every-folder decision (D1/D2):
+    only the script operand of a python interpreter whose last path component is
+    aid_session.py, or a script operand built at run time in an interpreter's script position
+    (_unresolved_session_call, Bash), or code given to an interpreter (_inline_session_call),
+    counts. Prose, commit messages, echo/printf/grep text and heredoc bodies that only NAME
+    aid_session do not (HEAD 2db6933 allowed them outside AID). Inside an AID project
+    evaluate_bash keeps the wider T3 text check (_confirmed_intent).
+    PowerShell: backtick escapes and `+` joins are removed first; a bare variable script
+    operand (`$env:SCRIPT`) is not judged (R4-C3); built paths are _ps_built_session_call's.
+    """
+    text = command
+    if powershell:
+        text = re.sub(r"[`]", "", command)
+    elif _unresolved_session_call(command) or _inline_session_call(command):
+        return True
+    segments = _shell_segments(text)
+    if segments is None:
+        # Unparsable (unterminated quote or heredoc): fail closed when it names the script.
+        return "aid_session" in re.sub(r"[\"'`\\\s+]", "", command).lower()
+    for words in segments:
+        lead = next((x for x in words if x.lower() not in _CMD_PREFIXES - {"eval"}
+                     and not re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", x)), "")
+        if lead.lower() == "eval":                 # eval 'python "<S>" approve': its text runs
+            rest = words[words.index(lead) + 1:]
+            if rest and _runs_session(" ".join(rest), powershell):
+                return True
+            continue
+        k, _ = _interpreter_at(words, shc=lambda p: _runs_session(p, powershell))
+        if k == "sh-c":
+            return True
+        if k is None:
+            continue
+        kind, j = _script_operand(words, k)
+        if kind not in ("script", "module") or j is None:
+            continue
+        op = re.sub(r"[()+\s\"']", "", words[j]) if powershell else words[j]
+        named = _session_operand(op)
+        if powershell and not named and re.search(r"[*?\[]", op):
+            named = fnmatch.fnmatchcase("aid_session.py", re.split(r"[/\\]", op.lower())[-1])
+        if not named:
+            continue
+        nxt = next((x for x in words[j + 1:] if not x.startswith("-")), "")
+        first = re.split(r"[;&|<>()]", nxt)[0]
+        if first.lower() in CONFIRMED_SUBCOMMANDS or (nxt and re.search(r"[$`(]", nxt)):
+            return True
+    return False
 
 
 def _confirmed_intent(command):
@@ -110,13 +604,22 @@ def _confirmed_intent(command):
         # Bash-only quoting ($'\x61pprove', a backslash-newline split) can spell any
         # subcommand; never canonical, so treating it as a confirmed call denies it.
         return True
+    if _unresolved_session_call(command) or _inline_session_call(command):
+        return True
     # EVERY occurrence: in `".../AID_SESSION x/../AID_SESSION.PY" jump` the first one is a
     # directory name, and the word after it is not the subcommand (T3 CI, Linux).
     for m in re.finditer("aid_session", cleaned.lower()):
         words = cleaned[m.start():].split()[1:]
         first = next((w for w in words if not w.startswith("-")), "")
-        if first.lower() in CONFIRMED_SUBCOMMANDS:
+        # T15-3: `approve; echo x`, `approve>log`, `approve&&x`: the shell ends the word there.
+        first = re.split(r"[;&|<>()]", first)[0]
+        if first.lower() in _T3_SUBCOMMANDS:
             return True
+    # R4-C3: this text loop keeps HEAD's (T3) subcommands, so `rg "aid_session.py qa-pass"`
+    # or `printf "aid_session.py reset"` is not a new deny inside AID; the T15 additions
+    # (reset, qa-pass) count when an interpreter really runs the script (_runs_session).
+    if _runs_session(command):
+        return True
     # And on the same words AC-23 accepts: whatever the gate would run as this plugin's
     # script, its subcommand decides.
     if _is_plugin_session(command):
@@ -134,9 +637,15 @@ def confirmed_form_verdict(command):
     """
     if not _confirmed_intent(command):
         return None
+    return _form_reason(command)
+
+
+def _form_reason(command):
+    """T3-4b: None when a confirmed call is in the asked (canonical) spelling, else the
+    deny reason. The caller has already decided that the command is a confirmed call."""
     raw = command.strip()
     bare = raw.replace('"', "").replace("'", "")
-    if _CANONICAL_CALL.match(raw) and any(
+    if _CANONICAL_CALL.match(raw) and not _unresolved_session_call(command) and any(
             fnmatch.fnmatchcase(bare, r[len("Bash("):-1]) for r in ASK_RULES):
         return None
     return ("this aid_session.py call changes the AID phase or AID's learning memory, so the "
@@ -226,7 +735,9 @@ def _env_protected():
     cfg = os.environ.get("CLAUDE_CONFIG_DIR")
     if cfg:
         base = _key(os.path.realpath(cfg)).rstrip("/")
-        out += [base + "/settings.json", base + "/plugins/cache/", base + "/hooks/"]
+        out += [base + "/settings.json", base + "/plugins/cache/", base + "/hooks/",
+                base + "/plugins/known_marketplaces.json",          # T15 I-5
+                base + "/plugins/installed_plugins.json"]
     return out
 
 
@@ -251,6 +762,8 @@ def is_protected(norm):
     k = _pkey(norm.rstrip("/"))
     if k in _user_state_files():
         return False
+    if _QA_MARKER.search(k):
+        return True
     for s in PROTECTED_SUFFIXES:
         sk = _pkey(s)
         if sk.endswith("/"):
@@ -341,6 +854,15 @@ def _target_verdict(path, cwd, root, phase, rules, literal, strip):
     # .git, .GIT, ".git." and ".git " all name the same directory on Windows.
     if any(part.casefold().rstrip(" .") == ".git" for part in rel.split("/")):
         return "'{}' is inside .git (hooks and config there run code)".format(path)
+    # T15-1 (R-01): Claude Code loads skills, agents, commands, output styles, rules and
+    # hooks from .claude/<dir>/; a file there runs with the agent's tools, so before the
+    # execute phase it is not a plain doc even though .claude/ is an allowed prefix.
+    parts = [part.casefold().rstrip(" .") for part in rel.split("/")]
+    if any(a == ".claude" and b in CLAUDE_CAPABILITY_DIRS for a, b in zip(parts, parts[1:])):
+        return ("'{}' is in a Claude Code capability folder (.claude/{}/): what it holds is "
+                "loaded as skills, agents, commands or rules, so it waits for Phase {} like "
+                "source (.claude/plans/ and other .claude/ files stay writable)").format(
+            path, "|".join(CLAUDE_CAPABILITY_DIRS), rules.get("code_write_min_phase", 4))
     for prefix in rules.get("allowed_write_prefixes", []):
         if (rel + "/").startswith(_key(prefix)):
             return None
@@ -1308,6 +1830,37 @@ def ps_mentions_session(command):
     return "aid_session" in re.sub(r"[\"'`+\s]", "", command).casefold()
 
 
+_PS_LISTING = r"(?:get-childitem|gci|ls|dir|resolve-path|rvpa|get-item|gi)"
+# R3-C4: a value taken from a listing of an aid_s* wildcard: the script path built at run time.
+_PS_SESSION_GLOB = re.compile(_PS_LISTING + r"\b[^;|\n]*aid_s[^\s'\"/\\;|)]*[*?\[]", re.I)
+_PS_HOOKS_LISTING = re.compile(r"(?:=|\()\s*" + _PS_LISTING + r"\b[^;|\n)]*[\\/]hooks(?:[\\/'\"\s)]|$)", re.I)
+
+
+def _ps_built_session_call(command):
+    """
+    R3-C4 (best effort, D3): a PowerShell command that may run aid_session.py through a script
+    path built at run time: a value taken from Get-ChildItem/Resolve-Path on an aid_s*
+    wildcard, or on a hooks/ folder together with python and a confirmed word; or a python
+    reached through `& (Get-Command python)` or Start-Process ... -ArgumentList, read as the
+    plain call it makes and judged like Bash (T15-3).
+    """
+    if _PS_SESSION_GLOB.search(command):
+        return True
+    low = command.casefold()
+    if _PS_HOOKS_LISTING.search(command) and re.search(r"\bpy(?:thon[0-9.]*)?(?:\.exe)?\b", low) and (
+            set(re.split(r"[^a-z0-9-]+", re.sub(r"[\"'`+]", "", low))) & set(CONFIRMED_SUBCOMMANDS)):
+        return True
+    plain = re.sub(r"\(\s*(?:get-command|gcm)\s+(?:-name\s+)?['\"]?([^\s'\")]+)['\"]?\s*\)", r"\1",
+                   command, flags=re.I)
+    plain = re.sub(r"\b(?:start-process|saps|start)\b((?:\s+-(?!argumentlist\b|args\b)\w+)*)\s+"
+                   r"(?:-filepath\s+)?(\S+)((?:\s+-(?!argumentlist\b|args\b)\w+)*)\s+"
+                   r"-(?:argumentlist|args)\s+([^;|\n]+)",
+                   lambda m: m.group(2) + " " + " ".join(
+                       a.strip() for a in re.split(r",(?![^(]*\))", m.group(4))),
+                   plain, flags=re.I)
+    return plain != command and _unresolved_session_call(plain)
+
+
 def evaluate_powershell(command, cwd, root, phase, rules):
     """
     Return None when a PowerShell command may run, else a reason string.
@@ -1317,8 +1870,11 @@ def evaluate_powershell(command, cwd, root, phase, rules):
     copy with backticks removed and backslashes as '/' (T7-5, D3); layers A and B remain the
     real protection, as for Bash at that phase.
     """
-    if ps_mentions_session(command):
-        return PS_SESSION_REASON
+    # R4-C3: the Bash run-time-built check misread PowerShell (`(Join-Path $PWD 'manage.py')`,
+    # `$env:SCRIPT`) as a built session script; _runs_session judges PowerShell operands.
+    if (ps_mentions_session(command) or _runs_session(command, powershell=True)
+            or _ps_built_session_call(command)):
+        return PS_SESSION_REASON        # R2-C3: also (Get-ChildItem ..aid_s*.py).FullName qa-pass
     min_phase = rules.get("code_execute_min_phase", 4)
     if phase is not None and phase < min_phase:
         return ("PowerShell commands cannot run before Phase {}: AID's read-only command list "
@@ -1336,6 +1892,207 @@ def evaluate_powershell(command, cwd, root, phase, rules):
 
 
 PS_PROTECTED_LITERALS = PROTECTED_LITERALS + (".aid/state.json", ".aid/pipeline/escalation.json")
+
+
+# ---------------------------------------------------------------------------
+# T15 (D1, D2): the gate itself asks the user, in EVERY folder, before any phase rule
+# ---------------------------------------------------------------------------
+
+LIVE_ROOT = Path(__file__).resolve().parent.parent      # the plugin root this hook runs from
+
+
+def _plugin_root_ok(d):
+    """I-5: a regular hooks/aid_session.py and .claude-plugin/plugin.json named "aid"."""
+    try:
+        if not stat.S_ISREG(os.stat(os.path.join(d, "hooks", "aid_session.py")).st_mode):
+            return False
+        data = read_settings(os.path.join(d, ".claude-plugin", "plugin.json"))[0]
+        return isinstance(data, dict) and data.get("name") == "aid"
+    except (OSError, ValueError):
+        return False
+
+
+def _json_or_none(path):
+    try:
+        return read_settings(path)[0]
+    except (OSError, ValueError):
+        return None
+
+
+def installed_plugin_roots(project_root=None):
+    """
+    T15 I-5: the normalised AID plugin roots, the live root first, then for each config dir
+    ($CLAUDE_CONFIG_DIR, ~/.claude; deduplicated) every plugins/cache/*/aid/*/, every
+    directory-marketplace installLocation and every installed_plugins.json aid@* installPath.
+    A candidate counts only if _plugin_root_ok and (except the live root) it is not inside
+    the current project, where the agent can write.
+    """
+    cfgs, seen = [], set()
+    for c in (os.environ.get("CLAUDE_CONFIG_DIR"), str(Path.home() / ".claude")):
+        if c and _key(os.path.realpath(c)) not in seen:
+            seen.add(_key(os.path.realpath(c)))
+            cfgs.append(Path(c))
+    cands = []
+    for cfg in cfgs:
+        plugins = cfg / "plugins"
+        try:
+            markets = sorted((plugins / "cache").iterdir())
+        except OSError:
+            markets = []
+        for m in markets:
+            try:
+                cands += [str(v) for v in sorted((m / "aid").iterdir())]
+            except OSError:
+                pass
+        known = _json_or_none(plugins / "known_marketplaces.json")
+        for e in (known.values() if isinstance(known, dict) else ()):
+            if (isinstance(e, dict) and isinstance(e.get("source"), dict)
+                    and e["source"].get("source") == "directory"
+                    and isinstance(e.get("installLocation"), str)):
+                cands.append(e["installLocation"])
+        inst = _json_or_none(plugins / "installed_plugins.json")
+        plugs = inst.get("plugins") if isinstance(inst, dict) else None
+        for name, entries in (plugs.items() if isinstance(plugs, dict) else ()):
+            if not str(name).startswith("aid@"):
+                continue
+            for e in (entries if isinstance(entries, list) else [entries]):
+                if isinstance(e, dict) and isinstance(e.get("installPath"), str):
+                    cands.append(e["installPath"])
+    proj = (_key(os.path.realpath(str(project_root))).rstrip("/") + "/") if project_root else None
+    out = [_key(os.path.realpath(str(LIVE_ROOT))).rstrip("/")]
+    for c in cands:
+        if "\x00" in c or not os.path.isabs(c):
+            continue
+        k = _key(os.path.realpath(c)).rstrip("/")
+        if k in out or (proj and (k + "/").startswith(proj)) or not _plugin_root_ok(k):
+            continue
+        out.append(k)
+    return out
+
+
+def _session_call_root(command, roots):
+    """The root whose hooks/aid_session.py the command runs in the AC-23 shape, else None."""
+    try:
+        segs = tokenize_strict(command)
+    except Denied:
+        return None
+    if len(segs) != 1 or segs[0].redirect or len(segs[0].words) < 2:
+        return None
+    w = segs[0].words
+    if w[0].quoted or _cmd_name(w[0]) not in _INTERPRETERS:
+        return None
+    script = w[1].text
+    if not (os.path.isabs(script.replace("\\", "/")) or re.match(r"^[A-Za-z]:[/\\]", script)):
+        return None
+    if not all(_SESSION_ARG.match(x.text) for x in w[2:]):
+        return None
+    n = normalize(script, None, literal=True)
+    return next((r for r in roots
+                 if n == _key(os.path.realpath(os.path.join(r, "hooks", "aid_session.py")))), None)
+
+
+def _session_subcommand(command):
+    try:
+        w = tokenize_strict(command)[0].words
+    except (Denied, IndexError):
+        return "?"
+    return next((x.text for x in w[2:] if not x.text.startswith("-")), "?")
+
+
+# T15-6 (D2): plugin scripts that change the machine outside the project. Exact shapes only.
+PLUGIN_SCRIPTS = (
+    ("node", ("integrations", "breather", "install.mjs"),
+     "the breather installer writes hooks into ~/.claude/settings.json and reads your calendar"),
+    ("bash", ("scripts", "init-project.sh"), "init-project.sh creates a new project folder"),
+)
+_SCRIPT_CALL = re.compile(r"^(node|bash) (\"[^\"\n$`]*[^\"\n$`\\]\"|'[^'\n]+'|[^\s\"'$`;&|<>(){}]+)"
+                          r"((?: [A-Za-z0-9._=:-]+)*)$")
+
+
+def plugin_script_ask(command, project_root=None):
+    """T15-6: the ask reason when the command is exactly `node|bash "<IR>/<script>" [args]`."""
+    m = _SCRIPT_CALL.match(command)
+    if not m:
+        return None
+    path = m.group(2)
+    path = path[1:-1] if path[:1] in "\"'" else path
+    if not (os.path.isabs(path.replace("\\", "/")) or re.match(r"^[A-Za-z]:[/\\]", path)):
+        return None
+    n = normalize(path, None, literal=True)
+    for interp, rel, what in PLUGIN_SCRIPTS:
+        if interp == m.group(1) and any(
+                n == _key(os.path.realpath(os.path.join(r, *rel)))
+                for r in installed_plugin_roots(project_root)):
+            return ("AID asks before this plugin script runs: {}. The user must confirm it "
+                    "({}).".format(what, "/".join(rel)))
+    return None
+
+
+def session_ask_verdict(command, project_root=None, powershell=False):
+    """
+    T15 (D1, D2): decided before any phase rule, in every folder. Returns (kind, reason):
+      ("ask", r)     the gate asks the user: a confirmed subcommand (I-1) in the asked spelling
+                     to an installed plugin root, any subcommand of a non-live installed root
+                     (Bash), or a T15-6 plugin script (Bash);
+      ("foreign", r) a confirmed subcommand in the asked spelling to an aid_session.py that is
+                     not an installed root (the caller asks outside AID, applies the existing
+                     rules inside it, and asks where those would allow);
+      ("deny", r)    a confirmed subcommand in any other spelling (T3-4b);
+      (None, None)   not a human-confirmed call: the phase rules decide.
+    """
+    if powershell:
+        # T15-6 (D2, A2; docs review NEW-1): the exact plugin-root breather installer /
+        # init-project.sh call is asked from the PowerShell tool too, as from Bash. Only the
+        # exact form: no $, backtick, ;, |, redirect or ( ) can follow the quoted path.
+        why = plugin_script_ask(command, project_root)
+        if why:
+            return "ask", why
+        # T15-4: only the exact canonical call is asked; any other PowerShell spelling that
+        # names aid_session and a confirmed subcommand (quotes, backticks, + joins) is denied.
+        # R2-C3: also a script operand built at run time ((Get-ChildItem ..aid_s*.py).FullName,
+        # $p) followed by a confirmed word, and a subcommand built at run time ($([char]105+
+        # 'nit'), $env:X) after aid_session: the same as Bash (T15-3), denied in every folder.
+        # R4-C3: judged only on python script operands (_runs_session), never on prose or a
+        # commit message that names aid_session; inside AID evaluate_powershell keeps T7-4.
+        if _ps_built_session_call(command):
+            return "deny", PS_SESSION_REASON        # R3-C4: gci aid_s*.py, & (gcm python), Start-Process
+        if not _runs_session(command, powershell=True):
+            return None, None
+        bad = "`" in command or _form_reason(command)
+        if not bad:
+            return _confirmed_call_verdict(command, project_root)
+        return "deny", _form_reason(command) or PS_SESSION_REASON
+    why = plugin_script_ask(command, project_root)
+    if why:
+        return "ask", why
+    if ("aid_session" not in re.sub(r"[\"'`\\\s]", "", command).casefold()
+            and not _unresolved_session_call(command)):     # T15-3 (R1-C1): aid_ses*.py, $S.py
+        return None, None
+    # R4-C3: the every-folder decision judges only a real call (_runs_session): an
+    # interpreter's aid_session.py operand or a run-time-built one, not text naming it.
+    if not _runs_session(command):
+        roots = installed_plugin_roots(project_root)
+        r = _session_call_root(command, roots)
+        if r and r != roots[0]:
+            return "ask", ("aid_session.py {} runs from another installed copy of the AID plugin "
+                           "({}); the user must confirm it".format(_session_subcommand(command), r))
+        return None, None
+    bad = _form_reason(command)
+    if bad:
+        return "deny", bad
+    return _confirmed_call_verdict(command, project_root)
+
+
+def _confirmed_call_verdict(command, project_root):
+    """A confirmed subcommand in the canonical (asked) spelling: ask or foreign."""
+    sub = _session_subcommand(command)
+    if _session_call_root(command, installed_plugin_roots(project_root)):
+        return "ask", ("aid_session.py {} changes the AID phase, AID's runtime data or its learning "
+                       "memory, so the user must confirm it (AID's gate asks in every folder)"
+                       .format(sub))
+    return "foreign", ("aid_session.py {} is a human-confirmed subcommand, run here from a script "
+                       "that is not an installed AID plugin's (this plugin's is {}); the user "
+                       "must confirm it".format(sub, str(SESSION_SCRIPT).replace("\\", "/")))
 
 
 # ---------------------------------------------------------------------------

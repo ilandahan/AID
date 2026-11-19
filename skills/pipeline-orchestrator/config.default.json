@@ -54,7 +54,7 @@
       "max_acceptance_rounds": 2,
       "pass_rate_target": 90
     },
-    "bundle_dir": "~/.claude/skills/autoresearch",
+    "bundle_dir": "${CLAUDE_PLUGIN_ROOT}/skills/autoresearch",
     "criticality_profile": "standard business app",
     "safety_critical_flows": []
   },

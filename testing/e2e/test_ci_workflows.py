@@ -71,3 +71,38 @@ def test_ci_runs_repo_tests_and_supply_chain_checks():
     assert 'npm ci --ignore-scripts' in runs
     assert 'npm audit --audit-level=high' in runs
     assert 'gitleaks' in runs and '--redact' in runs and 'sha256sum -c' in runs
+
+
+# --- T15-44 (item 36): storybook audit, version-bump guard, Windows Git Bash job ---------
+
+def _ci_jobs():
+    return _load(WF_DIR / 'ci.yml')['jobs']
+
+
+def test_t15_44_storybook_preview_is_audited():
+    steps = [s for job in _ci_jobs().values() for s in job.get('steps', [])]
+    hits = [s for s in steps if s.get('working-directory') == 'storybook-preview'
+            and 'npm audit --audit-level=high' in s.get('run', '')]
+    assert hits, 'no npm audit step in storybook-preview'
+
+
+def test_t15_44_version_bump_guard():
+    jobs = _ci_jobs()
+    guard = [j for j in jobs.values()
+             if any("--match 'v*'" in s.get('run', '') for s in j.get('steps', []))]
+    assert len(guard) == 1, 'no version bump guard job'
+    job = guard[0]
+    checkout = [s for s in job['steps'] if s.get('uses', '').startswith('actions/checkout@')][0]
+    assert checkout['with'].get('fetch-depth') == 0          # tags and history are needed
+    run = '\n'.join(s.get('run', '') for s in job['steps'])
+    assert 'plugin.json' in run and 'exit 1' in run           # fails when the version was not bumped
+    assert '::notice::' in run and 'exit 0' in run            # skips with a notice when there is no tag
+
+
+def test_t15_44_windows_job_runs_init_project_tests_under_git_bash():
+    win = [j for j in _ci_jobs().values() if j.get('runs-on') == 'windows-latest']
+    assert win, 'no windows-latest job'
+    job = win[0]
+    assert job.get('defaults', {}).get('run', {}).get('shell') == 'bash'
+    run = '\n'.join(s.get('run', '') for s in job['steps'])
+    assert 'testing/e2e/test_t15_scripts.py' in run and 'HOME=' in run

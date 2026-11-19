@@ -21,7 +21,7 @@ Current session: PM / Discovery
 Pending feedback: 5
 Sessions since improvement: 8
 
-💡 Suggestion: Time to run /aid improve
+💡 Suggestion: Time to run /aid-improve
 ```
 
 ---
@@ -49,7 +49,7 @@ This creates:
 **If init fails:**
 ```bash
 # Manual creation
-mkdir -p ~/.aid/{skills/roles,skills/phases,feedback/pending,feedback/processed,metrics}
+mkdir -p ~/.aid/{feedback/pending,feedback/processed,metrics}
 
 # Then run init again
 /aid init
@@ -101,7 +101,7 @@ mkdir -p ~/.aid/{skills/roles,skills/phases,feedback/pending,feedback/processed,
 ### 3. Corrupted Feedback Files
 
 **Symptoms:**
-- `/aid improve` fails
+- `/aid-improve` fails
 - "Invalid feedback file" errors
 - Improvement analysis incomplete
 
@@ -165,8 +165,8 @@ cat ~/.aid/metrics/memory-tracking.json
 
 **Check skill files exist:**
 ```bash
-ls ~/.aid/skills/roles/*/QUICK-REFERENCE.md
-ls ~/.aid/skills/phases/*/QUICK-REFERENCE.md
+ls "${CLAUDE_PLUGIN_ROOT}"/skills/memory-system/references/roles/*/QUICK-REFERENCE.md
+ls "${CLAUDE_PLUGIN_ROOT}"/skills/memory-system/references/phases/*/QUICK-REFERENCE.md
 ```
 
 **Resync from repo:**
@@ -179,7 +179,7 @@ ls ~/.aid/skills/phases/*/QUICK-REFERENCE.md
 ### 6. Improvement Flow Fails
 
 **Symptoms:**
-- `/aid improve` hangs or errors
+- `/aid-improve` hangs or errors
 - "Not enough data" message with plenty of feedback
 - Suggestions not being generated
 
@@ -197,7 +197,7 @@ All feedback files must have:
 
 **Force reanalysis:**
 ```
-/aid improve --force
+/aid-improve --force
 ```
 
 ---

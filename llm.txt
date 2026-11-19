@@ -9,7 +9,7 @@ Provide a methodical, enforced workflow for building full-stack applications wit
 KEY FEATURES
 - Phase Gates (6 phases, 0-5): Discovery -> PRD -> Tech Spec -> Breakdown -> Development -> QA & Ship
 - Phase Enforcement: Work is blocked out-of-order by hooks, critical rule enforced
-- 39 Registered Sub-Agents: 8 reviewers, 2 builders, 29 phase specialists
+- 39 Registered Sub-Agents: 7 reviewers, 2 builders, 1 test runner, 29 phase specialists
 - 27 Skills: Automatic skill loading based on role and phase
 - 44 Slash Commands: Full workflow management
 - 12-Step Dev Pipeline: Automated pipeline with a hard QA gate
@@ -125,8 +125,9 @@ Loaded automatically by role and phase. Highlights:
 
 SUB-AGENTS (39)
 Flat .md files under agents/, one self-contained definition each, prompt inlined.
-- 8 reviewers: code, tests, visual QA, phase gates, QA validation, reflection, feedback analysis
+- 7 reviewers (read-only): code, tests, visual QA, phase gates, QA validation, reflection, feedback analysis
 - 2 builders: developer, test-engineer
+- 1 test runner with write tools: aid-test-agent (/aid-test)
 - 29 phase specialists: Phase 0 discovery, Phase 2 architecture, Phase 3 breakdown, Phase 4 sprint work, Phase 5 release, and the PRD pipeline
 All invocable by name via subagent_type.
 
@@ -177,7 +178,7 @@ skills/            - 27 skills
 agents/            - 39 sub-agents (FLAT - every .md here registers as an agent)
 agent-assets/      - Calibration examples + AGENT-STANDARD.md (not scanned as agents)
 commands/          - 44 slash commands
-rules/             - 23 rule files, incl. the Data Science / ML track
+rules/             - 24 rule files, incl. the Data Science / ML track
 references/        - Shared lookup data (role/phase terminology)
 hooks/             - Phase gate, QA gate, pipeline enforcement, session writer
 .claude/           - settings.json (project-mode permissions/hooks, copied on link)
@@ -185,7 +186,7 @@ docs/              - prd/, tech-spec/, implementation-plan/, research/ outputs +
 memory-system/     - Learning system (Python package: python -m memory_system)
 storybook-preview/ - Component preview workspace
 scripts/           - init-project.sh scaffolding
-testing/e2e/       - 228 tests covering AID itself
+testing/e2e/       - Tests covering AID itself
 install.sh / install.bat, link-project.sh / .bat
 CLAUDE.md          - Main AID instructions Claude loads every session
 

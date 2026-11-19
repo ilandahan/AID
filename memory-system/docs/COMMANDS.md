@@ -12,13 +12,13 @@
 | `/aid start [role] [phase]` | Start a work session |
 | `/aid status` | Show current state |
 | `/aid end` | Complete phase, collect feedback |
-| `/aid improve` | Run improvement analysis |
+| `/aid-improve` | Run improvement analysis |
 | `/aid memory list` | Show AID's local memory entries |
 | `/aid memory stats` | Show memory statistics |
 | `/aid skill view [type]` | View skill content |
 | `/aid skill edit [type]` | Edit skill file |
 | `/aid skill sync` | Sync skills from repo |
-| `/aid reset --confirm` | Reset all data |
+| `/aid-reset` | Reset AID runtime data ([details](#reset)) |
 
 ---
 
@@ -43,7 +43,7 @@ Initializes the AID Memory System for first-time use.
 Created:
 • ~/.aid/config.yaml - Settings
 • ~/.aid/state.json - System state
-• ~/.aid/skills/ - Skill files (4 roles × 5 phases)
+• Skill references: skills/memory-system/references/ (in the plugin, not copied)
 • ~/.aid/feedback/ - Feedback directories
 • ~/.aid/metrics/ - Metrics files
 
@@ -105,7 +105,7 @@ Statistics:
 • Pending feedback: 8
 • Sessions since last improvement: 8
 
-💡 Recommended: Run /aid improve
+💡 Recommended: Run /aid-improve
 ```
 
 ---
@@ -129,7 +129,7 @@ Completes the current phase and collects feedback.
 
 ## Improvement Commands
 
-### `/aid improve`
+### `/aid-improve`
 
 Runs the improvement analysis sub-agent.
 
@@ -236,10 +236,10 @@ Opens skill file for editing.
 - `type`: Role name or phase name
 
 **Editable files:**
-- `~/.aid/skills/roles/{role}/QUICK-REFERENCE.md`
-- `~/.aid/skills/roles/{role}/cumulative.md`
-- `~/.aid/skills/phases/{phase}/QUICK-REFERENCE.md`
-- `~/.aid/skills/phases/{phase}/cumulative.md`
+- `skills/memory-system/references/roles/{role}/QUICK-REFERENCE.md`
+- `skills/memory-system/references/roles/{role}/cumulative.md`
+- `skills/memory-system/references/phases/{phase}/QUICK-REFERENCE.md`
+- `skills/memory-system/references/phases/{phase}/cumulative.md`
 
 ---
 
@@ -267,29 +267,44 @@ AID's local memory.
 
 ---
 
-### `/aid reset --confirm`
+<a id="reset"></a>
+### Reset
 
-Resets the AID Memory System.
+`/aid-reset` (see `commands/aid-reset.md`) runs exactly one command, which Claude Code
+asks the user to confirm:
 
-**Warning:** This deletes all feedback and statistics!
-
-**What is deleted:**
-- All feedback files (pending and processed)
-- Statistics in state.json
-- Trends data
-
-**What is preserved:**
-- Skill files (including cumulative.md learnings)
-- AID's local memory entries
-- Configuration preferences
-
-**Confirmation required:**
 ```
-⚠️ This will delete all feedback and reset statistics.
-Skill files and AID's local memory will be preserved.
-
-Type 'RESET' to confirm: ___
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" reset          # keeps memory/
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" reset --all    # also deletes memory/
 ```
+
+Use `--all` only when the user explicitly asked to delete AID's local memory too.
+Do not delete anything by hand (no `rm`, no changing into `$AID_HOME`): the command is the
+only supported way to reset.
+
+**Warning:** This deletes all feedback and statistics. It cannot be undone except from a
+backup (see "Backing up AID data" above).
+
+**What is deleted** (the fixed list of runtime entries under `$AID_HOME`, default `~/.aid`):
+- `state.json` and `agent_state.json` (session state)
+- `feedback/` (pending and processed feedback)
+- `recommendations/` (queued, applied and rejected recommendations)
+- `metrics/` (statistics and trends)
+- `reports/` (dashboard output)
+- `memory/` (AID's local memory) - only with `--all`
+
+**What is kept:**
+- `memory/` - unless `--all` is given
+- `integrity/` - the session integrity baseline, never deleted, not even with `--all`
+- The project's `.aid/` folder (state, context, QA criteria) - never touched
+- Skill files in the plugin (including cumulative.md learnings)
+- Anything else in `$AID_HOME` it does not recognise (printed as "kept")
+
+The command prints each entry it removes and each entry it keeps. It refuses, deleting
+nothing, when `$AID_HOME` is (or contains) a user home folder, a filesystem root, the
+current project root or the current folder, or is not a plain folder. In `-p` or dontAsk
+sessions the confirmation cannot be given, so it is denied. Run `/aid-init` afterwards to
+reinitialize.
 
 ---
 
@@ -320,6 +335,6 @@ The system also responds to natural language phrases:
 | `/aid start` | `/aid s`, `/aid begin` |
 | `/aid status` | `/aid st`, `/aid info` |
 | `/aid end` | `/aid done`, `/aid finish` |
-| `/aid improve` | `/aid i`, `/aid learn` |
+| `/aid-improve` | `/aid i`, `/aid learn` |
 | `/aid memory list` | `/aid mem`, `/aid m list` |
 | `/aid memory stats` | `/aid m stats` |

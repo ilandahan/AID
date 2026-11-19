@@ -89,13 +89,11 @@ ELSE:
 3. phases/{phase}/QUICK-REFERENCE.md
 4. phases/{phase}/cumulative.md
 ```
-6. Update state & begin:
+6. Begin (state is already written):
 ```
-Update ~/.aid/state.json with:
-- current_session.active = true
-- current_session.role = role
-- current_session.phase = phase
-- current_session.started_at = now()
+Do not edit ~/.aid/state.json yourself: aid_session.py start/end updates it
+(the session role, phase, start time and active flag are set by
+`aid_session.py start`, which /aid-start runs).
 
 Greet user and ask what they're working on.
 ```
@@ -151,13 +149,10 @@ MUST get rating before proceeding
 and writes `$AID_HOME/feedback/pending/` (default `~/.aid/feedback/pending/`). The only
 other writer is `aid_session.py approve` (via `/phase-approve`), which stores its rating as a
 pending entry too.
-5. Update state:
+5. State: nothing to do by hand.
 ```
-Update ~/.aid/state.json:
-- statistics.total_sessions += 1
-- statistics.pending_feedback_count += 1
-- statistics.sessions_since_last_improvement += 1
-- current_session.active = false
+Do not edit ~/.aid/state.json yourself: aid_session.py start/end updates it
+(session statistics and the active flag are updated by `aid_session.py end`).
 ```
 
 ## Improvement Flow (`/aid-improve`)

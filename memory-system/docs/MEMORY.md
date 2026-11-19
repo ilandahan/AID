@@ -102,7 +102,7 @@ Patterns from feedback analysis can be written to AID's local memory when **ALL*
 | Occurrences | ≥5 sessions | Pattern appeared in 5+ sessions |
 | Avg Rating | ≥4.0 | When pattern was applied |
 | Avg Revisions | ≤2.0 | When pattern was applied |
-| Human Confirmed | Yes | User confirmed the `memory-sync` prompt during /aid improve |
+| Human Confirmed | Yes | User confirmed the `memory-sync` prompt during /aid-improve |
 | Fits Limit | ≤200 chars | Entry fits character limit |
 | Not Duplicate | Unique | Not already in memory |
 | Context-Free | Yes | No project-specific references |

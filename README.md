@@ -6,10 +6,10 @@
 
 [![Claude Code](https://img.shields.io/badge/Claude-Code-orange)](https://claude.ai)
 [![License](https://img.shields.io/badge/License-AID%20Community%20v1.0-blue.svg)](LICENSE)
-[![MCP Integrations](https://img.shields.io/badge/MCP-6%20Integrations-green)](#mcp-integrations)
-[![Skills](https://img.shields.io/badge/Skills-28%20Specialized-purple)](#skills-system)
+[![MCP Integrations](https://img.shields.io/badge/MCP-3%20Integrations-green)](#mcp-integrations)
+[![Skills](https://img.shields.io/badge/Skills-27%20Specialized-purple)](#skills-system)
 [![Sub-Agents](https://img.shields.io/badge/Sub--Agents-39-teal)](#sub-agents)
-[![Tests](https://img.shields.io/badge/Tests-228-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/Tests-pytest%20%2B%20node-brightgreen)](#testing)
 [![Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet)](#install-as-a-plugin)
 
 *A complete AI-powered software development lifecycle framework*
@@ -32,7 +32,7 @@
 - [Nano Banana Pro (Visual AI)](#nano-banana-pro-visual-ai)
 - [Breather (Knowing When to Stop)](#breather-knowing-when-to-stop)
 - [Skills System (27 Skills)](#skills-system)
-- [Commands Reference (45 Commands)](#commands-reference)
+- [Commands Reference (44 Commands)](#commands-reference)
 - [Quick Start](#quick-start)
 - [Tech Stack](#tech-stack)
 - [Testing](#testing)
@@ -48,7 +48,8 @@
 **Behaviour change.** In an AID project (one with `.aid/state.json` or
 `.aid/hooks/config.json`), the write and bash phase gates now **block** by default. Before
 Phase 4, a source write or a code run is denied with a reason. Earlier versions only logged
-unless you configured `block`. Folders without AID are never touched.
+unless you configured `block`. The phase rules apply only in AID projects, but some of
+AID's hooks also act in other folders: see [Hook scope](#hook-scope-outside-aid-projects).
 
 To lower a gate for one project, set its level in `.aid/hooks/config.json` (`block`, `warn`
 = allow with a warning to Claude, `log` = audit only):
@@ -57,12 +58,23 @@ To lower a gate for one project, set its level in `.aid/hooks/config.json` (`blo
 { "enforcement": { "phase_gate_write": "warn", "phase_gate_bash": "log" } }
 ```
 
-Lowering a gate relaxes only the phase rules. Writes to AID's own control files are refused
-at every level.
+Lowering a gate relaxes only the phase rules, and it has a cost: at `log` or `warn`, code
+runs and interpreter one-liners (`python -c`, `node -e`) are allowed before Phase 4, so
+from then on project code can do anything your account can. Writes to AID's own control
+files stay refused at every level. Every session start in such a project states which gates
+are not at `block`.
 
 The bash gate now also covers Claude Code's PowerShell tool, which is on by default on
-Windows. Before Phase 4 every PowerShell command is refused (Claude uses the Bash tool or
-Read, Grep and Glob instead), and `aid_session.py` must always run through the Bash tool.
+Windows. By default (`phase_gate_bash` at `block`), every PowerShell command is refused
+before Phase 4 (Claude uses the Bash tool or Read, Grep and Glob instead), except the few
+that are asked: they run only after you confirm them. The exact canonical form of a
+human-confirmed `aid_session.py` command, and the exact form of the plugin's breather
+installer (`node "<plugin>/integrations/breather/install.mjs"`) and of
+`bash "<plugin>/scripts/init-project.sh"`, get "ask" from PowerShell in every folder, phase
+and level, as from Bash; other spellings of these two scripts are not asked; in an AID project every other PowerShell command whose text names
+`aid_session` is refused. That check reads the command text, so it is best effort: a call
+whose script name is hidden in a variable (`python $env:SCRIPT reset`) runs without a
+prompt outside AID projects, and in an AID project from Phase 4 on, or at `log` or `warn`.
 See [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md#the-powershell-tool).
 
 AID's gates are a guardrail for a cooperating agent, not a sandbox.
@@ -94,11 +106,11 @@ override-with-reason and the `subagent_review` record in state are all unchanged
 | **Cucumber / BDD** | `cucumber-bdd` skill with step-definition guides for **JS, Python, Java, Ruby and Go**. Phase 1 acceptance criteria are written as Gherkin, so the PRD and the test suite are the same artifact. Runs via `npm run cucumber`. |
 | **Automated dev pipeline** | `pipeline-orchestrator` drives a 12-step state machine: DEVELOP → CODE_REVIEW → AR_DESIGN → TDD → AR_FUNCTION → VISUAL_QA → TEST_REVIEW → PHASE_GATE → AR_ACCEPTANCE → API_TESTS → E2E_TESTS → CERTIFICATION, with hard iteration caps and escalation instead of infinite retry loops. All scored review gates (code review, test review, autoresearch KPI) are unified at 9.5/10, and the E2E step pre-checks that E2E tests actually exist before claiming a pass — if none do, it asks you to create or explicitly skip them. |
 | **Autoresearch runner** | `autoresearch` performs bounded keep/revert improvement: snapshot → one focused edit → score → keep **only if strictly better**, else revert. Every edit is reversible and the loop always terminates. |
-| **39 registered sub-agents** | Independent, context-free specialists: 8 reviewers (code, tests, visual QA, phase gates, QA validation, reflection, feedback analysis), 2 builders (developer, test-engineer) and 29 phase specialists covering Phase 0 discovery, Phase 2 architecture, Phase 3 breakdown, Phase 4 sprint work, Phase 5 release and the PRD pipeline. All invocable by name. |
+| **39 registered sub-agents** | Independent, context-free specialists: 7 reviewers (code, tests, visual QA, phase gates, QA validation, reflection, feedback analysis), 2 builders (developer, test-engineer), 1 test runner (aid-test-agent) and 29 phase specialists covering Phase 0 discovery, Phase 2 architecture, Phase 3 breakdown, Phase 4 sprint work, Phase 5 release and the PRD pipeline. All invocable by name. |
 | **Quality Check on every output** | The `reflection` skill scores WHY alignment, phase compliance, correctness, security and completeness before you see the result. |
 | **WHY-first foundation** | `why-driven-decision` loads before everything else — no implementation without an articulated purpose. |
 | **Learning system** | `memory-system` collects session feedback and turns recurring patterns into concrete skill improvements, with a Python CLI for analysis and dashboards. |
-| **Enforcement hooks** | A QA gate that blocks task completion until acceptance criteria pass, a language-check gate that blocks a turn ending on code that does not compile, and automatic pipeline initialization when a plan is approved. |
+| **Enforcement hooks** | A Phase 4 QA Stop gate that keeps a task from ending until a QA pass is recorded with `aid_session.py qa-pass`, which the user confirms in Claude Code's prompt (it stops a cooperating agent; from Phase 4 project code can still write files), a language-check gate that blocks a turn ending on code that does not compile, and automatic pipeline initialization when a plan is approved. |
 | **Breather** | Session-boundary tracking bundled into the plugin: presence across every session, break offers at safe moments, written handoffs, and a rest/usage status line. Activate with `/breather-start`. See [Breather](#breather-knowing-when-to-stop). |
 
 ### Reliability fixes in this release
@@ -115,7 +127,7 @@ override-with-reason and the `subagent_review` record in state are all unchanged
 | **Dead references** | 22 documentation links pointed at files that did not exist. All fixed, and the missing `memory-system` package and `scripts/init-project.sh` were restored. |
 | **Ships as a plugin** | `claude plugin marketplace add ilandahan/AID` then `claude plugin install aid@AID`. No cloning, no symlinks, no Developer Mode on Windows, and `claude plugin update aid` moves every project at once. The clone + `link-project` route still works unchanged. |
 | **Phase-gate hooks that actually block** | The enforcement dispatcher emitted `decision`/`reason` without `hookEventName`, a shape Claude Code discards - so every gate was read as an allow and never stopped a write. Fixed, and pinned by tests that execute the hook and assert the payload. |
-| **Test suite** | 228 tests cover destructive-guard behaviour, hook block/allow payload schemas, agent registration, the plugin layout and repository integrity. |
+| **Test suite** | The tests cover destructive-guard behaviour, hook block/allow payload schemas, agent registration, the plugin layout and repository integrity. |
 
 ---
 
@@ -247,7 +259,10 @@ See the reasoning behind every major decision:
 
 ## Phase Gate System
 
-AID enforces **6 mandatory phases** (0-5) with quality gates between each. No phase can be skipped.
+AID uses **6 phases** (0-5) with a gate between each. The method is to finish each phase;
+a forward `jump` (which the user confirms) is the exception. The hooks enforce only that no
+source files are written and no project code is run before Phase 4 (see
+[docs/PHASE-GATES.md](docs/PHASE-GATES.md)).
 
 ```
 Phase 0 ──► Gate ──► Phase 1 ──► Gate ──► Phase 2 ──► Gate ──► Phase 3 ──► Gate ──► Phase 4 ──► Gate ──► Phase 5
@@ -308,8 +323,9 @@ Before each phase transition, a **sub-agent must review** all deliverables:
 
 ## Sub-Agents
 
-AID ships **39 registered sub-agents**: 8 reviewers (below), 2 builders (`developer`,
-`test-engineer` - spawned by the pipeline DEVELOP and TDD steps) and 29 phase specialists
+AID ships **39 registered sub-agents**: 7 reviewers (below), 2 builders (`developer`,
+`test-engineer` - spawned by the pipeline DEVELOP and TDD steps), 1 test runner
+(`aid-test-agent`) and 29 phase specialists
 (`phase0-*` discovery, `phase2-*` architecture, `phase3-*` breakdown, `phase4-*` sprint
 work, `phase5-*` release, and the `prd-*` pipeline) invocable by name for isolated
 clean-room work. Each runs with **no knowledge of the conversation
@@ -325,10 +341,12 @@ code being good is the only one that reliably finds what is wrong with it.
 | `qa-validator-agent` | Completed work against `.aid/qa/<task>.yaml` acceptance criteria | QA gate Stop hook |
 | `phase-review-agent` | Whether a phase's deliverables justify advancing | `/gate-check` |
 | `memory-analysis-agent` | Session feedback → concrete skill improvements | `/aid-improve` |
-| `aid-test-agent` | The AID methodology itself, end to end | `/aid-test` |
 
-Reviewer agents are **read-only by design** - a reviewer that can edit the code is no
-longer independent.
+These 7 reviewer agents are **read-only by design** (Read, Grep and Glob, plus the browser
+tools for `visual-qa-agent`) - a reviewer that can edit the code is no longer independent.
+`aid-test-agent` (`/aid-test`) is not a reviewer: it is a test runner with write tools
+(Read, Write, Edit, Bash, Grep, Glob) that writes its test outputs under
+`.aid/test-outputs/`.
 
 Each agent is one self-contained definition file (`agents/<name>.md`) with its prompt
 inlined - that file is what makes it invocable by name. Calibration examples and response
@@ -353,6 +371,44 @@ templates live in `agent-assets/`; see `agent-assets/AGENT-STANDARD.md` to add y
 - "Claude Memory" in AID means a local file, `$AID_HOME/memory/slots.json` (default
   `~/.aid/memory/`). Nothing is sent to Claude's built-in memory. AID's own write commands (`memory-sync`, `memory-apply`) run only after you confirm
   them in Claude Code's prompt. `memory-apply` is also used by `/aid-recommendations`.
+  AID's Bash gate itself returns "ask" for every human-confirmed `aid_session.py` command
+  (`approve`, `advance`, `jump`, `init`, `memory-sync`, `memory-apply`, `reset`, `qa-pass`),
+  for any `aid_session.py` subcommand run from an installed copy of the plugin that is not
+  the live one (in the canonical form: one plain command, absolute script path), and for the exact forms of the plugin's breather installer and
+  `scripts/init-project.sh`, in every folder, AID project or not, from the Bash and the
+  PowerShell tool. For these two scripts only the exact form is asked; other spellings are not (before Phase 4 at `block` the Bash
+  allow-list refuses them, and the PowerShell rule refuses every PowerShell command; outside
+  AID projects, and from Phase 4 on or at `log` or `warn`, they run without a prompt). In AID projects the ask
+  rules AID adds to `.claude/settings.json` are a second layer, and a confirmed call is
+  still asked when the gate or the integrity baseline is at `log` or `warn`. The ask reads
+  only the command text, so its check of run-time-built names is best effort. It denies the
+  run-time-built spellings it can parse, in every folder and with the exact form to use: a
+  confirmed call whose script name or subcommand comes from a variable, `$(...)`, backticks,
+  a glob, `$'...'` quoting or `xargs` with the script path written out
+  (`echo approve | xargs python "<plugin>/hooks/aid_session.py"`), also behind `timeout` or `winpty` or followed by a `#`
+  comment. Deliberately obfuscated forms are an accepted limit and are not caught: `pythonw`
+  or `pyw`; a wrapper prefix with an option value or one the gate does not know (`exec -a`,
+  `env -u`, `sudo -u`, `setsid`, `flock`, `chronic`); a `case` arm; `xargs` fed by a pipe with the
+  script name in a variable (`echo approve | xargs python "$S"`) or fed by `-a`; an `eval` of
+  a string built in a variable; and code given to python through `/dev/stdin`, `/dev/fd/N`
+  or `<( )`. Outside AID projects these run without a prompt. In an AID project, before
+  Phase 4 at `block` the Bash allow-list refuses all of them. From Phase 4 on, or at `log` or
+  `warn`, one of them is still refused only when the command writes out the `aid_session.py`
+  path and the very next word is `approve`, `advance`, `jump`, `init`, `memory-sync` or
+  `memory-apply`; the same forms with `reset` or `qa-pass`, a script name held in a variable
+  (even when the assignment writes out the path), and the script fed to `/dev/stdin`,
+  `/dev/fd/N` or `python -` by a redirect or a pipe, and code built inside a `<( )`, get
+  through without a prompt (see
+  [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md#human-confirmation-ask)). What it cannot see at all is indirection that leaves no trace in the command (a
+  copy of `aid_session.py`, a wrapper script, or an `eval` of a file written by an earlier
+  call): outside AID projects, and in an AID project from Phase 4 on (or from Phase 0 when
+  `phase_gate_bash` is lowered to `log` or `warn`), such a call is neither asked nor denied
+  (best effort, like the other text checks). Before Phase 4 at
+  `block`, the Bash allow-list refuses it. In `-p`, headless or dontAsk sessions nobody can
+  answer the prompt, so these calls are denied. Under `--dangerously-skip-permissions`,
+  Claude Code documents that ask rules still prompt, but not whether a hook's "ask" does, so
+  outside AID projects, and for the breather installer and `init-project.sh`, do not count
+  on a prompt in that mode.
   Before Phase 4 the phase gate also refuses other writes outside the project. From
   Phase 4 on, AID does not stop other code from editing these files.
 - Feedback is stored locally in `$AID_HOME`. AID has no collection service of its own. When
@@ -376,11 +432,32 @@ AID does not set the retention policy for these third-party services. Their own 
 settings and terms apply. Local files under `.aid/` and `~/.aid/` are also retained separately
 from any server-side data.
 
+### Hook scope outside AID projects
+
+The phase rules apply only in AID projects (a folder with `.aid/state.json` or
+`.aid/hooks/config.json`). Some of AID's hooks also act in other folders once the plugin is
+installed:
+
+- **dev-pipeline-gate (Stop)** runs in every git repo. When a turn ends with changed
+  source files, it may run the repo's own checkers (for example
+  `node_modules/typescript/bin/tsc`) and can block the turn on errors.
+- **plan-execution-pipeline (ExitPlanMode)** runs in every project. When a plan is
+  approved it injects the pipeline instructions into the conversation and writes a session
+  marker, `~/.claude/.loop1-kickoff/<session_id>`.
+- **The Bash gate** asks you before any human-confirmed `aid_session.py` command, the
+  breather installer or `scripts/init-project.sh` runs, in every folder, from the Bash and
+  the PowerShell tool. It asks only for the exact forms; other spellings of the two scripts
+  are not asked outside AID projects, or from Phase 4 on, or at `log` or `warn`.
+
+See [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md#hooks-that-act-outside-aid-projects).
+
 ---
 
 ## MCP Integrations
 
-AID integrates with 5 Model Context Protocol (MCP) servers for seamless tool connectivity:
+AID's MCP templates configure Model Context Protocol servers for tool connectivity.
+`.mcp.json.example` holds 3 (GitHub, Jira, Chrome DevTools); the OS templates
+`.mcp.json.windows` and `.mcp.json.mac` add Filesystem and Confluence:
 
 ### Configured MCPs
 
@@ -392,18 +469,28 @@ AID integrates with 5 Model Context Protocol (MCP) servers for seamless tool con
 | **Confluence** | Documentation | Create/update pages, manage spaces, organize docs |
 | **GitHub** | Source control | Repos, PRs, issues, code search, reviews |
 
-### Environment Variables Required
+### Credentials
 
-```env
-# Atlassian (Jira & Confluence)
-ATLASSIAN_SITE_URL=https://your-org.atlassian.net
-ATLASSIAN_USER_EMAIL=your-email@company.com
-ATLASSIAN_API_TOKEN=your-api-token
+Never put a token in a file (`.env`, `.mcp.json` or any other). In order of preference:
 
-# GitHub
-GITHUB_PERSONAL_ACCESS_TOKEN=<your-github-token>
+1. **SSO / OAuth.** Atlassian's official remote MCP server signs in with OAuth, so no
+   token is stored: `claude mcp add --transport http atlassian https://mcp.atlassian.com/v2/mcp`,
+   then authorize it with `/mcp`.
+2. **OS keystore.** Store the token once, then load it into the shell you start `claude` from:
 
-```
+   | OS | Store once (prompts for the value) | Load per shell |
+   |----|------------------------------------|----------------|
+   | macOS (Keychain) | `security add-generic-password -s aid-github -a "$USER" -w` | `export GITHUB_PERSONAL_ACCESS_TOKEN=$(security find-generic-password -s aid-github -w)` |
+   | Linux (libsecret) | `secret-tool store --label="AID GitHub" service aid-github` | `export GITHUB_PERSONAL_ACCESS_TOKEN=$(secret-tool lookup service aid-github)` |
+   | Windows (Credential Manager) | `cmdkey /generic:aid-github /user:you /pass` | PowerShell (module `CredentialManager`): `$env:GITHUB_PERSONAL_ACCESS_TOKEN = (Get-StoredCredential -Target aid-github).GetNetworkCredential().Password` |
+
+   Use the same pattern with `aid-atlassian` for `ATLASSIAN_API_TOKEN`.
+3. **Environment variable.** The templates read `GITHUB_PERSONAL_ACCESS_TOKEN` and
+   `ATLASSIAN_API_TOKEN` through `${VAR}` expansion, so the token lives only in the
+   environment of that shell. `ATLASSIAN_SITE_URL` and `ATLASSIAN_USER_EMAIL` are not
+   secrets; export them directly.
+
+See [INSTALLATION.md](INSTALLATION.md#mcp-integrations-setup) for the full table.
 
 ### MCP Configuration
 
@@ -426,33 +513,23 @@ Generate professional visual artifacts using Google's Nano Banana Pro (Gemini 3 
 | Phase 2: Tech Spec | Architecture diagrams, ERDs | Microservices system diagram |
 | Phase 4: Development | Screen mockups | Dashboard with design tokens applied |
 
-### Setup (Environment Variables)
+### Setup
 
-```env
-# Enable the feature
-ENABLE_NANO_BANANA=true
+Non-secret settings: `ENABLE_NANO_BANANA=true` and `NANO_BANANA_PROVIDER` (`google`,
+`aimlapi` or `vertex`; Vertex also takes `VERTEX_PROJECT_ID` and `VERTEX_LOCATION`).
 
-# Choose ONE provider:
-
-# Option 1: Google AI Studio (Easiest)
-NANO_BANANA_PROVIDER=google
-GOOGLE_AI_API_KEY=your-key-from-aistudio.google.com
-
-# Option 2: AI/ML API
-NANO_BANANA_PROVIDER=aimlapi
-AIML_API_KEY=your-key-from-aimlapi.com
-
-# Option 3: Google Vertex AI (Enterprise)
-NANO_BANANA_PROVIDER=vertex
-VERTEX_PROJECT_ID=your-gcp-project-id
-VERTEX_LOCATION=us-central1
-```
+The provider key is a secret. Prefer SSO (Vertex AI with
+`gcloud auth application-default login`); otherwise keep the key in the OS keystore and
+export it into the shell, as in [Credentials](#credentials) (service `aid-nano-banana`,
+variable `GOOGLE_AI_API_KEY` or `AIML_API_KEY`). Never write it to `.env`. Details:
+[skills/nano-banana-visual/SKILL.extended.md](skills/nano-banana-visual/SKILL.extended.md).
 
 ### Usage
 
-```typescript
-import { createNanoBananaClient, isNanoBananaEnabled } from '@/lib/nano-banana-pro';
+Design note: AID ships no client library; this is the interface a project writes itself.
 
+```typescript
+// createNanoBananaClient / isNanoBananaEnabled: your project's own client
 if (isNanoBananaEnabled()) {
   const client = createNanoBananaClient();
   const result = await client.generateFromText(
@@ -733,7 +810,7 @@ Two independent layers, because they answer different questions.
 
 ### The repository's own test suite
 
-**228 pytest tests** under `testing/e2e/` verify that *AID itself* works - not that
+The **pytest tests** under `testing/e2e/` verify that *AID itself* works - not that
 your application works. Run them after cloning, and after any change to a hook,
 installer or link script:
 
@@ -744,7 +821,7 @@ npm run test:all              # or: python -m pytest testing/e2e/ -v
 
 Narrower runs: `npm run test:install`, `npm run test:mcp`, `npm run test:memory`.
 
-11 of the 228 skip unless `node` and `typescript` are reachable from the shell that runs
+Some of them skip unless `node` and `typescript` are reachable from the shell that runs
 hooks - run `npm install` first to exercise them. They **skip**, they do not silently pass.
 
 | Suite | What it proves |
@@ -819,9 +896,11 @@ cd AID
 ./install.sh          # macOS/Linux
 ./install.bat         # Windows
 
-# Initialize your project
-./scripts/init-project.sh my-app
+# Initialize your project (from this clone; plugin users type /start-project my-app,
+# which runs: bash "${CLAUDE_PLUGIN_ROOT}/scripts/init-project.sh" my-app)
+bash scripts/init-project.sh my-app
 cd my-app
+# The script does not write .aid/state.json: run /aid-start in Claude Code to set it up
 
 # Every morning
 /good-morning
@@ -905,13 +984,13 @@ AID/
 │   ├── phase0-problem-validator.md
 │   └── ... (36 more)
 ├── agent-assets/               # Calibration examples + AGENT-STANDARD.md (not scanned)
-├── rules/                      # 23 rule files, incl. the Data Science / ML track
+├── rules/                      # 24 rule files, incl. the Data Science / ML track
 ├── references/                 # Shared lookup data (role/phase terminology)
 ├── hooks/                      # Phase gate, QA gate, pipeline enforcement,
 │                               # and aid_session.py (the /aid-start and /aid-end writer)
 ├── .claude/
 │   └── settings.json           # Permissions + hooks for PROJECT mode (copied on link)
-├── testing/e2e/                # 228 tests covering AID itself
+├── testing/e2e/                # Tests covering AID itself
 ├── docs/
 │   ├── prd/                    # Phase 1 outputs
 │   ├── tech-spec/              # Phase 2 outputs
@@ -927,7 +1006,7 @@ AID/
 ├── scripts/init-project.sh     # New-project scaffolding
 ├── install.sh / install.bat    # Installers
 ├── link-project.sh / .bat      # Link an existing project (one source of truth)
-├── .mcp.json.mac / .windows    # MCP templates - copy to .mcp.json, add your tokens
+├── .mcp.json.mac / .windows    # MCP templates - copy to .mcp.json; tokens come from env vars loaded from your OS keystore (see Credentials)
 ├── .gitattributes              # LF for .sh, CRLF for .bat
 └── CLAUDE.md                   # Critical instructions Claude loads every session
 ```

@@ -44,7 +44,7 @@ Your choice: ___
 Current task: {current_task}
 
 New task:
-  Jira key (or 'none'): ___
+  Task key, saved as current_task.id (or 'none'): ___
   Title: ___
 
 Updating...
@@ -114,6 +114,28 @@ What's your new current task?
 ```
 
 ### 4. Save and Confirm
+
+Write `.aid/context.json` in this shape. The task key goes in `current_task.id` (the QA
+gate reads `id`, then `key`, then `jira_key`); `jira_key` may be kept as an extra field.
+Use `null` for `current_task` when there is no task.
+
+```json
+{
+  "current_task": {
+    "id": "PROJ-123",
+    "jira_key": "PROJ-123",
+    "title": "Add login form",
+    "current_step": "Implement validation",
+    "progress": 40
+  },
+  "blockers": [],
+  "session_notes": [],
+  "last_updated": "2026-11-19T10:00:00Z"
+}
+```
+
+The task id must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` (letters, digits, `.`, `_`,
+`-`; no `/` and no `..`), the same rule `aid_session.py qa-pass` uses.
 
 After any update:
 ```

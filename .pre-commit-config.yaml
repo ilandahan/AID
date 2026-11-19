@@ -63,7 +63,8 @@ repos:
     hooks:
       - id: eslint
         name: eslint
-        entry: npx eslint --fix
+        # --no-install: never download an unpinned package at commit time (A-32)
+        entry: npx --no-install eslint --fix
         language: system
         types_or: [javascript, jsx, ts, tsx]
         pass_filenames: true
@@ -73,7 +74,7 @@ repos:
     hooks:
       - id: prettier
         name: prettier
-        entry: npx prettier --write
+        entry: npx --no-install prettier --write
         language: system
         types_or: [javascript, jsx, ts, tsx, json, yaml, css, scss, markdown]
         exclude: |
@@ -87,7 +88,7 @@ repos:
     hooks:
       - id: tsc
         name: tsc
-        entry: npx tsc --noEmit
+        entry: npx --no-install tsc --noEmit
         language: system
         types: [ts, tsx]
         pass_filenames: false

@@ -2,7 +2,9 @@
 # All 18 are example credentials in security-teaching docs ("BAD:" examples). Each value was checked and cannot be a real
 # credential: counting sequences (sk-1234...), wrong format (sk-live- with hyphens), alternating placeholders ending in '...',
 # and a 12-character sk_test_ value (real Stripe keys are 24+ random characters). The current files use placeholders.
+# The last 3 entries are runtime-built test strings in memory-system tests (reviewed separately).
 # Format: commit:file:rule:line. Add a line here only after reviewing that finding. New findings still fail CI.
+# This file is LF only: a CR at the end of a line becomes part of the fingerprint and stops it matching.
 
 0e9fed53f018bfdd0b4430648e5c685b8ccf1b3b:.claude/rules/code/security.md:generic-api-key:28
 0e9fed53f018bfdd0b4430648e5c685b8ccf1b3b:.claude/rules/testing/test-security.md:generic-api-key:34

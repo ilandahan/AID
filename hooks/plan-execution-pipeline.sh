@@ -48,10 +48,12 @@ fi
 #
 # Everything crosses via FILES, never argv: MSYS path-translates argv and turns "C:\a\b" into "C:ab",
 # which silently breaks project identity so a prediction can never resolve.
-_hk_dir=$(mktemp -d 2>/dev/null || echo "${TMPDIR:-/tmp}/cc-plan-hook.$$")
-mkdir -p "$_hk_dir" 2>/dev/null
+# No predictable fallback dir (A-39): a fixed "${TMPDIR}/cc-plan-hook.$$" name can be pre-created
+# or symlinked by another local user. When mktemp -d fails the extraction is skipped and announced.
 _hk_fail=""
-if command -v node >/dev/null 2>&1; then
+_hk_dir=$(mktemp -d 2>/dev/null) || _hk_dir=""
+[ -n "$_hk_dir" ] && [ -d "$_hk_dir" ] || { _hk_dir=""; _hk_fail="could not create a private temp dir (mktemp -d failed)"; }
+if [ -n "$_hk_dir" ] && command -v node >/dev/null 2>&1; then
   # Buffer in, Buffer out. Writes plan.txt, cwd.txt and payload.json — the API body is assembled here
   # so the plan text never has to survive a shell variable round-trip.
   printf '%s' "$input" | node -e '
@@ -93,10 +95,12 @@ fi
 # `cat`, not $(node ...): command substitution is byte-transparent in bash, but only if the bytes get
 # there via a file. Reading them back here keeps the plan exact.
 plan_text=""
-[ -f "$_hk_dir/plan.txt" ] && plan_text=$(cat "$_hk_dir/plan.txt")
 cwd=""
-[ -f "$_hk_dir/cwd.txt" ] && cwd=$(cat "$_hk_dir/cwd.txt")
-[ -f "$_hk_dir/payload.json" ] || _hk_fail="could not read the ExitPlanMode payload (node unavailable or payload unparseable)"
+if [ -n "$_hk_dir" ]; then
+  [ -f "$_hk_dir/plan.txt" ] && plan_text=$(cat "$_hk_dir/plan.txt")
+  [ -f "$_hk_dir/cwd.txt" ] && cwd=$(cat "$_hk_dir/cwd.txt")
+  [ -f "$_hk_dir/payload.json" ] || _hk_fail="could not read the ExitPlanMode payload (node unavailable or payload unparseable)"
+fi
 # An EMPTY plan is the same outcome as a failed parse — no snapshot happens — and it must announce
 # itself for exactly the reason this rewrite exists. The node step falls back to `{}` on malformed
 # JSON, which yields an empty plan and would otherwise skip the POST in total silence: the original
@@ -113,6 +117,11 @@ ROOT="${cwd:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 # it claims the marker here rather than checking it.
 _l1_home="${USERPROFILE:-$HOME}"
 _l1_sid=$(printf '%s' "$input" | node -e 'let b=[];process.stdin.on("data",c=>b.push(c));process.stdin.on("end",()=>{try{process.stdout.write(String(JSON.parse(Buffer.concat(b).toString("utf8")).session_id||""))}catch{}})' 2>/dev/null)
+# The session id becomes a FILE NAME (A-36): "../../x" would write outside the marker folder. Only a
+# plain name is used; anything else gets no marker and no session_id in the instruction below.
+if ! [[ "$_l1_sid" =~ ^[A-Za-z0-9_.-]{1,128}$ ]] || [ "$_l1_sid" = "." ] || [ "$_l1_sid" = ".." ]; then
+  _l1_sid=""
+fi
 if [ -n "$_l1_home" ] && [ -n "$_l1_sid" ]; then
   mkdir -p "$_l1_home/.claude/.loop1-kickoff" 2>/dev/null && : > "$_l1_home/.claude/.loop1-kickoff/$_l1_sid" 2>/dev/null
 fi
@@ -144,24 +153,34 @@ if [ -n "$_hk_fail" ]; then
   fail_line="WARNING: the approved plan text could not be extracted — ${_hk_fail}. Proceed with the work; the brief-freeze step below will fall back to the plan already in your context.
 "
 fi
-rm -rf "$_hk_dir" 2>/dev/null
+[ -n "$_hk_dir" ] && rm -rf "$_hk_dir" 2>/dev/null
 
-# The execution engine ships user-level, so the pipeline runs in EVERY project.
+# The pipeline-orchestrator skill ships INSIDE this plugin (R-03): its files are addressed from this
+# script's own location, never from ~/.claude/skills (a folder the plugin does not install, and one
+# any other tool can write). Forward-slash absolute path; `pwd -W` gives the Windows form in Git Bash.
+_plugin_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && { pwd -W 2>/dev/null || pwd; })
+_cfg_default="${_plugin_root}/skills/pipeline-orchestrator/config.default.json"
+[ -n "$_plugin_root" ] && [ -f "$_cfg_default" ] || _cfg_default='${CLAUDE_PLUGIN_ROOT}/skills/pipeline-orchestrator/config.default.json'
+_sid_field=""
+[ -n "$_l1_sid" ] && _sid_field=", session_id=${_l1_sid}"
+
+# The pipeline ships with the AID plugin and runs in EVERY project (D4: documented scope).
 # AID (.aid/ + PRD/qa/validators) is an optional enrichment used when present.
 if [ -d "$ROOT/.aid" ]; then
   enrich="This project has AID (.aid/ present): the pipeline will use its PRD/specs, .aid/qa/<task>.yaml acceptance criteria, and the phase4/5 validator agents as enrichment when available."
 else
-  enrich="This project is NOT AID-enabled: the pipeline bootstraps its own .aid/pipeline/config.json from the user-level default and AR_ACCEPTANCE derives acceptance from the frozen brief. No PRD/AID setup is required."
+  enrich="This project is NOT AID-enabled: the pipeline bootstraps its own .aid/pipeline/config.json from the plugin's default and AR_ACCEPTANCE derives acceptance from the frozen brief. No PRD/AID setup is required."
 fi
-instr="A plan was just approved. The dev pipeline (pipeline-orchestrator + reflection + autoresearch) ships at USER LEVEL and is available in this project regardless of AID — BUT it must only drive IMPLEMENTATION plans.
+# No bypass switch is named in additionalContext (A-28): it is read by the model, and an instruction
+# that teaches the agent how to switch the gate off is not a gate. The systemMessage (human) keeps it.
+instr="A plan was just approved. The dev pipeline (pipeline-orchestrator + reflection + autoresearch) ships with the AID plugin and is available in this project regardless of AID — BUT it must only drive IMPLEMENTATION plans.
 ${fail_line}${plan_line}INTENT GATE — do this FIRST, before anything else:
 Classify the just-approved plan as either (a) IMPLEMENTATION (it will write/modify/delete code, config, or other project files) or (b) READ-ONLY (research, analysis, investigation, debugging-to-understand, audit, explanation — it produces findings/answers but makes no source changes).
-- If READ-ONLY: do NOT initialize or drive the dev pipeline. Do NOT freeze a brief, do NOT create/refresh .aid/pipeline/state.json, do NOT bootstrap config. Stay advisory-only and just carry out the approved plan. (Steps 1-3 below do not apply.) Set SKIP_PIPELINE_GATE=1 if a downstream gate still nags.
+- If READ-ONLY: do NOT initialize or drive the dev pipeline. Do NOT freeze a brief, do NOT create/refresh .aid/pipeline/state.json, do NOT bootstrap config. Stay advisory-only and just carry out the approved plan. (Steps 1-3 below do not apply.)
 - If IMPLEMENTATION: proceed with steps 1-3 below BEFORE writing implementation code.
-1. INITIALIZE the pipeline (pipeline-orchestrator skill): if .aid/pipeline/config.json is missing, BOOTSTRAP it by copying ~/.claude/skills/pipeline-orchestrator/config.default.json; then create/refresh .aid/pipeline/state.json (pipeline_status=running, current_step=DEVELOP, counters).
+1. INITIALIZE the pipeline (pipeline-orchestrator skill): if .aid/pipeline/config.json is missing, BOOTSTRAP it by copying \"${_cfg_default}\"; then create/refresh .aid/pipeline/state.json (pipeline_status=running, current_step=DEVELOP${_sid_field}, counters).
 2. FREEZE THE TASK BRIEF now, while the original prompt is still in context: write .aid/pipeline/<task_id>/brief.md ONCE (never overwrite) with the VERBATIM original request, the STATED_WHY, and the approved plan above as the DEVELOP plan. Use the verbatim APPROVED_PLAN block when present; if only a best-effort plan-file guess was given, prefer the approved plan from your own context over that file on any mismatch. AR_ACCEPTANCE validates against this; it survives a later compaction.
-3. DRIVE all implementation through the orchestrator: DEVELOP → CODE_REVIEW (≤2) → AR_DESIGN → TDD (≤2) → AR_FUNCTION → VISUAL_QA → TEST_REVIEW → PHASE_GATE (≤2 re-examine) → AR_ACCEPTANCE. Resolve agents/criteria project-first, else user-level. ${enrich} Do not finish the turn until the pipeline is satisfied (the dev-pipeline-gate Stop hook also enforces this).
-Set SKIP_PIPELINE_GATE=1 to bypass for a one-off."
+3. DRIVE all implementation through the orchestrator: DEVELOP → CODE_REVIEW (≤2) → AR_DESIGN → TDD (≤2) → AR_FUNCTION → VISUAL_QA → TEST_REVIEW → PHASE_GATE (≤2 re-examine) → AR_ACCEPTANCE. Resolve agents/criteria project-first, else the plugin's. ${enrich} Do not finish the turn until the pipeline is satisfied (the dev-pipeline-gate Stop hook also enforces this)."
 msg="plan approved → classify intent: IMPLEMENTATION plans run the pipeline (freeze brief + DEVELOP→…→AR_ACCEPTANCE); read-only/research/analysis plans stay advisory-only. SKIP_PIPELINE_GATE=1 to bypass."
 [ -n "$_hk_fail" ] && msg="approved plan text could not be extracted — ${_hk_fail}. Plan execution continues; the brief-freeze step falls back to the plan already in context. ${msg}"
 

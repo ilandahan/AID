@@ -45,7 +45,7 @@ TARGET USERS
 - Organizations needing audit trails and phase gates
 
 KEY PRINCIPLES
-1. Sequential progression through phases (no skipping)
+1. Sequential progression through phases as the method (a forward jump, which the user confirms, is the exception)
 2. Clear entry/exit criteria for each phase
 3. Real-time context preservation (never lose your place)
 4. TDD-first development (tests before code)
@@ -686,10 +686,14 @@ For Technical Users:
 git clone https://github.com/ilandahan/AID.git
 cd AID
 ./install.sh
-./scripts/init-project.sh my-app
+bash scripts/init-project.sh my-app
 cd my-app
 claude
 /aid-init
+
+(The script path above works from a clone. Plugin users type /start-project my-app, which
+runs bash "${CLAUDE_PLUGIN_ROOT}/scripts/init-project.sh" my-app. The script no longer
+writes .aid/state.json: run /aid-start to set the phase.)
 
 PREREQUISITES
 
@@ -698,13 +702,22 @@ PREREQUISITES
 - Docker 20.0.0+ (optional)
 - PostgreSQL 16+ (via Docker or local)
 
-ENVIRONMENT VARIABLES (.env)
+CREDENTIALS (never in a file)
 
-DATABASE_URL=postgresql://user:password@localhost:5432/app_db
-ATLASSIAN_SITE_URL=https://your-domain.atlassian.net
-ATLASSIAN_USER_EMAIL=your-email@company.com
-ATLASSIAN_API_TOKEN=your-api-token
-GITHUB_PERSONAL_ACCESS_TOKEN=<your-github-token>
+Preference order: SSO/OAuth > OS keystore > environment variable > never a plaintext file.
+1. SSO: Atlassian's official remote MCP server signs in with OAuth (no token stored):
+   claude mcp add --transport http atlassian https://mcp.atlassian.com/v2/mcp
+2. OS keystore: store once, load per shell
+   macOS:   security add-generic-password -s aid-github -a "$USER" -w
+            export GITHUB_PERSONAL_ACCESS_TOKEN=$(security find-generic-password -s aid-github -w)
+   Linux:   secret-tool store --label="AID GitHub" service aid-github
+            export GITHUB_PERSONAL_ACCESS_TOKEN=$(secret-tool lookup service aid-github)
+   Windows: cmdkey /generic:aid-github /user:you /pass
+            $env:GITHUB_PERSONAL_ACCESS_TOKEN = (Get-StoredCredential -Target aid-github).GetNetworkCredential().Password
+   Same pattern with aid-atlassian for ATLASSIAN_API_TOKEN.
+3. Environment variable: the MCP templates read the tokens through ${VAR} expansion.
+Not secrets (export directly): ATLASSIAN_SITE_URL, ATLASSIAN_USER_EMAIL.
+See INSTALLATION.md, "MCP Integrations Setup".
 
 ================================================================================
 11. TROUBLESHOOTING
@@ -719,7 +732,7 @@ Context Not Showing
 - Fix: /context-update to manually update
 
 MCP Not Connecting
-- Check: Environment variables in .env
+- Check: the token variables are exported in the shell that started claude (from the OS keystore)
 - Check: API tokens are valid
 - Fix: Restart Claude Code after config change
 
@@ -779,10 +792,10 @@ CLAUDE.md               AID instructions
 KEY STATISTICS
 
 Files:
-- Commands: 27
-- Skills: 7 main + 9 memory system
-- Phases: 5
-- Integrations: 6 MCPs
+- Commands: 44
+- Skills: 27
+- Phases: 6 (0-5)
+- Integrations: 3 MCP servers in .mcp.json.example (the OS templates add filesystem and confluence)
 
 ================================================================================
 END OF DOCUMENTATION

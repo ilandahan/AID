@@ -36,6 +36,10 @@ Usage (T3: this script is the ONLY writer of .aid/state.json, a protected file):
                                             <project>/.aid/improve/proposals.json
   aid_session.py memory-apply <id>          append ONE queued proposal to its learnings file [confirmed]
   aid_session.py memory-reject <id>         drop a queued proposal
+  aid_session.py reset [--all]              delete AID runtime data under $AID_HOME (RESET_ENTRIES;
+                                            --all adds memory/; never integrity/)        [confirmed]
+  aid_session.py qa-pass <task_id> [--note TEXT]   record a QA pass for .aid/qa/<task_id>.yaml
+                                            (phase 4-5; read by the QA Stop gate)          [confirmed]
   T8: feedback text is redacted before it is written (memory_system/redact.py, best effort).
   [confirmed] = Claude Code asks the user first: SessionStart installs permission ask rules
   for exactly these calls (aid_guard.ASK_RULES), and the phase gate refuses any other
@@ -307,7 +311,7 @@ def cmd_review(args):
     entry = {"status": {"PASS": "passed", "PARTIAL": "partial", "FAIL": "failed"}[args.status],
              "timestamp": now_iso()}
     if args.note:
-        entry["note"] = args.note
+        entry["note"] = _clean(redactor(), args.note)     # T15-12 (R-09): redacted like feedback
     state.setdefault("subagent_review", {})["phase_{}".format(args.phase)] = entry
     save_json(STATE_FILE, state)
     print("Review recorded: phase {} {}".format(args.phase, args.status))
@@ -319,13 +323,13 @@ def cmd_approve(args):
     state["phase_approved"] = True
     state["feedback_provided"] = True
     state["phase_approved_at"] = now_iso()
+    red = redactor()
     if args.note:
-        state["phase_approval_note"] = args.note
+        state["phase_approval_note"] = _clean(red, args.note)   # T15-12 (R-09)
     save_json(STATE_FILE, state)
     # T8 D5: the /phase-approve rating reaches the learning loop as a REDACTED pending entry.
     m = re.search(r"\brating\s*([1-5])\b", args.note or "", re.I)
     ts = now_iso()
-    red = redactor()
     save_json(feedback_dir() / ("approve-" + ts.replace(":", "-") + ".json"), {
         "source": "phase-approve", "timestamp": ts, "role": _clean(red, state.get("role")),
         "phase": state.get("current_phase"), "phase_display": _clean(red, state.get("phase_display")),
@@ -509,10 +513,24 @@ def cmd_memory_queue(args):
         sys.exit("memory-queue: cannot read {}: {}".format(path, e))
     result = queue_proposals(data)
     print("Queued {} proposal(s): {}".format(len(result["queued"]), ", ".join(result["queued"]) or "-"))
-    named = [t for t in result["skipped_targets"] if t not in ("None", "")]
-    unnamed = len(result["skipped_targets"]) - len(named)
+    # T15-17 (L3-4e, I-8): two skip reasons. `skipped_empty` comes from memory_system; an
+    # older memory_system put allowed-but-empty targets in skipped_targets, so those are
+    # moved here by the same target check rather than being called "not allowed".
+    from memory_system.recommendations.generator import resolve_target
+    empty = [str(t) for t in result.get("skipped_empty", [])]
+    skipped = []
+    for t in result.get("skipped_targets", []):
+        if t not in ("None", "") and resolve_target(t) is not None:
+            if t not in empty:
+                empty.append(t)
+        else:
+            skipped.append(t)
+    named = [t for t in skipped if t not in ("None", "")]
+    unnamed = len(skipped) - len(named)
     if named:
         print("Not queued, target is not an allowed learnings file: " + ", ".join(named))
+    if empty:
+        print("Not queued, empty content: " + ", ".join(empty))
     if unnamed:
         print("Not queued: {} proposal(s) with no target file (memory candidates come from "
               "memory-preview / memory-sync instead)".format(unnamed))
@@ -533,6 +551,143 @@ def cmd_memory_reject(args):
     if not reject_recommendation(args.id):
         sys.exit("memory-reject: no single queued proposal has id {!r}".format(args.id))
     print("Rejected {}".format(args.id))
+
+
+# ---------------------------------------------------------------------------
+# T15 (D2, D3; I-2): reset and qa-pass. Both are confirmed by the user (aid_guard.ASK_RULES).
+# ---------------------------------------------------------------------------
+
+# Every runtime path AID code writes under $AID_HOME: state.json (user-level session),
+# agent_state.json (memory_system subagent), feedback/ (aid_session end/approve,
+# collector), recommendations/ (queue, applied, rejected), metrics/ (trends), reports/
+# (dashboard). memory/ only with --all. integrity/ (layer B baseline) is never deleted:
+# deleting it would weaken enforcement. Anything else is kept and printed as "kept".
+RESET_ENTRIES = ("state.json", "agent_state.json", "feedback", "recommendations", "metrics", "reports")
+RESET_ALL_ENTRIES = RESET_ENTRIES + ("memory",)
+RESET_NEVER = ("integrity",)
+
+
+def _aid_home():
+    home = os.environ.get("AID_HOME")
+    return Path(home) if home else Path.home() / ".aid"
+
+
+def _norm(p):
+    return os.path.normcase(os.path.realpath(str(p)))
+
+
+def _is_link_or_junction(p):
+    """A symlink or a Windows junction/reparse point: unlinked, never followed."""
+    if os.path.islink(p):
+        return True
+    try:
+        attrs = getattr(os.lstat(p), "st_file_attributes", 0)
+    except OSError:
+        return False
+    return bool(attrs & 0x400)              # FILE_ATTRIBUTE_REPARSE_POINT
+
+
+def _reset_refusal(home):
+    """Why $AID_HOME must not be reset, or None. Refused when it resolves to (or contains)
+    a user home, a filesystem/drive root, the current project root or the cwd."""
+    target = _norm(home)
+    if os.path.dirname(target) == target:
+        return "it is a filesystem root"
+    sys.path.insert(0, str(HERE))
+    import aid_hooks                      # noqa: E402  (bundled beside this file)
+    guarded = [("a user home folder", h) for h in (str(Path.home()), os.path.expanduser("~"),
+                                                    aid_hooks._account_home()) if h]
+    guarded += [("the current project root", aid_hooks.resolve_project_root({})),
+                ("the current folder", os.getcwd())]
+    for label, other in guarded:
+        o = _norm(other)
+        if o == target or o.startswith(target.rstrip(os.sep) + os.sep):
+            return "it is (or contains) {}".format(label)
+    # R1-C3 (I-2: reset never touches a project .aid/): refuse an AID_HOME at or under an
+    # AID project root, e.g. <P>/.aid. A project root is any ancestor (or the folder itself)
+    # whose .aid/ holds an AID marker; a user home is not one (its .aid/ IS the default
+    # AID_HOME). aid_hooks.is_aid_root cannot be used: it excludes the AID_HOME .aid/.
+    homes = {_norm(h) for _l, h in guarded[:3]}
+    t = Path(target)
+    for d in [t] + list(t.parents):
+        if _norm(d) in homes:
+            continue
+        aid = d / ".aid"
+        if (aid / "state.json").is_file() or (aid / "hooks" / "config.json").is_file():
+            return "is inside the AID project {}".format(d)
+    return None
+
+
+def _remove(p):
+    if _is_link_or_junction(p):
+        try:
+            os.unlink(p)
+        except (IsADirectoryError, PermissionError, OSError):
+            os.rmdir(p)                     # a Windows directory symlink or junction
+    elif p.is_dir():
+        import shutil
+        shutil.rmtree(p)
+    else:
+        p.unlink()
+
+
+def cmd_reset(args):
+    home = _aid_home()
+    problem = _reset_refusal(home)
+    if problem:
+        sys.exit("reset refused: AID_HOME {} {}; nothing was deleted.".format(home, problem))
+    if not home.exists():
+        print("Nothing to reset: {} does not exist.".format(home))
+        return
+    if not home.is_dir() or _is_link_or_junction(home):
+        sys.exit("reset refused: AID_HOME {} is not a plain folder; nothing was deleted.".format(home))
+    remove = RESET_ALL_ENTRIES if args.all else RESET_ENTRIES
+    removed, failed = [], []
+    for name in remove:
+        p = home / name
+        if not (p.exists() or os.path.lexists(p)):
+            continue
+        try:
+            _remove(p)
+            removed.append(name)
+            print("Removed {}".format(p))
+        except OSError as e:
+            failed.append(name)
+            print("Could not remove {}: {}".format(p, e))
+    for entry in sorted(os.listdir(home)):
+        if entry not in removed:
+            print("kept {}".format(home / entry))
+    print("Reset done ({} removed). Project .aid/ folders were not touched.".format(len(removed)))
+    if failed:
+        sys.exit(1)
+
+
+TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+def valid_task_id(task_id):
+    return isinstance(task_id, str) and bool(TASK_ID_RE.match(task_id)) and ".." not in task_id
+
+
+def cmd_qa_pass(args):
+    """qa-pass: the human-confirmed QA verdict the QA Stop gate reads (D3, R-07)."""
+    import hashlib
+    if not valid_task_id(args.task_id):
+        sys.exit("qa-pass: invalid task id {!r} (letters, digits, . _ -; max 64; no ..)".format(args.task_id))
+    state = require_state()
+    if state["current_phase"] not in (4, 5):
+        sys.exit("qa-pass: the project is at phase {}; QA passes are recorded in phase 4 or 5."
+                 .format(state["current_phase"]))
+    criteria = STATE_FILE.parent / "qa" / (args.task_id + ".yaml")
+    if not criteria.is_file():
+        sys.exit("qa-pass: no QA criteria file {}".format(criteria))
+    digest = hashlib.sha256(criteria.read_bytes()).hexdigest()
+    passed = state.get("qa_passed") if isinstance(state.get("qa_passed"), dict) else {}
+    passed[args.task_id] = {"at": now_iso(), "criteria_sha256": digest,
+                            "note": _clean(redactor(), args.note or "") or ""}
+    state["qa_passed"] = passed
+    save_json(STATE_FILE, state)
+    print("✅ QA pass recorded for {} (criteria sha256 {}).".format(args.task_id, digest[:12]))
 
 
 def main():
@@ -600,6 +755,15 @@ def main():
         m = sub.add_parser(name)
         m.add_argument("id")
         m.set_defaults(fn=fn)
+
+    rs = sub.add_parser("reset", help="delete AID runtime data under $AID_HOME (keeps memory/ and integrity/)")
+    rs.add_argument("--all", action="store_true", help="also delete memory/ (integrity/ is always kept)")
+    rs.set_defaults(fn=cmd_reset)
+
+    qp = sub.add_parser("qa-pass", help="record a QA pass for .aid/qa/<task_id>.yaml (phase 4-5)")
+    qp.add_argument("task_id")
+    qp.add_argument("--note", default=None)
+    qp.set_defaults(fn=cmd_qa_pass)
 
     args = p.parse_args()
     STATE_FILE = project_state_file()

@@ -66,10 +66,11 @@ check_prerequisites() {
 install_npm_deps() {
     echo ""
     echo "[STEP 1/10] Installing npm dependencies..."
-    if npm install; then
+    # npm ci: install exactly what package-lock.json pins (no silent upgrades).
+    if npm ci; then
         log_success "npm dependencies installed"
     else
-        log_warning "npm install had issues, continuing..."
+        log_warning "npm ci had issues, continuing..."
     fi
 }
 
@@ -272,15 +273,10 @@ setup_mcp_and_env() {
         log_success "MCP configuration already exists"
     fi
 
-    # Create .env if not exists
-    if [ ! -f ".env" ]; then
-        if [ -f ".env.example" ]; then
-            cp ".env.example" ".env"
-            log_success "Created .env from template"
-        fi
-    else
-        log_success ".env already exists"
-    fi
+    # No .env is created: tokens never go into a plaintext file.
+    # Preference order: SSO/OAuth > OS keystore > environment variable.
+    log_info "Tokens: store them in your OS keystore, not in a .env file."
+    echo "  See INSTALLATION.md, section \"MCP Integrations Setup\" (OS keystore table)."
 }
 
 # Verify MCP configuration
@@ -320,10 +316,10 @@ setup_storybook() {
         cd storybook-preview
 
         # Install npm dependencies
-        if npm install; then
+        if npm ci; then
             log_success "Storybook dependencies installed"
         else
-            log_warning "Storybook install had issues - try manually: cd storybook-preview && npm install"
+            log_warning "Storybook install had issues - try manually: cd storybook-preview && npm ci"
         fi
 
         # Create atomic design component directories

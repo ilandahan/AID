@@ -14,7 +14,7 @@
 | `/aid start [role] [phase]` | Start a session |
 | `/aid status` | Show current session state |
 | `/aid end` | Complete phase gate, collect feedback |
-| `/aid improve` | Run improvement analysis (sub-agent) |
+| `/aid-improve` | Run improvement analysis (sub-agent) |
 
 ### Roles
 - `product-manager` (pm)
@@ -70,7 +70,7 @@ IF state.notifications.improvement_suggested == true:
   """
   
   IF user chooses "Yes":
-    → Go to /aid improve flow
+    → Go to /aid-improve flow
   ELSE:
     → Continue to Step 4
 ```
@@ -89,25 +89,21 @@ ELSE:
 ### Step 5: Load Skills
 ```
 Load and internalize:
-1. ~/.aid/skills/roles/{role}/QUICK-REFERENCE.md
-2. ~/.aid/skills/roles/{role}/cumulative.md
-3. ~/.aid/skills/phases/{phase}/QUICK-REFERENCE.md
-4. ~/.aid/skills/phases/{phase}/cumulative.md
+1. skills/memory-system/references/roles/{role}/QUICK-REFERENCE.md
+2. skills/memory-system/references/roles/{role}/cumulative.md
+3. skills/memory-system/references/phases/{phase}/QUICK-REFERENCE.md
+4. skills/memory-system/references/phases/{phase}/cumulative.md
 
 AID's local memory (AID:* entries in `$AID_HOME/memory/slots.json`) is read when present
 ```
 
 ### Step 6: Update State & Begin
 ```python
-# Update state.json
-state.current_session = {
-  "active": true,
-  "role": role,
-  "phase": phase,
-  "started_at": now(),
-  "revision_count": 0
-}
-save(state)
+# Do NOT edit state.json. `aid_session.py start <role> <phase>` (and `/aid-end`,
+# `aid_session.py end`) is the only writer of `.aid/state.json`: it sets
+# current_session (active, role, phase, started) itself. The file is protected and a
+# direct Edit/Write to it is denied.
+run("aid_session.py start {role} {phase}")
 
 # Greet user
 print(f"Good morning! I'm ready to work with you as {role_display} in {phase_display}.")
@@ -262,7 +258,7 @@ Thanks for the feedback! 🙏
 
 {IF pending >= threshold:}
 I now have {pending} feedback items for analysis.
-When you're ready, run `/aid improve` to enhance skills.
+When you're ready, run `/aid-improve` to enhance skills.
 
 Continue to next phase? [Yes] [No, done for today]
 """
@@ -289,7 +285,7 @@ Statistics:
 • Sessions since last improvement: {sessions_since_last_improvement}
 
 {IF improvement_suggested:}
-💡 Recommended: Run /aid improve
+💡 Recommended: Run /aid-improve
 """
 ```
 

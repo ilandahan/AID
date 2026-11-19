@@ -26,7 +26,14 @@ Tell the user what breather does and get a yes first. breather is optional and i
    ```bash
    node "${CLAUDE_PLUGIN_ROOT}/integrations/breather/install.mjs"
    ```
-   Installs user-scope to `~/.claude` (skills/breather, hooks/breather,
+   Claude Code asks the user before the installer runs: AID's gate answers "ask" for this
+   exact command in every folder, because it writes hooks into `~/.claude/settings.json`
+   and its instructions read the calendar. Run it as one plain command (no `cd`, `&&`,
+   redirect or other path) and never change it: only this exact form is asked. Outside AID
+   projects, and in an AID project from Phase 4 on, another form (chained, redirected,
+   another path) is not asked and may run without a prompt. In `-p` or dontAsk sessions it is
+   denied. Under `--dangerously-skip-permissions` Claude Code does not document that a
+   hook's "ask" still prompts, so do not count on a prompt in that mode. Installs user-scope to `~/.claude` (skills/breather, hooks/breather,
    settings.json hooks + statusLine, with a settings backup). Active in
    every project on this machine.
 

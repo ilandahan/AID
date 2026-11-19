@@ -23,7 +23,9 @@ The pipeline activates in two ways:
 2. **Automatically on plan execution** — when an approved plan begins execution, the
    `plan-execution-pipeline.sh` `PostToolUse(ExitPlanMode)` hook injects an instruction to
    initialize the pipeline. On that signal you MUST, before writing implementation code:
-   (a) initialize `.aid/pipeline/state.json` (`pipeline_status: running`, `current_step: DEVELOP`);
+   (a) initialize `.aid/pipeline/state.json` (`pipeline_status: running`, `current_step: DEVELOP`,
+   and `session_id` when the instruction gives one: the `dev-pipeline-gate.sh` Stop hook treats a
+   `running` run from another session, or one untouched for more than 6 h, as stale and does not block on it);
    (b) **freeze the immutable Task Brief** (see Initialize step 4) from the verbatim original
    request + WHY + the approved plan; and (c) drive all implementation through this state machine
    rather than coding ad-hoc. This is why the brief must be frozen at kickoff: plan-approval is the
@@ -382,7 +384,7 @@ Focus on the lowest-scoring categories first.
 | FIX_API_TESTS | Fix integration test failures | API_TESTS | loop |
 | E2E_TESTS | **Pre-check:** if no E2E tests exist (no playwright config / `e2e/` / `tests/e2e/` / `features/*.feature`), STOP and ask the user via AskUserQuestion: create E2E tests now, or skip E2E for this task (record choice in `state.json` as `e2e_skipped: true`, log in step_summaries). Never run a test command against nothing and call it PASS. Otherwise run `config.test_commands.e2e` + `npm run cucumber` | CERTIFICATION | FIX_E2E_TESTS |
 | FIX_E2E_TESTS | Fix E2E/Cucumber failures | E2E_TESTS | loop |
-| CERTIFICATION | Run ALL tests (random order), verify coverage, generate report. On CERTIFICATION → DONE, a terminal **RETRO/SYNTHESIS** step runs (detailed in `SKILL.extended.md`): it aggregates `step_summaries` + final scores + AR gap reasons into a short human-readable `.aid/pipeline/<task_id>/retro.md`, INVOKES the existing user-level retro skill (`~/.claude/skills/retro`) to close the loop, and may append a one-line learning to user memory `MEMORY.md`. Report-only — NEVER auto-commits. | DONE | N/A |
+| CERTIFICATION | Run ALL tests (random order), verify coverage, generate report. On CERTIFICATION → DONE, a terminal **RETRO/SYNTHESIS** step runs (detailed in `SKILL.extended.md`): it aggregates `step_summaries` + final scores + AR gap reasons into a short human-readable `.aid/pipeline/<task_id>/retro.md` (project-local; nothing is written outside the project). To keep a learning, it tells the user to run `/aid-end` (redacted `aid_session.py end`) or `/aid-improve` (memory-sync, which the user confirms). Report-only — NEVER auto-commits. | DONE | N/A |
 
 ---
 
@@ -426,7 +428,7 @@ If you had to reason about what a number should be, you did not recover a score 
 **3. If nothing is recoverable, record the failure and re-spawn once.**
 
 ```
-node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" --step CODE_REVIEW --scores '{}'
+node "${CLAUDE_PLUGIN_ROOT}/skills/pipeline-orchestrator/gate.mjs" --step CODE_REVIEW --scores '{}'
 ```
 
 That returns ERROR with exit 3 and appends one `result: "ERROR"` row to `step_history`. It consumes
@@ -466,7 +468,7 @@ Agent(
 **Parse response — the decision is NOT yours to make. Run the gate:**
 
 ```bash
-node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" \
+node "${CLAUDE_PLUGIN_ROOT}/skills/pipeline-orchestrator/gate.mjs" \
   --step CODE_REVIEW --scores '<the agent's scores object, verbatim JSON>'
 ```
 
@@ -496,7 +498,7 @@ unresolved ESCALATE cannot be quietly skipped. Resolution is the user's decision
 past" failure this whole gate exists to prevent:
 
 ```bash
-node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" \
+node "${CLAUDE_PLUGIN_ROOT}/skills/pipeline-orchestrator/gate.mjs" \
   --should-spawn-dual --step CODE_REVIEW
 ```
 
@@ -531,7 +533,7 @@ they are separate sub-agents with no shared context. The `.meta.json` beside eac
 one before merging — `mergeReviews` takes both **verbatim**:
 
 ```bash
-node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" --step CODE_REVIEW   --scores   '<reviewer A's JSON, verbatim>'   --scores-b '<reviewer B's JSON, verbatim>'
+node "${CLAUDE_PLUGIN_ROOT}/skills/pipeline-orchestrator/gate.mjs" --step CODE_REVIEW   --scores   '<reviewer A's JSON, verbatim>'   --scores-b '<reviewer B's JSON, verbatim>'
 ```
 
 The merge is in code, not in your judgement, because you are the party that wants to advance and
@@ -587,7 +589,7 @@ Agent(
 **Parse response — the decision is NOT yours to make. Run the gate:**
 
 ```bash
-node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" \
+node "${CLAUDE_PLUGIN_ROOT}/skills/pipeline-orchestrator/gate.mjs" \
   --step TEST_REVIEW --scores '<the agent's scores object, verbatim JSON>'
 ```
 
@@ -651,7 +653,7 @@ Agent(
 **Parse response — the decision is NOT yours to make. Run the gate:**
 
 ```bash
-node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" \
+node "${CLAUDE_PLUGIN_ROOT}/skills/pipeline-orchestrator/gate.mjs" \
   --step VISUAL_QA --scores '<the agent's scores object, verbatim JSON>'
 ```
 
@@ -735,7 +737,7 @@ Agent(
 **Parse response — the decision is NOT yours to make. Run the gate:**
 
 ```bash
-node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs" \
+node "${CLAUDE_PLUGIN_ROOT}/skills/pipeline-orchestrator/gate.mjs" \
   --step PHASE_GATE --scores '<the validator's verdict object, verbatim JSON>'
 ```
 
@@ -794,8 +796,8 @@ the phase5-acceptance-validator / phase4-intent-validator:
 
 When `/pipeline` is invoked:
 
-0. **Intent check (do this first).** Confirm this is an IMPLEMENTATION task with a code/test deliverable. If the approved plan / frozen `brief.md` describes pure analysis, research, investigation, or a report with NO code deliverable, do NOT initialize the pipeline — there is nothing for DEVELOP→CODE_REVIEW to act on. Stay advisory-only and set `SKIP_PIPELINE_GATE=1` for the turn. This backs the start-hook's advisory INTENT GATE with an orchestrator-side check.
-1. Read `.aid/pipeline/config.json` for settings. **If it does not exist (non-AID project, or first run): create `.aid/pipeline/` and copy the user-level default `~/.claude/skills/pipeline-orchestrator/config.default.json` into `.aid/pipeline/config.json`, then continue.** Do NOT escalate for a missing config — bootstrap it. (The default carries the caps + `autoresearch` block + thresholds; the project may edit it afterward.)
+0. **Intent check (do this first).** Confirm this is an IMPLEMENTATION task with a code/test deliverable. If the approved plan / frozen `brief.md` describes pure analysis, research, investigation, or a report with NO code deliverable, do NOT initialize the pipeline — there is nothing for DEVELOP→CODE_REVIEW to act on. Stay advisory-only. This backs the start-hook's advisory INTENT GATE with an orchestrator-side check.
+1. Read `.aid/pipeline/config.json` for settings. **If it does not exist (non-AID project, or first run): create `.aid/pipeline/` and copy the plugin's default `${CLAUDE_PLUGIN_ROOT}/skills/pipeline-orchestrator/config.default.json` into `.aid/pipeline/config.json`, then continue.** Do NOT escalate for a missing config — bootstrap it. (The default carries the caps + `autoresearch` block + thresholds; the project may edit it afterward.)
 2. Read `.aid/context.json` for current task
 3. Create `.aid/pipeline/state.json`:
 
@@ -806,6 +808,7 @@ When `/pipeline` is invoked:
   "current_phase": 4,
   "current_step": "DEVELOP",
   "current_task_id": "[from context.json]",
+  "session_id": "[the session_id from the plan-approval instruction, if given]",
   "started_at": "[ISO-8601 now]",
   "last_updated": "[ISO-8601 now]",
   "iterations": {
@@ -886,7 +889,7 @@ When `/pipeline` is invoked:
    an immutable, hash-pinned file.
 
    ```bash
-   node "$HOME/.claude/skills/pipeline-orchestrator/gate.mjs"      --brief-check .aid/pipeline/<task_id>/brief.draft.md
+   node "${CLAUDE_PLUGIN_ROOT}/skills/pipeline-orchestrator/gate.mjs"      --brief-check .aid/pipeline/<task_id>/brief.draft.md
    ```
 
    | Exit | Meaning | What to do |

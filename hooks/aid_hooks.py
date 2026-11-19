@@ -322,21 +322,23 @@ def clear_markers():
 EVENT = ""
 
 
-def output_allow(additional_context=""):
+def output_allow(additional_context="", system_message=None):
     """
-    Allow the action, optionally injecting context.
+    Allow the action, optionally injecting context (and, T15-11, a top-level systemMessage
+    the user sees).
 
     WHY hookEventName: without it Claude Code cannot route hookSpecificOutput and
     silently drops additionalContext -- which made every SessionStart context injection
     and every "warn" enforcement level a no-op.
     """
-    if additional_context:
-        print(json.dumps({
-            "hookSpecificOutput": {
-                "hookEventName": EVENT,
-                "additionalContext": additional_context
-            }
-        }))
+    if additional_context or system_message:
+        out = {}
+        if system_message:
+            out["systemMessage"] = system_message
+        if additional_context:
+            out["hookSpecificOutput"] = {"hookEventName": EVENT,
+                                         "additionalContext": additional_context}
+        print(json.dumps(out))
     # Allowing with nothing to say = stay silent, exit 0. The old {"ok": true} body was
     # not a shape Claude Code reads.
     sys.exit(0)
@@ -355,6 +357,22 @@ def output_deny(reason):
         "hookSpecificOutput": {
             "hookEventName": EVENT or "PreToolUse",
             "permissionDecision": "deny",
+            "permissionDecisionReason": reason
+        }
+    }))
+    sys.exit(0)
+
+
+def output_ask(reason):
+    """
+    T15 I-6: ask the user to confirm the call. A human confirmation, not a phase rule, so it
+    is emitted at every gate level. Where nobody can answer (-p / dontAsk) Claude Code
+    denies it.
+    """
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "ask",
             "permissionDecisionReason": reason
         }
     }))
@@ -468,8 +486,20 @@ def handle_session_start(input_data, config):
                          "permission rules only apply when Claude Code is started in the AID "
                          "project folder.".format(env_dir, PROJECT_ROOT))
 
+    # T15-11 (R-14): every SessionStart in an AID project names each gate below block,
+    # whether or not it changed since the last session, to the user and to the agent.
+    lowered = ["{}: {}".format(g, lv) for g, lv in sorted(gate_levels(config).items())
+               if lv != "block"] if aid_in_use() else []
+    system_message = None
+    if lowered:
+        notes.append("AID gates below block in this project: {}. At log/warn out-of-phase code "
+                     "and commands are not stopped; control files stay refused."
+                     .format(", ".join(lowered)))
+        system_message = ("AID: phase gates below block in this project ({}); out-of-phase "
+                          "work is not stopped.".format(", ".join(lowered)))
+
     def say(text):
-        output_allow("\n".join(notes + [text]))
+        output_allow("\n".join(notes + [text]), system_message=system_message)
 
     state = load_state()
     context = load_context()
@@ -631,18 +661,26 @@ def load_gate_state(config):
     if phase is None:
         return state, (0 if blocking else None)
     try:
-        return state, int(str(phase).strip())
+        if isinstance(phase, bool):
+            raise TypeError
+        value = int(str(phase).strip())
     except (ValueError, TypeError):
         raise GateInputError("current_phase {!r} is not an integer".format(phase))
+    if not 0 <= value <= 5:
+        # T15-9: phases are 0-5; 99 used to read as "past every gate".
+        raise GateInputError("current_phase {!r} is outside 0-5".format(phase))
+    return state, value
 
 
 ACTION = None  # set by main(); read by fail_closed()
+PENDING_ASK = None  # T15: a human-confirmed call being judged; never allowed silently
 
 
 def fail_closed(reason):
     """
     A PreToolUse gate could not evaluate the call. In block mode deny it (fail CLOSED);
-    in log/warn mode, and for every other hook, log the error and allow.
+    in log/warn mode, and for every other hook, log the error and allow -- except a
+    human-confirmed call (PENDING_ASK), which is still asked.
     """
     log_error(reason)
     if EVENT == "PreToolUse" and ACTION in GATES:
@@ -653,6 +691,8 @@ def fail_closed(reason):
         if level == "block":
             output_deny("🚫 AID ENFORCEMENT BLOCK: the phase gate could not evaluate "
                         "this call ({}), so it is denied.".format(reason))
+        if PENDING_ASK:
+            output_ask(PENDING_ASK)
     sys.exit(0)
 
 
@@ -670,12 +710,15 @@ def gate_cwd(input_data):
     return cwd if isinstance(cwd, str) and cwd else str(PROJECT_ROOT)
 
 
-def check_integrity_or_deny(input_data, config, hook_name, phase):
-    """Layer B: deny (per the BASELINE's level) when the gate config or deny rules changed."""
+def check_integrity_or_deny(input_data, config, hook_name, phase, ask=None):
+    """Layer B: deny (per the BASELINE's level) when the gate config or deny rules changed.
+    T15: for a human-confirmed call (ask) a log/warn baseline still asks, never allows."""
     reason, base_levels = aid_guard.check_integrity(
         PROJECT_ROOT, input_data.get("session_id"), gate_levels(config), markers_missing=LATCHED)
     if reason:
         level = base_levels.get(hook_name, get_enforcement_level(config, hook_name))
+        if ask and level != "block":
+            output_ask("{} (AID integrity note: {})".format(ask, reason))
         enforce(level, reason, {"event": "PreToolUse", "hook": hook_name, "integrity": True,
                                 "phase": phase, "violation": True})
 
@@ -790,12 +833,35 @@ def handle_phase_gate_bash(input_data, config):
     only a best-effort literal control-file check runs (layers A and B are the real
     protection). The human extends the pre-Phase-4 list with
     phase_gate_rules.extra_allowed_commands in .aid/hooks/config.json (a protected file).
+
+    T15 (D1, D2) first, in EVERY folder: human-confirmed aid_session.py calls and the plugin
+    scripts are asked (aid_guard.session_ask_verdict), whatever the phase or level.
     """
+    global PENDING_ASK
+    tool_name = input_data.get("tool_name") or "Bash"
+    if isinstance(tool_name, str) and tool_name.casefold() == "powershell":
+        tool_name = "PowerShell"          # T7 review r1: defence in depth
+    tool_input = input_data.get("tool_input")
+    raw_cmd = tool_input.get("command") if isinstance(tool_input, dict) else None
+    kind, why = None, None
+    if isinstance(raw_cmd, str) and raw_cmd.strip():
+        kind, why = aid_guard.session_ask_verdict(raw_cmd, str(PROJECT_ROOT),
+                                                  powershell=tool_name == "PowerShell")
     if not aid_in_use() and not LATCHED:
+        if kind in ("ask", "foreign"):
+            output_ask(why)
+        if kind == "deny":
+            output_deny("🚫 AID: " + why)
         output_allow()
         return
+    asking = why if kind in ("ask", "foreign") else None
+    PENDING_ASK = asking
     # INV-3: layer B before the state is read, so a broken state.json cannot skip it.
-    check_integrity_or_deny(input_data, config, "phase_gate_bash", None)
+    check_integrity_or_deny(input_data, config, "phase_gate_bash", None, ask=asking)
+    if kind == "ask":
+        audit_log_entry({"event": "PreToolUse", "hook": "phase_gate_bash", "tool": tool_name,
+                         "command": raw_cmd[:200], "ask": True})
+        output_ask(why)
     state, phase = load_gate_state(config)
 
     command = input_data["tool_input"].get("command") or ""
@@ -806,9 +872,6 @@ def handle_phase_gate_bash(input_data, config):
         return
 
     rules = config["phase_gate_rules"]
-    tool_name = input_data.get("tool_name") or "Bash"
-    if isinstance(tool_name, str) and tool_name.casefold() == "powershell":
-        tool_name = "PowerShell"          # T7 review r1: defence in depth
     min_phase = rules.get("code_execute_min_phase", 4)
     cmd_display = command[:100] + ("..." if len(command) > 100 else "")
     if tool_name == "PowerShell":
@@ -823,6 +886,8 @@ def handle_phase_gate_bash(input_data, config):
                                            extra if ph is not None else ())
     reason = verdict(phase)
     if not reason:
+        if asking:
+            output_ask(asking)        # "foreign": the existing rules allow, the user still confirms
         output_allow()
         return
 
@@ -851,6 +916,8 @@ def handle_phase_gate_bash(input_data, config):
                 cmd_display, reason, phase, (state or {}).get("phase_name", "?"), min_phase))
     else:
         message = "Phase gate: '{}' — {}. {}".format(cmd_display, reason, CONTROL_FILE_HINT)
+    if asking and gate_level(config, "phase_gate_bash", control) != "block":
+        output_ask(asking)            # a lowered gate relaxes phase rules, never the confirmation
     enforce(gate_level(config, "phase_gate_bash", control), message, {
         "event": "PreToolUse",
         "hook": "phase_gate_bash",

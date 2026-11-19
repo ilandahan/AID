@@ -22,17 +22,20 @@ The vendored installer is pinned: `integrations/breather/PAYLOAD.lock.json` reco
 
 Please do not put vulnerability details in a public GitHub issue.
 
-Report vulnerabilities privately through
-[GitHub Security Advisories](https://github.com/ilandahan/AID/security/advisories/new)
-for this repository.
+The reporting channel is GitHub's private vulnerability advisory form for this
+repository:
+[GitHub Security Advisories](https://github.com/ilandahan/AID/security/advisories/new).
 
-If that link does not let you submit a private report, use one of these
-fallbacks instead:
+Status: the owner is enabling GitHub private vulnerability reporting for this
+repository. Until that is done (pending with the owner), the form may not accept a
+report.
 
-- Email the maintainer at the address listed on the GitHub profile
-  <https://github.com/ilandahan>.
-- Or open a minimal public issue that only asks for a private contact channel.
-  Do not include any details of the vulnerability in that issue.
+If the form does not let you submit a private report, open a minimal public issue
+that only asks for a private contact channel. Do not include any details of the
+vulnerability in that issue; the maintainer will reply with a private channel.
+
+Repository security settings (Dependabot alerts and Dependabot security updates) are
+also pending with the owner; `.github/dependabot.yml` only configures version updates.
 
 Please include:
 

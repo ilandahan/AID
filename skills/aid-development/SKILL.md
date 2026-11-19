@@ -30,7 +30,18 @@ Task(
   description="QA validation for {TASK-ID}"
 )
 ```
-5. Process QA report → PASS: proceed to next task. FAIL: fix issues in `action_required`, spawn QA again.
+5. Save the validator's JSON report as `.aid/qa/reports/{task-id}-report-{N}.json` (N = QA cycle).
+6. Process QA report → PASS: record the pass (below), then proceed to next task. FAIL: fix issues in `action_required`, spawn QA again.
+
+Recording a PASS. The Phase 4 QA Stop gate lets the task end only when `.aid/state.json`
+holds a QA pass for the task's current criteria file. The one way to record it is this
+command, which Claude Code asks the user to confirm:
+```
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" qa-pass <TASK-ID> --note "<short summary>"
+```
+Never create a marker or verdict file under `.aid/qa/` yourself: those files are refused,
+and the gate ignores them. If the criteria file changes after the pass, the pass no longer
+counts and QA must run again.
 
 QA criteria file `.aid/qa/{task-id}.yaml`:
 ```yaml
@@ -55,7 +66,7 @@ QA gate rules:
 | No skipping | Mandatory for all tasks |
 
 When QA fails:
-1. Read report at `.aid/qa/{task-id}-review-{N}.json`
+1. Read report at `.aid/qa/reports/{task-id}-report-{N}.json`
 2. Fix each issue in `action_required`
 3. Re-spawn QA
 4. Repeat until PASS or max cycles

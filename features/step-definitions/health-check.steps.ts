@@ -2,17 +2,21 @@ import { Given, Then } from '@cucumber/cucumber';
 import * as fs from 'fs';
 import * as path from 'path';
 import assert from 'assert';
+import { healthRoot } from '../support/health-root';
 
 let fileContent: string;
 let parsedJson: Record<string, unknown>;
 
+// Files are resolved under AID_HEALTH_ROOT (default: the current working directory).
+// A scenario whose .aid/ file is absent is skipped by the Before hook in support/health-root.ts.
+
 Given('the AID system is initialized', function () {
-  const aidDir = path.resolve(process.cwd(), '.aid');
+  const aidDir = path.join(healthRoot(), '.aid');
   assert.ok(fs.existsSync(aidDir), '.aid directory does not exist');
 });
 
 Then('the file {string} should exist', function (filePath: string) {
-  const fullPath = path.resolve(process.cwd(), filePath);
+  const fullPath = path.join(healthRoot(), filePath);
   assert.ok(fs.existsSync(fullPath), `File ${filePath} does not exist`);
   fileContent = fs.readFileSync(fullPath, 'utf-8');
 });

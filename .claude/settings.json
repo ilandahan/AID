@@ -4,8 +4,8 @@
       "Read",
       "Grep",
       "Glob",
-      "Edit",
-      "Write"
+      "Edit(/docs/**)",
+      "Write(/docs/**)"
     ],
     "deny": []
   },

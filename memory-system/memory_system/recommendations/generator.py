@@ -464,7 +464,9 @@ def save_recommendations(recommendations: List[Dict[str, Any]]) -> Path:
     already applied or rejected is not queued again.
     """
     queue = _read_list(_queue_file())
-    seen = {r.get("id") for r in queue + _read_list(_applied_file()) + _read_list(_rejected_file())}
+    known = queue + _read_list(_applied_file()) + _read_list(_rejected_file())
+    # T15-30: an entry stored under its pre-T15 id still counts as seen under its new id.
+    seen = {r.get("id") for r in known} | {_content_id(r) for r in known if _id_matches_content(r)}
     for rec in recommendations:
         if isinstance(rec, dict) and rec.get("id") and rec["id"] not in seen:
             queue.append(redact_obj(rec, default_names(), skip_keys=("id", "generated_at")))
@@ -505,7 +507,7 @@ def apply_recommendation(rec_id: str, refs_root: Optional[Path] = None) -> Dict[
         return {"ok": False, "reason": "recommendation {} has no allowed target (only "
                 "skills/memory-system/references/roles|phases/<name>/cumulative.md); apply it "
                 "by hand if you want it".format(rec.get("id"))}
-    if rec.get("id") != _content_id(rec):
+    if not _id_matches_content(rec):
         return {"ok": False, "reason": "recommendation {!r} does not match its content (the queue "
                 "was edited); run memory-preview and confirm the id it shows".format(rec.get("id"))}
     clean = redact_obj(rec, default_names(), skip_keys=("id", "generated_at"))
@@ -521,13 +523,28 @@ def apply_recommendation(rec_id: str, refs_root: Optional[Path] = None) -> Dict[
     return {"ok": True, "id": clean.get("id"), "target": str(rec.get("target_file"))}
 
 
+def _content_key(rec: Dict[str, Any]) -> bytes:
+    return "|".join(str(rec.get(k)) for k in
+                    ("target_skill", "target_file", "section", "proposed_change",
+                     "rationale")).encode("utf-8")
+
+
 def _content_id(rec: Dict[str, Any]) -> str:
     """The id a recommendation's CONTENT gives it. memory-apply checks it, so the id the user
     confirms in Claude Code's prompt fixes exactly what is appended: the target file and
-    both texts that are written (T8 review r1 and r2)."""
-    key = "|".join(str(rec.get(k)) for k in
-                   ("target_skill", "target_file", "section", "proposed_change", "rationale"))
-    return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
+    both texts that are written (T8 review r1 and r2). T15-30: sha256, 32 hex chars."""
+    return hashlib.sha256(_content_key(rec)).hexdigest()[:32]
+
+
+def _legacy_content_id(rec: Dict[str, Any]) -> str:
+    """The pre-T15 id (SHA-1, 16 hex chars). Only READ, so entries queued before T15 can
+    still be applied or rejected; new ids are never made this way."""
+    return hashlib.sha1(_content_key(rec), usedforsecurity=False).hexdigest()[:16]
+
+
+def _id_matches_content(rec: Dict[str, Any]) -> bool:
+    rec_id = rec.get("id")
+    return rec_id == _content_id(rec) or rec_id == _legacy_content_id(rec)
 
 
 def _one_line(value: Any) -> str:
@@ -626,17 +643,23 @@ def queue_proposals(data: Any) -> Dict[str, Any]:
     T8-2 (D3): queue the memory-analysis agent's proposals (its JSON output, or the list in
     its ``suggestions``). Each proposal is redacted; one whose target is not an allowed
     learnings file is skipped. Nothing is applied here.
+
+    I-8 (T15-29): ``skipped_targets`` lists targets that are not an allowed learnings file;
+    ``skipped_empty`` lists allowed targets whose proposal has no content.
     """
     items = data.get("suggestions", []) if isinstance(data, dict) else data
-    queued, skipped = [], []
+    queued, skipped, empty = [], [], []
     for s in items if isinstance(items, list) else []:
         if not isinstance(s, dict):
             continue
         target = s.get("target") if isinstance(s.get("target"), dict) else {}
         rel = target.get("file") or s.get("target_file")
         text = s.get("content") or s.get("proposed_change")
-        if resolve_target(rel) is None or not isinstance(text, str) or not text.strip():
+        if resolve_target(rel) is None:
             skipped.append(str(rel))
+            continue
+        if not isinstance(text, str) or not text.strip():
+            empty.append(str(rel))
             continue
         rel = str(rel).replace("\\", "/").replace("skills/memory-system/references/", "")
         rec = redact_obj({"priority": s.get("priority", "medium"), "target_skill": "memory-system",
@@ -648,7 +671,8 @@ def queue_proposals(data: Any) -> Dict[str, Any]:
                     "requires_review": True, "status": "pending", "source": "memory-analysis-agent"})
         queued.append(rec)
     save_recommendations(queued)
-    return {"queued": [r["id"] for r in queued], "skipped_targets": skipped}
+    return {"queued": [r["id"] for r in queued], "skipped_targets": skipped,
+            "skipped_empty": empty}
 
 
 def format_recommendations_report(recommendations: List[Dict[str, Any]]) -> str:

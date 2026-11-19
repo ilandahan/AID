@@ -27,8 +27,13 @@ Day plan questions and offers stop for the rest of the day.
 ## 3. Uninstall — remove breather entirely
 
 ```bash
-node <installer-path> --uninstall
+node "${CLAUDE_PLUGIN_ROOT}/integrations/breather/install.mjs" --uninstall
 ```
+
+Claude Code asks the user before the installer runs (AID's gate answers "ask" for this exact
+command in every folder; in `-p` or dontAsk sessions it is denied). Under
+`--dangerously-skip-permissions` Claude Code does not document that a hook's "ask" still
+prompts, so do not count on a prompt in that mode.
 
 Installer path (first match wins):
 - `${CLAUDE_PLUGIN_ROOT}/integrations/breather/install.mjs` only (plugin install). Never run an

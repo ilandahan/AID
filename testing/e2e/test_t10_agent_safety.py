@@ -168,6 +168,29 @@ def test_t10_1_only_the_listed_agents_can_write_or_run_commands():
     assert writers == set(WRITERS), writers ^ set(WRITERS)
 
 
+def _readme_reviewer_table():
+    text = (REPO / "README.md").read_text(encoding="utf-8")
+    sec = text[text.index("## Sub-Agents"):]
+    sec = sec[:sec.index("\n---")]
+    return re.findall(r"^\| `([a-z0-9-]+)` \|", sec, re.M), " ".join(sec.split())
+
+
+def test_t15_33_readme_reviewers_have_no_write_tools():
+    """WHY (T15-33, R-05/A-08): the README called aid-test-agent a read-only reviewer while
+    it holds Write, Edit and Bash. Every agent in the reviewer table must be read-only."""
+    names, sec = _readme_reviewer_table()
+    assert names and "aid-test-agent" not in names, names
+    assert len(names) == 7 and "7 reviewer" in sec, (names, sec[:200])
+    bad = {n: tools_of(n) for n in names if WRITE_TOOLS & set(tools_of(n) or [])}
+    assert bad == {}, bad
+    assert "`aid-test-agent`" in sec and "test runner with write tools" in sec
+
+
+def test_t15_33_security_model_agrees_on_aid_test_agent():
+    text = " ".join((REPO / "docs" / "SECURITY-MODEL.md").read_text(encoding="utf-8").split())
+    assert "The 7 reviewers" in text and "`aid-test-agent` is not a reviewer" in text
+
+
 def test_t10_review_scorer_has_no_bare_name_fallback():
     """WHY (T10 review r1, A2): a bare `reflection-agent` lets a project's own
     .claude/agents/reflection-agent.md act as the autoresearch judge."""

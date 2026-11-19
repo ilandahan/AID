@@ -49,6 +49,11 @@ SLOT_ALLOCATION = {
 }
 
 
+def _norm(content: Any) -> str:
+    """T15-26: the form two memory entries are compared in (casefold, collapsed whitespace)."""
+    return " ".join(str(content).casefold().split())
+
+
 def ensure_directories():
     """Create memory directories if they don't exist."""
     paths.memory_dir().mkdir(parents=True, exist_ok=True)
@@ -113,13 +118,17 @@ class MemorySlotManager:
             metadata: Optional metadata
 
         Returns:
-            True if added successfully
+            True if added; False for an unknown category or an entry whose normalised
+            content is already in that category (T15-26: a sync run twice adds nothing)
         """
         if category not in SLOT_ALLOCATION:
             return False
 
         max_slots = SLOT_ALLOCATION[category]
         current_entries = self.slots.get(category, [])
+        clean = redact(content, default_names())               # T8-1: never raw text
+        if self.has_memory(category, clean):
+            return False
 
         # Check if slot available
         if len(current_entries) >= max_slots:
@@ -127,7 +136,7 @@ class MemorySlotManager:
             current_entries.pop(0)
 
         entry = {
-            "content": redact(content, default_names()),      # T8-1: never raw text
+            "content": clean,
             "added_at": datetime.utcnow().isoformat() + "Z",
             "metadata": metadata or {}
         }
@@ -137,6 +146,11 @@ class MemorySlotManager:
         self._save_slots()
 
         return True
+
+    def has_memory(self, category: str, content: Any) -> bool:
+        """True when ``category`` already holds an entry with this normalised content."""
+        key = _norm(content)
+        return any(_norm(e.get("content", "")) == key for e in self.slots.get(category, []))
 
     def get_memories(self, category: str) -> List[Dict[str, Any]]:
         """Get all memories for a category."""
@@ -256,8 +270,13 @@ class MemorySyncEngine:
         planned = []
 
         def add(category, content, meta):
-            planned.append({"category": category, "content": redact(content, default_names()),
-                            "metadata": meta})
+            clean = redact(content, default_names())
+            # T15-26: an entry already in memory, or already planned, is not planned again.
+            if self.slot_manager.has_memory(category, clean) or any(
+                    p["category"] == category and _norm(p["content"]) == _norm(clean)
+                    for p in planned):
+                return
+            planned.append({"category": category, "content": clean, "metadata": meta})
 
         verbosity = self.patterns.get('verbosity_preference', {})
         if verbosity.get('confidence') in ['high', 'medium']:
@@ -305,7 +324,9 @@ class MemorySyncEngine:
         """
         planned = self.plan()
         if not planned:
-            return {"synced": False, "reason": "No patterns available"}
+            return {"synced": False, "memories_added": [],
+                    "reason": "Nothing new to sync: every entry is already in memory"
+                    if self.patterns else "No patterns available"}
         results = {"synced": True, "timestamp": datetime.utcnow().isoformat() + "Z",
                    "memories_added": []}
         for item in planned:
@@ -352,7 +373,11 @@ def sync_memory_from_feedback(days: int = 30, approve: bool = False) -> Dict[str
         return {"synced": False, "dry_run": not approve, "planned": [],
                 "reason": "No significant patterns to sync"}
     if not approve:
-        return {"synced": False, "dry_run": True, "planned": engine.plan(),
+        planned = engine.plan()
+        if not planned:
+            return {"synced": False, "dry_run": True, "planned": [],
+                    "reason": "Nothing new to sync: every entry is already in memory"}
+        return {"synced": False, "dry_run": True, "planned": planned,
                 "reason": "Dry run: nothing written. To write these entries, run /aid-improve "
                           "(it uses aid_session.py memory-sync, which asks you to confirm)."}
     return engine.sync_to_memory()

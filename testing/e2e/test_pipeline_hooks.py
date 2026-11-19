@@ -112,29 +112,80 @@ class TestNoPersonalPathsAnywhere:
     MARKERS = ['users/iland', 'users\\iland', "ilans' local files", 'melingo',
                'cc_loop_port', "start the day view", "dashboard's start the day"]
 
-    def test_no_personal_paths_in_shipped_files(self):
-        offenders = []
-        skip_dirs = {'node_modules', '.git', '__pycache__', '.pytest_cache'}
-        for root, dirs, files in os.walk(REPO_ROOT):
-            dirs[:] = [d for d in dirs if d not in skip_dirs]
+    SCAN_EXTS = ('.md', '.json', '.yaml', '.yml', '.sh', '.bat',
+                 '.py', '.mjs', '.js', '.ts', '.txt')
+    SKIP_DIRS = {'node_modules', '.git', '__pycache__', '.pytest_cache'}
+
+    @classmethod
+    def _candidate_files(cls, repo_root):
+        """Relative paths of every file that could ship from `repo_root`.
+
+        In a git checkout that is tracked + untracked-but-not-ignored files: a
+        gitignored file (.aid/pipeline/state.json, .claude/settings.local.json,
+        plan-store files the running session writes) can never be committed or
+        packaged, so a local path inside it is not a leak. A brand-new file that
+        is merely untracked IS still scanned - it is one `git add` from shipping.
+        Outside git (tarball, archive) fall back to walking everything.
+        """
+        if os.path.isdir(os.path.join(repo_root, '.git')) or os.path.isfile(
+                os.path.join(repo_root, '.git')):
+            r = subprocess.run(
+                ['git', '-C', repo_root, 'ls-files', '-z', '--cached',
+                 '--others', '--exclude-standard'],
+                capture_output=True, timeout=120)
+            if r.returncode == 0:
+                rels = [p for p in r.stdout.decode('utf-8', 'replace').split('\0') if p]
+                return [p for p in rels
+                        if not (set(p.split('/')[:-1]) & cls.SKIP_DIRS)]
+        rels = []
+        for root, dirs, files in os.walk(repo_root):
+            dirs[:] = [d for d in dirs if d not in cls.SKIP_DIRS]
             for fn in files:
-                if os.path.splitext(fn)[1].lower() not in (
-                        '.md', '.json', '.yaml', '.yml', '.sh', '.bat',
-                        '.py', '.mjs', '.js', '.ts', '.txt'):
-                    continue
-                path = os.path.join(root, fn)
-                try:
-                    with open(path, encoding='utf-8', errors='replace') as f:
-                        text = f.read().lower()
-                except OSError:
-                    continue
-                rel = os.path.relpath(path, REPO_ROOT)
-                # This test file necessarily names the markers it hunts for.
-                if rel.replace('\\', '/').endswith('testing/e2e/test_pipeline_hooks.py'):
-                    continue
-                for m in self.MARKERS:
-                    if m in text:
-                        offenders.append(f'{rel}: {m}')
+                rels.append(os.path.relpath(os.path.join(root, fn), repo_root))
+        return rels
+
+    @classmethod
+    def _offenders(cls, repo_root):
+        offenders = []
+        for rel in cls._candidate_files(repo_root):
+            if os.path.splitext(rel)[1].lower() not in cls.SCAN_EXTS:
+                continue
+            # This test file necessarily names the markers it hunts for.
+            if rel.replace('\\', '/').endswith('testing/e2e/test_pipeline_hooks.py'):
+                continue
+            try:
+                with open(os.path.join(repo_root, rel), encoding='utf-8',
+                          errors='replace') as f:
+                    text = f.read().lower()
+            except OSError:
+                continue
+            for m in cls.MARKERS:
+                if m in text:
+                    offenders.append(f'{rel}: {m}')
+        return offenders
+
+    def test_gitignored_runtime_state_is_not_scanned_but_untracked_files_are(
+            self, tmp_path):
+        # A session's own gitignored state (plan store, settings.local.json) holds
+        # absolute local paths by design; it cannot ship. A new untracked file can.
+        if shutil.which('git') is None:
+            pytest.skip('git not available')
+        repo = str(tmp_path)
+        subprocess.run(['git', 'init', '-q', repo], check=True, timeout=60)
+        marker = 'C:/' + 'Users' + '/' + 'iland' + '/proj'
+        with open(os.path.join(repo, '.gitignore'), 'w') as f:
+            f.write('local-state/\nsettings.local.json\n')
+        os.makedirs(os.path.join(repo, 'local-state'))
+        for rel in ('local-state/state.json', 'settings.local.json'):
+            with open(os.path.join(repo, rel), 'w') as f:
+                f.write(json.dumps({'cwd': marker}))
+        with open(os.path.join(repo, 'new-skill.md'), 'w') as f:
+            f.write('see ' + marker + '\n')
+        found = self._offenders(repo)
+        assert found == ['new-skill.md: users/iland'], found
+
+    def test_no_personal_paths_in_shipped_files(self):
+        offenders = self._offenders(REPO_ROOT)
         assert not offenders, (
             'personal machine paths / private tooling references would ship:\n  '
             + '\n  '.join(offenders)

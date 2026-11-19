@@ -1,6 +1,6 @@
 # AID Memory System - Improvement Flow
 
-> Complete implementation guide for the `/aid improve` command.
+> Complete implementation guide for the `/aid-improve` command.
 >
 > The exact commands are in `commands/aid-improve.md`. The pseudo-code below shows the
 > logic. AID's own write commands (`memory-sync`, `memory-apply`) run only after you confirm
@@ -15,7 +15,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     /aid improve                                │
+│                     /aid-improve                                │
 └─────────────────────┬───────────────────────────────────────────┘
                       │
                       ▼

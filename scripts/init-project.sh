@@ -99,7 +99,14 @@ if [ -z "$PROJECT_NAME" ]; then
     exit 1
 fi
 
-if [ -d "$PROJECT_NAME" ]; then
+# The name becomes a folder name and is written into JSON and Markdown files.
+# Allow only a plain name: letters, digits, dot, underscore, dash.
+if ! [[ "$PROJECT_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$ ]] || [[ "$PROJECT_NAME" == *..* ]]; then
+    log_error "Invalid project name '$PROJECT_NAME' (use letters, digits, '.', '_' or '-')"
+    exit 1
+fi
+
+if [ -e "$PROJECT_NAME" ]; then
     log_error "Directory '$PROJECT_NAME' already exists"
     exit 1
 fi
@@ -132,38 +139,20 @@ mkdir -p src/{components/{atoms,molecules,organisms,templates},app,hooks,utils,t
 mkdir -p tests/{unit,integration,e2e}
 mkdir -p docs
 
-# Create .aid directory for state tracking
-log_info "Initializing AID phase tracking..."
-mkdir -p .aid/approvals
+# Create .aid directory for work context.
+# .aid/state.json is NOT written here: hooks/aid_session.py is its only writer.
+# The user creates it with /aid-start (aid_session.py init, which Claude Code asks
+# the user to confirm).
+log_info "Creating AID work context..."
+mkdir -p .aid
 
-# Create state.json (Phase 1: PRD)
-cat > .aid/state.json << 'EOF'
-{
-  "current_phase": 1,
-  "phase_name": "PRD",
-  "project_name": "PROJECT_NAME_PLACEHOLDER",
-  "initialized_at": "TIMESTAMP_PLACEHOLDER",
-  "phases": {
-    "1": { "name": "PRD", "status": "in_progress", "started_at": "TIMESTAMP_PLACEHOLDER" },
-    "2": { "name": "Tech Spec", "status": "locked" },
-    "3": { "name": "Breakdown", "status": "locked" },
-    "4": { "name": "Development", "status": "locked" },
-    "5": { "name": "QA & Ship", "status": "locked" }
-  }
-}
-EOF
-
-# Replace placeholders
-TIMESTAMP=$(date -Iseconds 2>/dev/null || date +"%Y-%m-%dT%H:%M:%S")
-sed -i "s/PROJECT_NAME_PLACEHOLDER/$PROJECT_NAME/g" .aid/state.json 2>/dev/null || \
-    sed -i '' "s/PROJECT_NAME_PLACEHOLDER/$PROJECT_NAME/g" .aid/state.json
-sed -i "s/TIMESTAMP_PLACEHOLDER/$TIMESTAMP/g" .aid/state.json 2>/dev/null || \
-    sed -i '' "s/TIMESTAMP_PLACEHOLDER/$TIMESTAMP/g" .aid/state.json
+# Portable timestamp; no `sed -i` (its flags differ between GNU, BSD and Git Bash).
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Create context.json
-cat > .aid/context.json << 'EOF'
+cat > .aid/context.json << EOF
 {
-  "last_updated": "TIMESTAMP_PLACEHOLDER",
+  "last_updated": "$TIMESTAMP",
   "tasks": {
     "previous": null,
     "current": null,
@@ -174,14 +163,42 @@ cat > .aid/context.json << 'EOF'
     "current": null,
     "next": null
   },
-  "notes": "Project initialized. Start with /prd to create Product Requirements Document."
+  "notes": "Project created. Run /aid-start to choose your role and phase (0-5)."
 }
 EOF
 
-sed -i "s/TIMESTAMP_PLACEHOLDER/$TIMESTAMP/g" .aid/context.json 2>/dev/null || \
-    sed -i '' "s/TIMESTAMP_PLACEHOLDER/$TIMESTAMP/g" .aid/context.json
+log_success "AID work context created (.aid/context.json)"
 
-log_success "AID state initialized at Phase 1 (PRD)"
+# The entries linked or copied from AID into the project.
+AID_ENTRIES=(.claude CLAUDE.md skills)
+
+# link_entry <name>: create a REAL symbolic link <name> -> AID's <name>.
+# Git Bash without native symlinks makes `ln -s` copy instead (and a copy of a tree
+# that holds relative mirror links can fail half-way), so anything that is not a real
+# link afterwards counts as a failure and is removed.
+link_entry() {
+    local name="$1"
+    local target
+    for target in "$RELATIVE_AID/$name" "$AID_DIR/$name"; do
+        if ln -s "$target" "$name" 2>/dev/null && [ -L "$name" ] && [ -e "$name" ]; then
+            return 0
+        fi
+        rm -rf -- "./$name"
+    done
+    return 1
+}
+
+# copy_entry <name>: copy AID's <name> into the project, following links.
+# `.claude/` in an installed AID holds relative mirror links (agents -> ../agents);
+# copied as links they would dangle (and Git Bash refuses to create them, exit 1),
+# so they are dereferenced (-L).
+copy_entry() {
+    local name="$1"
+    if [ -e "$AID_DIR/$name" ]; then
+        cp -RL "$AID_DIR/$name" "./$name"
+        log_info "  Copied: $name"
+    fi
+}
 
 # Link or copy AID files
 if [ "$USE_SYMLINKS" = true ]; then
@@ -190,45 +207,36 @@ if [ "$USE_SYMLINKS" = true ]; then
     # Create relative path to AID from project
     RELATIVE_AID="../$(basename "$AID_DIR")"
 
-    # Create symbolic links
-    ln -s "$RELATIVE_AID/.claude" .claude 2>/dev/null || {
-        # Windows or symlink failed - try with full path
-        ln -s "$AID_DIR/.claude" .claude 2>/dev/null || {
+    for entry in "${AID_ENTRIES[@]}"; do
+        if ! link_entry "$entry"; then
             log_warning "Symbolic link failed. Copying instead."
             USE_SYMLINKS=false
-        }
-    }
+            break
+        fi
+    done
 
     if [ "$USE_SYMLINKS" = true ]; then
-        ln -s "$RELATIVE_AID/CLAUDE.md" CLAUDE.md 2>/dev/null || ln -s "$AID_DIR/CLAUDE.md" CLAUDE.md
-        ln -s "$RELATIVE_AID/skills" skills 2>/dev/null || ln -s "$AID_DIR/skills" skills
         log_success "Symbolic links created"
-        log_info "  .claude -> $RELATIVE_AID/.claude"
-        log_info "  CLAUDE.md -> $RELATIVE_AID/CLAUDE.md"
-        log_info "  skills -> $RELATIVE_AID/skills"
+        for entry in "${AID_ENTRIES[@]}"; do
+            log_info "  $entry -> $(readlink "$entry")"
+        done
+    else
+        # Remove the links made before the failure, so the copy starts clean.
+        for entry in "${AID_ENTRIES[@]}"; do
+            rm -rf -- "./$entry"
+        done
     fi
 fi
 
 if [ "$USE_SYMLINKS" = false ]; then
     log_info "Copying AID files..."
 
-    # Copy .claude directory
-    if [ -d "$AID_DIR/.claude" ]; then
-        cp -r "$AID_DIR/.claude" .claude
-        log_info "  Copied: .claude/"
-    fi
-
-    # Copy CLAUDE.md
-    if [ -f "$AID_DIR/CLAUDE.md" ]; then
-        cp "$AID_DIR/CLAUDE.md" CLAUDE.md
-        log_info "  Copied: CLAUDE.md"
-    fi
-
-    # Copy skills
-    if [ -d "$AID_DIR/skills" ]; then
-        cp -r "$AID_DIR/skills" skills
-        log_info "  Copied: skills/"
-    fi
+    for entry in "${AID_ENTRIES[@]}"; do
+        copy_entry "$entry"
+    done
+    # settings.local.json holds the AID install's own machine-local permissions;
+    # a new project starts without them.
+    rm -f ./.claude/settings.local.json
 
     log_success "AID files copied"
 fi
@@ -337,17 +345,16 @@ coverage/
 *.tsbuildinfo
 EOF
 
-# Create .env.example
+# Create .env.example: non-secret settings only.
 cat > .env.example << 'EOF'
+# Non-secret settings only. Never put passwords, tokens or keys in this file
+# or in a .env file. Store secrets in your OS keystore (macOS Keychain,
+# Windows Credential Manager, Linux libsecret) and export them per shell;
+# see AID's INSTALLATION.md, section "MCP Integrations Setup".
+
 # Application
 NODE_ENV=development
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-
-# Database (optional)
-DATABASE_URL=postgresql://user:password@localhost:5432/mydb
-
-# Authentication (optional)
-NEXTAUTH_SECRET=your-secret-key
 NEXTAUTH_URL=http://localhost:3000
 EOF
 
@@ -455,6 +462,9 @@ npm run dev
 
 This project uses the AID phase-gated methodology:
 
+Run \`/aid-start\` first: it records your role and phase (0-5).
+
+0. **Phase 0: Discovery** - \`/discovery\` - Research and validation
 1. **Phase 1: PRD** - \`/prd\` - Create Product Requirements
 2. **Phase 2: Tech Spec** - \`/tech-spec\` - Technical Specification
 3. **Phase 3: Breakdown** - \`/jira-breakdown\` - Task Breakdown
@@ -471,7 +481,7 @@ This project uses the AID phase-gated methodology:
 \`\`\`
 $PROJECT_NAME/
 ├── .aid/                # AID state tracking
-│   ├── state.json       # Current phase
+│   ├── state.json       # Current phase (created by /aid-start)
 │   └── context.json     # Work context
 ├── .claude/             # Commands (linked to AID)
 ├── skills/              # Skills (linked to AID)
@@ -490,13 +500,20 @@ if [ "$INIT_GIT" = true ]; then
     log_info "Initializing git repository..."
     git init --quiet
     git add .
-    git commit -m "Initial commit: Project setup with AID methodology" --quiet
-    log_success "Git repository initialized"
+    # A machine without a git identity (user.name/user.email) cannot commit;
+    # the project is still usable, so warn instead of failing the whole script.
+    if git commit -m "Initial commit: Project setup with AID methodology" --quiet; then
+        log_success "Git repository initialized"
+    else
+        log_warning "git commit failed (is user.name/user.email set?). Commit the files yourself."
+    fi
 fi
 
 # Install dependencies
 if [ "$INSTALL_DEPS" = true ]; then
     log_info "Installing dependencies..."
+    # Exception to AID's `npm ci` rule: a brand-new project has no package-lock.json
+    # yet, so `npm ci` cannot run. `npm install` creates the lockfile; commit it.
     npm install --silent 2>/dev/null || npm install
     log_success "Dependencies installed"
 fi
@@ -509,8 +526,6 @@ echo -e "${GREEN}═════════════════════
 echo ""
 echo "Your project is ready at: $(pwd)"
 echo ""
-echo -e "${YELLOW}Current Phase: 1 - PRD${NC}"
-echo ""
 echo "Next steps:"
 echo ""
 echo "  1. Navigate to your project:"
@@ -519,11 +534,8 @@ echo ""
 echo "  2. Open Claude Code:"
 echo "     claude"
 echo ""
-echo "  3. Check your phase status:"
-echo "     /phase"
-echo ""
-echo "  4. Start creating your PRD:"
-echo "     /prd"
+echo "  3. Start AID (choose your role and phase 0-5; this creates .aid/state.json):"
+echo "     /aid-start"
 echo ""
 if [ "$USE_SYMLINKS" = true ]; then
     echo -e "${BLUE}Note: This project uses symbolic links to AID.${NC}"

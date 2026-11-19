@@ -154,13 +154,13 @@ The system suggests improvement when:
 You'll see:
 ```
 💡 Enough feedback for analysis.
-   Run /aid improve before we start?
+   Run /aid-improve before we start?
 ```
 
 ### Running Improvement
 
 ```
-/aid improve
+/aid-improve
 ```
 
 **The process:**
@@ -264,7 +264,7 @@ Shows slot allocation and top performers.
 
 | Command | Description |
 |---------|-------------|
-| `/aid improve` | Run pattern analysis |
+| `/aid-improve` | Run pattern analysis |
 | `/aid stats [period]` | Show metrics |
 
 ### Skill Commands
@@ -403,10 +403,10 @@ A: Yes, the rating is required. It's the primary signal for pattern detection.
 A: Run `/aid end` when you remember, or feedback won't be collected.
 
 **Q: Can I edit skill files directly?**
-A: Yes! Use `/aid skill edit [type]` or edit files directly in `~/.aid/skills/`.
+A: Yes! Use `/aid skill edit [type]` or edit files directly in the plugin's `skills/memory-system/references/`.
 
 **Q: How long until I see improvements?**
-A: After 10+ sessions and running `/aid improve`, you'll see patterns.
+A: After 10+ sessions and running `/aid-improve`, you'll see patterns.
 
 **Q: What if a pattern doesn't apply to my next project?**
 A: Patterns should be general. If too specific, don't approve promotion.

@@ -441,7 +441,8 @@ class TestNoRealSecretsInTrackedTemplates:
         r'AKIA[0-9A-Z]{16}',
     ]
 
-    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac'])
+    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac',
+                                          '.mcp.json.example'])
     def test_template_has_no_real_credentials(self, template):
         path = os.path.join(REPO_ROOT, template)
         with open(path) as f:
@@ -455,7 +456,8 @@ class TestNoRealSecretsInTrackedTemplates:
                 f"value from the OS keystore - never put it in a tracked template."
             )
 
-    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac'])
+    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac',
+                                          '.mcp.json.example'])
     def test_template_credentials_come_from_environment(self, template):
         """Every env value and header must be a ${VAR} reference, so the file a
         user copies never invites them to paste a token into it."""
@@ -473,7 +475,8 @@ class TestNoRealSecretsInTrackedTemplates:
                         f"use ${{{key}}} env expansion"
                     )
 
-    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac'])
+    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac',
+                                          '.mcp.json.example'])
     def test_template_npx_packages_are_pinned(self, template):
         """npx -y fetches whatever is newest and runs it with the user's tokens;
         every package must carry an exact x.y.z version."""

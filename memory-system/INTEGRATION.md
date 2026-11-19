@@ -14,18 +14,19 @@ Add this section to your existing `CLAUDE.md`:
 AID includes a learning system that improves over time.
 
 ### Quick Commands
-- `/aid init` - Initialize memory system
-- `/aid start` - Start work session
-- `/aid end` - End phase with feedback
-- `/aid improve` - Run learning cycle
+- `/aid-init` - Initialize memory system
+- `/aid-start` - Start work session
+- `/aid-end` - End phase with feedback
+- `/aid-improve` - Run learning cycle
 
 ### How It Works
-At session start, Claude loads relevant skills from `memory-system/skills/`.
+At session start, Claude loads the role and phase references from `skills/memory-system/references/`.
 At phase end, feedback is collected and stored.
-Weekly, the `/aid improve` command analyzes patterns and updates skills.
+Weekly, the `/aid-improve` command analyzes patterns and proposes learnings; each one is
+applied only after you confirm it (`aid_session.py memory-apply`).
 
 ### Files
-- Skills: `memory-system/skills/`
+- Skill references: `skills/memory-system/references/`
 - Docs: `memory-system/docs/`
 - Runtime: `~/.aid/` (created on init)
 
@@ -62,7 +63,8 @@ Start a new work session.
 1. Ask for role (PM/Developer/QA/Lead)
 2. Ask for phase (Discovery/PRD/Tech-Spec/Development/QA-Ship)
 3. Load relevant skills
-4. Update state.json
+4. Run `aid_session.py start <role> <phase>`: it records the session in `.aid/state.json`
+   (the agent never edits state.json itself; only `aid_session.py` writes it)
 5. Greet user with context
 
 ## Implementation
@@ -89,7 +91,7 @@ See: `memory-system/docs/AGENT.md#3-phase-gate-flow-feedback-collection`
 
 **`/aid-improve.md`**
 ```markdown
-# /aid improve
+# /aid-improve
 
 Run the improvement analysis cycle.
 

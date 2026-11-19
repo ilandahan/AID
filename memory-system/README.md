@@ -101,7 +101,7 @@ Provide feedback on the session (1-5 rating + notes).
 ### 5. Run Improvement (Weekly)
 
 ```
-/aid improve
+/aid-improve
 ```
 
 Analyzes feedback and proposes skill updates and memory entries. AID's own write commands
@@ -115,7 +115,7 @@ run only after you confirm them.
 | `/aid start` | Start new session |
 | `/aid status` | Show current state |
 | `/aid end` | End phase, collect feedback |
-| `/aid improve` | Run improvement analysis |
+| `/aid-improve` | Run improvement analysis |
 | `/aid memory list` | Show AID's local memory entries |
 | `/aid memory stats` | Memory usage statistics |
 | `/aid skill view [name]` | View skill content |

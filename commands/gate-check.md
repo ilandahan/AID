@@ -205,9 +205,11 @@ If review status is PENDING, Claude will:
      reason to the user verbatim.
    - Never edit `.aid/state.json` yourself: `aid_session.py` is its only writer.
 
-### Review Cannot Be Skipped
+### Review Is Part of the Method
 
-The sub-agent review is **mandatory** and **cannot be bypassed**. This ensures:
+The sub-agent review is the methodology's required step before `/phase-advance`. It is
+guidance, not a hard lock: the user can override a PARTIAL with a reason, and a forward
+`jump` from `/aid-start` (which the user confirms) moves the phase without it. It gives:
 - Fresh, unbiased evaluation of deliverables
 - Consistent quality gates across all phases
 - Objective checklist validation without context bias

@@ -50,7 +50,7 @@ Sub-tasks contain ONLY acceptance criteria - no technical or business context.
 ## Status
 - [ ] Pending QA review
 - [ ] Passed
-- [ ] Failed (see `.aid/qa/{TASK_ID}-review-N.json`)
+- [ ] Failed (see `.aid/qa/reports/{TASK_ID}-report-N.json`)
 ```
 
 ---
@@ -103,7 +103,7 @@ Sub-tasks contain ONLY acceptance criteria - no technical or business context.
 ## Status
 - [x] Pending QA review
 - [ ] Passed
-- [ ] Failed (see `.aid/qa/AUTH-123-review-N.json`)
+- [ ] Failed (see `.aid/qa/reports/AUTH-123-report-N.json`)
 ```
 
 ---

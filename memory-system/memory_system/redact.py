@@ -129,6 +129,25 @@ def _name_patterns(names: Iterable[str]):
         yield label, re.compile(r"(?i)(?<![A-Za-z0-9])" + body + r"(?![A-Za-z0-9])")
 
 
+_TRAIL = ".,;:!?"
+_CLOSE = {")": "(", "]": "[", "}": "{"}
+
+
+def _path_sub(m) -> str:
+    """T15-28: "[path]" plus the sentence punctuation the path class swallowed
+    (``notes.txt,`` -> ``[path],``). A closing bracket is kept with the path only when the
+    path itself opened it."""
+    s = m.group(0)
+    end = len(s)
+    while end > 1:
+        ch = s[end - 1]
+        if ch in _TRAIL or (ch in _CLOSE and s[:end].count(_CLOSE[ch]) < s[:end].count(ch)):
+            end -= 1
+            continue
+        break
+    return "[path]" + s[end:]
+
+
 def redact(text: Any, names: Optional[Iterable[str]] = None) -> Any:
     """Replace each sensitive part of ``text`` with a typed placeholder ([email], [path],
     [url], [token], [file-ref], [project], [user]). Non-strings are returned unchanged.
@@ -137,7 +156,10 @@ def redact(text: Any, names: Optional[Iterable[str]] = None) -> Any:
         return text
     out = text if len(text) <= _MAX_LEN else text[:_MAX_LEN] + " [truncated]"
     for label, rx, repl in _PATTERNS:
-        out = rx.sub(repl or "[{}]".format(label), out)
+        if label == "path" and repl is None:
+            out = rx.sub(_path_sub, out)
+        else:
+            out = rx.sub(repl or "[{}]".format(label), out)
     for label, rx in _name_patterns(names or ()):
         out = rx.sub(label, out)
     return out
