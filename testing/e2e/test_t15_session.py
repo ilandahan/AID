@@ -60,7 +60,7 @@ def state_of(P):
 
 def leaky_note():
     """An e-mail, a token built at run time (never a literal in the repo) and an absolute path."""
-    token = "ghp_" + "a1B2" * 9
+    token = "gh" + "p_" + "a1B2" * 9
     return token, "ok jane.doe@acme.example {} see C:/Users/jane/secret/notes.txt rating 4".format(token)
 
 
