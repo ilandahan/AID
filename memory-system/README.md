@@ -237,9 +237,12 @@ AID:QA:ALL:REGRESSION Keep regression suite fast and reliable
   `aid_session.py approve` (via `/phase-approve`) write it.
 - Feedback text is redacted (best effort) before it is written and again whenever it is
   read, so older files are redacted again when they are read.
-- Redaction replaces e-mail addresses, URLs (including git remotes), absolute paths
+- Redaction replaces e-mail addresses, URLs of any scheme (including git remotes and
+  `postgres://user:pass@host`-style credentials), absolute paths
   (Windows, UNC, POSIX, `~/`), `file.ext:line` references, common secret tokens (GitHub,
-  `sk-`, Slack, AWS keys, JWTs, long hex/base64), the project's own names (cwd and
+  `sk-`, Slack, AWS keys, JWTs, long hex/base64), secret-named values (`PASSWORD=`,
+  `"api_key": "..."`, `--password V`, `--token=V`, `pass=`), `mysql -p<V>`, `sshpass -p V`,
+  `curl -u user:<V>`, `Authorization: <scheme> <V>`, the project's own names (cwd and
   project-root folder names, git remote owner and repo) and the OS user name. Placeholders:
   `[email]`, `[url]`, `[path]`, `[file-ref]`, `[token]`, `[project]`, `[user]`.
 - It does NOT catch a person's or company's name written as plain words unless it is one of

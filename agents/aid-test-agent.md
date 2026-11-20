@@ -907,8 +907,8 @@ completion_protocol:
     Run inline QA validation:
     1. Check all must_achieve criteria against code
     2. Check all must_not criteria against code
-    3. Check best_practices criteria
-    4. Return PASS/FAIL verdict
+    3. Check best_practices criteria (a miss goes in `warnings`; it never makes the verdict FAIL)
+    4. Return PASS/FAIL verdict (FAIL only for a failed must_achieve / must_not / not_included item)
 
   on_qa_pass: |
     Return:

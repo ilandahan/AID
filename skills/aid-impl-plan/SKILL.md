@@ -232,12 +232,13 @@ Enhancement Template:
 
 ## Commands
 
+Phase 3a-3c have no slash commands of their own: ask for the step in plain words while this
+skill is loaded (for example "consolidate the PRD and Tech Spec").
+
 |Command|Purpose|
 |-|-|
-|/impl-plan|Start Phase 3|
-|/consolidate|Run Phase 3a|
-|/breakdown|Run Phase 3b|
-|/populate-jira|Run Phase 3d|
+|/jira-breakdown|Break the spec into Jira epics, stories and tasks (3c/3d)|
+|/gate-check|Check whether Phase 3 is ready to advance|
 
 ## State Tracking
 

@@ -239,6 +239,20 @@ if [ "$USE_SYMLINKS" = false ]; then
     rm -f ./.claude/settings.local.json
 
     log_success "AID files copied"
+
+    # T17-42 (U-13): the copied .claude/settings.json is AID's own repo settings, whose hooks
+    # are the legacy `bash .claude/hooks/...` lines with no PreToolUse phase gate. Register
+    # the plugin's hooks the way link-project does: scripts/link-settings.mjs (the one
+    # generator, T16 I-9) replaces those legacy entries with the runner hooks.
+    to_native() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s\n' "$1"; fi; }
+    if [ -f "$AID_DIR/scripts/link-settings.mjs" ] && command -v node >/dev/null 2>&1 \
+        && node "$(to_native "$AID_DIR/scripts/link-settings.mjs")" "$(to_native "$(pwd -P)")" \
+                "$(to_native "$(cd "$AID_DIR" && pwd -P)")"; then
+        log_success "AID hooks registered in .claude/settings.json"
+    else
+        log_warning "The AID hooks are NOT registered in .claude/settings.json (needs node and AID's scripts/link-settings.mjs)."
+        log_warning "Run: node \"$AID_DIR/scripts/link-settings.mjs\" \"$(pwd)\" \"$AID_DIR\""
+    fi
 fi
 
 # Create package.json
@@ -353,6 +367,9 @@ coverage/
 # Cache
 .cache/
 *.tsbuildinfo
+
+# AID hook audit log (T17 I-26). More AID patterns: AID's .claude/templates/gitignore-aid-patterns.txt
+.aid/audit/
 EOF
 
 # Create .env.example: non-secret settings only.

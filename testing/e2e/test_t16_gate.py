@@ -680,7 +680,8 @@ def test_t16_8_reason_does_not_call_git_add_commit_read_only(base):
     v = _w(base, 'p1/block').bash('npm test')
     assert v[0] == 'DENY'
     assert 'git status/log/diff/add/commit' not in v[1] and 'git status/log/diff/add' not in v[1], v[1]
-    assert 'git add/commit' in v[1] and 'run no project code' in v[1], v[1]
+    # T17 (owner 2026-11-20): T17-7 (U-03) rewords it: the user's own git hooks still run.
+    assert 'git add/commit' in v[1] and 'your own git hooks' in v[1], v[1]
 
 
 # --- T16-9 the cd reason names the real cause --------------------------------------------
@@ -849,7 +850,7 @@ def test_t16_14_pythonw_is_not_an_every_folder_interpreter():
 
 def test_t16_15_audit_log_keeps_no_secret(base):
     w = _w(base, 'p1/block')
-    tok = 'gh' + 'p_' + 'A1b2C3d4' * 5
+    tok = ''.join(['gh', 'p_', 'A1b2C3d4' * 5])   # T17 (owner 2026-11-20): U-17, no folded literal
     pw = 'Hunter' + '2secret'
     v = w.bash('deploy --token {} DB_PASSWORD={}'.format(tok, pw))
     assert v[0] == 'DENY'
@@ -861,7 +862,7 @@ def test_t16_15_audit_log_keeps_no_secret(base):
 def test_t16_15_fallback_masks_key_rule_and_tokens(monkeypatch):
     import aid_hooks
     monkeypatch.setattr(aid_hooks, '_REDACT', [None])
-    tok = 'gh' + 'p_' + 'Z9y8X7w6' * 5
+    tok = ''.join(['gh', 'p_', 'Z9y8X7w6' * 5])   # T17 (owner 2026-11-20): U-17, no folded literal
     out = aid_hooks.audit_redact('x --token {} AWS_SECRET_ACCESS_KEY=abc client_secret: "q" ok'.format(tok))
     assert tok not in out and 'abc' not in out and '"q"' not in out and out.endswith(' ok'), out
 

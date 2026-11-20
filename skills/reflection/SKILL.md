@@ -40,7 +40,7 @@ DO NOT: ❌ summarize the request; ❌ explain your decisions; ❌ include conve
 
 ```
 Task(
-  subagent_type: "aid:reflection-agent",   (fallback: "reflection-agent")
+  subagent_type: "aid:reflection-agent",   (link-project route only: "reflection-agent")
   prompt: [the variables above, filled in; the agent brings its own prompt],
   description: "Objective quality evaluation"
 )
@@ -93,7 +93,7 @@ On project load or `/good-morning`, spawn session review instead:
 
 ```
 Task(
-  subagent_type: "aid:reflection-agent",   (fallback: "reflection-agent")
+  subagent_type: "aid:reflection-agent",   (link-project route only: "reflection-agent")
   prompt: [Session review: the variables below, filled in],
   description: "Session review - outside perspective"
 )

@@ -76,12 +76,24 @@ folder that is not linked has none of them):
   folder before the pipeline's `gate.mjs --resolve` runs, in its exact form
   (`node "<plugin>/skills/pipeline-orchestrator/gate.mjs" --resolve "<what was decided>"`);
   a non-exact spelling is not caught outside AID projects (see
-  [SECURITY-MODEL.md](SECURITY-MODEL.md#what-aid-does-not-promise)).
+  [SECURITY-MODEL.md](SECURITY-MODEL.md#what-aid-does-not-promise)). A direct call of
+  either script (`"<plugin>/hooks/aid_session.py" approve`,
+  `env "<plugin>/hooks/aid_session.py" reset`,
+  `"<plugin>/skills/pipeline-orchestrator/gate.mjs" --resolve ok`) is judged like the
+  `python` / `node` call (T17, F1), so "other spellings are denied" holds for it as written.
+  A `--resolve` argument built at run time (`f=--re; ${f}solve`) is an accepted, not-caught
+  obfuscation (A1).
 - **The Write and Bash gates (PreToolUse)** refuse a write to a project `.aid/state.json`
   in every folder, AID project or not: from the Write, Edit, MultiEdit and NotebookEdit
   tools and from Bash and PowerShell commands that name it. Only `aid_session.py` writes
   it. Outside AID projects a name built at run time, or a write reached through a change of
   folder, a shell `-c` body or interpreter code, is not caught (see
+  [SECURITY-MODEL.md](SECURITY-MODEL.md#what-aid-does-not-promise)).
+- **Every-folder false denials.** A few harmless commands are refused in every folder, AID
+  project or not, because the gate cannot tell them from a confirmed call or a state write:
+  an interpreter whose script operand is built at run time (`python "$SCRIPT" "$INPUT"`) and
+  archiving `.aid/state.json` (`tar czf b.tgz .aid/state.json`). Write the script path out,
+  back the file up with `cp`, or run the command yourself with `!` (see
   [SECURITY-MODEL.md](SECURITY-MODEL.md#what-aid-does-not-promise)).
 
 To lower a gate for one project, set it in `.aid/hooks/config.json`. Levels are
@@ -100,6 +112,40 @@ names `aid_session` is refused at every level. That check reads the command text
 best effort: a PowerShell call whose script name is hidden in a variable
 (`python $env:SCRIPT reset`) runs without a prompt outside AID projects, and in an AID
 project from Phase 4 on, or at `log` or `warn`.
+
+More limits and rules (details in
+[SECURITY-MODEL.md](SECURITY-MODEL.md#what-aid-does-not-promise)):
+
+- **The plugin's reviewers win (F4).** Reviewers are spawned as `aid:<name>`; the plugin's
+  review criteria and standards always apply, and project files may only add criteria,
+  never replace the plugin's agents or criteria. The T10 A3 accepted risk is gone; the
+  pipeline skill marks this rule "F4 (2026-11-20)".
+- **git add and commit before Phase 4** are on the allow-list, but your own git hooks
+  (`pre-commit`, `core.hooksPath`) still run when you commit (N-5). The gate's message
+  before Phase 4 says so ("git add/commit are allowed; your own git hooks ... still run
+  when you commit", T17-7).
+- **The UI-evidence (`.ui-verified`) and pipeline-state gates are self-attested**: the
+  agent can create the evidence they check.
+- **`.aid/pipeline/config.json`** (the pipeline's pass thresholds) is protected in layer C:
+  the Write and Edit tools ask you before changing it, and a Bash write is refused (T16-4).
+- **`find` over user config folders** naming agents or control files
+  (`find ~/.claude -path '*agents*' -name x.md`) is refused in AID projects, because `find`
+  can delete and run commands: an accepted, safe-direction false denial. Use `ls`.
+- **Some reads of a linked install's control folders** (`less`, `find`, PowerShell
+  `Get-Content`, `git -C <root> fetch`, `python -m pytest <root>/hooks`) are refused from a
+  linked project: an accepted, safe-direction false denial (see the next bullet). Use
+  `cat`, `head` or `grep`.
+- **AID's recommendation queue** (`$AID_HOME/recommendations/`) and, for a project linked
+  to an AID install outside it, that install's `hooks/`, `.claude-plugin/`, `agents/` and
+  `skills/reflection/criteria/` are control files in every phase (T17). Writes to them are
+  refused (the Write tools, `cp`, `mv`, `tee`, redirects, `sed -i`, `perl -i` and the other
+  in-place commands). Reading them with `cat`, `head`, `grep` or `git log`/`status`/`diff`,
+  and running a script there (`python "<plugin>/hooks/aid_session.py" status`), stays
+  allowed (within the phase rules). Other commands that name the live-root folders from a
+  linked project (`less`, `find`, PowerShell `Get-Content`, `git -C <root>` with a non-read
+  subcommand such as `fetch`, `python -m pytest <root>/hooks`) are refused: an accepted,
+  safe-direction false denial, as for the plugin cache copies. Only `aid_session.py
+  memory-queue` / `memory-apply` write the recommendation queue.
 
 The gates are a guardrail, not a sandbox. See [SECURITY-MODEL.md](SECURITY-MODEL.md) for
 what they guarantee and how to add a hard boundary.

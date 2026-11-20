@@ -142,7 +142,9 @@ class QualityDashboard:
             "key_metrics": {
                 "overall_rating": ratings.get('overall_average'),
                 "acceptance_rate": acceptance.get('rate'),
-                "debate_rate": round(1 - (acceptance.get('rate') or 0), 3),
+                # T17-19 (L3c-2e): no decisions -> rate None -> n/a, never a made-up 100%.
+                "debate_rate": (round(1 - acceptance['rate'], 3)
+                                if isinstance(acceptance.get('rate'), (int, float)) else None),
                 "debate_change_rate": debates.get('change_rate'),
                 "feedback_response_rate": engagement.get('response_rate')
             },
@@ -302,6 +304,8 @@ class QualityDashboard:
                 lines.append(f"| Decision Acceptance | {key_metrics['acceptance_rate']*100:.0f}% |")
             if key_metrics.get('debate_rate') is not None:
                 lines.append(f"| Debate Rate | {key_metrics['debate_rate']*100:.0f}% |")
+            else:
+                lines.append("| Debate Rate | n/a |")
             if key_metrics.get('debate_change_rate') is not None:
                 lines.append(f"| Debate Change Rate | {key_metrics['debate_change_rate']*100:.0f}% |")
             if key_metrics.get('feedback_response_rate') is not None:

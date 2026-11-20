@@ -192,7 +192,7 @@ When a score improved due to revision, show:
 ### Phase-Specific Criteria
 
 Detailed criteria for each phase in:
-`.claude/skills/reflection/criteria/phase-{N}-{name}.yaml`
+`skills/reflection/criteria/phase-{N}-{name}.yaml`
 
 ---
 
@@ -457,10 +457,11 @@ Sub-agents are spawned to perform isolated, specialized tasks. They receive NO c
 | **code-review-agent** | Isolated code review (security, quality, docs, architecture) | Pipeline CODE_REVIEW step |
 | **test-review-agent** | Isolated test quality review (coverage, mocks, independence) | Pipeline TEST_REVIEW step |
 
-**Location:** `.claude/agents/` — single source of truth (official Claude Code location).
-Linked projects reach it through a symlink/junction, so editing here updates every project.
+**Location:** `agents/` at the plugin root — single source of truth. A linked project
+reaches it as its own `.claude/agents` (a symlink/junction), so editing here updates every
+project.
 
-**Documentation:** `.claude/agent-assets/AGENT-STANDARD.md`
+**Documentation:** `agent-assets/AGENT-STANDARD.md`
 
 ---
 
@@ -622,26 +623,28 @@ Phases are displayed using **role-specific language** so each persona sees famil
 | 4 | Feature Validation & UAT | Code Review & Architecture Oversight | Implementation & Coding | Test Execution & Automation | Development & Validation |
 | 5 | Launch & Post-Launch | Release Engineering & Deployment | Bug Fixes & Polish | Release Certification & Sign-off | Deploy to Production & Monitoring |
 
-Terminology mapping defined in: `.claude/references/role-phase-terminology.json`
+Terminology mapping defined in: `references/role-phase-terminology.json`
 
 ### Skills & Agents Location
 
-**Single source of truth** (edit here, in this AID install):
-- `.claude/skills/` - All skill definitions and prompts
-- `.claude/agents/` - All sub-agent definitions
+**Single source of truth** (edit here, at the plugin root of this AID install):
+- `skills/` - All skill definitions and prompts
+- `agents/` - All sub-agent definitions
 
-`link-project` points each project's `.claude/skills` and `.claude/agents` at these
-folders via symlink (macOS/Linux) or junction (Windows). There is no copy step and no
-second source: update AID once and every linked project sees it immediately.
+`link-project` points each linked project's `.claude/skills` and `.claude/agents` (paths in
+the linked project) at these folders via symlink (macOS/Linux) or junction (Windows). There
+is no copy step and no second source: update AID once and every linked project sees it
+immediately.
 
 **Foundational:**
-- `.claude/skills/why-driven-decision/` - **Foundational WHY skill (loads first)**
+- `skills/why-driven-decision/` - **Foundational WHY skill (loads first)**
 
 **Memory System** (References + learnings):
-- `.claude/skills/memory-system/references/roles/{role}/` - Quick reference + cumulative learnings
-- `.claude/skills/memory-system/references/phases/{phase}/` - Quick reference + cumulative learnings
+- `skills/memory-system/references/roles/{role}/` - Quick reference + cumulative learnings
+- `skills/memory-system/references/phases/{phase}/` - Quick reference + cumulative learnings
 
-Claude loads skills from `.claude/skills/` and agents from `.claude/agents/` based on role and phase.
+Claude loads skills from the plugin's `skills/` and agents from its `agents/` (in a linked
+project: `.claude/skills/` and `.claude/agents/`) based on role and phase.
 
 ### Runtime State
 
@@ -651,7 +654,7 @@ Claude loads skills from `.claude/skills/` and agents from `.claude/agents/` bas
 
 ### Memory System Documentation
 
-Full documentation: `.claude/skills/memory-system/references/`
+Full documentation: `skills/memory-system/references/`
 
 ---
 

@@ -8,7 +8,7 @@
     "chrome-devtools": {
       "type": "stdio",
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "chrome-devtools-mcp@1.12.0"]
+      "args": ["/c", "npx", "-y", "chrome-devtools-mcp@1.12.0", "--no-usage-statistics", "--no-performance-crux"]
     },
     "jira": {
       "type": "stdio",

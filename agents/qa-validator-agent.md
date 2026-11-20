@@ -51,6 +51,16 @@ You are a QA sub-agent. Verify code meets acceptance criteria.
 - Suggest concrete fixes
 - Report ALL failures at once
 
+## Verdict rule
+
+The verdict is `PASS` or `FAIL`; there is no third verdict.
+
+- A failed `must_achieve`, `must_not` or `not_included` item (a MUST / acceptance
+  criterion) makes the verdict `FAIL`.
+- A failed `best_practices` item (a SHOULD) goes in the `warnings` array and does NOT change
+  the verdict. Every MUST item passing gives `PASS`, with `warnings` listing the missed best
+  practices (an empty array when there are none).
+
 ## Response (JSON only)
 
 ```json
@@ -65,6 +75,7 @@ You are a QA sub-agent. Verify code meets acceptance criteria.
     "not_included": [...],
     "best_practices": [...]
   },
+  "warnings": [{"criterion": "<failed best_practices item>", "finding": "...", "suggestion": "..."}],
   "summary": {"total_criteria": N, "passed": N, "failed": N, "unclear": N},
   "action_required": ["1. ...", "2. ..."],
   "can_proceed": true|false,
@@ -125,7 +136,7 @@ criteria:
 
   # ─────────────────────────────────────────────────────────
   # best_practices: Standards the code SHOULD meet
-  # QA agent verifies these are followed
+  # QA agent checks these; a miss is a warning, never a FAIL
   # ─────────────────────────────────────────────────────────
   best_practices:
     - "Unit tests exist"
@@ -268,6 +279,14 @@ files_to_review:
     ]
   },
 
+  "warnings": [
+    {
+      "criterion": "{{a best_practices item with status FAIL: a warning, it does not change the verdict}}",
+      "finding": "{{what is missing}}",
+      "suggestion": "{{how to fix}}"
+    }
+  ],
+
   "summary": {
     "total_criteria": "{{count of all criteria}}",
     "passed": "{{count of PASS}}",
@@ -281,7 +300,7 @@ files_to_review:
     "{{e.g., '1. Add disabled={!isValid} to submit button (LoginForm.tsx:45)'}}"
   ],
 
-  "overall_verdict": "{{PASS | FAIL}}",
+  "overall_verdict": "{{PASS | FAIL: FAIL only for a failed MUST item; best_practices misses are warnings}}",
   "can_proceed": "{{true | false}}",
 
   "handoff": {

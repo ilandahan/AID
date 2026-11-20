@@ -94,7 +94,7 @@ Do NOT cherry-pick. Let the agent determine relevance.
 
 ```
 Task(
-  subagent_type: "aid:reflection-agent",   (fallback: "reflection-agent")
+  subagent_type: "aid:reflection-agent",   (link-project route only: "reflection-agent")
   prompt: [the task variables, filled in; the agent brings its own prompt],
   description: "Objective quality evaluation"
 )

@@ -111,7 +111,7 @@ This command uses the **system-architect** skill:
 
 1. Review architecture decisions
 2. Validate with team
-3. Move to Phase 4: Jira Breakdown
+3. Move to Phase 3: Breakdown
    ```
    /jira-breakdown
    ```

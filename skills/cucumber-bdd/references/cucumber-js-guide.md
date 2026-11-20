@@ -343,18 +343,18 @@ After('@database', async function() {
 npm run cucumber
 
 # Run with specific profile
-npx cucumber-js --profile ci
+npx --no-install cucumber-js --profile ci
 
 # Run specific feature file
-npx cucumber-js features/auth/login.feature
+npx --no-install cucumber-js features/auth/login.feature
 
 # Run specific scenario by line number
-npx cucumber-js features/auth/login.feature:15
+npx --no-install cucumber-js features/auth/login.feature:15
 
 # Run with tags
-npx cucumber-js --tags "@smoke"
-npx cucumber-js --tags "@critical and @auth"
-npx cucumber-js --tags "not @wip"
+npx --no-install cucumber-js --tags "@smoke"
+npx --no-install cucumber-js --tags "@critical and @auth"
+npx --no-install cucumber-js --tags "not @wip"
 
 # Dry run (validate syntax only)
 npm run cucumber:dry
@@ -401,7 +401,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npx --no-install playwright install --with-deps chromium
 
       - name: Run Cucumber tests
         run: npm run cucumber -- --profile ci
@@ -435,7 +435,7 @@ Given('I am logged in', async function() {
 
 ```bash
 # Ensure ts-node is registered
-npx cucumber-js --require-module ts-node/register
+npx --no-install cucumber-js --require-module ts-node/register
 
 # Check tsconfig.json includes features folder
 ```

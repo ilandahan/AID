@@ -47,8 +47,17 @@ def test_t10_1_every_agent_declares_its_tools():
     assert missing == [], missing
 
 
+_VISUAL_QA_BROWSER_TOOLS = (   # T17 (owner 2026-11-20): I-25 replaces the wildcard grant
+    "navigate_page", "new_page", "list_pages", "select_page", "close_page", "resize_page",
+    "handle_dialog", "wait_for", "take_snapshot", "take_screenshot", "click", "hover", "fill",
+    "fill_form", "press_key", "type_text", "drag", "emulate", "list_console_messages",
+    "get_console_message", "list_network_requests", "get_network_request", "get_css_styles")
+
+
 def test_t10_1_visual_qa_agent_has_only_read_and_browser_tools():
-    assert tools_of("visual-qa-agent") == ["Read", "Grep", "Glob", "mcp__chrome-devtools__*"]
+    # T17 (owner 2026-11-20): exact I-25 list, no wildcard.
+    assert sorted(tools_of("visual-qa-agent")) == sorted(
+        ["Read", "Grep", "Glob"] + ["mcp__chrome-devtools__" + t for t in _VISUAL_QA_BROWSER_TOOLS])
 
 
 REVIEWERS = sorted(n for n in AGENTS if re.search(

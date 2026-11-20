@@ -118,32 +118,57 @@ def _env(home, path=None):
     return env
 
 
-def link_sh(target, home, *extra, path=None):
-    p = subprocess.run([BASH, LINK_SH.as_posix(), Path(target).as_posix(), '--force', *extra],
-                       cwd=str(REPO), env=_env(home, path), stdin=subprocess.DEVNULL,
+def link_sh(target, home, *extra, path=None, aid=REPO):
+    p = subprocess.run([BASH, (Path(aid) / 'link-project.sh').as_posix(), Path(target).as_posix(),
+                        '--force', *extra],
+                       cwd=str(aid), env=_env(home, path), stdin=subprocess.DEVNULL,
                        capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=600)
     return p.returncode, p.stdout + p.stderr
 
 
-def link_bat(target, home, *extra, path=None):
-    p = subprocess.run([str(LINK_BAT), str(target), '--force', *extra], cwd=str(REPO),
+def link_bat(target, home, *extra, path=None, aid=REPO):
+    p = subprocess.run([str(Path(aid) / 'link-project.bat'), str(target), '--force', *extra], cwd=str(aid),
                        env=_env(home, path), stdin=subprocess.DEVNULL, capture_output=True,
                        text=True, encoding='utf-8', errors='replace', timeout=600)
     return p.returncode, p.stdout + p.stderr
+
+
+# T17 (owner 2026-11-20), U-04: the hard quoting case (spaces and an apostrophe in the AID
+# path) no longer depends on where this repo is checked out. On Windows the linker's inputs
+# are copied into "<drive-root tmp>/it's AID" and the test links from that copy.
+QUOTING_AID_DIRS = ('.claude-plugin', 'hooks', 'scripts', 'memory-system', 'references',
+                    'commands', 'skills', 'agents', 'rules')
+QUOTING_AID_FILES = ('link-project.sh', 'link-project.bat', 'CLAUDE.md', '.mcp.json.mac',
+                     '.mcp.json.windows', os.path.join('.claude', 'settings.json'))
+
+
+def quoting_aid(base):
+    """The AID root test_t16_63 links from: on Windows a copy whose path has a space and an
+    apostrophe; elsewhere this checkout."""
+    if os.name != 'nt':
+        return REPO
+    dst = Path(base) / "it's AID"
+    skip = shutil.ignore_patterns('__pycache__', 'node_modules', '.pytest_cache', 'tests')
+    for d in QUOTING_AID_DIRS:
+        shutil.copytree(str(REPO / d), str(dst / d), ignore=skip)
+    for f in QUOTING_AID_FILES:
+        (dst / f).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(str(REPO / f), str(dst / f))
+    return dst
 
 
 LINKERS = [pytest.param(link_sh, marks=needs_bash, id='sh'),
            pytest.param(link_bat, marks=needs_bat, id='bat')]
 
 
-def expected_hooks():
-    """plugin.json's hooks, ${CLAUDE_PLUGIN_ROOT} -> this checkout's real path (I-9)."""
+def expected_hooks(root=R):
+    """plugin.json's hooks, ${CLAUDE_PLUGIN_ROOT} -> the AID install's real path (I-9)."""
     out = {}
     for event in EVENTS:
         groups = json.loads(json.dumps(PLUGIN['hooks'][event]))
         for g in groups:
             for h in g['hooks']:
-                h['args'] = [a.replace('${CLAUDE_PLUGIN_ROOT}', R) for a in h['args']]
+                h['args'] = [a.replace('${CLAUDE_PLUGIN_ROOT}', root) for a in h['args']]
         out[event] = groups
     return out
 
@@ -177,7 +202,7 @@ def registered(target, event, matcher=None):
     raise AssertionError('no {} group with matcher {!r}'.format(event, matcher))
 
 
-def drive_registered_hooks(target, home):
+def drive_registered_hooks(target, home, root=R):
     """T16-63: the registered commands gate the linked project (after the init of T16-64)."""
     sid = lambda: uuid.uuid4().hex     # noqa: E731  (a fresh first-use baseline per call)
     (start,) = registered(target, 'SessionStart')
@@ -197,7 +222,7 @@ def drive_registered_hooks(target, home):
     assert call(write, 'Write', {'file_path': 'src/a.ts', 'content': 'x'})[0] == 'DENY'
     assert call(bash, 'Bash', {'command': 'npm test'})[0] == 'DENY'
     assert call(write, 'Write', {'file_path': '.aid/state.json', 'content': '{}'})[0] == 'DENY'
-    approve = 'python "{}/hooks/aid_session.py" approve'.format(R)
+    approve = 'python "{}/hooks/aid_session.py" approve'.format(root)
     assert call(bash, 'Bash', {'command': approve})[0] == 'ASK'
 
     for hook in registered(target, 'Stop'):
@@ -214,24 +239,26 @@ def drive_registered_hooks(target, home):
 @pytest.mark.parametrize('link', LINKERS)
 def test_t16_63_link_registers_plugin_hooks_and_they_gate(base, link):
     T, H = base / 'proj', base / 'home'
-    rc, out = link(T, H)
+    # T17 (owner 2026-11-20), U-04: link from quoting_aid(), so the hard quoting case does not
+    # depend on the checkout path (a CI checkout, /home/runner/work/AID/AID, has neither).
+    aid = quoting_aid(base)
+    root = os.path.realpath(str(aid)).replace('\\', '/')
+    if os.name == 'nt':
+        assert "'" in root and ' ' in root, 'the test must use an AID path with spaces + apostrophe'
+    rc, out = link(T, H, aid=aid)
     assert rc == 0, out
     data = settings(T)
-    want = expected_hooks()
+    want = expected_hooks(root)
     for event in EVENTS:
         assert data['hooks'][event] == want[event], (event, data['hooks'].get(event))
     for g in data['hooks']['PreToolUse']:
         assert [(h['onFailure'], h['timeout']) for h in g['hooks']] == [('block', 10)], g
-    if os.name == 'nt':
-        # On the owner's machine the real AID path has spaces and an apostrophe, the hard quoting
-        # case; a CI checkout (/home/runner/work/AID/AID) has neither.
-        assert "'" in R and ' ' in R, 'the test must use the real AID path (spaces + apostrophe)'
     # The permissions block comes from the AID settings template.
-    tmpl = json.loads((REPO / '.claude' / 'settings.json').read_text(encoding='utf-8'))
+    tmpl = json.loads((Path(aid) / '.claude' / 'settings.json').read_text(encoding='utf-8'))
     assert data['permissions'] == tmpl['permissions']
     first = (T / '.claude' / 'settings.json').read_bytes()
 
-    rc, out = link(T, H)
+    rc, out = link(T, H, aid=aid)
     assert rc == 0, out
     assert (T / '.claude' / 'settings.json').read_bytes() == first, 'second run changed settings.json'
 
@@ -242,7 +269,7 @@ def test_t16_63_link_registers_plugin_hooks_and_they_gate(base, link):
         ig = subprocess.run(['git', '-C', str(T), 'check-ignore', '-q', '.mcp.json'], env=_env(H))
         assert ig.returncode == 0, '.mcp.json is not gitignored in the linked project'
 
-    drive_registered_hooks(T, H)
+    drive_registered_hooks(T, H, root)
 
 
 @pytest.mark.parametrize('link', LINKERS)
@@ -611,8 +638,15 @@ def test_t16_69_cucumber_check_uses_the_engines_skip():
     fn = test_installation.TestNodeDependencies.test_cucumber_installed
     marks = [m for m in getattr(fn, 'pytestmark', []) if m.name == 'skipif']
     assert marks, 'test_cucumber_installed has no skipif'
-    reason = test_t15_docs._cucumber_runnable()
+    # T17 (owner 2026-11-20), U-19: compare against the value test_installation computed at
+    # import time (calling _cucumber_runnable() again races with node_modules changing in
+    # between), and check that it IS the shared engines rule.
+    src = Path(test_installation.__file__).read_text(encoding='utf-8')
+    assert re.search(r'^from test_t15_docs import _cucumber_runnable\b', src, re.M), 'not the shared rule'
+    assert re.search(r'^_CUCUMBER_SKIP = _cucumber_runnable\(\)$', src, re.M), 'not the shared rule'
+    reason = test_installation._CUCUMBER_SKIP
     assert marks[0].args[0] == (reason is not None)
+    assert marks[0].kwargs.get('reason') == str(reason)
     if NODE:
         major = int(subprocess.run(['node', '-v'], capture_output=True, text=True).stdout.strip()
                     .lstrip('v').split('.')[0])

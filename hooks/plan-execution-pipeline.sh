@@ -171,6 +171,13 @@ if [ -d "$ROOT/.aid" ]; then
 else
   enrich="This project is NOT AID-enabled: the pipeline bootstraps its own .aid/pipeline/config.json from the plugin's default and AR_ACCEPTANCE derives acceptance from the frozen brief. No PRD/AID setup is required."
 fi
+# T17 I-19 (F4): the plugin's reviewers win. Plugin route (CLAUDE_PLUGIN_ROOT set): aid:<name>.
+# Link-project route: the bare name, the only resolution that exists there.
+if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+  spawn_line="Spawn reviewers as aid:<name> (the plugin's agents)."
+else
+  spawn_line="Spawn reviewers by their bare <name>: this linked project's .claude/agents is AID's linked folder."
+fi
 # No bypass switch is named in additionalContext (A-28): it is read by the model, and an instruction
 # that teaches the agent how to switch the gate off is not a gate. The systemMessage (human) keeps it.
 instr="A plan was just approved. The dev pipeline (pipeline-orchestrator + reflection + autoresearch) ships with the AID plugin and is available in this project regardless of AID - BUT it must only drive IMPLEMENTATION plans.
@@ -180,7 +187,7 @@ Classify the just-approved plan as either (a) IMPLEMENTATION (it will write/modi
 - If IMPLEMENTATION: proceed with steps 1-3 below BEFORE writing implementation code.
 1. INITIALIZE the pipeline (pipeline-orchestrator skill): if .aid/pipeline/config.json is missing, BOOTSTRAP it with the Write tool (read \"${_cfg_default}\" and Write its content to .aid/pipeline/config.json; a Bash cp/redirect to that file is denied, an Edit of an existing one is asked); then create/refresh .aid/pipeline/state.json (pipeline_status=running, current_step=DEVELOP${_sid_field}, counters).
 2. FREEZE THE TASK BRIEF now, while the original prompt is still in context: write .aid/pipeline/<task_id>/brief.md ONCE (never overwrite) with the VERBATIM original request, the STATED_WHY, and the approved plan above as the DEVELOP plan. Use the verbatim APPROVED_PLAN block when present; if only a best-effort plan-file guess was given, prefer the approved plan from your own context over that file on any mismatch. AR_ACCEPTANCE validates against this; it survives a later compaction.
-3. DRIVE all implementation through the orchestrator: DEVELOP -> CODE_REVIEW (<=2) -> AR_DESIGN -> TDD (<=2) -> AR_FUNCTION -> VISUAL_QA -> TEST_REVIEW -> PHASE_GATE (<=2 re-examine) -> AR_ACCEPTANCE. Resolve agents/criteria project-first, else the plugin's. ${enrich} Do not finish the turn until the pipeline is satisfied (the dev-pipeline-gate Stop hook also enforces this)."
+3. DRIVE all implementation through the orchestrator: DEVELOP -> CODE_REVIEW (<=2) -> AR_DESIGN -> TDD (<=2) -> AR_FUNCTION -> VISUAL_QA -> TEST_REVIEW -> PHASE_GATE (<=2 re-examine) -> AR_ACCEPTANCE. ${spawn_line} Review criteria and standards come from the plugin; project files may only add criteria, never replace the plugin's agents or criteria. ${enrich} Do not finish the turn until the pipeline is satisfied (the dev-pipeline-gate Stop hook also enforces this)."
 msg="plan approved -> classify intent: IMPLEMENTATION plans run the pipeline (freeze brief + DEVELOP->...->AR_ACCEPTANCE); read-only/research/analysis plans stay advisory-only. SKIP_PIPELINE_GATE=1 to bypass."
 [ -n "$_hk_fail" ] && msg="approved plan text could not be extracted - ${_hk_fail}. Plan execution continues; the brief-freeze step falls back to the plan already in context. ${msg}"
 

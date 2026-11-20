@@ -82,12 +82,12 @@ Cucumber executes the acceptance criteria written during Phase 1 (PRD). Each `.f
 
 ```bash
 # Run scenarios by tag
-npx cucumber-js --tags "@critical"
-npx cucumber-js --tags "@smoke or @critical"
-npx cucumber-js --tags "not @wip and not @manual"
+npx --no-install cucumber-js --tags "@critical"
+npx --no-install cucumber-js --tags "@smoke or @critical"
+npx --no-install cucumber-js --tags "not @wip and not @manual"
 
 # Run specific feature file
-npx cucumber-js features/auth/login.feature
+npx --no-install cucumber-js features/auth/login.feature
 ```
 
 ## API Contract Testing (from Tech Spec)

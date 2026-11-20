@@ -87,8 +87,8 @@ Include full output (pass/fail counts, error messages, coverage if available).
 2. Read all changed files
 3. Read tech spec excerpt
 4. Read code standards reference
-5. Construct code-review-agent prompt with variables
-6. Spawn agent
+5. Construct the code-review-agent inputs (its variables)
+6. Spawn it as `aid:code-review-agent` (the plugin's agent; the bare name only on the link-project route, see SKILL.md "How to Spawn Sub-Agents")
 7. Update state: `current_step: "CODE_REVIEW"`, increment `iterations.code_review`
 
 ### CODE_REVIEW → TDD (on PASS)
@@ -96,8 +96,8 @@ Include full output (pass/fail counts, error messages, coverage if available).
 **Trigger:** Agent returns `verdict: "PASS"`
 
 **Actions:**
-1. Store review result in `last_review_result`
-2. Log to `step_history`
+1. `gate.mjs --step CODE_REVIEW` has already written `last_review_result`, the `step_history` row and the cost (pass `--usage` when known)
+2. Do not write `last_review_result`, `cost` or `step_history` yourself
 3. Update state: `current_step: "TDD"`
 4. Display: "Code review PASSED. Proceeding to TDD..."
 
@@ -108,7 +108,7 @@ Include full output (pass/fail counts, error messages, coverage if available).
 **Actions:**
 1. Check `iterations.code_review` < `max_iterations.code_review`
 2. If at max → ESCALATE
-3. Store FULL review result in `last_review_result` (including scores, score_justification, biggest_gaps)
+3. Keep the FULL review result (including scores, score_justification, biggest_gaps) for the fix step; `last_review_result` is written by `gate.mjs`
 4. Display full review context using the FIX_CODE template from SKILL.md:
    - Overall score and per-category scores
    - Score justification and biggest gaps
@@ -136,8 +136,8 @@ Include full output (pass/fail counts, error messages, coverage if available).
 **Trigger:** Agent returns `verdict: "PASS"` AND `scores.overall >= config.thresholds.visual_qa_pass`
 
 **Actions:**
-1. Store review result in `last_review_result`
-2. Log lighthouse scores alongside visual scores in `step_history`
+1. `gate.mjs --step VISUAL_QA` has already written `last_review_result` and the cost
+2. Pass lighthouse scores inside `--scores` so the gate keeps them in `step_history`
 3. Update state: `current_step: "TEST_REVIEW"`
 4. Display: "Visual QA PASSED (X.X/10). Lighthouse: A11y X, SEO X, BP X. Proceeding to test review..."
 
@@ -148,7 +148,7 @@ Include full output (pass/fail counts, error messages, coverage if available).
 **Actions:**
 1. Check `iterations.visual_qa` < `max_iterations.visual_qa`
 2. If at max → ESCALATE
-3. Store FULL review result in `last_review_result` (including scores, lighthouse, issues, testing_summary)
+3. Keep the FULL review result (including scores, lighthouse, issues, testing_summary) for the fix step; `last_review_result` is written by `gate.mjs`
 4. Display full review context using the FIX_VISUAL template from SKILL.md
 5. Update state: `current_step: "FIX_VISUAL"`
 6. Developer applies visual fixes, prioritizing functionality > craft > design quality
@@ -175,7 +175,7 @@ Include full output (pass/fail counts, error messages, coverage if available).
 **Actions:**
 1. Store review result
 2. Update state: `current_step: "PHASE_GATE"`
-3. Spawn qa-validator-agent
+3. Spawn `aid:qa-validator-agent` (the plugin's agent; the bare name only on the link-project route)
 
 ### PHASE_GATE → API_TESTS (on PASS)
 
@@ -203,7 +203,7 @@ Include full output (pass/fail counts, error messages, coverage if available).
 1. Run ALL test commands from config in sequence:
    - `npm test` (unit)
    - `npm test -- --testPathPattern=integration` (integration)
-   - `npx playwright test` (e2e)
+   - `npx --no-install playwright test` (e2e)
    - `npm run cucumber` (cucumber)
 2. Run `npm test -- --coverage` for coverage report
 3. Verify coverage >= `min_coverage_percent` threshold

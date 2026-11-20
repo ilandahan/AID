@@ -305,14 +305,18 @@ Discovery    ✓        PRD        ✓      Tech Spec     ✓      Impl Plan    
 
 ### Phase Permissions
 
-| Phase | Allowed | Blocked |
+| Phase | Allowed | Not yet (methodology) |
 |-------|---------|---------|
 | 0 Discovery | Research, stakeholders, competitive analysis | PRD, architecture, code |
 | 1 PRD | + Requirements, scope, user stories | Architecture, code, Jira |
 | 2 Tech Spec | + Architecture, schemas, APIs | Code, Jira issues |
 | 3 Impl Plan | + Jira epics, stories, tasks | Production code |
-| 4 Development | + Code, tests, components | Deployment |
+| 4 Development | + Code, tests, components | Deployment (guidance) |
 | 5 QA & Ship | Everything | - |
+
+The hooks enforce only the code rows: source writes and code runs before Phase 4. Jira
+work and deployment are not checked by any hook; those rows are the method's guidance (see
+[docs/PHASE-GATES.md](docs/PHASE-GATES.md#phase-permissions)).
 
 ### Phase 0: Discovery (NEW)
 
@@ -336,11 +340,13 @@ Start every project with research:
 
 ### Sub-Agent Review (Mandatory)
 
-Before each phase transition, a **sub-agent must review** all deliverables:
+Before each phase transition, the method has a **sub-agent review** all deliverables:
 - Results: **PASS** / **PARTIAL** / **FAIL**
 - PASS: Proceed to feedback collection
 - PARTIAL: Fix minor issues and re-run
-- FAIL: Cannot advance without fixing critical issues
+- FAIL: Not yet (methodology): fix the critical issues and re-run `/gate-check`. This is
+  guidance: `/phase-advance` checks the recorded review and approval, and the user can
+  override or `jump`.
 
 ---
 
@@ -365,8 +371,13 @@ code being good is the only one that reliably finds what is wrong with it.
 | `phase-review-agent` | Whether a phase's deliverables justify advancing | `/gate-check` |
 | `memory-analysis-agent` | Session feedback → concrete skill improvements | `/aid-improve` |
 
-These 7 reviewer agents are **read-only by design** (Read, Grep and Glob, plus the browser
-tools for `visual-qa-agent`) - a reviewer that can edit the code is no longer independent.
+These 7 reviewer agents **cannot write files with the Write, Edit or Bash tools** (they
+get Read, Grep and Glob, plus a fixed list of browser tools for `visual-qa-agent`) - a
+reviewer that can edit the code is no longer independent. `visual-qa-agent` drives a
+browser, so its clicks and form fills reach the target site. Three of its tools
+(`take_screenshot`, `take_snapshot`, `get_network_request`) could save to a path the Write
+gate does not see, so the agent is told never to pass one; its screenshots and snapshots
+come back inline.
 `aid-test-agent` (`/aid-test`) is not a reviewer: it is a test runner with write tools
 (Read, Write, Edit, Bash, Grep, Glob) that writes its test outputs under
 `.aid/test-outputs/`.
@@ -385,6 +396,8 @@ templates live in `agent-assets/`; see `agent-assets/AGENT-STANDARD.md` to add y
   `~/.aid/integrity/` (or `$AID_HOME/integrity/`). Project content and paths may contain personal data. The learning system stores feedback
   locally in `$AID_HOME/feedback/pending/` (default `~/.aid/feedback/pending/`); see
   [memory-system privacy](memory-system/README.md#privacy).
+- In an AID project, the SessionStart hook adds AID's deny and ask rules to the project's
+  `.claude/settings.json` (it rewrites that file to merge them in; your own entries stay).
 - Feedback text is redacted (best effort) before it is written and again when it is read.
   E-mail addresses, URLs, absolute paths, `file.ext:line` references, common secret tokens,
   the project's own names (folder names, git remote owner and repo) and the OS user name
@@ -450,6 +463,7 @@ templates live in `agent-assets/`; see `agent-assets/AGENT-STANDARD.md` to add y
 | Atlassian Jira and Confluence | Issue, project and documentation content sent to the configured Atlassian site when those workflows run. See [Jira setup](integrations/jira/README.md) and the MCP templates. |
 | Google AI Studio / Google Vertex AI, or AI/ML API (AIMLAPI) | The optional visual-generation skill describes sending generation prompts, source images or sketches and edit instructions to the selected provider. See [visual-generation setup](skills/nano-banana-visual/SKILL.extended.md). |
 | User-selected websites and application endpoints | Chrome DevTools workflows navigate and test the configured target; browser requests and form submissions reach that target. See [browser-testing setup](integrations/chrome-devtools/README.md). |
+| Google (chrome-devtools-mcp server) | By default the `chrome-devtools-mcp` server sends usage statistics (tool success rates, latency, environment information) to Google, and its performance tools send trace URLs to the Google CrUX API. AID's templates and snippets pass `--no-usage-statistics` and `--no-performance-crux`, which turn both off. The server also checks the npm registry for updates (`CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS=1` disables it). See the [Google Privacy Policy](https://policies.google.com/privacy) and [Chrome DevTools privacy](integrations/chrome-devtools/README.md#privacy). |
 
 AID does not set the retention policy for these third-party services. Their own account
 settings and terms apply. Local files under `.aid/` and `~/.aid/` are also retained separately
@@ -479,6 +493,12 @@ linked runs none of them):
   and PowerShell commands that name it. Only `aid_session.py` writes it (outside AID
   projects a name built at run time, or a write reached through a change of folder, a shell
   `-c` body or interpreter code, is not caught; see
+  [What AID does not promise](docs/SECURITY-MODEL.md#what-aid-does-not-promise)).
+- **Every-folder false denials.** A few harmless commands are refused in every folder, AID
+  project or not, because the gate cannot tell them from a confirmed call or a state write:
+  an interpreter whose script operand is built at run time (`python "$SCRIPT" "$INPUT"`) and
+  archiving `.aid/state.json` (`tar czf b.tgz .aid/state.json`). Write the script path out,
+  back the file up with `cp`, or run the command yourself with `!` (see
   [What AID does not promise](docs/SECURITY-MODEL.md#what-aid-does-not-promise)).
 
 See [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md#hooks-that-act-outside-aid-projects).

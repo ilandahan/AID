@@ -133,7 +133,7 @@ Failures:
 
 2. **Run single scenario for debugging**
    ```bash
-   npx cucumber-js features/auth/login.feature:15  # Line number
+   npx --no-install cucumber-js features/auth/login.feature:15  # Line number
    ```
 
 3. **Check step definition**
@@ -153,7 +153,7 @@ Failures:
 npm run cucumber && npm run cucumber && npm run cucumber
 
 # Run with retry to identify flaky
-npx cucumber-js --retry 2 --retryTagFilter @flaky
+npx --no-install cucumber-js --retry 2 --retryTagFilter @flaky
 ```
 
 **If test is flaky:**

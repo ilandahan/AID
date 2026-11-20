@@ -27,7 +27,7 @@ What would you like to update?
 
 [1] Current task (change to different task)
 [2] Current step (change step within task)
-[3] Progress (update percentage/notes)
+[3] Progress (steps completed / pending)
 [4] Mark step complete (advance to next)
 [5] Mark task complete (advance to next task)
 [6] Add blocker
@@ -61,10 +61,11 @@ Updating...
 
 #### [3] Update Progress
 ```
-Current: {step_name} ({progress}%)
+Completed steps: {progress.steps_completed}
+Pending steps:   {progress.steps_pending}
 
-New progress (0-100): ___
-Notes (optional): ___
+Steps to add to completed / pending: ___
+Note (optional, saved to session_notes): ___
 
 Updating...
 ```
@@ -90,8 +91,9 @@ Consider running /aid-end if this was a significant milestone.
 #### [6] Add Blocker
 ```
 Describe the blocker: ___
+Severity (low/medium/high): ___
 
-Blocker added. This will be shown in /context and /good-morning.
+Blocker added as {"description": ..., "severity": ...}. This will be shown in /context and /good-morning.
 ```
 
 #### [7] Add Session Note
@@ -115,22 +117,24 @@ What's your new current task?
 
 ### 4. Save and Confirm
 
-Write `.aid/context.json` in this shape. The task key goes in `current_task.id` (the QA
-gate reads `id`, then `key`, then `jira_key`); `jira_key` may be kept as an extra field.
-Use `null` for `current_task` when there is no task.
+Write `.aid/context.json` in the one `aid-context-v1` shape
+(`skills/context-tracking/references/context-schema.md`), changing only the fields this
+command owns: `current_task`, `current_step`, `progress`, `session_notes`, `blockers` and
+`last_updated`. Keep every other key as it is. The task key goes in `current_task.id` (the
+QA gate reads `id`, then `key`, then `jira_key`); `jira_key` is optional. The step is the
+top-level `current_step` string, never a field of `current_task`. Use `null` for
+`current_task` and `current_step` when there is none.
 
 ```json
 {
-  "current_task": {
-    "id": "PROJ-123",
-    "jira_key": "PROJ-123",
-    "title": "Add login form",
-    "current_step": "Implement validation",
-    "progress": 40
-  },
-  "blockers": [],
-  "session_notes": [],
-  "last_updated": "2026-11-19T10:00:00Z"
+  "$schema": "aid-context-v1",
+  "version": "1.0",
+  "last_updated": "2026-11-20T10:00:00Z",
+  "current_task": {"id": "PROJ-123", "title": "Add login form", "jira_key": "PROJ-123"},
+  "current_step": "Implement validation",
+  "progress": {"steps_completed": ["Design form"], "steps_pending": ["Write tests"]},
+  "session_notes": ["Decided to reuse the auth hook"],
+  "blockers": [{"description": "Waiting for API keys", "severity": "medium"}]
 }
 ```
 

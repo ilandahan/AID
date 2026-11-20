@@ -42,6 +42,8 @@ Usage (T3: this script is the ONLY writer of .aid/state.json, a protected file):
                                             (phase 4-5; read by the QA Stop gate)          [confirmed]
   aid_session.py status [--format text|json]  project, session, feedback, improvement stats,
                                             memory slots and queue length (read-only)
+  aid_session.py checklist [--phase N] [--format text|json]  phase summary + approval checklist
+                                            (read-only; approve prints the same block first)
   T16: init also creates .aid/context.json when absent (never overwrites it); memory-sync and
   memory-apply update $AID_HOME/metrics/improvement.json.
   T8: feedback text is redacted before it is written (memory_system/redact.py, best effort).
@@ -183,6 +185,37 @@ def ensure_context_file():
 
 
 PHASE_NAMES = ["Discovery", "PRD", "Tech Spec", "Impl Plan", "Development", "QA & Ship"]
+
+# T17-17 (G4-10, I-22): the ONE source of the phase-approval checklist items. Phases 1-5 are
+# commands/phase-approve.md:94-118 at 11371b8, verbatim; phase 0 is new. /phase-approve runs
+# `checklist` and reproduces its output instead of restating the items.
+PHASE_CHECKLISTS = {
+    0: ["Research folder `docs/research/YYYY-MM-DD-<project>/` exists",
+        "`research-report.md` states the problem",
+        "Stakeholders and success metrics identified",
+        "Go / no-go decision recorded"],
+    1: ["Requirements documented in `docs/prd/`",
+        "User stories defined",
+        "Acceptance criteria specified",
+        "Scope agreed upon"],
+    2: ["Technical specification in `docs/tech-spec/`",
+        "Database schema designed",
+        "API endpoints defined",
+        "Architecture decisions documented"],
+    3: ["Jira Epic created",
+        "Stories broken down",
+        "Tasks estimated",
+        "Sprint planned"],
+    4: ["All features implemented",
+        "Tests passing",
+        "Code reviewed",
+        "Documentation updated"],
+    5: ["QA testing complete",
+        "No critical bugs",
+        "Performance acceptable",
+        "Ready for deployment"],
+}
+PHASE_FOLDERS = {0: "docs/research", 1: "docs/prd", 2: "docs/tech-spec", 3: "docs/implementation-plan"}
 
 
 def read_state():
@@ -360,9 +393,66 @@ def cmd_review(args):
     print("Review recorded: phase {} {}".format(args.phase, args.status))
 
 
+def collect_checklist(state, phase):
+    """T17-17 (I-22): the phase summary and checklist, read-only. Phase folders list their files;
+    phases 4-5 list the .aid/qa/*.yaml task ids with their QA pass state."""
+    root = STATE_FILE.parent.parent
+    current = state["current_phase"]
+    if phase in PHASE_FOLDERS:
+        folder = root / PHASE_FOLDERS[phase]
+        docs = sorted(p.relative_to(root).as_posix() for p in folder.rglob("*") if p.is_file()) \
+            if folder.is_dir() else []
+    else:
+        passed = state.get("qa_passed") if isinstance(state.get("qa_passed"), dict) else {}
+        qa = STATE_FILE.parent / "qa"
+        docs = ["{} (qa_passed: {})".format(p.stem, "yes" if p.stem in passed else "no")
+                for p in sorted(qa.glob("*.yaml"))] if qa.is_dir() else []
+    return {"phase": phase,
+            "summary": {"phase": phase, "phase_name": PHASE_NAMES[phase],
+                        "role": state.get("role_display") or state.get("role") or "-",
+                        "approved": phase == current and state.get("phase_approved") is True,
+                        "feedback": phase == current and state.get("feedback_provided") is True,
+                        "documents": docs},
+            "checklist": list(PHASE_CHECKLISTS[phase])}
+
+
+def checklist_text(data):
+    s = data["summary"]
+    n = data["phase"]
+    yn = lambda b: "yes" if b else "no"           # noqa: E731
+    lines = ["## Phase {} Summary".format(n),
+             "Phase: {} ({}) | Role: {} | Approved: {} | Feedback: {}".format(
+                 n, s["phase_name"], s["role"], yn(s["approved"]), yn(s["feedback"])),
+             "Documents: {}".format(", ".join(s["documents"]) or "none found"),
+             "## Phase {} Checklist".format(n)]
+    lines += ["- [ ] " + item for item in data["checklist"]]
+    return "\n".join(lines)
+
+
+def cmd_checklist(args):
+    """checklist: read-only (not confirmed, not in I-1). Writes nothing."""
+    sys.dont_write_bytecode = True
+    state, problem = read_state()
+    if problem:
+        print(problem)
+        sys.exit(1)
+    if state is None:
+        print("AID is not initialized here (run /aid-init)")
+        sys.exit(1)
+    phase = state["current_phase"] if args.phase is None else args.phase
+    data = collect_checklist(state, phase)
+    if args.format == "json":
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    else:
+        print(checklist_text(data))
+
+
 def cmd_approve(args):
     """approve: the human sign-off for the current phase (human-confirmed, T3-4)."""
     state = require_state()
+    # T17-17 (I-22): the same Summary + Checklist block, before anything is written, so a
+    # human `!` run always shows what is being signed off.
+    print(checklist_text(collect_checklist(state, state["current_phase"])) + "\n")
     state["phase_approved"] = True
     state["feedback_provided"] = True
     state["phase_approved_at"] = now_iso()
@@ -500,7 +590,12 @@ def cmd_end(args):
         print(f"Duration: {duration} min")
     print(f"Rating: {args.rating}/5")
     print(f"Sub-agent review: {args.review}")
-    print(f"Feedback saved (redacted): {fb_path}")
+    # T17-15: "redacted" only when the saved text is redact(text); without the redactor the
+    # free text was not stored at all.
+    if red:
+        print(f"Feedback saved (redacted): {fb_path}")
+    else:
+        print(f"Feedback saved without free text (redaction unavailable): {fb_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -931,6 +1026,11 @@ def main():
                                        "and queue status (read-only)")
     st.add_argument("--format", choices=["text", "json"], default="text")
     st.set_defaults(fn=cmd_status)
+
+    cl = sub.add_parser("checklist", help="print the phase summary and approval checklist (read-only)")
+    cl.add_argument("--phase", type=int, choices=range(0, 6), default=None)
+    cl.add_argument("--format", choices=["text", "json"], default="text")
+    cl.set_defaults(fn=cmd_checklist)
 
     args = p.parse_args()
     STATE_FILE = project_state_file()

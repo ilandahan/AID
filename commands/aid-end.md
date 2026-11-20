@@ -39,7 +39,7 @@ transition (option 1 in Step 5). Saving feedback does not wait for it.
 
 ```
 Agent tool:
-- subagent_type: "aid:phase-review-agent"   (fallback: "phase-review-agent")
+- subagent_type: "aid:phase-review-agent"   (link-project route only: "phase-review-agent")
 - description: "Phase [N] gate review"
 - prompt: "Phase [N] ([Phase Name]) gate review. Deliverables: [exact paths].
            Checklist: [Review Prompt for this phase, below].

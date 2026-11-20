@@ -36,7 +36,7 @@ When `/aid-improve` is invoked, spawn the memory analysis sub-agent:
 
 ```
 Task(
-  subagent_type: "aid:memory-analysis-agent",   # fallback: "memory-analysis-agent";
+  subagent_type: "aid:memory-analysis-agent",   # link-project route only: "memory-analysis-agent";
                                                # tools: Read, Grep, Glob (no Write)
   model: "inherit",
   prompt: [the inputs ({{FEEDBACK_DATA}} etc.), filled in; the agent brings its own prompt],

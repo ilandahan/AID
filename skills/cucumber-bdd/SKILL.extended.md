@@ -242,10 +242,10 @@ Given('I create a test user', async function() {
 
 ```bash
 # Save failures to a file
-npx cucumber-js --format rerun:@rerun.txt
+npx --no-install cucumber-js --format rerun:@rerun.txt
 
 # Rerun only failed scenarios
-npx cucumber-js @rerun.txt
+npx --no-install cucumber-js @rerun.txt
 ```
 
 ### Step-by-Step Logging
@@ -447,6 +447,6 @@ module.exports = {
 
 Generate report:
 ```bash
-npx allure generate allure-results --clean
-npx allure open
+npx --no-install allure generate allure-results --clean
+npx --no-install allure open
 ```

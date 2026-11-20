@@ -218,16 +218,16 @@ Scenario Outline: Product search with filters
 
 ```bash
 # Run only smoke tests
-npx cucumber-js --tags "@smoke"
+npx --no-install cucumber-js --tags "@smoke"
 
 # Run critical but not WIP
-npx cucumber-js --tags "@critical and not @wip"
+npx --no-install cucumber-js --tags "@critical and not @wip"
 
 # Run authentication OR checkout tests
-npx cucumber-js --tags "@authentication or @checkout"
+npx --no-install cucumber-js --tags "@authentication or @checkout"
 
 # Complex expression
-npx cucumber-js --tags "(@smoke or @critical) and not @flaky"
+npx --no-install cucumber-js --tags "(@smoke or @critical) and not @flaky"
 ```
 
 ---

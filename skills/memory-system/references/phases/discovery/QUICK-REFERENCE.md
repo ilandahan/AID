@@ -2,7 +2,7 @@
 
 > **Source**: `../../../../pre-prd-research/SKILL.md`, `../../../../aid-discovery/SKILL.md`
 >
-> This file is a quick reference. The main skill definitions are in the `.claude/skills/` directory.
+> This file is a quick reference. The main skill definitions are in the plugin's `skills/` directory (the **Source** links above).
 
 ## Quick Reference
 

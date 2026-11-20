@@ -674,13 +674,15 @@ def _runs_session(command, powershell=False):
         lead = next((x for x in words if x.lower() not in _CMD_PREFIXES - {"eval"}
                      and not re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", x)), "")
         if lead.lower() == "eval":                 # eval 'python "<S>" approve': its text runs
-            rest = words[words.index(lead) + 1:]
-            if rest and _runs_session(" ".join(rest), powershell):
+            rest = words[words.index(lead) + 1:]   # R2-01: a direct call there gets its twin
+            if rest and _runs_session(direct_exec_twin(" ".join(rest), powershell), powershell):
                 return True
             continue
         if not powershell and any(_runs_session(p) for p in _carried_lines(words)):
             return True                          # R2-04: git alias, script -c, su -c, ...
-        k, _ = _interpreter_at(words, shc=lambda p: _runs_session(p, powershell))
+        # R1-03 (T17 fix cycle 1): a direct call in the -c payload (`sh -c "\"<S>\" approve"`)
+        # is judged like its python twin (I-17).
+        k, _ = _interpreter_at(words, shc=lambda p: _runs_session(direct_exec_twin(p, powershell), powershell))
         if k == "sh-c":
             return True
         r = _runner_script(words)
@@ -857,12 +859,108 @@ def normalize(path, cwd, literal=False, strip=True):
     return _key(os.path.realpath(p))
 
 
+_PROJECT = None         # the gated project's root (aid_hooks.set_project_root sets it)
+_LIVE_PROTECTED = ("hooks", ".claude-plugin", "agents", "skills/reflection/criteria")
+
+
+def set_project(root):
+    """T17-9: the project root the gates judge, so the live plugin root can be told apart."""
+    global _PROJECT
+    _PROJECT = str(root) if root else None
+
+
+def _live_protected():
+    """T17-9 (U-09): from a project outside the live plugin root (link-project route), the
+    live root's hooks, manifest, agents and reflection criteria are protected like the cache
+    copies (T15-5). The live root's own repo, as the project, is unchanged."""
+    if not _PROJECT:
+        return []
+    live = _key(os.path.realpath(str(LIVE_ROOT))).rstrip("/")
+    proj = _key(os.path.realpath(str(_PROJECT))).rstrip("/")
+    if (live + "/").startswith(proj + "/"):
+        return []
+    return [live + "/" + d + "/" for d in _LIVE_PROTECTED]
+
+
+def _live_root_only(norm):
+    """T17-9: protected only as a live-root file (not by any other rule)."""
+    if norm in (None, SUSPICIOUS) or norm in SINKS:
+        return False
+    k = _pkey(norm.rstrip("/")) + "/"
+    if not any(k.startswith(_pkey(e)) for e in _live_protected()):
+        return False
+    global _PROJECT
+    saved, _PROJECT = _PROJECT, None
+    try:
+        return not is_protected(norm)
+    finally:
+        _PROJECT = saved
+
+
+def _live_parent(norm, lp):
+    """R1-01 (T17 fix cycle 1): the live root itself, or a folder in it that holds a protected
+    one (skills/, skills/reflection/): removing, moving or extracting into it reaches the
+    live-root files, as a cache copy's own folder does (T15-5). `lp` is _live_protected()."""
+    if not lp or norm in (None, SUSPICIOUS) or norm in SINKS:
+        return False
+    k = _pkey(norm.rstrip("/"))
+    root = _pkey(lp[0])[:-len("/" + _LIVE_PROTECTED[0] + "/")]
+    return (k + "/").startswith(root + "/") and any(_pkey(e).startswith(k + "/") for e in lp)
+
+
+def _mentions_live(text, lp):
+    """R1-01: the text names a live-root protected folder inside a word (`of=<R>/hooks/x`,
+    `-o<R>/hooks/x`, code given to an interpreter): the live-root twin of mentions_protected,
+    which catches the cache copies by their `.claude/plugins/cache` text."""
+    t = text.replace("\\", "/").casefold() + "/"
+    return any(_pkey(e) in t for e in lp)
+
+
+# R1-01: interpreters whose script word may be a live-root file (running it is not writing it).
+_LIVE_RUNNERS = re.compile(r"^(?:pythonw?[0-9.]*|pyw?|node(?:js)?|deno|bun|(?:ba|z|da|k)?sh)(?:\.exe)?$",
+                           re.I)
+
+
+def _live_run_word(words):
+    """R1-01: the script word the interpreter of this simple command runs (after the VAR=,
+    env/exec/nohup/..., wrapper and runner prefixes), else None."""
+    texts = [w.text for w in words]
+    k, _ = _interpreter_at(texts, _LIVE_RUNNERS, shc=lambda _p: False, dyn=False)
+    if not isinstance(k, int):
+        # Behind a launcher the walk does not know (chronic, setsid, flock F, ...): the first
+        # interpreter word, so the T15 A1 residual rows keep their verdicts (T16-14).
+        k = next((i for i, w in enumerate(words) if not w.dynamic
+                  and _LIVE_RUNNERS.match(re.split(r"[/\\]", w.text)[-1])), None)
+        if k is None:
+            return None
+    if _PY_INTERP.match(re.split(r"[/\\]", texts[k])[-1]):
+        kind, j = _script_operand(texts, k)
+        return texts[j] if kind == "script" else None
+    j = k + 1
+    while j < len(texts) and texts[j].startswith("-"):
+        j += 1
+    return texts[j] if j < len(texts) else None
+
+
+# T17-9: operands a Phase 4+ command edits in place (writers proper are judged as writes).
+_IN_PLACE_CMDS = {"install", "ln", "truncate", "dd", "rsync", "chmod", "chown", "shred", "unlink"}
+
+
+def _edits_in_place(name, args):
+    return name in _IN_PLACE_CMDS or (name in ("sed", "perl", "ruby") and any(
+        re.match(r"^-[A-Za-z]*i", a) or a.startswith("--in-place") for a in args))
+
+
 def _env_protected():
     """Protected paths that env vars move away from a .claude / .aid folder name, so the
     suffix list misses them: $CLAUDE_CONFIG_DIR/{settings.json, plugins/cache/, hooks/}
     and the layer-B baseline under $AID_HOME/integrity/. Directories end in "/" and
     match by prefix."""
     out = [_key(os.path.realpath(str(integrity_base()))).rstrip("/") + "/"]
+    # T17-8 (U-08): the recommendation queue that memory-apply turns into skill edits.
+    for h in (os.environ.get("AID_HOME") or str(Path.home() / ".aid"), str(Path.home() / ".aid")):
+        out.append(_key(os.path.realpath(os.path.join(h, "recommendations"))).rstrip("/") + "/")
+    out += _live_protected()
     cfg = os.environ.get("CLAUDE_CONFIG_DIR")
     if cfg:
         base = _key(os.path.realpath(cfg)).rstrip("/")
@@ -2331,7 +2429,10 @@ def _phase4_check(command, cwd, root, phase, rules):
     try:
         segments, subs = lex(command)
     except ParseError as e:
-        return "cannot parse the command safely ({})".format(e) if mentions_protected(command) else None
+        # R2-02 (T17 fix cycle 2): also a text naming a live-root protected folder (a shell -c
+        # body with an apostrophe path, `sh -c "cp a <R>/hooks/x"`), as for the cache copies.
+        return "cannot parse the command safely ({})".format(e) if (
+            mentions_protected(command) or _mentions_live(command, _live_protected())) else None
     for body in subs:                     # substitution bodies run in subshells; cwd unknown
         reason = _phase4_check(body, None, root, phase, rules)
         if reason:
@@ -2397,7 +2498,14 @@ def _phase4_check(command, cwd, root, phase, rules):
                         "cat, grep, git status/log/diff) may follow such a cd").format(seg.raw.strip()[:80])
         if _phase4_exempt(name, words, args):
             continue
+        lp = _live_protected()
         if name not in WRITERS:
+            # R1-01 (T17 fix cycle 1): from a linked project, a live-root operand is allowed only
+            # as the script an interpreter runs, or a cd / pushd folder; any other command that
+            # names it (curl -o, dd of=, tar -C, unzip -d, Remove-Item, Set-Content, ...) is
+            # refused, as for the cache copies. A shell -c body is judged on its own (R3-03).
+            run_word = _live_run_word(words) if lp else None
+            sh_bodies = set(_shell_c_bodies(words)) if lp else set()
             # R2-01: each alternative of an unquoted {a,b} operand (`sed -i ... .aid/{hooks,x}/..`).
             for a in [x.text for w in words[1:] for x in _brace_words(w, home=False)]:
                 cand = a.split("=", 1)[1] if a.startswith("-") and "=" in a else (None if a.startswith("-") else a)
@@ -2406,8 +2514,13 @@ def _phase4_check(command, cwd, root, phase, rules):
                 # literal words (stream, drive-relative, UNC); words with ~ or $ are dynamic
                 # and get only the mentions_protected check (best effort, N-1).
                 n = normalize(cand, vcwd) if cand else None
+                live_ok = bool(lp) and (a == run_word or name in ("cd", "pushd")) and not _edits_in_place(
+                    name, args) and (_live_root_only(n) or _live_parent(n, lp))
                 # T16 B1: T16-10 reverted; `cd .aid` / `cd ~/.aid` stay denied, as at 5f8f199.
-                if mentions_protected(a) or (n != SUSPICIOUS and is_protected_or_parent(n)):
+                if mentions_protected(a) or (n != SUSPICIOUS and is_protected_or_parent(n) and not live_ok) or (
+                        lp and not live_ok and a not in sh_bodies and (
+                            _mentions_live(a, lp) or _live_parent(n, lp))):
+                    # T17-9: running or reading a live-root file is not writing it.
                     return "'{}' would touch an AID control file".format(seg.raw.strip()[:80])
                 if name != "cd" and _pipeline_config_reason(Word(a, True), vcwd):
                     return "'{}' would touch {}".format(seg.raw.strip()[:80], PIPELINE_CONFIG[1:])
@@ -2440,12 +2553,23 @@ def _phase4_check(command, cwd, root, phase, rules):
                 if not reason and name in ("rm", "rmdir", "mv") and any(
                         is_protected_or_parent(normalize(a.text, vcwd)) for a in _brace_words(w)):
                     reason = "'{}' contains AID control files".format(w.text)
+                if not reason and lp and name in ("rm", "rmdir", "mv", "cp") and any(
+                        _live_parent(normalize(a.text, vcwd), lp) for a in _brace_words(w)):
+                    # R1-01: `rm -rf "<R>"`, `mv "<R>/skills" x`, `cp -r hooks "<R>"`.
+                    reason = "'{}' contains AID control files (the live AID plugin root)".format(w.text)
                 if reason:
                     return "{}: {}".format(name, reason)
-        if name == "cd":
+        # R3-02 (T17): skip cd/pushd options (-L -P -e -@ -n) and `--` before the target, so
+        # `cd -- "<R>"`, `cd -P "<R>"` and `pushd -- "<R>"` move vcwd like the plain forms.
+        cd_rest = _cd_operands(words) if name in ("cd", "pushd") else None
+        if name == "cd" or (name == "pushd" and len(cd_rest) == 1 and not cd_rest[0].dynamic
+                            and not re.match(r"^[-+]", cd_rest[0].text)):
+            # R2-02 (T17 fix cycle 2): `pushd DIR` moves to DIR like `cd DIR`, so the later
+            # segments' relative words resolve there (`pushd "<R>" && rm -rf agents`).
             target = None
-            if len(words) == 2 and not words[1].dynamic and words[1].text != "-":
-                target = normalize(words[1].text, vcwd) if vcwd is not None or os.path.isabs(words[1].text) else None
+            if len(cd_rest) == 1 and not cd_rest[0].dynamic and cd_rest[0].text != "-":
+                t = cd_rest[0].text
+                target = normalize(t, vcwd) if vcwd is not None or os.path.isabs(t) else None
             ops = [w for w in words[1:] if not (w.text.startswith("-") and not w.dynamic)]
             if ops:
                 in_ctl = _ctl_dir_word(ops[-1], vcwd)               # R3-01
@@ -2459,6 +2583,22 @@ def _phase4_check(command, cwd, root, phase, rules):
                 in_ctl = _ctl_dir_word(ops[-1], vcwd)               # R3-01
             vcwd = None
     return None
+
+
+def _cd_operands(words):
+    """R3-02 (T17): the operands of a cd/pushd segment after its leading options
+    (-L, -P, -e, -@, -n, combined like -LP) and an optional `--` end-of-options marker."""
+    rest = list(words[1:])
+    while rest and not rest[0].dynamic:
+        t = rest[0].text
+        if t == "--":
+            rest = rest[1:]
+            break
+        if re.fullmatch(r"-[LPe@n]+", t):
+            rest = rest[1:]
+            continue
+        break
+    return rest
 
 
 def _ctl_dir_word(w, vcwd):
@@ -2570,6 +2710,14 @@ def evaluate_powershell(command, cwd, root, phase, rules):
     hit = next((lit for lit in PS_PROTECTED_LITERALS if lit in low), None)
     if hit:
         return "this PowerShell command names an AID control file ({})".format(hit)
+    # R2-02 (T17 fix cycle 2): a .NET static call that changes files (`[IO.File]::WriteAllText`,
+    # `[IO.Directory]::Delete`, ...) naming a live-root protected folder from a linked project,
+    # as the cache copies' literal check above refuses it. Reads (Read*, Exists, Get*,
+    # Enumerate*) stay as they were.
+    lp = _live_protected()
+    if lp and _PS_IO_CHANGE.search(norm) and any(re.search(
+            re.escape(_pkey(e).rstrip("/")) + r"(?:[/\"'\s,)]|$)", low) for e in lp):
+        return "this PowerShell command changes a file of the live AID plugin root (an AID control file)"
     # R2-05: a wildcard a writer or Remove-Item/ri/del/... may expand to a control file
     # (`Remove-Item .aid\pipeline\ESC*.json`, `del .aid\*`); PowerShell wildcards match dot names.
     glob = next((t for t in _ps_glob_targets(re.sub(r"[\"']", "", low), remove=True)
@@ -2580,6 +2728,12 @@ def evaluate_powershell(command, cwd, root, phase, rules):
 
 
 PS_PROTECTED_LITERALS = PROTECTED_LITERALS + (".aid/state.json", ".aid/pipeline/escalation.json")
+# R2-02: a System.IO static call other than a read (the type may be written with System. or
+# without, any case, spaces before ::).
+_PS_IO_CHANGE = re.compile(r"\[\s*(?:system\s*\.\s*)?io\s*\.\s*\w+\s*\]\s*::\s*(?!(?:read|exists|get|enumerate|combine|join|has|is)\w*\b)\w"
+                           # R3-02 (T17): writer constructors, `New-Object IO.StreamWriter("<R>/hooks/x")`
+                           r"|new-object\s+(?:-typename\s+)?(?:system\s*\.\s*)?io\s*\.\s*(?:streamwriter|filestream|binarywriter|fileinfo)\b",
+                           re.I)
 
 
 # ---------------------------------------------------------------------------
@@ -2767,7 +2921,15 @@ def resolve_denied(command, powershell=False):
     if segs is None:
         return names
     for words in segs:
-        k, _ = _interpreter_at(words, _RESOLVE_INTERP, shc=lambda p: resolve_denied(p, powershell))
+        lead = next((x for x in words if x.lower() not in _CMD_PREFIXES - {"eval"}
+                     and not re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", x)), "")
+        if lead.lower() == "eval":      # R2-01: eval "\"<P>\" --resolve ok": its text runs
+            rest = words[words.index(lead) + 1:]
+            if rest and resolve_denied(direct_exec_twin(" ".join(rest), powershell), powershell):
+                return True
+            continue
+        k, _ = _interpreter_at(words, _RESOLVE_INTERP,       # R1-03: direct calls in the payload
+                               shc=lambda p: resolve_denied(direct_exec_twin(p, powershell), powershell))
         if k == "sh-c":
             return True
         if k is None:
@@ -2786,6 +2948,203 @@ def resolve_denied(command, powershell=False):
         if ops and re.search(r"[$`(*?\[{]", ops[0]) and "--resolve" in rest:
             return True
     return False
+
+
+# T17 I-17 (F1): a command word whose last path component is aid_session.py or gate.mjs runs
+# that script directly (shebang, file association). It is judged as if python / node stood
+# right before that word, so every spelling gets the interpreter call's verdict. Exact name
+# only (the _session_operand normaliser: any case, trailing dots/spaces ignored).
+_DIRECT_SCRIPTS = (
+    ("python", re.compile(r"^aid_session\.py[. ]*$", re.I), _PY_INTERP, _session_operand),
+    ("node", re.compile(r"^gate\.mjs[. ]*$", re.I), re.compile(r"^node(?:\.exe)?$", re.I),
+     lambda w: re.split(r"[/\\]", w.lower())[-1].rstrip(". ") == "gate.mjs"),
+)
+_DIRECT_NAME = re.compile(r"aid_session\.py|gate\.mjs", re.I)
+
+
+def _word_start(command, idx, powershell):
+    """Index where the shell word holding command[idx] starts (quotes and escapes tracked)."""
+    return _word_starts(command, [idx], powershell)[0]
+
+
+def _word_starts(command, idxs, powershell):
+    """R2-04 (T17 fix cycle 2): _word_start for every index of the ascending `idxs`, in one
+    forward scan of `command` (linear, not one scan from 0 per index)."""
+    out, start, quote, i = [], 0, None, 0
+    esc = "`" if powershell else "\\"
+    for idx in idxs:
+        while i < idx:
+            ch = command[i]
+            if quote:
+                if ch == quote:
+                    quote = None
+                elif ch == esc and quote == '"':
+                    i += 1
+            elif ch in "'\"":
+                quote = ch
+            elif ch == esc:
+                i += 1
+            elif ch in " \t\r\n;&|()" or (ch == "`" and not powershell):
+                start = i + 1
+            i += 1
+        out.append(start)
+    return out
+
+
+def _direct_calls(command, powershell, interp, is_script):
+    """How many simple commands run `<interp> <script> ...` (interp the command word)."""
+    text = command.replace("`", "").replace("\\", "/") if powershell else command
+    segs = _shell_segments(text) or []
+    n = 0
+    for words in segs:
+        k, _ = _interpreter_at(words, interp, shc=lambda _p: False, dyn=False)
+        if isinstance(k, int) and k + 1 < len(words) and is_script(words[k + 1]):
+            n += 1
+    return n
+
+
+def direct_exec_twin(command, powershell=False):
+    """T17 I-17: the command with `python ` / `node ` inserted before every command word that
+    is aid_session.py / gate.mjs (after the VAR=, env/exec/nohup/..., wrapper and runner
+    prefixes _interpreter_at walks). The gates judge this twin, so verdict(C) == verdict(P)."""
+    if not isinstance(command, str) or not _DIRECT_NAME.search(command):
+        return command
+    if powershell:
+        # R2-01 (T17 fix cycle 2): `& ("<P>") --resolve ok` runs the same as `& "<P>" ...`.
+        command = _PS_CALL_GROUP.sub(r"& \1", command)
+    if "<<" in command:                 # a heredoc body spans the separators: judged whole
+        return _twin_subs(_twin_part(command, powershell), powershell)
+    out, last = [], 0
+    for a, b in _twin_chunks(command, powershell):
+        out.append(command[last:a])
+        out.append(_twin_part(command[a:b], powershell))
+        last = b
+    out.append(command[last:])
+    return _twin_subs("".join(out), powershell)
+
+
+_PS_CALL_GROUP = re.compile(r"&\s*\(\s*(\"[^\"`$]*\"|'[^']*'|[^\s()\"'`$;|&]+)\s*\)")
+
+
+def _twin_subs(command, powershell):
+    """R2-01 (T17 fix cycle 2): the twin inside every command-substitution body, whatever
+    its quoting: `x="$("<S>" qa-pass T-1)"`, `echo "$(...)"`, `` `...` ``. The top-level pass
+    sees a double-quoted word as one word, so each $( ) / backtick body (outside single
+    quotes) is twinned on its own, recursively. Unbalanced text is left as it is."""
+    if not _DIRECT_NAME.search(command):
+        return command
+    return _map_subs(command, powershell, lambda body: direct_exec_twin(body, powershell))
+
+
+def _map_subs(command, powershell, fn):
+    """`command` with each outermost $( ) / backtick body (outside single quotes) as fn(body)."""
+    out, i, last, quote, n = [], 0, 0, None, len(command)
+    esc = "`" if powershell else "\\"
+    while i < n:
+        ch = command[i]
+        if quote == "'":
+            if ch == "'":
+                quote = None
+        elif ch == esc:
+            i += 2
+            continue
+        elif ch == "'" and quote is None:
+            quote = "'"
+        elif ch == '"':
+            quote = None if quote == '"' else '"'
+        elif command.startswith("$(", i):
+            try:
+                j = _matching_paren(command, i + 2)
+            except ParseError:
+                break
+            out.append(command[last:i + 2])
+            out.append(fn(command[i + 2:j]))
+            last, i = j, j + 1
+            continue
+        elif ch == "`" and not powershell:
+            j = command.find("`", i + 1)
+            if j < 0:
+                break
+            out.append(command[last:i + 1])
+            out.append(fn(command[i + 1:j]))
+            last, i = j, j + 1
+            continue
+        i += 1
+    out.append(command[last:])
+    return "".join(out)
+
+
+def _twin_chunks(command, powershell):
+    """R1-05 (T17 fix cycle 1): (start, end) spans of the parts of `command` split at the
+    top-level ; & | and newlines (quotes, escapes, backticks and parentheses tracked), so each
+    candidate twin is re-judged on its own part, not on the whole command (linear time)."""
+    spans, start, quote, depth, i, n = [], 0, None, 0, 0, len(command)
+    esc = "`" if powershell else "\\"
+    while i < n:
+        ch = command[i]
+        if quote:
+            if ch == quote:
+                quote = None
+            elif ch == esc and quote == '"':
+                i += 1
+        elif ch in "'\"" or (ch == "`" and not powershell):
+            quote = ch
+        elif ch == esc:
+            i += 1
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        elif depth == 0 and ch == "&" and (
+                (i > 0 and command[i - 1] in "<>") or (i + 1 < n and command[i + 1] == ">")):
+            # R3-01 (T17): the & of a redirect (2>&1, >&2, <&3, &>file) is not a separator;
+            # splitting there left an unlexable part and the direct call got no twin.
+            pass
+        elif depth == 0 and ch in ";&|\n":
+            spans.append((start, i))
+            start = i + 1
+        i += 1
+    spans.append((start, n))
+    return spans
+
+
+def _twin_part(text, powershell):
+    """T17 I-17 on one part: insert the interpreter before each direct script command word.
+    R1-05: a part whose simple commands have no such command word is skipped after one lex,
+    and the search stops once every such command word has its interpreter."""
+    if not _DIRECT_NAME.search(text):
+        return text
+    for interp_word, name, interp, is_script in _DIRECT_SCRIPTS:
+        # R2-04: substitution bodies are twinned on their own (_twin_subs), so only this
+        # part's own simple commands count here; text the lexer cannot read gets no twin
+        # (no candidate could add a call), so it is not tried word by word.
+        plain = _map_subs(text, powershell, lambda _b: "")
+        plain = plain.replace("`", "").replace("\\", "/") if powershell else plain
+        segs = _shell_segments(plain)
+        want = 0 if segs is None else sum(
+            1 for w in segs if isinstance(_interpreter_at(w, name, shc=lambda _p: False, dyn=False)[0], int))
+        if want == 0:
+            continue
+        have = _direct_calls(text, powershell, interp, is_script)
+        done, shift = 0, 0
+        ms = [m for m in _DIRECT_NAME.finditer(text) if name.match(m.group(0))]
+        # R2-04 (T17 fix cycle 2): every word start in one scan of this text (an insertion is
+        # at an earlier word start, so a later one only moves by `shift`), and each word tried
+        # once: names inside one quoted VAR= / env value are one word, not one lex each.
+        starts, tried = _word_starts(text, [m.start() for m in ms], powershell), set()
+        # In order: the command word comes before its arguments, so the search ends early.
+        for m, s0 in zip(ms, starts):
+            if want is not None and done >= want:
+                break
+            if s0 in tried:
+                continue
+            tried.add(s0)
+            s = s0 + shift
+            cand = text[:s] + interp_word + " " + text[s:]
+            got = _direct_calls(cand, powershell, interp, is_script)
+            if got > have:
+                text, have, done, shift = cand, got, done + 1, shift + len(interp_word) + 1
+    return text
 
 
 def session_ask_verdict(command, project_root=None, powershell=False):

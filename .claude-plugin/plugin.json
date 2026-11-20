@@ -3,7 +3,7 @@
   "version": "3.0.8",
   "displayName": "AID",
   "icon": "./.claude-plugin/icon.png",
-  "description": "AI Development Methodology: 6 phase gates from discovery to ship, 27 skills, 39 sub-agents (7 read-only reviewers), and WHY-first enforcement hooks. Stops code being written before the problem is understood.",
+  "description": "AI Development Methodology: 6 phase gates from discovery to ship, 27 skills, 39 sub-agents (7 reviewers that cannot write files with the Write, Edit or Bash tools; visual-qa-agent drives a browser, so its clicks and form fills reach the target site, and three of its tools could save to a path the Write gate does not see, so it is told never to pass one), and WHY-first enforcement hooks. Stops code being written before the problem is understood.",
   "author": {
     "name": "Ilan Dahan",
     "url": "https://github.com/ilandahan/AID"

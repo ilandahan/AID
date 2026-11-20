@@ -139,6 +139,18 @@ def qa_pass_command(task_id):
     return f'python "{script}" qa-pass {task_id} --note "<short summary>"'
 
 
+def qa_agent_name():
+    """T17 I-19 (F4): the plugin's reviewer (aid:qa-validator-agent) on the plugin route
+    (CLAUDE_PLUGIN_ROOT set); the bare name only on the link-project route."""
+    return "aid:qa-validator-agent" if os.environ.get("CLAUDE_PLUGIN_ROOT") else "qa-validator-agent"
+
+
+def qa_agent_note():
+    if os.environ.get("CLAUDE_PLUGIN_ROOT"):
+        return " (the plugin's agent)"
+    return " (this linked project's .claude/agents is AID's linked folder)"
+
+
 def block(reason):
     # Stop hook block schema: {"decision": "block", "reason": ...}. The reason is fed
     # back to Claude as the instruction for what to do next.
@@ -182,10 +194,10 @@ def evaluate():
     block(f"""QA Gate BLOCKED: task {task_id} requires QA validation before you stop.
 
 ACTION REQUIRED:
-1. Spawn the QA validator sub-agent:
+1. Spawn the QA validator sub-agent{qa_agent_note()}:
 
    Task(
-     subagent_type="qa-validator-agent",
+     subagent_type="{qa_agent_name()}",
      prompt="Validate task {task_id}. Criteria: .aid/qa/{task_id}.yaml",
      description="QA validation for {task_id}"
    )
@@ -210,8 +222,9 @@ QA criteria file: .aid/qa/{task_id}.yaml
 
 def main():
     try:
-        # Read hook input from stdin
-        input_data = json.load(sys.stdin)
+        # Read hook input from stdin. T17 I-18 (F3): decoded as UTF-8 whatever the locale, so a
+        # non-ASCII project path resolves; invalid UTF-8 (a ValueError) is malformed input.
+        input_data = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
     except (OSError, ValueError):
         input_data = {}
     if not isinstance(input_data, dict):

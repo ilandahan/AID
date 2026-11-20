@@ -56,7 +56,7 @@ The shipped `.mcp.json.mac` / `.mcp.json.windows` already contain this entry
 
 ## Installation
 
-The pinned MCP server is fetched by npx when Claude Code connects.
+The pinned MCP server is fetched by `npx` when Claude Code connects.
 
 Manual test:
 ```bash

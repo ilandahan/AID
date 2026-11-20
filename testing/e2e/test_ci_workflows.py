@@ -178,7 +178,9 @@ def test_t16_57_ci_installs_python_deps_from_hashed_requirements():
     pip = [s['run'] for s in steps if 'pip install' in s.get('run', '')]
     assert pip, 'no pip install step'
     for run in pip:
-        assert '--require-hashes -r .github/requirements-ci.txt' in run, run
+        # T17 (owner 2026-11-20): T17-37 adds the hashed pip-audit tool file.
+        assert ('--require-hashes -r .github/requirements-ci.txt' in run
+                or '--require-hashes -r .github/requirements-audit.txt' in run), run
         assert not re.search(r'pip install\s+pytest', run), run
     text = REQ.read_text(encoding='utf-8')
     reqs = re.findall(r'(?m)^([A-Za-z0-9_.-]+)==(\S+) \\$', text)
@@ -194,3 +196,51 @@ def test_t16_57_dependabot_has_a_pip_entry_with_cooldown():
     pip = [u for u in cfg['updates'] if u['package-ecosystem'] == 'pip']
     assert pip and pip[0]['directory'] == '/.github'
     assert pip[0]['cooldown']['default-days'] == 7
+
+
+# --- T17-37: CI test dependencies are advisory-free and audited (U-01) ----------------------
+
+# Oldest fixed versions (OSV, 2026-11-20): GHSA-6w46-j5rx-g56g fixed in pytest 9.0.3,
+# GHSA-5239-wwwm-4pmq fixed in pygments 2.20.0.
+_T17_FLOORS = {'pytest': (9, 0, 3), 'pygments': (2, 20, 0)}
+AUDIT_REQ = WF_DIR.parent / 'requirements-audit.txt'
+
+
+def _pins(path):
+    text = path.read_text(encoding='utf-8')
+    return {n.lower(): v for n, v in re.findall(r'(?m)^([A-Za-z0-9_.-]+)==(\S+) \\\r?$', text)}
+
+
+def _ver(v):
+    return tuple(int(x) for x in re.findall(r'\d+', v)[:3])
+
+
+def test_t17_37_ci_pins_are_at_or_above_the_fixed_versions():
+    pins = _pins(REQ)
+    for name, floor in _T17_FLOORS.items():
+        assert name in pins, name
+        assert _ver(pins[name]) >= floor, (name, pins[name], floor)
+
+
+def test_t17_37_pip_audit_step_is_hash_pinned_and_audits_the_ci_pins():
+    steps = [s for job in _ci_jobs().values() for s in job.get('steps', [])]
+    audit = [s['run'] for s in steps if 'pip_audit' in s.get('run', '') or 'pip-audit ' in s.get('run', '')]
+    assert audit, 'no pip-audit step'
+    for run in audit:
+        assert '-r .github/requirements-ci.txt' in run and '--require-hashes' in run, run
+        assert '--strict' in run, run
+    installs = [s['run'] for s in steps if '-r .github/requirements-audit.txt' in s.get('run', '')]
+    assert installs and all('--require-hashes' in r for r in installs), installs
+    pins = _pins(AUDIT_REQ)
+    assert 'pip-audit' in pins, sorted(pins)
+    blocks = re.split(r'(?m)^(?=[A-Za-z0-9_.-]+==)', AUDIT_REQ.read_text(encoding='utf-8'))[1:]
+    assert blocks
+    for block in blocks:
+        assert re.search(r'--hash=sha256:[0-9a-f]{64}', block), block[:80]
+
+
+def test_t17_37_every_uses_stays_sha_pinned():
+    for path in WORKFLOWS:
+        text = path.read_text(encoding='utf-8')
+        for m in re.finditer(r'(?m)^\s*-?\s*uses:\s*(\S+)', text):
+            assert SHA_PIN.match(m.group(1)), (path.name, m.group(1))

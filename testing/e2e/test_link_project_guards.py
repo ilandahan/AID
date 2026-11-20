@@ -92,6 +92,8 @@ def _make_aid_fixture(root):
     # through hooks/aid_session.py init (I-10), so the fixture carries those real files.
     for rel in (os.path.join('.claude-plugin', 'plugin.json'),
                 os.path.join('scripts', 'link-settings.mjs'),
+                # T17 (owner 2026-11-20): both linkers add the I-26 .gitignore lines through it.
+                os.path.join('scripts', 'ensure-gitignore.mjs'),
                 os.path.join('references', 'role-phase-terminology.json')):
         os.makedirs(os.path.dirname(os.path.join(root, rel)), exist_ok=True)
         shutil.copy(os.path.join(REPO_ROOT, rel), os.path.join(root, rel))
@@ -304,7 +306,8 @@ class TestWindowsLinkerRefusesSelfTarget:
             assert result.returncode == 0, result.stdout
 
         lines = [l.strip() for l in (target / '.gitignore').read_text().splitlines()]
-        assert [l for l in lines if l] == ['node_modules', '.mcp.json'], lines
+        # T17 (owner 2026-11-20): I-26 also adds .aid/audit/, and no blank line is inserted.
+        assert lines == ['node_modules', '.mcp.json', '.aid/audit/'], lines
 
     def test_bat_propagates_aid_updates_to_linked_project(self, tmp_path):
         """
@@ -453,7 +456,8 @@ class TestLegitimateLinkStillWorks:
         _run_link(aid, '../project')
 
         lines = (target / '.gitignore').read_text().splitlines()
-        assert lines == ['node_modules', '.mcp.json'], lines
+        # T17 (owner 2026-11-20): I-26 also adds .aid/audit/.
+        assert lines == ['node_modules', '.mcp.json', '.aid/audit/'], lines
 
 
 class TestNoRealSecretsInTrackedTemplates:

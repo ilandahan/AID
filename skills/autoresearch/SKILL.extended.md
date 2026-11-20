@@ -65,7 +65,7 @@ All knobs live under `autoresearch` in `.aid/pipeline/config.json`:
 | `ar_function.internal_rounds` | Internal scoring rounds for AR-2 |
 | `ar_acceptance.max_acceptance_rounds` | Hard cap on re-entering DEVELOP |
 | `ar_acceptance.pass_rate_target` | Minimum acceptance-criteria pass rate (%) |
-| `bundle_dir` | Where this skill lives (the plugin's `skills/autoresearch`; a project `.claude/skills/autoresearch` can override the bundle, an accepted risk documented in `docs/SECURITY-MODEL.md`, but the scorer is always the plugin's `aid:reflection-agent`) |
+| `bundle_dir` | Where this skill lives (the plugin's `skills/autoresearch`; a project `.claude/skills/autoresearch` can replace the loop instructions, an accepted risk documented in `docs/SECURITY-MODEL.md`; the scorer is always the plugin's `aid:reflection-agent` and its criteria are always the plugin's `skills/reflection/criteria/*.yaml`, to which a project may only add) |
 | `criticality_profile` | Informs how strict the judging should be |
 
 `config.default.json` in the pipeline-orchestrator skill carries the shipped defaults.

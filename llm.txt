@@ -1,7 +1,7 @@
 AID - AI Development Methodology for Claude Code
 
 PROJECT OVERVIEW
-AID is a comprehensive framework that transforms raw ideas into production-ready software using Claude Code and AI assistance. It systematizes the entire development journey with structured phases, enforced phase gates, a skills system, 39 sub-agents (7 read-only reviewers), and memory-based learning. Ships as a Claude Code plugin.
+AID is a comprehensive framework that transforms raw ideas into production-ready software using Claude Code and AI assistance. It systematizes the entire development journey with structured phases, enforced phase gates, a skills system, 39 sub-agents (7 reviewers that cannot write files with the Write, Edit or Bash tools; visual-qa-agent drives a browser), and memory-based learning. Ships as a Claude Code plugin.
 
 CORE PURPOSE
 Provide a methodical, enforced workflow for building full-stack applications with Claude Code assistance. The methodology stops code being written before the problem is understood, and ensures quality, consistency, and progressive disclosure of work through phase gates.

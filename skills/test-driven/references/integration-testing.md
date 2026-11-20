@@ -119,7 +119,7 @@ const prisma = new PrismaClient();
 
 beforeAll(async () => {
   // Push schema to test database
-  execSync('npx prisma db push', {
+  execSync('npx --no-install prisma db push', {
     env: {
       ...process.env,
       DATABASE_URL: process.env.TEST_DATABASE_URL

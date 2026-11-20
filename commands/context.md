@@ -9,15 +9,17 @@ Display the current work context from `.aid/context.json`.
 ## Usage
 
 - `/context` - Show full context summary
-- `/context tasks` - Show task progression only
-- `/context steps` - Show current task steps only
+- `/context tasks` - Show the current task only
+- `/context steps` - Show the steps (completed and pending) only
 - `/context log` - Show session log
 
 ## Steps to Execute
 
 ### 1. Read Context File
 
-Read `.aid/context.json` and `.aid/state.json`
+Read `.aid/context.json` and `.aid/state.json`. `context.json` follows the one
+`aid-context-v1` schema (`skills/context-tracking/references/context-schema.md`); the phase
+comes from `state.json` only. Read field by field and skip a field of an unexpected type.
 
 ### 2. Display Context Summary
 
@@ -26,25 +28,24 @@ Read `.aid/context.json` and `.aid/state.json`
   CURRENT WORK CONTEXT
 ========================================
 
-PHASE: {phase_number} - {phase_name}
+PHASE: {state.current_phase} - {phase_name}
 SESSION: {session_id}
 LAST UPDATED: {last_updated}
 
 ----------------------------------------
-TASKS
+TASK
 ----------------------------------------
-Previous: [{prev_key}] {prev_title} ✓
-Current:  [{curr_key}] {curr_title} ◄── YOU ARE HERE
-Next:     [{next_key}] {next_title}
+Current:  [{current_task.id}] {current_task.title} ◄── YOU ARE HERE
 
 ----------------------------------------
-CURRENT TASK STEPS
+STEPS
 ----------------------------------------
-Previous: {prev_step} ✓
-Current:  {curr_step} ({progress}%) ◄── IN PROGRESS
-Next:     {next_step}
+Done:     {progress.steps_completed} ✓
+Current:  {current_step} ◄── IN PROGRESS
+Pending:  {progress.steps_pending}
 
-Notes: {current_step_notes}
+Notes: {session_notes}
+Blockers: [{severity}] {description}
 
 ----------------------------------------
 SESSION LOG (Last 5)
@@ -53,17 +54,6 @@ SESSION LOG (Last 5)
 ...
 
 ========================================
-```
-
-### 3. Sync Check
-
-If context.phase doesn't match state.current_phase:
-```
-⚠️ Context-State mismatch detected!
-Context: Phase {context_phase}
-State:   Phase {state_phase}
-
-Syncing to Phase {state_phase}...
 ```
 
 ## Error Handling

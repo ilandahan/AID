@@ -36,6 +36,32 @@ _ROLE_DIRS = {"pm": "product-manager", "product-manager": "product-manager", "qa
               "qa-engineer": "qa-engineer", "lead": "tech-lead", "tech-lead": "tech-lead",
               "developer": "developer", "dev": "developer", "data-scientist": "data-scientist"}
 _PHASE_DIRS = ("discovery", "prd", "tech-spec", "breakdown", "development", "qa-ship")
+# T17-18 (L3c-2d): phase 0-5 -> the real phase skill directory under skills/, and that skill's
+# learnings folder. "aid-tech" and "aid-spec" (the old split on "-") are not skills.
+_PHASE_SKILLS = ("aid-discovery", "aid-prd", "aid-tech-spec", "aid-impl-plan", "aid-development",
+                 "aid-qa-ship")
+_SKILL_PHASE_DIR = dict(zip(_PHASE_SKILLS, _PHASE_DIRS))
+_PHASE_ALIASES = {"discovery": 0, "research": 0, "prd": 1, "tech-spec": 2, "techspec": 2,
+                  "technical-spec": 2, "breakdown": 3, "impl-plan": 3, "implementation-plan": 3,
+                  "development": 4, "dev": 4, "qa-ship": 5, "qa": 5, "qa-and-ship": 5}
+
+
+def phase_skill(phase: Any) -> Optional[str]:
+    """T17-18: the phase skill directory for a phase number (0-5) or a phase name
+    ("tech-spec", "2-tech-spec", "phase-2", "aid-impl-plan"), else None."""
+    if isinstance(phase, bool):
+        return None
+    if isinstance(phase, int):
+        return _PHASE_SKILLS[phase] if 0 <= phase <= 5 else None
+    p = re.sub(r"[\s_]+", "-", str(phase or "").strip().lower())
+    if p in _PHASE_SKILLS:
+        return p
+    p = re.sub(r"^(?:aid-|phase-)", "", p)
+    m = re.match(r"^([0-5])(?:-|$)", p)
+    if m:
+        return _PHASE_SKILLS[int(m.group(1))]
+    n = _PHASE_ALIASES.get(p)
+    return _PHASE_SKILLS[n] if n is not None else None
 
 
 # Configuration. T8-3: from paths.aid_home() on every call ($AID_HOME, else ~/.aid).
@@ -77,6 +103,8 @@ def target_for(target_skill: str) -> Optional[str]:
     t = str(target_skill or "")
     if t.startswith("role-") and t[5:] in _ROLE_DIRS:
         return "roles/{}/cumulative.md".format(_ROLE_DIRS[t[5:]])
+    if t in _SKILL_PHASE_DIR:                              # T17-18: aid-impl-plan -> breakdown
+        return "phases/{}/cumulative.md".format(_SKILL_PHASE_DIR[t])
     if t.startswith("aid-") and t[4:] in _PHASE_DIRS:
         return "phases/{}/cumulative.md".format(t[4:])
     return None
@@ -147,6 +175,10 @@ class RecommendationGenerator:
 
         # From phase struggles
         recommendations.extend(self._recommendations_from_phases())
+
+        # T17-18 (L3c-2d): a proposal with no allowed learnings file cannot be applied; it is
+        # dropped here rather than queued as a dead entry.
+        recommendations = [r for r in recommendations if r.get("target_file")]
 
         # Deduplicate and prioritize
         recommendations = self._deduplicate_recommendations(recommendations)
@@ -239,6 +271,14 @@ class RecommendationGenerator:
         for mismatch in role_patterns.get('mismatched_roles', []):
             role = mismatch['role']
             weak_topics = mismatch.get('weak_topics', [])
+            # T17-18: no proposal for a role that matches the average (|gap| < 0.1), and the
+            # target is the real role skill (role-pm -> role-product-manager).
+            gap = mismatch.get('gap_from_overall')
+            if not isinstance(gap, (int, float)) or abs(gap) < 0.1:
+                continue
+            role_dir = _ROLE_DIRS.get(str(role).lower())
+            if role_dir is None:
+                continue
 
             if weak_topics:
                 change = f"Update guidance for {', '.join(weak_topics)} to be more appropriate for {role} role. "
@@ -253,7 +293,7 @@ class RecommendationGenerator:
 
             recommendations.append(self._create_recommendation(
                 priority="high" if mismatch['gap_from_overall'] > 0.7 else "medium",
-                target_skill=f"role-{role}",
+                target_skill=f"role-{role_dir}",
                 section="Role-Specific Guidance",
                 current_guidance=f"Current guidance for {role}",
                 proposed_change=change,
@@ -326,7 +366,11 @@ class RecommendationGenerator:
 
         for phase_data in phase_patterns.get('struggling_phases', []):
             phase = phase_data['phase']
-            phase_name = phase.split('-')[1] if '-' in phase else phase
+            # T17-18 (L3c-2d): "tech-spec".split('-')[1] gave "aid-spec", not a skill.
+            skill = phase_skill(phase)
+            if skill is None:
+                continue
+            phase_name = skill[len("aid-"):]
 
             weak_topics = phase_data.get('weak_topics', [])
 
@@ -339,7 +383,7 @@ class RecommendationGenerator:
 
             recommendations.append(self._create_recommendation(
                 priority="high" if phase_data['average_rating'] < 3.0 else "medium",
-                target_skill=f"aid-{phase_name}",
+                target_skill=skill,
                 section="Phase Guidance",
                 current_guidance=f"Current guidance for {phase_name} phase",
                 proposed_change=change,
@@ -469,6 +513,9 @@ def save_recommendations(recommendations: List[Dict[str, Any]]) -> Path:
     seen = {r.get("id") for r in known} | {_content_id(r) for r in known if _id_matches_content(r)}
     for rec in recommendations:
         if not (isinstance(rec, dict) and rec.get("id")):
+            continue
+        # T17-18 (L3c-2d): a proposal with no allowed target_file is never queued.
+        if resolve_target(rec.get("target_file")) is None:
             continue
         clean = redact_obj(rec, default_names(), skip_keys=("id", "generated_at"))
         # T16-33: a NEW entry always gets its sha256 content id, whatever id it came with, so

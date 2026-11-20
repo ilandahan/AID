@@ -637,6 +637,8 @@ Examples:
                     print(f"  - Acceptance: {metrics['acceptance_rate']*100:.0f}%")
                 if metrics.get("debate_rate") is not None:
                     print(f"  - Debate Rate: {metrics['debate_rate']*100:.0f}%")
+                else:
+                    print("  - Debate Rate: n/a")      # T17-19 (L3c-2e): no decision data
 
                 # Action items
                 items = result.get("action_items", [])

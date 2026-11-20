@@ -47,7 +47,7 @@ Every step that runs a command is ONE Bash call, in exactly the shape shown:
 
    Count its entries; if there are fewer than 3, stop unless the user passed `--force`.
 
-   Spawn `aid:memory-analysis-agent` (fallback: `memory-analysis-agent`; tools: Read, Grep,
+   Spawn `aid:memory-analysis-agent` (link-project route only: `memory-analysis-agent`; tools: Read, Grep,
    Glob) and pass it:
 
    - `{{FEEDBACK_DATA}}`: the `memory-feedback` output. Do not paste raw files from the

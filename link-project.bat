@@ -468,14 +468,12 @@ if not exist "!TARGET_PATH!\.mcp.json" (
 ) else (
     echo   [SKIP] .mcp.json already exists - kept; tokens come from environment variables / OS keystore, not this file
 )
-REM .mcp.json is per-user config; keep it out of the project's git history.
-REM Idempotent: only appends when no exact line exists. Leading blank line guards
-REM against a .gitignore that does not end in a newline.
-findstr /X /L /C:".mcp.json" "!TARGET_PATH!\.gitignore" >nul 2>nul
-if errorlevel 1 (
-    (echo.& echo .mcp.json)>>"!TARGET_PATH!\.gitignore"
-    echo   [OK] .mcp.json added to .gitignore
-)
+REM .mcp.json is per-user config and .aid/audit/ is the hook audit log: keep both out of
+REM the project's git history. T17 I-26: the one helper, shared with link-project.sh, adds
+REM a line only when no existing line equals it (a trailing CR, spaces and tabs ignored),
+REM in the file's own line ending, so any mix of sh/bat runs adds it once.
+node "!AID_REAL!\scripts\ensure-gitignore.mjs" "!TARGET_REAL!" ".mcp.json" ".aid/audit/"
+if errorlevel 1 echo   [WARNING] .gitignore was not updated: add .mcp.json and .aid/audit/ to it yourself
 
 REM ============================================
 REM Summary

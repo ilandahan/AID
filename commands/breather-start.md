@@ -50,6 +50,9 @@ Tell the user what breather does and get a yes first. breather is optional and i
 - Coming back from a break? Ask the user to type `! node ~/.claude/hooks/breather/mark.mjs resumed`
   themselves (with the leading `!`). In an AID project the phase gate refuses this command to
   Claude, because it runs a file under `~/.claude/hooks`.
+- breather's session-start text asks Claude to acknowledge its notice with `mark.mjs ack`. In
+  an AID project do not run it yourself (the gate refuses it in every phase); show the user
+  this line to type, with the leading `!`: `! node ~/.claude/hooks/breather/mark.mjs ack`
 
 ## Related
 

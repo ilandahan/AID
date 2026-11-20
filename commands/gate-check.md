@@ -184,7 +184,7 @@ If review status is PENDING, Claude will:
 4. Spawn the phase-review-agent by name with the Task tool:
    ```
    Task(
-     subagent_type: "aid:phase-review-agent",   (fallback: "phase-review-agent")
+     subagent_type: "aid:phase-review-agent",   (link-project route only: "phase-review-agent")
      prompt: [phase {N} and its name, the deliverable paths, the checklist],
      description: "Phase {N} review"
    )

@@ -11,9 +11,14 @@ Start the day by checking systems, loading context, and preparing to continue wo
 ### 1. Check Project State
 
 Read `.aid/state.json` and `.aid/context.json` to understand:
-- Current phase
+- Current phase (from `state.json` only; `context.json` holds no phase)
 - Last session info
-- Current/previous/next tasks
+- The current task, step, progress and blockers
+
+`.aid/context.json` follows the one `aid-context-v1` schema
+(`skills/context-tracking/references/context-schema.md`). Read it field by field: the task
+id is `current_task.id` (else `key`, else `jira_key`); `current_step` is a string; skip any
+field of another type instead of stopping.
 
 ### 2. Display Status Summary
 
@@ -25,16 +30,14 @@ Read `.aid/state.json` and `.aid/context.json` to understand:
 Phase: {current_phase} - {phase_name}
 Last Session: {last_session_date}
 
-YESTERDAY'S PROGRESS:
-  Task: {previous_task}
-  Status: {status}
-
 CURRENT TASK:
-  {current_task_key}: {current_task_title}
-  Step: {current_step} ({progress}%)
+  {current_task.id}: {current_task.title}
+  Step: {current_step}
+  Done: {progress.steps_completed}
+  Next: {progress.steps_pending}
 
-NEXT UP:
-  {next_task_key}: {next_task_title}
+BLOCKERS:
+  - [{severity}] {description}
 
 ========================================
 ```
@@ -51,17 +54,21 @@ NEXT UP:
 How would you like to proceed?
 
 [1] Continue current task ({current_task})
-[2] Start fresh with next task
+[2] Start the next pending step
 [3] Update context manually
 [4] Show full context details
 ```
 
 ### 5. Update Context
 
-Update `.aid/context.json`:
-- Add `session_started` to session_log
-- Update `last_updated` timestamp
-- Set new `session_id`
+Update `.aid/context.json`, changing only these fields and keeping every other key:
+- Add a `session_started` entry to `session_log`
+- Update the `last_updated` timestamp
+- Set a new `session_id`
+
+If a system check finds a blocker (for example Docker is not running), add it to `blockers`
+only as a `{"description": "<text>", "severity": "low"|"medium"|"high"}` object, never as a
+plain string.
 
 ## Error Handling
 

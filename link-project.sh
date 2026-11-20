@@ -59,7 +59,7 @@ esac
 
 # Get target project path if not provided
 if [ -z "$TARGET_PATH" ]; then
-    read -p "Enter project path to link: " TARGET_PATH
+    read -r -p "Enter project path to link: " TARGET_PATH
 fi
 
 # Remove trailing slash if present
@@ -138,7 +138,7 @@ if [ "$FORCE_MODE" -eq 0 ] && [ -e "$TARGET_PATH/.claude" ]; then
     echo "  [Y] Yes, recreate symbolic links"
     echo "  [N] No, keep existing"
     echo ""
-    read -p "Your choice (Y/N): " UPDATE_CHOICE
+    read -r -p "Your choice (Y/N): " UPDATE_CHOICE
     if [[ "$UPDATE_CHOICE" =~ ^[Yy]$ ]]; then
         FORCE_MODE=1
     fi
@@ -158,6 +158,34 @@ echo ""
 echo "Creating symbolic links to AID..."
 echo "(Changes in AID will automatically apply to this project)"
 echo ""
+
+# T17-40: what was really linked and what was copied, for the summary.
+LINKED_ITEMS=""
+COPIED_ITEMS=""
+
+# make_link <source> <target> <label>: create a symlink and report what it really is.
+# WHY: Git Bash's `ln -s` copies by default (MSYS without winsymlinks) and still exits 0,
+# so the old "[LINK]" line was printed for a copy that never sees an AID update. On Git
+# Bash a native link is tried first; afterwards `[ -L ]` decides the label.
+make_link() {
+    local source="$1" target="$2" label="$3"
+    case "$(uname -s 2>/dev/null)" in
+        MINGW*|MSYS*)
+            MSYS="${MSYS:+$MSYS }winsymlinks:nativestrict" ln -s "$source" "$target" 2>/dev/null \
+                || ln -s "$source" "$target" 2>/dev/null ;;
+        *)
+            ln -s "$source" "$target" 2>/dev/null ;;
+    esac
+    if [ -L "$target" ]; then
+        echo "  [LINK] $label -> AID"
+        LINKED_ITEMS="$LINKED_ITEMS $label"
+    elif [ -e "$target" ]; then
+        echo "  [COPY] $label (a copy: AID updates will not reach it; re-run link-project after updating AID)"
+        COPIED_ITEMS="$COPIED_ITEMS $label"
+    else
+        echo "  [ERROR] Failed to create symlink for $label"
+    fi
+}
 
 # Function to create symlink for a directory
 create_dir_symlink() {
@@ -179,6 +207,7 @@ create_dir_symlink() {
     # Already linked to AID - no work, and no reason to risk a delete.
     if [ -L "$target" ] && [ "$(readlink "$target")" = "$source" ]; then
         echo "  [SKIP] $name already linked to AID"
+        LINKED_ITEMS="$LINKED_ITEMS .claude/$name"
         return 0
     fi
 
@@ -189,11 +218,7 @@ create_dir_symlink() {
 
     # Create symlink if doesn't exist
     if [ ! -e "$target" ]; then
-        if ln -s "$source" "$target" 2>/dev/null; then
-            echo "  [LINK] .claude/$name -> AID"
-        else
-            echo "  [ERROR] Failed to create symlink for $name"
-        fi
+        make_link "$source" "$target" ".claude/$name"
     else
         echo "  [SKIP] $name already exists"
     fi
@@ -220,11 +245,7 @@ if [ "$FORCE_MODE" -eq 1 ] && [ -e "$TARGET_PATH/CLAUDE.md" ]; then
 fi
 
 if [ ! -e "$TARGET_PATH/CLAUDE.md" ]; then
-    if ln -s "$AID_PATH/CLAUDE.md" "$TARGET_PATH/CLAUDE.md" 2>/dev/null; then
-        echo "  [LINK] CLAUDE.md -> AID"
-    else
-        echo "  [ERROR] Failed to create symlink for CLAUDE.md"
-    fi
+    make_link "$AID_PATH/CLAUDE.md" "$TARGET_PATH/CLAUDE.md" "CLAUDE.md"
 else
     echo "  [SKIP] CLAUDE.md already exists"
 fi
@@ -340,14 +361,12 @@ if [ ! -f "$TARGET_PATH/.mcp.json" ]; then
 else
     echo "  [SKIP] .mcp.json already exists (kept; tokens come from environment variables / OS keystore, not this file)"
 fi
-# .mcp.json is per-user config; keep it out of the project's git history even if
-# someone pastes a token into it. Idempotent: only appends when no exact line exists.
-if ! grep -qxF '.mcp.json' "$TARGET_PATH/.gitignore" 2>/dev/null; then
-    if [ -s "$TARGET_PATH/.gitignore" ] && [ -n "$(tail -c1 "$TARGET_PATH/.gitignore")" ]; then
-        echo "" >> "$TARGET_PATH/.gitignore"
-    fi
-    echo ".mcp.json" >> "$TARGET_PATH/.gitignore"
-    echo "  [OK] .mcp.json added to .gitignore"
+# .mcp.json is per-user config (keep it out of git even if someone pastes a token into it)
+# and .aid/audit/ is the hook audit log. T17 I-26: the one helper, shared with
+# link-project.bat, adds a line only when no existing line equals it (a trailing CR, spaces
+# and tabs ignored), in the file's own line ending, so any mix of sh/bat runs adds it once.
+if ! node "$AID_NATIVE/scripts/ensure-gitignore.mjs" "$TARGET_NATIVE" ".mcp.json" ".aid/audit/"; then
+    echo "  [WARNING] .gitignore was not updated: add .mcp.json and .aid/audit/ to it yourself"
 fi
 
 #============================================
@@ -360,14 +379,19 @@ echo "========================================"
 echo ""
 echo "Target: $TARGET_PATH"
 echo ""
-echo "Symbolic links (auto-update from AID):"
-echo "  .claude/commands/   -> AID"
-echo "  .claude/skills/     -> AID"
-echo "  .claude/agents/     -> AID"
-echo "  .claude/references/ -> AID"
-echo "  .claude/rules/      -> AID"
-echo "  .claude/hooks/      -> AID"
-echo "  CLAUDE.md           -> AID"
+count_items() { set -- $1; echo $#; }
+echo "Symbolic links (auto-update from AID): $(count_items "$LINKED_ITEMS")"
+for item in $LINKED_ITEMS; do
+    echo "  $item -> AID"
+done
+if [ -n "$COPIED_ITEMS" ]; then
+    echo "Copies (AID updates will NOT reach them; re-run link-project after updating AID): $(count_items "$COPIED_ITEMS")"
+    for item in $COPIED_ITEMS; do
+        echo "  $item"
+    done
+    echo "  To get real links on Windows, enable Developer Mode (or run Git Bash as administrator)"
+    echo "  and run link-project again, or use link-project.bat (junctions)."
+fi
 echo ""
 echo "Project-specific (not linked):"
 echo "  .claude/settings.json - Permissions + AID hooks (phase gates)"

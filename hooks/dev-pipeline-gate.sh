@@ -50,9 +50,10 @@ case "$_sha_probe" in *'"stop_hook_active":true'*) exit 0 ;; esac
 ROOT="${CLAUDE_PROJECT_DIR:-}"
 [ -n "$ROOT" ] && [ ! -d "$ROOT" ] && ROOT=""
 [ -z "$ROOT" ] && ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+# T17 I-18 (F3): bytes in and out as UTF-8, whatever the console code page (a non-ASCII cwd).
 [ -z "$ROOT" ] && ROOT=$(printf '%s' "$input" | python -c 'import json,sys
-try: print((json.load(sys.stdin).get("cwd") or ""))
-except Exception: print("")' 2>/dev/null)
+try: sys.stdout.buffer.write((json.loads(sys.stdin.buffer.read().decode("utf-8-sig")).get("cwd") or "").encode("utf-8"))
+except Exception: pass' 2>/dev/null)
 [ -n "$ROOT" ] && cd "$ROOT" 2>/dev/null || exit 0
 
 # Is git usable HERE? Not a reason to quit — only a choice of where the changed-file list comes from.
@@ -216,8 +217,10 @@ _edited_this_session() {
   printf '%s' "$input" | python -c '
 import json, os, sys
 try:
-    d = json.load(sys.stdin)
+    d = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))   # T17 I-18
 except Exception:
+    raise SystemExit(0)
+if not isinstance(d, dict):
     raise SystemExit(0)
 tp = d.get("transcript_path") or ""
 if not tp or not os.path.isfile(tp):
@@ -266,7 +269,7 @@ try:
                     continue
 except Exception:
     raise SystemExit(0)
-print("\n".join(out))
+sys.stdout.buffer.write(("\n".join(out) + "\n").encode("utf-8") if out else b"")
 ' 2>/dev/null
 }
 

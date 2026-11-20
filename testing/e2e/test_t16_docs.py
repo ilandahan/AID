@@ -377,11 +377,13 @@ def test_t16_35_context_points_to_aid_init_which_creates_context_json():
 def test_t16_36_summary_and_checklist_precede_the_approve_call():
     t = read("commands/phase-approve.md")
     f = " ".join(t.split())
-    assert "Before any Bash call, print `## Phase N Summary` and `## Phase N Checklist`" in f
+    # T17 (owner 2026-11-20): T17-27 runs the read-only `checklist` call first, so the
+    # summary must precede the approve call, not every Bash call.
+    assert "Before the `approve` call, print `## Phase N Summary` and `## Phase N Checklist`" in f
     assert "You MUST show both sections" in f
     call = t.index('aid_session.py" approve')
     assert t.index("## Phase N Summary") < call and t.index("## Phase N Checklist") < call
-    assert "Display Phase Summary (MANDATORY)" in t and "Show Checklist (MANDATORY)" in t
+    assert "Display Phase Summary and Checklist (MANDATORY)" in t
 
 
 # --- T16-37: one PRD / tech-spec naming scheme --------------------------------------------
@@ -530,7 +532,7 @@ def test_t16_40_aid_status_anchor_resolves():
         assert anchor in anchors(target), (target, anchor)
 
 
-# --- T16-41: "39 sub-agents (7 read-only reviewers)" --------------------------------------
+# --- T16-41: "39 sub-agents (7 reviewers ...)" --------------------------------------------
 
 def test_t16_41_sub_agent_wording():
     plugin = json.loads(read(".claude-plugin/plugin.json"))
@@ -539,7 +541,8 @@ def test_t16_41_sub_agent_wording():
     for name, text in (("plugin.json", plugin["description"]),
                        ("marketplace.json", market["plugins"][0]["description"]),
                        ("llm.txt:4", llm)):
-        assert "39 sub-agents (7 read-only reviewers)" in text, name
+        # T17 (owner 2026-11-20): I-25 wording replaces "read-only reviewers".
+        assert "39 sub-agents (7 reviewers that cannot write files with the Write, Edit or Bash tools" in text, name
     for rel in (".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", "llm.txt",
                 "README.md", "docs/SECURITY-MODEL.md"):
         assert "review sub-agents" not in read(rel), rel

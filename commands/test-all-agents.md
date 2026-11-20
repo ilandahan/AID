@@ -118,6 +118,7 @@ Reports saved to:
 
 ### qa-validator-agent
 - Checks ALL criteria types
+- Returns only PASS or FAIL: a missed best practice is a `warnings` entry, not a FAIL
 - Provides file:line references
 - Returns correct PASS/FAIL verdicts
 - Handles edge cases

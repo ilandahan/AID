@@ -65,7 +65,7 @@ Create a new project folder, set up for the AID methodology, in the current dire
 │   ├── integration/
 │   └── e2e/
 ├── .env.example            # Non-secret settings only
-├── .gitignore
+├── .gitignore              # Includes .aid/audit/ (the hook audit log)
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -91,8 +91,16 @@ prompt in that mode.
 The script:
 1. Creates the folder tree above.
 2. Links AID's `.claude/`, `CLAUDE.md` and `skills/` into the project (or copies them).
-3. Runs `git init` and a first commit (unless `--no-git`).
-4. Runs `npm install` (unless `--no-deps`). This is the one place AID uses
+   In `--copy` mode (also used automatically when links fail) it then registers the
+   plugin's hooks in the project's `.claude/settings.json` with `scripts/link-settings.mjs`,
+   as link-project does, so the copied project gets the phase gates. That step needs
+   `node`; without it the script prints a warning with the exact command to run, for
+   example `node "<AID>/scripts/link-settings.mjs" "<project>" "<AID>"`.
+3. Writes a `.gitignore` that already ignores `.aid/audit/` (the hook audit log). The other
+   AID patterns are in AID's `.claude/templates/gitignore-aid-patterns.txt`; add the ones you
+   want yourself.
+4. Runs `git init` and a first commit (unless `--no-git`).
+5. Runs `npm install` (unless `--no-deps`). This is the one place AID uses
    `npm install` instead of `npm ci`: a new project has no lockfile yet.
 
 ## After Creation

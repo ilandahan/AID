@@ -37,6 +37,13 @@ Checked against the embedded files (`PAYLOAD.lock.json` pins them).
   on Windows by starting a hidden PowerShell with an encoded command, on macOS `osascript`,
   on Linux `notify-send`. Security tools may flag the encoded PowerShell.
 - **No network calls** of its own; the calendar fetch goes through Claude's connectors.
+- **`mark.mjs` in AID projects: you type it with `!`.** breather's session-start text asks
+  Claude to run `mark.mjs` (for example `ack` after it has shown the day's notice). In an AID
+  project the phase gate refuses that command to Claude in every phase and level, because it
+  runs a file under `~/.claude/hooks` (a control path). So in an AID project type it
+  yourself, with the leading `!`: `! node ~/.claude/hooks/breather/mark.mjs ack` (and
+  likewise `resumed`, `snooze <minutes>` or `skip`). The vendored payload is unchanged
+  (`PAYLOAD.lock.json` still pins it); only this instruction differs in AID projects.
 
 To keep all of this off, do not install breather, or remove it with `/breather-stop`
 (uninstall) or `node install.mjs --uninstall`.

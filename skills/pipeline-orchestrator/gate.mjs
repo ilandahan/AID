@@ -13,6 +13,8 @@
 //
 // Usage:
 //   node gate.mjs --step CODE_REVIEW --scores '{"overall":9.6,...}' [--root <repo>] [--dry-run]
+//                 [--usage '{"input_tokens":N,"output_tokens":M}']   # T17-20: recorded in cost
+//                 (without --usage the 4000/2000 estimate is recorded, marked estimated)
 //   node gate.mjs --check-escalation [--root <repo>]     # exit 2 if one is open
 //   node gate.mjs --resolve "<how it was resolved>" [--root <repo>]   # the USER runs this, as a `!`
 //                                                                     # line; an agent never does (E4)
@@ -199,10 +201,13 @@ export function logLoopEvent(payload, root = process.cwd()) {
  * agent must count toward is decorative. Now the gate increments on FIX and appends a step_history
  * row for every non-ERROR decision. Never fatal: a bookkeeping failure must not change the exit code.
  */
-export function recordDecision(root, { step, decision, scores }) {
+export function recordDecision(root, { step, decision, scores, review = null }) {
   try {
     const statePath = join(root, ".aid/pipeline/state.json");
     const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : {};
+    // T17-20 (I-23, G5-X1): the review result and its cost are written by the gate, in this same
+    // write, never by an agent. `review` is null for steps that are not scored reviews.
+    if (review) applyReview(state, { step, decision, ...review });
     const counter = STEP_CONFIG[step]?.counter;
     state.iterations ??= {};
     if (decision.result === "FIX" && counter) {
@@ -244,6 +249,79 @@ export function recordDecision(root, { step, decision, scores }) {
   } catch {
     return null; // bookkeeping must never become a new failure mode for the gate
   }
+}
+
+// T17-20 (I-23): the documented per-review estimate, used when the caller has no real usage.
+export const ESTIMATED_USAGE = { input_tokens: 4000, output_tokens: 2000 };
+
+/**
+ * Parse `--usage '{"input_tokens":N,"output_tokens":M}'`. Returns { usage, estimated } or
+ * { error }. Absent -> the documented estimate, marked estimated. A non-object, a missing or
+ * negative or non-integer count is an error (exit 3, nothing written).
+ */
+export function parseUsage(raw) {
+  if (raw === undefined) return { usage: { ...ESTIMATED_USAGE }, estimated: true };
+  let u;
+  try {
+    u = JSON.parse(raw);
+  } catch (err) {
+    return { error: `--usage is not JSON: ${err.message}` };
+  }
+  if (!u || typeof u !== "object" || Array.isArray(u)) return { error: "--usage must be a JSON object" };
+  const out = {};
+  for (const k of ["input_tokens", "output_tokens"]) {
+    const v = u[k];
+    if (!Number.isInteger(v) || v < 0) {
+      return { error: `--usage.${k} must be a non-negative integer (got ${JSON.stringify(v)})` };
+    }
+    out[k] = v;
+  }
+  return { usage: out, estimated: false };
+}
+
+/** Pricing from the project config's cost_limits.pricing, else config.default.json's. */
+export function pricingFor(config) {
+  const ok = (p) => p && Number.isFinite(p.input_per_mtok) && Number.isFinite(p.output_per_mtok);
+  if (ok(config?.cost_limits?.pricing)) return config.cost_limits.pricing;
+  try {
+    const def = JSON.parse(readFileSync(join(dirname(GATE_PATH), "config.default.json"), "utf8"));
+    if (ok(def?.cost_limits?.pricing)) return def.cost_limits.pricing;
+  } catch {
+    // fall through
+  }
+  return { input_per_mtok: 5, output_per_mtok: 25 };
+}
+
+/** I-23: last_review_result and the accumulated cost, applied to a state object in place. */
+export function applyReview(state, { step, decision, usage, estimated, pricing }) {
+  const now = new Date().toISOString();
+  state.last_review_result = {
+    step,
+    result: decision.result,
+    overall: decision.overall ?? null,
+    threshold: decision.threshold ?? null,
+    round: (decision.iterationsUsed ?? 0) + 1,
+    timestamp: now,
+  };
+  const n = usage.input_tokens;
+  const m = usage.output_tokens;
+  const usd = (n / 1e6) * pricing.input_per_mtok + (m / 1e6) * pricing.output_per_mtok;
+  const cost = state.cost && typeof state.cost === "object" && !Array.isArray(state.cost) ? state.cost : {};
+  const num = (v) => (Number.isFinite(v) ? v : 0);
+  cost.total_input_tokens = num(cost.total_input_tokens) + n;
+  cost.total_output_tokens = num(cost.total_output_tokens) + m;
+  cost.estimated_cost_usd = num(cost.estimated_cost_usd) + usd;
+  cost.per_step = cost.per_step && typeof cost.per_step === "object" ? cost.per_step : {};
+  const prev = cost.per_step[step] && typeof cost.per_step[step] === "object" ? cost.per_step[step] : {};
+  cost.per_step[step] = {
+    input_tokens: num(prev.input_tokens) + n,
+    output_tokens: num(prev.output_tokens) + m,
+    cost_usd: num(prev.cost_usd) + usd,
+    timestamp: now,
+    estimated: prev.estimated === true || estimated === true,
+  };
+  state.cost = cost;
+  return state;
 }
 
 const ESCALATION_FILE = ".aid/pipeline/ESCALATION.json";
@@ -738,6 +816,12 @@ function main() {
     console.error(`gate: --scores is not JSON: ${err.message}`);
     process.exit(3);
   }
+  // T17-20 (I-23): validated before anything is written; a bad --usage is a usage error.
+  const usageArg = parseUsage(arg("usage"));
+  if (usageArg.error) {
+    console.error(`gate: ${usageArg.error}`);
+    process.exit(3);
+  }
 
   // C5: a second independent review of the same diff. Merged HERE, in code, rather than by the
   // orchestrator: the orchestrator is the party that wants to advance, so asking it to arbitrate two
@@ -801,7 +885,10 @@ function main() {
   // recordDecision is already correct for ERROR with no change: result !== "FIX" so no counter
   // increments, and with no `overall` key the dashboard's pickScore yields NULL, so an ERROR row can
   // never pollute a score average.
-  if (!has("dry-run")) recordDecision(root, { step, decision: d, scores });
+  const review = STEP_CONFIG[step]
+    ? { usage: usageArg.usage, estimated: usageArg.estimated, pricing: pricingFor(config) }
+    : null;
+  if (!has("dry-run")) recordDecision(root, { step, decision: d, scores, review });
   if (d.result === "ERROR") process.exit(3);
 
   if (d.result === "ESCALATE" && !has("dry-run")) {

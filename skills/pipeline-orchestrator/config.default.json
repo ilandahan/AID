@@ -12,7 +12,7 @@
   "test_commands": {
     "unit": "npm test",
     "integration": "npm test -- --testPathPattern=integration",
-    "e2e": "npx playwright test",
+    "e2e": "npx --no-install playwright test",
     "cucumber": "npm run cucumber",
     "coverage": "npm test -- --coverage"
   },

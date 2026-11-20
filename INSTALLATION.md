@@ -203,7 +203,7 @@ Cucumber BDD is automatically installed for executable acceptance criteria:
 
 ```bash
 # Check Cucumber is installed
-npx cucumber-js --version
+npx --no-install cucumber-js --version
 
 # Validate feature files (if any exist)
 npm run cucumber:dry
@@ -271,6 +271,13 @@ link-project.bat C:\path\to\my-project
 ```
 
 **Note**: Windows requires Administrator privileges or Developer Mode enabled for symbolic links.
+`link-project.bat` uses directory junctions, which need neither.
+
+**Git Bash on Windows:** without symlink privilege (Developer Mode off), `ln -s` makes a
+copy. `link-project.sh` then reports each such item as `[COPY]` instead of `[LINK]`, with
+"(a copy: AID updates will not reach it; re-run link-project after updating AID)", and its
+summary lists them under "Copies". Enable Developer Mode and run it again, or use
+`link-project.bat` (junctions), to get real links that auto-update.
 
 ### What Gets Linked vs Copied
 
@@ -283,7 +290,7 @@ link-project.bat C:\path\to\my-project
 | `rules/` | `.claude/rules/` | Linked - auto-updates |
 | `hooks/` | `.claude/hooks/` | Linked - auto-updates |
 | `CLAUDE.md` | `CLAUDE.md` | Linked |
-| `.claude/settings.json` | `.claude/settings.json` | Copied - yours to edit |
+| `.claude/settings.json` | `.claude/settings.json` | Started from AID's file if you have none; AID's hooks merged in by `scripts/link-settings.mjs` (your own keys kept) |
 | `.mcp.json.*` | `.mcp.json` | Copied - reads tokens from env vars, gitignored |
 | - | `.aid/state.json`, `.aid/context.json` | Created per project |
 
@@ -291,9 +298,11 @@ Note the asymmetry: AID's components live at its **repository root**, while the 
 target is your project's `.claude/<name>`. The root layout is what lets the same files
 load as a plugin; `.claude/` is where Claude Code looks in a plain project.
 
-`hooks/` must be linked because the copied `settings.json` registers its hooks by the
-path `.claude/hooks/*`. Without the link, every linked project gets a settings file
-pointing at scripts that are not there.
+The linked project's hooks are merged into its `.claude/settings.json` by
+`scripts/link-settings.mjs`: it reads the hooks registered in `.claude-plugin/plugin.json`
+and writes each one with the AID install's absolute path (`<AID>/hooks/hook-runner.mjs`),
+replacing any legacy `.claude/hooks/*` shell entry. `hooks/` is still linked so the folder
+layout matches the plugin, but the registered hooks do not depend on that link.
 
 **Upgrading a clone from before 3.0:** run `./install.sh` once. It recreates `.claude/*`
 as links to the new root directories, so projects you have already linked keep working
@@ -404,8 +413,8 @@ MCP (Model Context Protocol) connects Claude to external tools.
 
 2. Do **not** edit tokens into `.mcp.json`. The templates use Claude Code's
    environment-variable expansion (`"ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN:-}"`),
-   so the file holds no secrets. `link-project` also adds `.mcp.json` to the project's
-   `.gitignore`.
+   so the file holds no secrets. `link-project` also adds `.mcp.json` (and `.aid/audit/`,
+   the hook audit log) to the project's `.gitignore`, once.
 3. Store each token once in your OS keystore and export it into the shell you start
    `claude` from. Preference order: SSO/OAuth > OS keystore > environment variable >
    never a plaintext file.

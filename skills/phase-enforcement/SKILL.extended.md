@@ -191,7 +191,7 @@ Claude MUST use the Task tool to spawn the review sub-agent:
 
 ```
 Task tool invocation:
-- subagent_type: "aid:phase-review-agent"   (fallback: "phase-review-agent")
+- subagent_type: "aid:phase-review-agent"   (link-project route only: "phase-review-agent")
 - prompt: [Use appropriate review prompt from above]
 - description: "Phase [N] gate review"
 ```
