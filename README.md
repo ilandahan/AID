@@ -77,6 +77,29 @@ whose script name is hidden in a variable (`python $env:SCRIPT reset`) runs with
 prompt outside AID projects, and in an AID project from Phase 4 on, or at `log` or `warn`.
 See [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md#the-powershell-tool).
 
+**Both install routes register the same gates.** The plugin registers AID's hooks from
+`.claude-plugin/plugin.json`. A clone + `link-project` install registers the same
+SessionStart, PreToolUse and Stop hooks in the project's `.claude/settings.json`, with
+absolute paths to the AID install and the same fail-closed setting (`onFailure: "block"`).
+`link-project.sh` / `link-project.bat` need `node`: without it they exit 1 before writing
+anything. They run `node <AID>/scripts/link-settings.mjs <target> <AID>` to write the hooks,
+and create the project state with `aid_session.py init <role> 0` (`--role`, default `1`);
+with no python they print that command and exit 0 with a warning. `install.sh` and
+`install.bat` no longer create `.aid/state.json`. The gates are identical, but AID's phase
+commands (`/aid-init`, `/aid-start`, `/phase-approve`, `/phase-advance` and the others that
+call `aid_session.py`) need the plugin: they find it through `${CLAUDE_PLUGIN_ROOT}`, which
+a linked project does not have. In a linked project, install the plugin as well, or run
+`! python "<AID>/hooks/aid_session.py" init <role> 0` (and later `approve` / `advance`)
+yourself; see [INSTALLATION.md](INSTALLATION.md#which-install-should-i-use).
+Fail-closed PreToolUse gates need Claude Code 2.1.295 or later. A project `.aid/state.json`
+is refused to the write tools and to shell writes in every folder, AID project or not;
+`aid_session.py` (which `/aid-init` and `/aid-start` call, and you confirm) is its only
+writer. That every-folder refusal, like the every-folder asks, needs the plugin: on the
+clone route a folder that is not linked runs no AID hooks. Outside AID projects a shell
+write is refused only when its own text names `.aid/state.json`; one reached through a
+change of folder, a shell `-c` body or interpreter code is not caught there (see
+[What AID does not promise](docs/SECURITY-MODEL.md#what-aid-does-not-promise)).
+
 AID's gates are a guardrail for a cooperating agent, not a sandbox.
 [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md) explains what they guarantee and what they
 do not, and how to add the Claude Code sandbox or managed settings for a hard boundary.
@@ -125,7 +148,7 @@ override-with-reason and the `subagent_review` record in state are all unchanged
 | **Cross-platform line endings** | `.gitattributes` pins `.sh` to LF and `.bat` to CRLF, so a clone on either OS gets working scripts. |
 | **Silent installer** | 50 copy commands ran against a directory removed in v2.1, each suppressing its own failure while reporting "Skills installed". Replaced with a real verification. |
 | **Dead references** | 22 documentation links pointed at files that did not exist. All fixed, and the missing `memory-system` package and `scripts/init-project.sh` were restored. |
-| **Ships as a plugin** | `claude plugin marketplace add ilandahan/AID` then `claude plugin install aid@AID`. No cloning, no symlinks, no Developer Mode on Windows, and `claude plugin update aid` moves every project at once. The clone + `link-project` route still works unchanged. |
+| **Ships as a plugin** | `claude plugin marketplace add ilandahan/AID` then `claude plugin install aid@AID`. No cloning, no symlinks, no Developer Mode on Windows, and `claude plugin update aid` moves every project at once. The clone + `link-project` route still works, and registers the same gates as the plugin (see [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md#both-install-routes-run-the-same-gates)). |
 | **Phase-gate hooks that actually block** | The enforcement dispatcher emitted `decision`/`reason` without `hookEventName`, a shape Claude Code discards - so every gate was read as an allow and never stopped a write. Fixed, and pinned by tests that execute the hook and assert the payload. |
 | **Test suite** | The tests cover destructive-guard behaviour, hook block/allow payload schemas, agent registration, the plugin layout and repository integrity. |
 
@@ -436,7 +459,8 @@ from any server-side data.
 
 The phase rules apply only in AID projects (a folder with `.aid/state.json` or
 `.aid/hooks/config.json`). Some of AID's hooks also act in other folders once the plugin is
-installed:
+installed (on the clone route only linked projects run AID hooks, so a folder that is not
+linked runs none of them):
 
 - **dev-pipeline-gate (Stop)** runs in every git repo. When a turn ends with changed
   source files, it may run the repo's own checkers (for example
@@ -447,7 +471,15 @@ installed:
 - **The Bash gate** asks you before any human-confirmed `aid_session.py` command, the
   breather installer or `scripts/init-project.sh` runs, in every folder, from the Bash and
   the PowerShell tool. It asks only for the exact forms; other spellings of the two scripts
-  are not asked outside AID projects, or from Phase 4 on, or at `log` or `warn`.
+  are not asked outside AID projects, or from Phase 4 on, or at `log` or `warn`. It also
+  asks before the pipeline's `gate.mjs --resolve` runs, in every folder, in its exact form
+  (a non-exact spelling is not caught outside AID projects).
+- **The Write and Bash gates** refuse a write to a project `.aid/state.json` in every folder,
+  AID project or not: from the Write, Edit, MultiEdit and NotebookEdit tools and from Bash
+  and PowerShell commands that name it. Only `aid_session.py` writes it (outside AID
+  projects a name built at run time, or a write reached through a change of folder, a shell
+  `-c` body or interpreter code, is not caught; see
+  [What AID does not promise](docs/SECURITY-MODEL.md#what-aid-does-not-promise)).
 
 See [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md#hooks-that-act-outside-aid-projects).
 
@@ -487,8 +519,9 @@ Never put a token in a file (`.env`, `.mcp.json` or any other). In order of pref
    Use the same pattern with `aid-atlassian` for `ATLASSIAN_API_TOKEN`.
 3. **Environment variable.** The templates read `GITHUB_PERSONAL_ACCESS_TOKEN` and
    `ATLASSIAN_API_TOKEN` through `${VAR}` expansion, so the token lives only in the
-   environment of that shell. `ATLASSIAN_SITE_URL` and `ATLASSIAN_USER_EMAIL` are not
-   secrets; export them directly.
+   environment of that shell. `ATLASSIAN_SITE_NAME` (the subdomain only, `your-company`
+   for `your-company.atlassian.net`) and `ATLASSIAN_USER_EMAIL` are not secrets; export
+   them directly.
 
 See [INSTALLATION.md](INSTALLATION.md#mcp-integrations-setup) for the full table.
 
@@ -607,7 +640,7 @@ going. Low usage is never presented as headroom you should spend.
 | Quiet for 90 minutes | `/breather-stop` → snooze |
 | No more offers today | `/breather-stop` → skip today |
 | Remove it from the machine | `/breather-stop` → uninstall (affects every project, so it confirms first) |
-| Tell it you are back from a break | `node ~/.claude/hooks/breather/mark.mjs resumed` |
+| Tell it you are back from a break | type `! node ~/.claude/hooks/breather/mark.mjs resumed` yourself (in an AID project the gate refuses this command to Claude, because it runs a file under `~/.claude/hooks`) |
 
 Handoffs are written to `.aid/handoff/YYYY-MM-DD-HHMM.md`: where exactly you stopped, what
 you tried and rejected and why, open decisions, and the one concrete next step.
@@ -901,6 +934,7 @@ cd AID
 bash scripts/init-project.sh my-app
 cd my-app
 # The script does not write .aid/state.json: run /aid-start in Claude Code to set it up
+# (needs the plugin; without it run: python "<AID>/hooks/aid_session.py" init <role> 0)
 
 # Every morning
 /good-morning
@@ -1029,9 +1063,10 @@ Three things here are load-bearing and easy to get wrong:
   calibration examples. Each agent is now one self-contained file with its prompt inlined,
   because an agent's working directory is the *user's project* — an external asset path
   resolves against their code, not the plugin.
-- **`.claude/settings.json` stays put.** It is project configuration, not a component, and
-  it is what `link-project` copies into a target. It names hooks as `.claude/hooks/*`,
-  which is correct in a linked project, where `.claude/hooks` points at AID's `hooks/`.
+- **`.claude/settings.json` stays put.** It is project configuration, not a component.
+  `link-project` starts a target's settings from its permissions block, and registers the
+  hooks from `.claude-plugin/plugin.json` (through `scripts/link-settings.mjs`) with absolute
+  paths to this install, so a linked project runs the same gates as the plugin.
 - **Hook commands use `"${CLAUDE_PLUGIN_ROOT}"`, always quoted.** The likely install path
   contains a space; unquoted, the hook splits into two arguments and dies.
 

@@ -3,8 +3,10 @@
 #============================================
 # AID - Link Project Script
 # Creates symbolic links from project to AID
-# Usage: ./link-project.sh [path] [--force|-f]
+# Usage: ./link-project.sh [path] [--force|-f] [--role <name|number>]
 # NOTE: Symbolic links auto-update when AID changes
+# Needs node (registers the AID hooks, T16 I-9) and python (creates the project state
+# through hooks/aid_session.py init, T16 I-10).
 #============================================
 
 echo ""
@@ -22,19 +24,38 @@ echo ""
 # Parse arguments
 FORCE_MODE=0
 TARGET_PATH=""
+# The role `aid_session.py init` starts the project with (a name or a menu number).
+ROLE="1"
 
-for arg in "$@"; do
-    case "$arg" in
+while [ $# -gt 0 ]; do
+    case "$1" in
         --force|-f)
             FORCE_MODE=1
             ;;
+        --role)
+            ROLE="$2"
+            shift
+            ;;
+        --role=*)
+            ROLE="${1#--role=}"
+            ;;
         *)
             if [ -z "$TARGET_PATH" ]; then
-                TARGET_PATH="$arg"
+                TARGET_PATH="$1"
             fi
             ;;
     esac
+    shift
 done
+
+# The role is passed to aid_session.py as one argument and printed in a command line:
+# accept only a plain name or number.
+case "$ROLE" in
+    ""|*[!A-Za-z0-9_-]*)
+        echo "[ERROR] --role must be a role name or menu number (letters, digits, _ and -)"
+        exit 1
+        ;;
+esac
 
 # Get target project path if not provided
 if [ -z "$TARGET_PATH" ]; then
@@ -88,6 +109,28 @@ if [ -n "$HOME_REAL" ] && [ "$TARGET_REAL" = "$HOME_REAL" ]; then
     echo "        Pass a specific project folder instead."
     exit 1
 fi
+
+#============================================
+# node is required (T16 I-9)
+# WHY: the hooks registered in the project's .claude/settings.json run `node`. A project
+# linked with gates that cannot run would look protected and not be. Stop before
+# anything is written.
+#============================================
+if ! command -v node >/dev/null 2>&1 || ! node -e "" >/dev/null 2>&1; then
+    echo "[ERROR] node was not found on PATH."
+    echo "        AID's phase gates run with node; install Node.js and run link-project again."
+    echo "        Nothing was changed in: $TARGET_PATH"
+    exit 1
+fi
+
+# Native (C:/...) form of a path for node and python under Git Bash; unchanged elsewhere.
+native_path() {
+    if command -v cygpath >/dev/null 2>&1; then
+        cygpath -m "$1"
+    else
+        printf '%s\n' "$1"
+    fi
+}
 
 # Check for existing links and ask to update
 if [ "$FORCE_MODE" -eq 0 ] && [ -e "$TARGET_PATH/.claude" ]; then
@@ -192,14 +235,15 @@ fi
 echo ""
 echo "Copying project-specific files..."
 
-# Copy settings.json template (project may customize)
-if [ ! -f "$TARGET_PATH/.claude/settings.json" ]; then
-    if [ -f "$AID_PATH/.claude/settings.json" ]; then
-        cp "$AID_PATH/.claude/settings.json" "$TARGET_PATH/.claude/settings.json"
-        echo "  [COPY] .claude/settings.json (customize as needed)"
-    fi
-else
-    echo "  [SKIP] settings.json already exists"
+# Register the AID hooks in the project's settings.json (T16 I-9). The ONE generator is
+# scripts/link-settings.mjs: it reads .claude-plugin/plugin.json, keeps the user's own keys
+# and hooks, and leaves an unparseable file untouched (and fails).
+TARGET_NATIVE="$(native_path "$TARGET_REAL")"
+AID_NATIVE="$(native_path "$AID_REAL")"
+if ! node "$AID_NATIVE/scripts/link-settings.mjs" "$TARGET_NATIVE" "$AID_NATIVE"; then
+    echo "  [ERROR] .claude/settings.json was not updated: the AID hooks are NOT registered."
+    echo "          Fix the problem above and run link-project again."
+    exit 1
 fi
 
 #============================================
@@ -210,69 +254,64 @@ echo "Creating project state directory..."
 mkdir -p "$TARGET_PATH/.aid"
 mkdir -p "$TARGET_PATH/.aid/qa"
 
-CURRENT_DATE=$(date '+%Y-%m-%d %H:%M:%S')
-
-# Create state.json if doesn't exist
-if [ ! -f "$TARGET_PATH/.aid/state.json" ]; then
-    cat > "$TARGET_PATH/.aid/state.json" << EOF
-{
-  "\$schema": "aid-state-v1",
-  "version": "1.0",
-  "initialized_at": "$CURRENT_DATE",
-  "last_updated": "$CURRENT_DATE",
-  "current_phase": 0,
-  "phase_name": "Discovery",
-  "phase_approved": false,
-  "current_session": {
-    "active": false,
-    "role": null,
-    "phase": null,
-    "started_at": null,
-    "revision_count": 0
-  },
-  "last_session": {
-    "role": null,
-    "phase": null,
-    "completed_at": null
-  },
-  "statistics": {
-    "total_sessions": 0,
-    "total_feedback_collected": 0,
-    "pending_feedback_count": 0,
-    "last_improvement_run": null,
-    "sessions_since_last_improvement": 0
-  },
-  "notifications": {
-    "improvement_suggested": false,
-    "reason": null
-  }
-}
-EOF
-    echo "  [OK] state.json created"
-else
+# The project state is created ONLY by hooks/aid_session.py (T16 I-10, E3): this script
+# runs its `init`, with cwd and CLAUDE_PROJECT_DIR = the target, and never writes
+# state.json or context.json itself. init also creates .aid/context.json.
+INIT_SCRIPT="$AID_NATIVE/hooks/aid_session.py"
+if [ -f "$TARGET_PATH/.aid/state.json" ]; then
     echo "  [SKIP] state.json already exists"
-fi
-
-# Create context.json if doesn't exist
-if [ ! -f "$TARGET_PATH/.aid/context.json" ]; then
-    cat > "$TARGET_PATH/.aid/context.json" << EOF
-{
-  "\$schema": "aid-context-v1",
-  "version": "1.0",
-  "last_updated": "$CURRENT_DATE",
-  "current_task": null,
-  "current_step": null,
-  "progress": {
-    "steps_completed": [],
-    "steps_pending": []
-  },
-  "session_notes": [],
-  "blockers": []
-}
-EOF
-    echo "  [OK] context.json created"
 else
-    echo "  [SKIP] context.json already exists"
+    PYTHON_CMD=""
+    INIT_RC=1
+    for cand in python3 python "py -3"; do
+        # The Windows Store stub exits 9009 instead of running: only a python that
+        # really runs counts. An alias that could not be executed at all (126/127/9009)
+        # wrote nothing, so the next candidate is tried.
+        $cand -c "import sys" >/dev/null 2>&1 || continue
+        PYTHON_CMD="$cand"
+        ( cd "$TARGET_PATH" && CLAUDE_PROJECT_DIR="$TARGET_NATIVE" \
+              $cand "$INIT_SCRIPT" init "$ROLE" 0 )
+        INIT_RC=$?
+        case "$INIT_RC" in
+            126|127|9009) continue ;;
+        esac
+        break
+    done
+    if [ "$INIT_RC" -eq 0 ] && [ -f "$TARGET_PATH/.aid/state.json" ]; then
+        echo "  [OK] state.json created by aid_session.py init"
+    else
+        if [ -z "$PYTHON_CMD" ]; then
+            echo "  [WARNING] No working python found (tried python3, python, py -3)."
+        else
+            echo "  [WARNING] aid_session.py init failed (exit $INIT_RC)."
+        fi
+        # R1-09: init resolves to the nearest AID root above the target (INV-2) and refuses
+        # there, so the printed command would fail the same way. Name that ancestor. A home
+        # folder's .aid (the user-level AID_HOME) is not a project and is skipped.
+        AID_ANCESTOR=""
+        USER_AIDS=" $(native_path "${AID_HOME:-$HOME/.aid}") $(native_path "$HOME/.aid") "
+        d="$(dirname "$TARGET_REAL")"
+        while :; do
+            if [ -f "$d/.aid/state.json" ] || [ -f "$d/.aid/hooks/config.json" ]; then
+                d_aid="$(native_path "$d/.aid")"
+                case "$USER_AIDS" in
+                    *" $d_aid "*) ;;
+                    *) AID_ANCESTOR="$(native_path "$d")"; break ;;
+                esac
+            fi
+            p="$(dirname "$d")"
+            [ "$p" = "$d" ] && break
+            d="$p"
+        done
+        if [ -n "$AID_ANCESTOR" ]; then
+            echo "  [WARNING] The project is inside another AID project: $AID_ANCESTOR"
+            echo "  [WARNING] init uses that project's state and refuses; the command below fails"
+            echo "            the same way until the project is moved out of $AID_ANCESTOR."
+        fi
+        echo "  [WARNING] The project state was NOT created. Run this yourself in the project:"
+        echo "      cd \"$TARGET_NATIVE\""
+        echo "      ${PYTHON_CMD:-python} \"$INIT_SCRIPT\" init $ROLE 0"
+    fi
 fi
 
 #============================================
@@ -299,7 +338,7 @@ if [ ! -f "$TARGET_PATH/.mcp.json" ]; then
         echo "  [ERROR] .mcp.json.mac template not found"
     fi
 else
-    echo "  [SKIP] .mcp.json already exists (preserving your tokens)"
+    echo "  [SKIP] .mcp.json already exists (kept; tokens come from environment variables / OS keystore, not this file)"
 fi
 # .mcp.json is per-user config; keep it out of the project's git history even if
 # someone pastes a token into it. Idempotent: only appends when no exact line exists.
@@ -330,11 +369,11 @@ echo "  .claude/rules/      -> AID"
 echo "  .claude/hooks/      -> AID"
 echo "  CLAUDE.md           -> AID"
 echo ""
-echo "Project-specific (copied):"
-echo "  .claude/settings.json - Permissions"
-echo "  .aid/state.json       - Phase tracking"
-echo "  .aid/context.json     - Work context"
-echo "  .mcp.json             - MCP config (your tokens)"
+echo "Project-specific (not linked):"
+echo "  .claude/settings.json - Permissions + AID hooks (phase gates)"
+echo "  .aid/state.json       - Phase tracking (aid_session.py init)"
+echo "  .aid/context.json     - Work context (aid_session.py init)"
+echo "  .mcp.json             - MCP config (tokens come from environment variables / OS keystore, not this file)"
 echo "  docs/                 - Phase outputs"
 echo ""
 echo "Next steps:"
@@ -345,7 +384,10 @@ echo "2. Open Claude Code in the project:"
 echo "   cd \"$TARGET_PATH\""
 echo "   claude"
 echo ""
-echo "3. Run /aid-start to begin working"
+echo "3. /aid-start, /aid-status, /phase-approve and /phase-advance need the plugin"
+echo "   (claude plugin install aid@AID). Without it, run the session steps yourself"
+echo "   (in Claude Code, with a leading !):"
+echo "   python \"$AID_PATH/hooks/aid_session.py\" status   (also: start, approve, advance)"
 echo ""
 echo "========================================"
 echo ""

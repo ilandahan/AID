@@ -8,18 +8,27 @@ disable-model-invocation: true
 Three levels of "stop". Ask the user which one they want if the request is
 ambiguous (default to the lightest that matches their words):
 
+Snooze and skip run breather's `mark.mjs` under `~/.claude/hooks/`. In an AID project the
+phase gate refuses that command to Claude in every phase (it runs a file under
+`~/.claude/hooks`, a control path), and that rule stays. So do not run these two yourself:
+show the user the line and ask them to type it, with the leading `!`.
+
 ## 1. Snooze — quiet for N minutes
 
-```bash
-node ~/.claude/hooks/breather/mark.mjs snooze 90
+The user types:
+
+```
+! node ~/.claude/hooks/breather/mark.mjs snooze 90
 ```
 
 No offers for the given minutes. Presence tracking continues.
 
 ## 2. Skip today — no more offers until tomorrow
 
-```bash
-node ~/.claude/hooks/breather/mark.mjs skip
+The user types:
+
+```
+! node ~/.claude/hooks/breather/mark.mjs skip
 ```
 
 Day plan questions and offers stop for the rest of the day.

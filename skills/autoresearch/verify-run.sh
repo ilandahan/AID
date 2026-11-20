@@ -17,7 +17,7 @@ echo
 echo "[1] Task Brief frozen (compaction-proof intent)"
 brief=$(ls "$P"/*/brief.md 2>/dev/null | head -1)
 if [ -n "$brief" ]; then
-  ok "brief.md exists: ${brief#$ROOT/}"
+  ok "brief.md exists: ${brief#"$ROOT"/}"
   grep -q "ORIGINAL_REQUEST" "$brief" && ok "has ORIGINAL_REQUEST section" || no "brief.md missing ORIGINAL_REQUEST"
   grep -q "STATED_WHY"       "$brief" && ok "has STATED_WHY section"       || no "brief.md missing STATED_WHY"
   grep -qi "frozen_at"       "$brief" && ok "has frozen_at timestamp"       || wn "brief.md missing frozen_at"
@@ -41,7 +41,7 @@ echo
 
 echo "[3] Autoresearch experiment logs"
 tsv=$(ls "$P"/autoresearch/*/results.tsv 2>/dev/null | head -1)
-if [ -n "$tsv" ]; then ok "results.tsv exists: ${tsv#$ROOT/} ($(($(wc -l < "$tsv")-1)) iteration rows)"
+if [ -n "$tsv" ]; then ok "results.tsv exists: ${tsv#"$ROOT"/} ($(($(wc -l < "$tsv")-1)) iteration rows)"
 else wn "no autoresearch/*/results.tsv (AR loops may not have logged, or ran 0 iters)"; fi
 echo
 
@@ -78,10 +78,10 @@ snapdir=$(ls -d "$P"/autoresearch/*/snapshots 2>/dev/null | head -1)
 if [ -z "$snapdir" ] || [ ! -d "$snapdir" ]; then
   no "no autoresearch/*/snapshots dir — cannot verify snapshot/restore integrity"
 else
-  ok "snapshots dir exists: ${snapdir#$ROOT/}"
+  ok "snapshots dir exists: ${snapdir#"$ROOT"/}"
   baseline=$(ls -d "$snapdir"/000-baseline-* 2>/dev/null | head -1)
   if [ -z "$baseline" ] || [ ! -r "$baseline" ]; then
-    no "no readable 000-baseline-* snapshot under ${snapdir#$ROOT/}"
+    no "no readable 000-baseline-* snapshot under ${snapdir#"$ROOT"/}"
   else
     ok "baseline snapshot present: $(basename "$baseline")"
     # Structural integrity: every pre-edit snapshot tag referenced in results.tsv must still
@@ -113,7 +113,7 @@ else
         mism=0; checked=0
         while IFS= read -r snapf; do
           [ -f "$snapf" ] || continue
-          rel="${snapf#$baseline/}"; cur="$ROOT/$rel"; checked=$((checked+1))
+          rel="${snapf#"$baseline"/}"; cur="$ROOT/$rel"; checked=$((checked+1))
           if [ ! -r "$cur" ]; then
             no "mutable file missing on disk vs baseline: $rel"; mism=$((mism+1))
           elif ! diff -q "$snapf" "$cur" >/dev/null 2>&1; then

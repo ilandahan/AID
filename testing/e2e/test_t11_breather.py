@@ -105,7 +105,9 @@ def test_t11_3_setup_asks_first():
     text = (REPO / "commands" / "setup.md").read_text(encoding="utf-8")
     step = text[text.index("**Offer breather**"):]
     assert "Ask the user first" in step and "default is No" in step
-    assert step.index("Ask the user first") < step.index("node integrations/breather/install.mjs")
+    # T16: setup.md runs the installer by its absolute plugin path (never a relative one).
+    assert step.index("Ask the user first") < \
+        step.index('node "${CLAUDE_PLUGIN_ROOT}/integrations/breather/install.mjs"')
 
 
 def _posix_bash():

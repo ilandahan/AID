@@ -122,9 +122,11 @@ The review follows this checklist:
 
 **Context**:
 - Test path: [TARGET PATH]
-- Read: `skills/test-driven/SKILL.md` for methodology
-- Read: `skills/test-driven/references/anti-patterns.md` for detection signals
-- Read: `skills/test-driven/references/review-checklist.md` for criteria
+- Read: `${CLAUDE_PLUGIN_ROOT}/skills/test-driven/SKILL.md` for methodology
+- Read: `${CLAUDE_PLUGIN_ROOT}/skills/test-driven/references/anti-patterns.md` for detection signals
+- Read: `${CLAUDE_PLUGIN_ROOT}/skills/test-driven/references/review-checklist.md` for criteria
+  (the plugin's own copy: a project-relative `skills/test-driven` path would read the
+  project's files, not AID's)
 
 **Reasoning**:
 - Target <20% mocking (prefer real integration)
@@ -144,7 +146,7 @@ See Output Format section above for detailed structure.
 - Clear verdict with quality score
 
 **Steps**:
-1. Read `skills/test-driven/SKILL.md`
+1. Read `${CLAUDE_PLUGIN_ROOT}/skills/test-driven/SKILL.md`
 2. Read reference files for anti-patterns
 3. List all test files in path
 4. For each file: count mocks, check assertions, evaluate data

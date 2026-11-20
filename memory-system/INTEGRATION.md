@@ -39,7 +39,7 @@ Create/update these in your `slash-commands/` or `commands/` directory:
 
 **`/aid-init.md`**
 ```markdown
-# /aid init
+# /aid-init
 
 Initialize the AID Memory System.
 
@@ -50,12 +50,12 @@ Initialize the AID Memory System.
 4. Sets up feedback directories
 
 ## Implementation
-See: `memory-system/docs/COMMANDS.md#init`
+See: `memory-system/docs/COMMANDS.md#aid-init`
 ```
 
 **`/aid-start.md`**
 ```markdown
-# /aid start
+# /aid-start
 
 Start a new work session.
 
@@ -68,12 +68,12 @@ Start a new work session.
 5. Greet user with context
 
 ## Implementation
-See: `memory-system/docs/AGENT.md#session-start`
+See: `memory-system/docs/AGENT.md#1-session-start-flow`
 ```
 
 **`/aid-end.md`**
 ```markdown
-# /aid end
+# /aid-end
 
 End current phase and collect feedback.
 
@@ -112,7 +112,7 @@ See: `memory-system/docs/IMPROVEMENT-FLOW.md`
 
 **`/aid-status.md`**
 ```markdown
-# /aid status
+# /aid-status
 
 Show current memory system state.
 
@@ -124,12 +124,12 @@ Show current memory system state.
 - Skills loaded
 
 ## Implementation
-See: `memory-system/docs/COMMANDS.md#status`
+See: `memory-system/docs/COMMANDS.md#aid-status`
 ```
 
 **`/aid-memory.md`**
 ```markdown
-# /aid memory [list|stats]
+# /aid-memory [list|stats]
 
 Manage entries in AID's local memory (`$AID_HOME/memory/slots.json`).
 
@@ -213,7 +213,7 @@ aid-repo/
 - [ ] Add memory system section to `CLAUDE.md`
 - [ ] Create slash command files in `commands/`
 - [ ] Update `work_context.json` schema (if used)
-- [ ] Run `/aid init` to test
+- [ ] Run `/aid-init` to test
 - [ ] Commit all changes
 
 ## Files Created by This Package
@@ -222,4 +222,4 @@ aid-repo/
 - `memory-system/` - All 36 files
 
 **At runtime (not in repo):**
-- `~/.aid/` - Created by `/aid init`
+- `~/.aid/` - Created by `/aid-init`

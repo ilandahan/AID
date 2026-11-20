@@ -1,6 +1,6 @@
 # Tech Spec Phase Skill
 
-> **Source**: `../aid-tech-spec/SKILL.md`
+> **Source**: `../../../../aid-tech-spec/SKILL.md`
 >
 > This file is a reference. The main skill definition is in the `.claude/skills/` directory.
 > Use the `/tech-spec` command for technical specification generation.

@@ -40,8 +40,9 @@ _PATTERNS = (
         r"|AIza[0-9A-Za-z_-]{30,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}"
         r"|eyJ[\w-]{8,}\.[\w-]{8,}\.[\w-]{2,})"), None),
     ("token", re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}"), r"\1 [token]"),
-    ("token", re.compile(r"(?i)\b(password|passwd|pwd|secret|api[_-]?key|access[_-]?key|token)"
-                         r"(\s*[:=]\s*)[^\s,;]+"), r"\1\2[token]"),
+    # T16-26 (I-14): a secret NAME may carry a prefix and a suffix (AWS_SECRET_ACCESS_KEY=,
+    # client_secret:, GITHUB_TOKEN=). Applied by _named_secrets (rx None), not by re.sub.
+    ("token", None, None),
     # A quoted path is one unit, spaces and all.
     ("path", re.compile(r"([\"'])(?:[A-Za-z]:[\\/]|\\\\|//|/|~[\w.-]*[\\/]|\$\{?HOME\}?[\\/]"
                         r"|%[A-Za-z]+%[\\/])[^\"'\n]*\1"), r"\1[path]\1"),
@@ -132,6 +133,47 @@ def _name_patterns(names: Iterable[str]):
 _TRAIL = ".,;:!?"
 _CLOSE = {")": "(", "]": "[", "}": "{"}
 
+# T16-26 (I-14). The contract's name rule is
+#   (?i)(?<![A-Za-z0-9])([A-Za-z0-9_.-]*(?:KEYWORDS)[A-Za-z0-9_.-]*)(\s*[:=]\s*)(["']?)[^\s,;"']+\3
+#   -> \1\2\3[token]\3
+# As ONE regex it backtracks cubically on a long run of name characters ("_" * 20000 does not
+# finish), which would break the _MAX_LEN linear-time bound. _named_secrets gives the same
+# matches in linear time: the name is a whole run of name characters (it cannot stop inside one,
+# since the next character must be a separator, and the leftmost start of a run always matches
+# when a later one does), the keyword is checked on that run, then the value is matched.
+_KEYWORD = re.compile(r"(?i)password|passwd|pwd|secret|api[_-]?key|access[_-]?key|private[_-]?key"
+                      r"|token|credential")
+_NAME_SEP = re.compile(r"(?<![A-Za-z0-9_.-])([A-Za-z0-9_.-]+)(\s*[:=]\s*)")
+_VALUE = re.compile(r"([\"']?)[^\s,;\"']+\1")
+# T16-26: a PEM private-key block, through its END line (or the end of the text).
+_PEM = re.compile(r"-----BEGIN ([A-Z0-9 ]*)PRIVATE KEY-----.*?(?:-----END \1PRIVATE KEY-----|\Z)",
+                  re.DOTALL)
+
+
+def _named_secrets(text: str) -> str:
+    out = []
+    pos = 0         # copied up to here
+    at = 0          # search from here
+    while True:
+        m = _NAME_SEP.search(text, at)
+        if not m:
+            break
+        v = _VALUE.match(text, m.end()) if _KEYWORD.search(m.group(1)) else None
+        if v is None:
+            at = m.end(1)
+            continue
+        q = v.group(1)
+        out.append(text[pos:m.end()] + q + "[token]" + q)
+        pos = at = v.end()
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def _url_sub(m) -> str:
+    """T16-32: "[url]" plus the sentence punctuation the URL class swallowed
+    (``see https://x.example/a.`` -> ``see [url].``), as for paths (T15-28)."""
+    return "[url]" + _path_sub(m)[len("[path]"):]
+
 
 def _path_sub(m) -> str:
     """T15-28: "[path]" plus the sentence punctuation the path class swallowed
@@ -155,8 +197,13 @@ def redact(text: Any, names: Optional[Iterable[str]] = None) -> Any:
     if not isinstance(text, str) or not text:
         return text
     out = text if len(text) <= _MAX_LEN else text[:_MAX_LEN] + " [truncated]"
+    out = _PEM.sub("[private-key]", out)
     for label, rx, repl in _PATTERNS:
-        if label == "path" and repl is None:
+        if rx is None:
+            out = _named_secrets(out)
+        elif label == "url" and repl is None:
+            out = rx.sub(_url_sub, out)
+        elif label == "path" and repl is None:
             out = rx.sub(_path_sub, out)
         else:
             out = rx.sub(repl or "[{}]".format(label), out)

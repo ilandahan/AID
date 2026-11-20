@@ -14,11 +14,13 @@ import os
 # Support both relative imports (when used as package) and direct imports (when used standalone)
 try:
     from ..feedback.collector import load_feedback_by_date_range, default_names
+    from ..feedback import collector
     from .patterns import PatternDetector
     from .. import paths
     from ..redact import redact
 except ImportError:
     from feedback.collector import load_feedback_by_date_range, default_names
+    from feedback import collector
     from analysis.patterns import PatternDetector
     import paths
     from redact import redact
@@ -361,6 +363,17 @@ class MemorySyncEngine:
         return log[-limit:]
 
 
+def _mark_processed(entries: List[Dict[str, Any]]) -> List[str]:
+    """T16-29 (g8-improve-stat; I-11): after an APPROVED sync, the pending entries it analysed
+    move to feedback/processed/. Returns their ids (aid_session.py counts them)."""
+    analysed = {e.get("id") for e in entries}
+    done = []
+    for e in collector.load_pending_feedback():
+        if e["id"] in analysed and collector.mark_feedback_processed(e["id"]):
+            done.append(e["id"])
+    return done
+
+
 def sync_memory_from_feedback(days: int = 30, approve: bool = False) -> Dict[str, Any]:
     """
     T8-2: without ``approve`` this is a DRY RUN: it returns the planned (redacted) entries
@@ -369,8 +382,14 @@ def sync_memory_from_feedback(days: int = 30, approve: bool = False) -> Dict[str
     """
     engine = MemorySyncEngine(days=days)
 
+    if approve:
+        result = engine.sync_to_memory() if engine.should_sync() else {
+            "synced": False, "dry_run": False, "planned": [],
+            "reason": "No significant patterns to sync"}
+        result["processed"] = _mark_processed(engine.entries)
+        return result
     if not engine.should_sync():
-        return {"synced": False, "dry_run": not approve, "planned": [],
+        return {"synced": False, "dry_run": True, "planned": [],
                 "reason": "No significant patterns to sync"}
     if not approve:
         planned = engine.plan()

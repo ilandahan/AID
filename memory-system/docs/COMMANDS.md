@@ -8,23 +8,21 @@
 
 | Command | Description |
 |---------|-------------|
-| `/aid init` | Initialize system (first time) |
-| `/aid start [role] [phase]` | Start a work session |
-| `/aid status` | Show current state |
-| `/aid end` | Complete phase, collect feedback |
+| `/aid-init` | Initialize system (first time) |
+| `/aid-start [role] [phase]` | Start a work session |
+| `/aid-status` | Show current state |
+| `/aid-end` | Complete phase, collect feedback |
 | `/aid-improve` | Run improvement analysis |
-| `/aid memory list` | Show AID's local memory entries |
-| `/aid memory stats` | Show memory statistics |
-| `/aid skill view [type]` | View skill content |
-| `/aid skill edit [type]` | Edit skill file |
-| `/aid skill sync` | Sync skills from repo |
+| `/aid-memory list` | Show AID's local memory entries |
+| `/aid-memory stats` | Show memory statistics |
+| `/aid-recommendations` | View and apply queued skill-update proposals |
 | `/aid-reset` | Reset AID runtime data ([details](#reset)) |
 
 ---
 
 ## Initialization
 
-### `/aid init`
+### `/aid-init`
 
 Initializes the AID Memory System for first-time use.
 
@@ -47,22 +45,22 @@ Created:
 • ~/.aid/feedback/ - Feedback directories
 • ~/.aid/metrics/ - Metrics files
 
-Let's begin! Run /aid start [role] [phase]
+Let's begin! Run /aid-start [role] [phase]
 ```
 
 **If already initialized:**
 ```
 ✅ AID Memory System already initialized.
 
-Run /aid status to see current state.
-Run /aid start to begin a session.
+Run /aid-status to see current state.
+Run /aid-start to begin a session.
 ```
 
 ---
 
 ## Session Commands
 
-### `/aid start [role] [phase]`
+### `/aid-start [role] [phase]`
 
 Starts a new work session.
 
@@ -72,10 +70,10 @@ Starts a new work session.
 
 **Examples:**
 ```
-/aid start                    # Interactive - asks for role & phase
-/aid start pm                 # Starts as PM, asks for phase
-/aid start pm discovery       # Starts as PM in Discovery phase
-/aid start dev development    # Starts as Developer in Development phase
+/aid-start                    # Interactive - asks for role & phase
+/aid-start pm                 # Starts as PM, asks for phase
+/aid-start pm discovery       # Starts as PM in Discovery phase
+/aid-start dev development    # Starts as Developer in Development phase
 ```
 
 **Behavior:**
@@ -86,7 +84,7 @@ Starts a new work session.
 
 ---
 
-### `/aid status`
+### `/aid-status`
 
 Shows current session state and statistics.
 
@@ -110,7 +108,7 @@ Statistics:
 
 ---
 
-### `/aid end`
+### `/aid-end`
 
 Completes the current phase and collects feedback.
 
@@ -135,7 +133,7 @@ Runs the improvement analysis sub-agent.
 
 **Requirements:**
 - At least 3 pending feedback items recommended
-- No active session (run `/aid end` first)
+- No active session (run `/aid-end` first)
 
 **Flow:** (see `commands/aid-improve.md` for the exact calls)
 1. Preview: `aid_session.py memory-preview` (writes nothing)
@@ -159,7 +157,7 @@ Runs the improvement analysis sub-agent.
 
 ## Memory Commands
 
-### `/aid memory list`
+### `/aid-memory list`
 
 Shows all AID:* entries in AID's local memory (`$AID_HOME/memory/slots.json`).
 
@@ -182,7 +180,7 @@ Developer:
 
 ---
 
-### `/aid memory stats`
+### `/aid-memory stats`
 
 Shows memory slot allocation and usage statistics.
 
@@ -209,48 +207,20 @@ Promotion Candidates:
 
 ---
 
-## Skill Commands
+## Skill Files
 
-### `/aid skill view [type]`
+There is no skill command. The role and phase skill files are plain files in the plugin;
+read or edit them directly:
 
-Views skill file content.
-
-**Arguments:**
-- `type`: Role name or phase name
-
-**Examples:**
-```
-/aid skill view pm              # View PM role skill
-/aid skill view developer       # View Developer role skill
-/aid skill view discovery       # View Discovery phase skill
-/aid skill view tech-spec       # View Tech Spec phase skill
-```
-
----
-
-### `/aid skill edit [type]`
-
-Opens skill file for editing.
-
-**Arguments:**
-- `type`: Role name or phase name
-
-**Editable files:**
 - `skills/memory-system/references/roles/{role}/QUICK-REFERENCE.md`
 - `skills/memory-system/references/roles/{role}/cumulative.md`
 - `skills/memory-system/references/phases/{phase}/QUICK-REFERENCE.md`
 - `skills/memory-system/references/phases/{phase}/cumulative.md`
 
----
-
-### `/aid skill sync`
-
-Synchronizes skill files from the AID repository.
-
-**What it does:**
-1. Pulls latest SKILL.md files from repo
-2. Preserves local cumulative.md (learned patterns)
-3. Reports any conflicts
+Learnings reach `cumulative.md` through `/aid-improve` or `/aid-recommendations`
+(`aid_session.py memory-apply <id>`, which Claude Code asks you to confirm). New skill
+versions come with an AID update; your `cumulative.md` learnings are in those same files,
+so back them up first (see `MIGRATION.md`).
 
 ---
 
@@ -328,13 +298,7 @@ The system also responds to natural language phrases:
 
 ---
 
-## Command Aliases
+## Command Names
 
-| Full Command | Aliases |
-|--------------|---------|
-| `/aid start` | `/aid s`, `/aid begin` |
-| `/aid status` | `/aid st`, `/aid info` |
-| `/aid end` | `/aid done`, `/aid finish` |
-| `/aid-improve` | `/aid i`, `/aid learn` |
-| `/aid memory list` | `/aid mem`, `/aid m list` |
-| `/aid memory stats` | `/aid m stats` |
+Every command is a separate slash command named `/aid-<name>` (one file in `commands/`).
+There are no aliases, and the name is always joined with a hyphen.

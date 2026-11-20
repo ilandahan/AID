@@ -126,6 +126,9 @@ lerna-debug.log*
 # QA enforcement log (runtime)
 .aid/qa/enforcement.log
 
+# Hook audit log (runtime; written by the phase gates, may hold command text)
+.aid/audit/
+
 # Local Claude settings (user-specific permissions).
 # WHY: this file is per-machine. A tracked allow-list would hand every adopter
 # unprompted Bash(powershell:*) / Bash(curl:*) / Bash(gcloud:*) approval.
@@ -141,6 +144,8 @@ lerna-debug.log*
 # QA validator reports (generated during development). A QA pass is recorded in
 # .aid/state.json by `aid_session.py qa-pass`, never by a file under .aid/qa/.
 .aid/qa/reports/
+# /qa-ship scratch and mutation scripts (T16-38)
+.aid/qa/tmp/
 
 # Pipeline runtime state (per-session, not shared)
 # Defensive: ignore all pipeline runtime files except config
@@ -164,7 +169,8 @@ clean_churn.py
 
 # The two files below are TRACKED TEMPLATES and must hold placeholders only.
 # They sit one character away from the ignored .mcp.json above, which is exactly
-# how a real Atlassian token once got published. Put real values in .mcp.json.
+# how a real Atlassian token once got published. No file holds a real token: tokens are
+# read from environment variables loaded from your OS keystore, never stored in .mcp.json.
 # testing/e2e/test_link_project_guards.py fails the build if a credential-shaped
 # string appears in either of them.
 !.mcp.json.windows

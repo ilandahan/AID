@@ -70,46 +70,13 @@ echo.
 echo [STEP 3/10] Creating project state directory...
 if not exist ".aid" mkdir ".aid"
 
-REM Create state.json if it doesn't exist
+REM .aid\state.json is NOT written here (T16-64, E3): hooks\aid_session.py is its only
+REM writer. /aid-start runs `aid_session.py init`, which the user confirms.
 echo [STEP 4/10] Creating state files...
-if not exist ".aid\state.json" (
-    (
-    echo {
-    echo   "$schema": "aid-state-v1",
-    echo   "version": "1.0",
-    echo   "initialized_at": "%DATE% %TIME%",
-    echo   "last_updated": "%DATE% %TIME%",
-    echo   "current_phase": 0,
-    echo   "phase_name": "Discovery",
-    echo   "phase_approved": false,
-    echo   "current_session": {
-    echo     "active": false,
-    echo     "role": null,
-    echo     "phase": null,
-    echo     "started_at": null,
-    echo     "revision_count": 0
-    echo   },
-    echo   "last_session": {
-    echo     "role": null,
-    echo     "phase": null,
-    echo     "completed_at": null
-    echo   },
-    echo   "statistics": {
-    echo     "total_sessions": 0,
-    echo     "total_feedback_collected": 0,
-    echo     "pending_feedback_count": 0,
-    echo     "last_improvement_run": null,
-    echo     "sessions_since_last_improvement": 0
-    echo   },
-    echo   "notifications": {
-    echo     "improvement_suggested": false,
-    echo     "reason": null
-    echo   }
-    echo }
-    ) > ".aid\state.json"
-    echo [OK] State file created
-) else (
+if exist ".aid\state.json" (
     echo [OK] State file already exists
+) else (
+    echo [INFO] State file: created by /aid-start - aid_session.py init - not by the installer
 )
 
 REM Create context.json if it doesn't exist
@@ -160,7 +127,7 @@ if not exist ".mcp.json" (
         echo.
         echo   NOTE: .mcp.json reads tokens from environment variables. Do NOT paste
         echo   tokens into it. Set them from Windows Credential Manager - see INSTALLATION.md:
-        echo     - ATLASSIAN_SITE_URL, ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN for Jira/Confluence
+        echo     - ATLASSIAN_SITE_NAME - subdomain only, ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN for Jira/Confluence
         echo     - GITHUB_PERSONAL_ACCESS_TOKEN for GitHub
     ) else (
         echo [ERROR] .mcp.json.windows template not found!
@@ -346,7 +313,7 @@ echo.
 echo Next steps:
 echo.
 echo 1. Set your API tokens as environment variables - do not edit them into .mcp.json:
-echo    - ATLASSIAN_SITE_URL, ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (for Jira/Confluence)
+echo    - ATLASSIAN_SITE_NAME (subdomain only), ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (for Jira/Confluence)
 echo    - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)
 echo    Store them in Windows Credential Manager and load them per session - see INSTALLATION.md
 echo.

@@ -226,12 +226,52 @@ def now_iso():
 # Utility: Audit logging
 # ---------------------------------------------------------------------------
 
+_AUDIT_TEXT_KEYS = ("command", "file", "reason", "enforcement_message", "agent_description")
+# T16-15 fallback when memory_system is not importable: the I-14 key rule and the T8 tokens.
+_FALLBACK_SECRETS = (
+    (re.compile(r"(?i)((?:password|passwd|pwd|secret|api[_-]?key|access[_-]?key|private[_-]?key"
+                r"|token|credential)[A-Za-z0-9_.-]*\s*[:=]\s*)([\"']?)[^\s,;\"']+\2"), r"\1\2[token]\2"),
+    (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{16,}"
+                r"|(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{10,}|glpat-[A-Za-z0-9_-]{16,}|npm_[A-Za-z0-9]{20,}"
+                r"|AIza[0-9A-Za-z_-]{30,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}"
+                r"|eyJ[\w-]{8,}\.[\w-]{8,}\.[\w-]{2,})"), "[token]"),
+    (re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}"), r"\1 [token]"),
+)
+_REDACT = []
+
+
+def audit_redact(text):
+    """T16-15 (audit L17): memory_system.redact.redact (the ONE redactor, INV-1), loaded from
+    the plugin's memory-system/ without its package __init__; else the fallback rules."""
+    if not _REDACT:
+        try:
+            import importlib.util
+            path = Path(__file__).resolve().parent.parent / "memory-system" / "memory_system" / "redact.py"
+            spec = importlib.util.spec_from_file_location("aid_audit_redact", str(path))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _REDACT.append(mod.redact)
+        except Exception:
+            _REDACT.append(None)
+    if _REDACT[0] is not None:
+        try:
+            return _REDACT[0](text)
+        except Exception:
+            pass
+    for rx, repl in _FALLBACK_SECRETS:
+        text = rx.sub(repl, text)
+    return text
+
+
 def audit_log_entry(entry):
     """Append a JSONL entry to the audit log (never in a non-AID project: AC-27).
     A latched root (AC-43) still logs while its .aid/audit exists, but never recreates it."""
     if not aid_in_use() and not (LATCHED and AUDIT_DIR.is_dir()):
         return
     try:
+        for k in _AUDIT_TEXT_KEYS:          # T16-15: never store a secret in the audit log
+            if isinstance(entry.get(k), str):
+                entry[k] = audit_redact(entry[k])
         AUDIT_DIR.mkdir(parents=True, exist_ok=True)
         entry["timestamp"] = now_iso()
         with open(AUDIT_FILE, "a", encoding="utf-8") as f:
@@ -435,6 +475,18 @@ AID_RULES = (
 )
 
 
+def _linked_hint(*subcommands):
+    """R2-A1: Claude Code sets CLAUDE_PLUGIN_ROOT for a plugin's hooks. Without it the hook
+    runs from a link-project install, where the /aid-* commands stop (they need
+    ${CLAUDE_PLUGIN_ROOT}): name the `! python "<AID>/hooks/aid_session.py" ...` lines."""
+    if os.environ.get("CLAUDE_PLUGIN_ROOT"):
+        return ""
+    script = str(aid_guard.SESSION_SCRIPT).replace("\\", "/")
+    return (" This project is linked to AID without the plugin, so the user types these "
+            "instead (typing the line is the user's confirmation): {}.".format(
+                "; ".join('! python "{}" {}'.format(script, s) for s in subcommands)))
+
+
 def handle_session_start(input_data, config):
     """
     Inject current AID phase/role/skills/task into Claude's context.
@@ -454,6 +506,9 @@ def handle_session_start(input_data, config):
     if aid_in_use():
         clear_markers()
         notes.append(AID_RULES)   # T13-4 (A-52): plugin users never load the root CLAUDE.md
+        hint = _linked_hint("approve", "advance")
+        if hint:
+            notes.append("Phase moves (rule 4):" + hint)
         added, err = aid_guard.ensure_permissions(PROJECT_ROOT)   # AC-38ext: config-only roots too
         if added:
             notes.append("AID added {} permission rules (deny, and ask-the-user for phase changes) to .claude/settings.json "
@@ -515,6 +570,7 @@ def handle_session_start(input_data, config):
         say(
             "NOTE: No AID state found (.aid/state.json missing). "
             "Run /aid-start to initialize your AID session with role and phase selection."
+            + _linked_hint("init <role> <phase>")
         )
         return
 
@@ -522,6 +578,7 @@ def handle_session_start(input_data, config):
     if not session.get("active"):
         say(
             "NOTE: No active AID session. Run /aid-start to select your role and phase."
+            + _linked_hint("start <role> <phase>")
         )
         return
 
@@ -575,7 +632,10 @@ def handle_session_start(input_data, config):
         allowed = ", ".join(config["phase_gate_rules"].get("allowed_write_prefixes", []))
         lines.append(
             "\n⚠️ PHASE RESTRICTION: Code writing/execution NOT allowed until Phase {}. "
-            "Allowed write paths: {}".format(min_phase, allowed)
+            "Allowed write paths: {} (except AID control files (.aid/state.json, .aid/hooks/, "
+            "QA markers, pipeline escalation) and Claude Code's executable .claude/ paths; see "
+            "{}/docs/SECURITY-MODEL.md)".format(
+                min_phase, allowed, str(aid_guard.LIVE_ROOT).replace("\\", "/"))
         )
 
     # Check for active pipeline
@@ -770,7 +830,16 @@ def handle_phase_gate_write(input_data, config):
     Refuse writes to AID control files in every phase, and source writes before
     code_write_min_phase. Allowed before then: docs/, .aid/, .claude/, features/,
     testing/, tests/ and Claude Code's own plan files. Rules: aid_guard.write_target_verdict.
+    T16-1 (E2): a project .aid/state.json is refused first, in EVERY folder.
+    T16-4: an existing .aid/pipeline/config.json is asked (it holds the pass thresholds).
     """
+    raw_input = input_data.get("tool_input")
+    for k in ("file_path", "notebook_path"):
+        p = raw_input.get(k) if isinstance(raw_input, dict) else None
+        if aid_guard.write_tool_state_target(p, gate_cwd(input_data)):
+            enforce("block", aid_guard.state_file_reason(p), {
+                "event": "PreToolUse", "hook": "phase_gate_write",
+                "tool": input_data.get("tool_name", "Write"), "file": p[:300], "violation": True})
     if not aid_in_use() and not LATCHED:
         output_allow()  # AID not used in this project -- stay out of the way
         return
@@ -794,6 +863,15 @@ def handle_phase_gate_write(input_data, config):
             file_path = p
             break
     if not reason:
+        cfg = os.path.realpath(str(PROJECT_ROOT / ".aid" / "pipeline" / "config.json"))
+        for p in paths:
+            n = aid_guard.normalize(p, gate_cwd(input_data), literal=True) if p else None
+            if n == aid_guard._key(cfg) and os.path.isfile(cfg):
+                audit_log_entry({"event": "PreToolUse", "hook": "phase_gate_write",
+                                 "tool": input_data.get("tool_name", "Write"), "file": p[:300],
+                                 "ask": True})
+                output_ask("AID asks before .aid/pipeline/config.json changes: it holds the "
+                           "pipeline's pass thresholds, so the user must confirm the change.")
         output_allow()
         return
 
@@ -847,6 +925,14 @@ def handle_phase_gate_bash(input_data, config):
     if isinstance(raw_cmd, str) and raw_cmd.strip():
         kind, why = aid_guard.session_ask_verdict(raw_cmd, str(PROJECT_ROOT),
                                                   powershell=tool_name == "PowerShell")
+        # T16-2 (E2): a write to a project .aid/state.json, in EVERY folder. T16 B1: outside
+        # AID projects only a command whose text literally names .aid/state.json.
+        state_why = None if kind else aid_guard.state_write_reason(
+            raw_cmd, gate_cwd(input_data), powershell=tool_name == "PowerShell",
+            in_aid=bool(aid_in_use() or LATCHED))
+        if state_why:
+            enforce("block", state_why, {"event": "PreToolUse", "hook": "phase_gate_bash",
+                                         "tool": tool_name, "command": raw_cmd[:200], "violation": True})
     if not aid_in_use() and not LATCHED:
         if kind in ("ask", "foreign"):
             output_ask(why)
@@ -862,6 +948,14 @@ def handle_phase_gate_bash(input_data, config):
         audit_log_entry({"event": "PreToolUse", "hook": "phase_gate_bash", "tool": tool_name,
                          "command": raw_cmd[:200], "ask": True})
         output_ask(why)
+    if kind is None and isinstance(raw_cmd, str) and aid_guard.resolve_denied(
+            raw_cmd, powershell=tool_name == "PowerShell"):
+        # T16-3 (E4, I-13): resolving an escalation is the user's decision, at every level.
+        enforce("block", "Phase gate: '{}' resolves a pipeline escalation, a decision only the "
+                "user makes. Show the user this line to run, and never run it yourself: {}".format(
+                    raw_cmd[:100], aid_guard.resolve_user_line()),
+                {"event": "PreToolUse", "hook": "phase_gate_bash", "tool": tool_name,
+                 "command": raw_cmd[:200], "violation": True})
     state, phase = load_gate_state(config)
 
     command = input_data["tool_input"].get("command") or ""
@@ -908,8 +1002,9 @@ def handle_phase_gate_bash(input_data, config):
     elif phase is not None and phase < min_phase:
         message = (
             "Phase gate: '{}' — {}. Phase {} ({}); running code needs Phase {} (Development). "
-            "Until then Bash runs only read-only commands (ls, cat, grep, git status/log/diff/"
-            "add/commit, mkdir in docs/...). To create or change files use the Write tool. "
+            "Until then Bash runs only read-only commands (ls, cat, grep, git status/log/diff), "
+            "plus git add/commit, which run no project code, and mkdir in docs/... To create or "
+            "change files use the Write tool. "
             "When this phase's work is done, use /gate-check, then /phase-advance. If the "
             "project needs a specific command earlier, ask the user to add it to "
             "phase_gate_rules.extra_allowed_commands in .aid/hooks/config.json.".format(

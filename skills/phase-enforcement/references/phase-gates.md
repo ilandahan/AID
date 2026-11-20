@@ -44,7 +44,7 @@ Detailed requirements for each phase gate in the AID methodology.
 | User Stories | PRD Section 2 | At least 1 story |
 | Acceptance Criteria | PRD Section 3 | Each story has criteria |
 | Non-Functional Requirements | PRD Section 4 | Defined |
-| **Feedback Collected** | `~/.aid/feedback/pending/` | `/aid end` completed |
+| **Feedback Collected** | `~/.aid/feedback/pending/` | `/aid-end` completed |
 
 ### Gate Check Script
 
@@ -72,13 +72,13 @@ Cannot proceed to Phase 2 (Tech Spec) until:
   → Save to: docs/prd/YYYY-MM-DD-[feature].md
 
 □ Feedback collected
-  → Run: /aid end
+  → Run: /aid-end
   → Rate the PRD quality (1-5)
 
 Commands:
   /gate-check  - See detailed status
   /prd         - Create PRD document
-  /aid end     - Complete phase with feedback
+  /aid-end     - Complete phase with feedback
 ```
 
 ---
@@ -99,7 +99,7 @@ Commands:
 | API Specification | Tech Spec Section 5 | Endpoints defined |
 | Security Assessment | Tech Spec Section 2 | Threat model, classification |
 | Database Schema | Tech Spec Section 6 | SQL migrations |
-| **Feedback Collected** | `~/.aid/feedback/pending/` | `/aid end` completed |
+| **Feedback Collected** | `~/.aid/feedback/pending/` | `/aid-end` completed |
 
 ### Security Gate Requirements
 
@@ -247,7 +247,7 @@ function checkGate2(state, feedback) {
 | PRD Coverage | Verification | 100% user stories covered |
 | Tech Spec Coverage | Verification | 100% components covered |
 | Test Strategy | Plan | Test types defined |
-| **Feedback Collected** | `~/.aid/feedback/pending/` | `/aid end` completed |
+| **Feedback Collected** | `~/.aid/feedback/pending/` | `/aid-end` completed |
 
 ### Content Mapping Rules
 
@@ -350,7 +350,7 @@ Use templates from `skills/aid-impl-plan/references/templates/`:
 | E2E Tests | `testing/e2e/` | Tests pass |
 | Coverage Met | CI/CD | >= 70% coverage |
 | Code Reviewed | PR | Approved |
-| **Feedback Collected** | `~/.aid/feedback/pending/` | `/aid end` completed |
+| **Feedback Collected** | `~/.aid/feedback/pending/` | `/aid-end` completed |
 
 > Pipeline runs additionally end with the REALITY_CHECK (AR-3b) stage — eval-harness reality validation of the acceptance verdict — see `pipeline-orchestrator/SKILL.md`.
 
@@ -420,7 +420,7 @@ function checkGate4(state, feedback) {
 | Security Verified | Staging | Pen test passed |
 | Documentation | `docs/` | Updated |
 | Release Notes | `CHANGELOG.md` | Version documented |
-| **Feedback Collected** | `~/.aid/feedback/pending/` | `/aid end` completed |
+| **Feedback Collected** | `~/.aid/feedback/pending/` | `/aid-end` completed |
 
 ---
 
@@ -496,4 +496,4 @@ Proceed with caution - skipped phases may cause issues.
 | `/gate-check` | Show current gate status |
 | `/gate-check --detailed` | Show all requirements |
 | `/phase approve` | Mark gate as passed |
-| `/aid end` | Collect feedback (required for gate) |
+| `/aid-end` | Collect feedback (required for gate) |

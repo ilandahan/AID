@@ -117,7 +117,7 @@ HANDLING:
 MESSAGE:
 "❌ Cannot save {filename}.
 Data kept temporarily in memory.
-Check permissions and try: /aid sync"
+Check permissions and try again: /aid-improve"
 ```
 
 #### E2.3: File Not Found
@@ -151,7 +151,7 @@ HANDLING:
 
 MESSAGE:
 "ℹ️ No active session to end.
-Start a new session with /aid start"
+Start a new session with /aid-start"
 ```
 
 #### E3.2: Concurrent State Modification

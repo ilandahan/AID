@@ -52,7 +52,7 @@ git subtree add --prefix=memory-system https://github.com/[aid-memory-repo] main
 Run the initialization command:
 
 ```
-/aid init
+/aid-init
 ```
 
 This creates `~/.aid/` if it doesn't exist, or updates missing files if it does.
@@ -77,7 +77,7 @@ If you have existing customized skill files:
 cp -r "${CLAUDE_PLUGIN_ROOT}/skills/memory-system/references" ./memory-references.backup
 
 # Run init
-/aid init
+/aid-init
 
 # Merge your customizations back
 # Especially check cumulative.md files
@@ -100,7 +100,7 @@ Look for any existing AID-related entries.
 If you don't have AID:* entries yet:
 
 ```
-/aid init
+/aid-init
 ```
 
 AID's local memory starts empty; entries are added only by `/aid-improve` (`memory-sync`, which you confirm).
@@ -110,7 +110,7 @@ AID's local memory starts empty; entries are added only by `/aid-improve` (`memo
 If you have custom entries you want to keep:
 
 1. Note their line numbers
-2. Run `/aid init`
+2. Run `/aid-init`
 3. Verify they weren't overwritten
 4. Update `~/.aid/metrics/memory-tracking.json` to include them
 
@@ -126,7 +126,7 @@ Add Memory System to your standard workflow:
 ## Updated AID Workflow
 
 ### Phase Start
-1. `/aid start [role] [phase]`
+1. `/aid-start [role] [phase]`
 2. Load relevant skills automatically
 3. Begin work
 
@@ -243,7 +243,7 @@ If your team uses different roles, edit `~/.aid/metrics/memory-tracking.json`:
 
 Each team member runs:
 ```
-/aid init
+/aid-init
 ```
 
 ### Shared Skill Repository
@@ -252,11 +252,11 @@ For teams sharing skill improvements:
 
 1. **Central Repo**: Keep SKILL.md files in git
 2. **Local Cumulative**: Each user's cumulative.md is personal
-3. **Sync Command**: `/aid skill sync` pulls SKILL.md updates
+3. **Updates**: an AID update brings new SKILL.md files (there is no skill sync command)
 
 ### Migration Checklist for Teams
 
-- [ ] Each member runs `/aid init`
+- [ ] Each member runs `/aid-init`
 - [ ] Note: AID's local memory starts empty; entries are added only by `/aid-improve` (`memory-sync`, which you confirm).
 - [ ] Test feedback collection with a sample session
 - [ ] Run first `/aid-improve` cycle
@@ -327,7 +327,7 @@ cp ~/.aid/state.json.backup ~/.aid/state.json
 
 1. Start a test session:
    ```
-   /aid start pm discovery
+   /aid-start pm discovery
    ```
 
 2. Verify skills loaded:
@@ -336,7 +336,7 @@ cp ~/.aid/state.json.backup ~/.aid/state.json
 
 3. End session with feedback:
    ```
-   /aid end
+   /aid-end
    ```
 
 4. Verify feedback created:
@@ -360,12 +360,29 @@ cp ~/.aid/state.json.backup ~/.aid/state.json
 
 1. Check AID's local memory:
    ```
-   /aid memory list
+   /aid-memory list
    ```
 
 2. Verify 20 AID:* entries exist
 
 3. Test memory stats:
    ```
-   /aid memory stats
+   /aid-memory stats
    ```
+
+---
+
+## Recommendation IDs: legacy SHA-1 sunset (T16-33)
+
+Before T15, a queued recommendation's id was SHA-1 of its content cut to 16 hex
+characters. Since T15 it is SHA-256 cut to 32 hex characters.
+
+- Entries queued BEFORE T15 keep their stored 16-hex id. `memory-apply <id>` and
+  `memory-reject <id>` still accept that id, but only for the entry that stores it and only
+  while its content still hashes to it.
+- Every NEW entry gets its SHA-256 id when it is queued, whatever id it came with. A 16-hex
+  id is never accepted for a new entry.
+- Sunset: the legacy id is read-only support for old queues. Apply or reject the old entries
+  (or run `/aid-reset`); once no pre-T15 entry is left in
+  `$AID_HOME/recommendations/`, legacy ids are no longer used, and a later release may drop
+  the SHA-1 check.

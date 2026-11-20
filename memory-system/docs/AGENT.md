@@ -10,10 +10,10 @@
 ### Commands
 | Command | Description |
 |---------|-------------|
-| `/aid init` | Initialize AID system (first time setup) |
-| `/aid start [role] [phase]` | Start a session |
-| `/aid status` | Show current session state |
-| `/aid end` | Complete phase gate, collect feedback |
+| `/aid-init` | Initialize AID system (first time setup) |
+| `/aid-start [role] [phase]` | Start a session |
+| `/aid-status` | Show current session state |
+| `/aid-end` | Complete phase gate, collect feedback |
 | `/aid-improve` | Run improvement analysis (sub-agent) |
 
 ### Roles
@@ -33,12 +33,12 @@
 
 ## 1. Session Start Flow
 
-When user starts a conversation or says `/aid start`:
+When user starts a conversation or says `/aid-start`:
 
 ### Step 1: Check AID Directory
 ```
 IF ~/.aid/ does not exist:
-  → Run /aid init flow
+  → Run /aid-init flow
   → Create directory structure
   → Initialize with defaults
   → Display: "🚀 AID Memory System initialized!"
@@ -77,7 +77,7 @@ IF state.notifications.improvement_suggested == true:
 
 ### Step 4: Determine Role & Phase
 ```
-IF /aid start <role> <phase> provided:
+IF /aid-start <role> <phase> provided:
   → Use provided values
 ELIF state.last_session exists:
   → Suggest: "Continue as {last_role} in {last_phase}?"
@@ -155,7 +155,7 @@ phase_complete_triggers = [
   "ship it", "let's proceed"
 ]
 
-IF message contains phase_complete trigger OR user says /aid end:
+IF message contains phase_complete trigger OR user says /aid-end:
   → Go to Phase Gate Flow
 ```
 
@@ -266,7 +266,7 @@ Continue to next phase? [Yes] [No, done for today]
 
 ---
 
-## 4. Status Command (/aid status)
+## 4. Status Command (/aid-status)
 
 ```
 Display:
@@ -342,7 +342,7 @@ names. So when you condense the user's answers, still leave these out.
 
 ### Missing ~/.aid/ directory
 ```
-→ Run /aid init automatically
+→ Run /aid-init automatically
 → "🚀 AID Memory System initialized! Let's begin."
 ```
 

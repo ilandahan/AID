@@ -37,7 +37,7 @@ Test the phase-review-agent to verify it:
 | Complete Phase 1 | All PRD items | PASS |
 | Missing user stories | PRD without stories | FAIL |
 | Missing security | Tech spec no security | FAIL |
-| Partial deliverables | 80% complete | PARTIAL |
+| Story without acceptance criteria | 1 story has no AC (a critical item) | FAIL |
 
 ## Test Execution
 
@@ -83,17 +83,19 @@ Create deliverables:
 
 Expected: verdict = FAIL, checklist 'Security considerations' = fail
 
-## Test 4: Partial Deliverables (Should PARTIAL)
+## Test 4: Story Without Acceptance Criteria (Should FAIL)
 
 Create deliverables:
 - All required files present ✓
 - 1 user story missing acceptance criteria ✗
 
-Expected: verdict = PARTIAL, suggestions include 'Add AC to Story 3'
+'Each story has acceptance criteria' is a [CRITICAL] item in phase-review-agent's PRD
+checklist, and ANY critical item that fails gives FAIL (its Verdict Rules).
+Expected: verdict = FAIL, blocking_issues include 'Story 3 missing acceptance criteria'
 
 ## Report Format
 
-Generate phase-review-test-report.md with results.
+Generate report.md in the output folder above with results.
 ",
   description: "Test phase review agent"
 )
@@ -110,7 +112,7 @@ Test Results:
   Test 1 (Complete P1):     PASS ✓ (expected PASS)
   Test 2 (Missing Stories): FAIL ✓ (expected FAIL)
   Test 3 (No Security):     FAIL ✓ (expected FAIL)
-  Test 4 (Partial):         PARTIAL ✓ (expected PARTIAL)
+  Test 4 (Story no AC):     FAIL ✓ (expected FAIL)
 
 Checklist Accuracy:
   Required items:    8/8 correctly evaluated ✓

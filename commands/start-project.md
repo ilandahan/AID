@@ -140,7 +140,10 @@ Use `/phase` to see the current phase and `/gate-check` before moving on.
 1. Check the project name: only letters, digits, `.`, `_` and `-`. Otherwise ask for another name.
 2. Run exactly: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/init-project.sh" [PROJECT_NAME] [options]`
    (one command; Claude Code asks the user to confirm it).
-3. Verify the folder tree from "What Gets Created".
+3. Verify the folder tree from "What Gets Created" with single read-only commands, one
+   Bash call each, no loops, no `&&` chains and no `test`/`[ ]` scripts (the phase gate
+   refuses a loop): `ls -A [PROJECT_NAME]`, then `ls -A [PROJECT_NAME]/.aid`, then
+   `ls [PROJECT_NAME]/src`. Compare what they list with the tree above yourself.
 4. Do not create or edit `.aid/state.json`. Tell the user to `cd` into the project,
    start `claude` there and run `/aid-start`.
 

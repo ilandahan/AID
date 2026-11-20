@@ -12,7 +12,7 @@
       "command": "npx",
       "args": ["-y", "@aashari/mcp-server-atlassian-jira@3.3.0"],
       "env": {
-        "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL:-}",
+        "ATLASSIAN_SITE_NAME": "${ATLASSIAN_SITE_NAME:-}",
         "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL:-}",
         "ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN:-}"
       }

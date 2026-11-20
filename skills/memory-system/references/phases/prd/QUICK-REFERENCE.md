@@ -1,6 +1,6 @@
 # PRD Phase Skill
 
-> **Source**: `../aid-prd/SKILL.md`
+> **Source**: `../../../../aid-prd/SKILL.md`
 >
 > This file is a reference. The main skill definition is in the `.claude/skills/` directory.
 > Use the `/prd` command for PRD generation with the full 7-shot prompt.

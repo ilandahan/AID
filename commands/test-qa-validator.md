@@ -118,7 +118,7 @@ Expected: verdict = PASS with warnings, best_practices[0] status = fail
 
 ## Report Format
 
-Generate qa-validator-test-report.md with results table.
+Generate report.md in the output folder above with results table.
 ",
   description: "Test QA validator agent"
 )

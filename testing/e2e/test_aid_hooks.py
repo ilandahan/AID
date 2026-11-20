@@ -22,6 +22,7 @@ Since 3.0.8 (T2) the shipped default is "block" for the two phase gates, "log" o
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -1490,6 +1491,13 @@ def test_t3_5_commands_call_the_script_in_the_gate_form():
         for line in text.splitlines():
             s = line.strip()
             if s.startswith(('python ', 'python3 ', 'py ')) and 'aid_session.py' in s:
+                # T16 (owner 2026-11-19), I-10 / E-R1-3: link-project.md shows the user the line
+                # to type in a terminal for a linked install (no plugin, so no
+                # ${CLAUDE_PLUGIN_ROOT}): python "<AID install>/hooks/aid_session.py" init|status.
+                if f.name == 'link-project.md' and re.match(
+                        r'^python "?(?:<AID-main>|[A-Za-z]:[\\/]|~/)[^"\s]*[\\/]hooks[\\/]aid_session\.py"? '
+                        r'(?:init|status)\b', s):
+                    continue
                 if not s.startswith(('python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py"',
                                      'python "${CLAUDE_PROJECT_DIR}/.claude/hooks/aid_session.py"')):
                     bad.append('{}: {}'.format(f.name, s))
@@ -1814,6 +1822,8 @@ def test_t7_7_qa_gate_from_a_subfolder_uses_the_project_root(clean_tmp):
 def test_t3_ci_every_aid_session_occurrence_is_judged(cmd, refused):
     """WHY (T3 CI on Linux): only the FIRST "aid_session" was judged; when it was a directory
     name the subcommand after the real script was missed and the call was not refused."""
+    # T16 (owner 2026-11-19): fix cycle 1 (R1-01): a later operand that is the session script
+    # keeps HEAD 5f8f199's T3 verdict (T16-14: "every T3 actual-call deny stays").
     assert aid_guard._confirmed_intent(cmd)
     assert bool(aid_guard.confirmed_form_verdict(cmd)) is refused
 

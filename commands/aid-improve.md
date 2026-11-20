@@ -2,7 +2,7 @@
 description: "Run the improvement analysis cycle"
 ---
 
-# /aid improve
+# /aid-improve
 
 Run the improvement analysis cycle.
 
@@ -118,12 +118,12 @@ Every step that runs a command is ONE Bash call, in exactly the shape shown:
 ## Usage
 
 ```
-/aid improve
+/aid-improve
 ```
 
 Force with limited data:
 ```
-/aid improve --force
+/aid-improve --force
 ```
 
 ## Notes

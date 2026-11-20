@@ -1,7 +1,7 @@
 AID - AI Development Methodology for Claude Code
 
 PROJECT OVERVIEW
-AID is a comprehensive framework that transforms raw ideas into production-ready software using Claude Code and AI assistance. It systematizes the entire development journey with structured phases, enforced phase gates, a skills system, 39 review sub-agents, and memory-based learning. Ships as a Claude Code plugin.
+AID is a comprehensive framework that transforms raw ideas into production-ready software using Claude Code and AI assistance. It systematizes the entire development journey with structured phases, enforced phase gates, a skills system, 39 sub-agents (7 read-only reviewers), and memory-based learning. Ships as a Claude Code plugin.
 
 CORE PURPOSE
 Provide a methodical, enforced workflow for building full-stack applications with Claude Code assistance. The methodology stops code being written before the problem is understood, and ensures quality, consistency, and progressive disclosure of work through phase gates.
@@ -193,8 +193,8 @@ CLAUDE.md          - Main AID instructions Claude loads every session
 FILE LOCATIONS
 .aid/state.json - Phase tracking
 .aid/context.json - Work context
-docs/prd/ - Phase 1 outputs (PRD)
-docs/tech-spec/ - Phase 2 outputs (technical specification)
+docs/prd/ - Phase 1 outputs (PRD), named docs/prd/YYYY-MM-DD-<feature>.md
+docs/tech-spec/ - Phase 2 outputs (technical specification), named docs/tech-spec/YYYY-MM-DD-<feature>.md
 docs/implementation-plan/ - Phase 3 outputs (task breakdown)
 docs/research/ - Phase 0 outputs (research reports)
 .mcp.json - MCP server configuration (from .mcp.json.mac / .windows templates)

@@ -203,7 +203,8 @@ def test_t15_18_plan_hook_bootstrap_path_is_the_plugin(tmp_path):
     r = _plan(project)
     ctx = json.loads(r.stdout)['hookSpecificOutput']['additionalContext']
     assert 'USER LEVEL' not in ctx and '.claude/skills' not in ctx, ctx
-    m = re.search(r'BOOTSTRAP it by copying "([^"]+config\.default\.json)"', ctx)
+    # T16-4 flip: a Bash copy to .aid/pipeline/config.json is denied, so the bootstrap is a Write.
+    m = re.search(r'BOOTSTRAP it with the Write tool \(read "([^"]+config\.default\.json)"', ctx)
     assert m and os.path.isfile(m.group(1)), ctx
     assert os.path.normcase(os.path.normpath(m.group(1))) == os.path.normcase(
         os.path.join(SKILL_DIR, 'config.default.json'))

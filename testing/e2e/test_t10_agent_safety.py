@@ -149,10 +149,45 @@ def test_t10_6_aid_session_runs_only_from_the_plugin():
     bad = []
     for d in ("commands", "skills"):
         for p in (REPO / d).rglob("*.md"):
-            for n, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            text = p.read_text(encoding="utf-8", errors="replace")
+            for n, line in enumerate(text.splitlines(), 1):
                 if re.search(r"\bpy(thon3?)?\s+\S*aid_session\.py", line) and "CLAUDE_PLUGIN_ROOT" not in line:
+                    if _linked_install_line(p, text, line):
+                        continue
                     bad.append("{}:{}: {}".format(p.relative_to(REPO), n, line.strip()[:100]))
     assert bad == [], bad
+
+
+# T16 (owner 2026-11-19), I-10 / T16-64: link-project.md (user-only: disable-model-invocation:
+# true, so the agent never runs it) shows the line a user types in a terminal for a linked
+# install, which has no plugin and so no ${CLAUDE_PLUGIN_ROOT}. Same narrow shape as the
+# test_t3_5 exemption in test_aid_hooks.py; every agent-invocable command and skill keeps A-26.
+_LINKED_INSTALL_LINE = re.compile(
+    r'^python "?(?:<AID-main>|[A-Za-z]:[\\/]|~/)[^"\s]*[\\/]hooks[\\/]aid_session\.py"? '
+    r'(?:init|status|start|approve|advance)\b')
+
+
+def _linked_install_line(path, text, line):
+    if path.name != "link-project.md" or path.parent.name != "commands":
+        return False
+    front = text.split("\n---", 1)[0] if text.startswith("---") else ""
+    if not re.search(r"^disable-model-invocation:\s*true\s*$", front, re.M):
+        return False
+    return bool(_LINKED_INSTALL_LINE.match(line.strip()))
+
+
+def test_t16_63_t10_6_exemption_is_narrow():
+    """WHY (R3-04): the link-project.md exemption must not let an agent-invocable file or a
+    project-local script path through A-26."""
+    lp = REPO / "commands" / "link-project.md"
+    text = lp.read_text(encoding="utf-8")
+    ok = 'python "C:/Tools/AID/hooks/aid_session.py" status'
+    assert _linked_install_line(lp, text, ok)
+    assert not _linked_install_line(lp, text, "python hooks/aid_session.py approve")
+    assert not _linked_install_line(lp, text, 'python "<AID-main>/hooks/aid_session.py" jump 1 5')
+    assert not _linked_install_line(REPO / "commands" / "aid-start.md", text, ok)
+    no_flag = text.replace("disable-model-invocation: true", "disable-model-invocation: false", 1)
+    assert not _linked_install_line(lp, no_flag, ok)
 
 
 # Agents allowed to write or run commands, each with its reason (T10-1: exceptions are listed).

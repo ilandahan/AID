@@ -51,6 +51,27 @@ To keep all of this off, do not install breather, or remove it with `/breather-s
 - Slash commands: `/breather-start` (enable), `/breather-stop` (snooze / skip today /
   uninstall)
 
+## Known limits of the pinned installer
+
+Both were reproduced against the pinned `install.mjs` (T16-60). The installer is pinned
+byte for byte (see Integrity below), so AID does not patch it; the fix belongs upstream,
+followed by a re-pin.
+
+- **Uninstall strips by substring.** `--uninstall` (and every re-install, which strips the
+  old entries first) removes every hook command in `~/.claude/settings.json` whose text
+  contains `breather`, and a status line whose command contains it, not only the entries
+  the installer added. A hook of your own such as `node /opt/my-breather-notes.mjs` is
+  removed too. The installer writes a `settings.json.bak-<timestamp>` backup first:
+  restore your own entries from it if needed.
+- **`CLAUDE_HOME` moves the files, not the hook paths.** With `CLAUDE_HOME` set, the files
+  go to `$CLAUDE_HOME/.claude/hooks/breather/` and the settings to
+  `$CLAUDE_HOME/.claude/settings.json`, but the hook and status-line commands it writes are
+  the literal `node ~/.claude/hooks/breather/<file>.mjs`. Unless `$CLAUDE_HOME` is your home
+  directory, those commands point at files that do not exist. Install without
+  `CLAUDE_HOME`, or fix the paths in that `settings.json` by hand.
+- Upstream fix needed (owner action): match only the exact commands the installer writes,
+  and write hook commands from the resolved install directory.
+
 ## Integrity (pinned)
 
 - Source: https://github.com/ilandahan/breather

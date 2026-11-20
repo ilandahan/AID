@@ -30,5 +30,5 @@ jobs:
       - uses: hashgraph-online/ai-plugin-scanner-action@c96833de5070fab4e564010b5ab6e3c3d7e07a3e # v1.2.806
         with:
           plugin_dir: "."
-          min_score: 75
+          min_score: 100
           fail_on_severity: high

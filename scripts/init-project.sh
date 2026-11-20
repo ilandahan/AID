@@ -242,6 +242,15 @@ if [ "$USE_SYMLINKS" = false ]; then
 fi
 
 # Create package.json
+# T16-65 (audit R-06): exact pins, each released at least 14 days before 2026-11-19, chosen
+# so the whole set has no high/critical advisory. Verified 2026-11-19 on a generated project
+# (`--no-git`): `npm install --package-lock-only --ignore-scripts && npm audit --audit-level=high`
+# -> 0 critical, 0 high (18 moderate: glob/minimatch via jest 30's coverage tooling).
+#   next 16.4.5 (2026-11-03), react / react-dom 19.3.1 (2026-10-14),
+#   @types/node 22.20.5, @types/react 19.3.0, @types/react-dom 19.3.0, typescript 5.9.3,
+#   jest 30.5.2, @testing-library/react 16.3.3 (React 19; needs @testing-library/dom),
+#   @testing-library/dom 10.4.2, @testing-library/jest-dom 6.10.0.
+# When you bump one, re-run that audit and update this list.
 log_info "Creating package.json..."
 
 cat > package.json << EOF
@@ -259,18 +268,19 @@ cat > package.json << EOF
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "next": "^14.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "typescript": "^5.0.0",
-    "jest": "^29.7.0",
-    "@testing-library/react": "^14.0.0",
-    "@testing-library/jest-dom": "^6.0.0"
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3",
+    "jest": "30.5.2",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "6.10.0"
   }
 }
 EOF
@@ -445,7 +455,7 @@ Built with [AID (AI Development Methodology)](../AID).
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 20.9+ (Next.js 16)
 - npm
 
 ### Installation
@@ -516,6 +526,11 @@ if [ "$INSTALL_DEPS" = true ]; then
     # yet, so `npm ci` cannot run. `npm install` creates the lockfile; commit it.
     npm install --silent 2>/dev/null || npm install
     log_success "Dependencies installed"
+    # T16-65: report known high/critical advisories in what was just installed. A finding
+    # is a WARNING only: it does not change this script's exit code.
+    if ! npm audit --audit-level=high >/dev/null 2>&1; then
+        log_warning "npm audit reports high/critical advisories in the new project's dependencies. Run 'npm audit' in $(pwd) and update them."
+    fi
 fi
 
 # Print success

@@ -73,7 +73,7 @@ The memory system creates a runtime directory at `~/.aid/` for user-specific dat
 ### 1. Initialize
 
 ```
-/aid init
+/aid-init
 ```
 
 This creates `~/.aid/` and copies skill templates.
@@ -81,7 +81,7 @@ This creates `~/.aid/` and copies skill templates.
 ### 2. Start Session
 
 ```
-/aid start
+/aid-start
 ```
 
 Select your role and phase.
@@ -93,7 +93,7 @@ Claude applies relevant skills automatically.
 ### 4. End Phase
 
 ```
-/aid end
+/aid-end
 ```
 
 Provide feedback on the session (1-5 rating + notes).
@@ -111,15 +111,15 @@ run only after you confirm them.
 
 | Command | Description |
 |---------|-------------|
-| `/aid init` | Initialize memory system |
-| `/aid start` | Start new session |
-| `/aid status` | Show current state |
-| `/aid end` | End phase, collect feedback |
+| `/aid-init` | Initialize memory system |
+| `/aid-start` | Start new session |
+| `/aid-status` | Show current state |
+| `/aid-end` | End phase, collect feedback |
 | `/aid-improve` | Run improvement analysis |
-| `/aid memory list` | Show AID's local memory entries |
-| `/aid memory stats` | Memory usage statistics |
-| `/aid skill view [name]` | View skill content |
-| `/aid reset` | Full system reset |
+| `/aid-memory list` | Show AID's local memory entries |
+| `/aid-memory stats` | Memory usage statistics |
+| `/aid-recommendations` | View and apply queued skill-update proposals |
+| `/aid-reset` | Reset AID runtime data |
 
 ## How It Works
 

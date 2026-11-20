@@ -164,45 +164,12 @@ create_state_files() {
 
     CURRENT_DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
-    # Create state.json if it doesn't exist
-    if [ ! -f ".aid/state.json" ]; then
-        cat > ".aid/state.json" << EOF
-{
-  "\$schema": "aid-state-v1",
-  "version": "1.0",
-  "initialized_at": "$CURRENT_DATE",
-  "last_updated": "$CURRENT_DATE",
-  "current_phase": 0,
-  "phase_name": "Discovery",
-  "phase_approved": false,
-  "current_session": {
-    "active": false,
-    "role": null,
-    "phase": null,
-    "started_at": null,
-    "revision_count": 0
-  },
-  "last_session": {
-    "role": null,
-    "phase": null,
-    "completed_at": null
-  },
-  "statistics": {
-    "total_sessions": 0,
-    "total_feedback_collected": 0,
-    "pending_feedback_count": 0,
-    "last_improvement_run": null,
-    "sessions_since_last_improvement": 0
-  },
-  "notifications": {
-    "improvement_suggested": false,
-    "reason": null
-  }
-}
-EOF
-        log_success "State file created"
-    else
+    # .aid/state.json is NOT written here (T16-64, E3): hooks/aid_session.py is its only
+    # writer. /aid-start runs `aid_session.py init`, which the user confirms.
+    if [ -f ".aid/state.json" ]; then
         log_success "State file already exists"
+    else
+        log_info "State file: created by /aid-start (aid_session.py init), not by the installer"
     fi
 
     # Create context.json if it doesn't exist
@@ -259,7 +226,7 @@ setup_mcp_and_env() {
             echo ""
             echo "  NOTE: .mcp.json reads tokens from environment variables. Do NOT paste"
             echo "  tokens into it. Export them from your OS keystore (see INSTALLATION.md):"
-            echo "    - ATLASSIAN_SITE_URL, ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (Jira/Confluence)"
+            echo "    - ATLASSIAN_SITE_NAME (subdomain only), ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (Jira/Confluence)"
             echo "    - GITHUB_PERSONAL_ACCESS_TOKEN (GitHub)"
         else
             log_error ".mcp.json.mac template not found!"
@@ -514,7 +481,7 @@ print_next_steps() {
     echo "Next steps:"
     echo ""
     echo "1. Export your API tokens as environment variables (do not edit them into .mcp.json):"
-    echo "   - ATLASSIAN_SITE_URL, ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (for Jira/Confluence)"
+    echo "   - ATLASSIAN_SITE_NAME (subdomain only), ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (for Jira/Confluence)"
     echo "   - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)"
     echo "   Load them from your OS keystore, e.g.:"
     echo "     export ATLASSIAN_API_TOKEN=\"\$(security find-generic-password -s aid-atlassian -w)\"   # macOS"

@@ -28,7 +28,7 @@ Detailed guide for the quality feedback collection and improvement system integr
 
 ---
 
-## Feedback Collection (/aid end)
+## Feedback Collection (/aid-end)
 
 ### Purpose
 Collect structured feedback at the end of each phase to enable continuous improvement of skills and methodology.
@@ -37,7 +37,7 @@ Collect structured feedback at the end of each phase to enable continuous improv
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                   /aid end FLOW                              │
+│                   /aid-end FLOW                              │
 │                                                              │
 │  1. Summarize Work                                           │
 │     └── What was accomplished in this phase                  │
@@ -159,7 +159,7 @@ Consider: Test thoroughness, deployment smoothness, documentation
 
 ---
 
-## Feedback Analysis (/aid improve)
+## Feedback Analysis (/aid-improve)
 
 ### Purpose
 Analyze collected feedback to identify patterns and suggest improvements to skills and methodology.
@@ -172,7 +172,7 @@ Analyze collected feedback to identify patterns and suggest improvements to skil
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                /aid improve FLOW                             │
+│                /aid-improve FLOW                             │
 │                                                              │
 │  1. GATHER DATA                                              │
 │     ├── Load ~/.aid/feedback/pending/*.json                  │
@@ -274,7 +274,7 @@ MEMORY CANDIDATES:
 │   ├── pending/           # Unprocessed feedback
 │   │   ├── 2024-12-11T10-00-00.json
 │   │   └── 2024-12-11T15-30-00.json
-│   └── processed/         # Archived after /aid improve
+│   └── processed/         # Archived after /aid-improve
 │       └── batch-2024-12-11.json
 ├── metrics/
 │   └── trends.json        # Aggregated metrics
@@ -351,7 +351,7 @@ Feedback collection is MANDATORY at each phase gate:
 │       ▼                                                      │
 │  Feedback Collected?                                         │
 │       │                                                      │
-│       ├── No ──▶ Prompt: "Run /aid end before advancing"     │
+│       ├── No ──▶ Prompt: "Run /aid-end before advancing"     │
 │       │                                                      │
 │       ▼                                                      │
 │  ✅ Advance to Phase N+1                                     │
@@ -380,7 +380,7 @@ Feedback collection is MANDATORY at each phase gate:
 
 | Command | Description |
 |---------|-------------|
-| `/aid end` | Collect feedback for current phase |
-| `/aid improve` | Run improvement analysis (3+ feedback) |
-| `/aid improve --force` | Run with fewer than 3 feedback items |
-| `/aid status` | Show feedback collection status |
+| `/aid-end` | Collect feedback for current phase |
+| `/aid-improve` | Run improvement analysis (3+ feedback) |
+| `/aid-improve --force` | Run with fewer than 3 feedback items |
+| `/aid-status` | Show feedback collection status |

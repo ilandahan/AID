@@ -1,6 +1,6 @@
 # Tech Lead Role Skill
 
-> **Source**: `../role-tech-lead/SKILL.md`
+> **Source**: `../../../../role-tech-lead/SKILL.md`
 >
 > This file is a reference. The main skill definition is in the `.claude/skills/` directory.
 

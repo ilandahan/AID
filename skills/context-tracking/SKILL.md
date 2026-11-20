@@ -12,7 +12,7 @@ Applies: every session, whenever work starts, a step/task changes, phase changes
 1. READ context before starting work
 2. UPDATE on every significant change
 3. READ phase state from `.aid/state.json` (read-only: only `aid_session.py` writes it)
-4. INTEGRATE with feedback (`/aid end`)
+4. INTEGRATE with feedback (`/aid-end`)
 5. SAVE at conversation end
 
 ## Update Triggers

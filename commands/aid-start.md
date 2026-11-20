@@ -2,7 +2,7 @@
 description: "Start a work session: pick a role and phase, load the matching skills"
 ---
 
-# /aid start
+# /aid-start
 
 Start a new work session with the AID Memory System.
 
@@ -137,13 +137,13 @@ was ever written. `skills_loaded` in state.json is the record of which skills ap
 ## Usage
 
 ```
-/aid start
+/aid-start
 ```
 
 Or with parameters (using role-specific phase names or numbers):
 ```
-/aid start developer 4
-/aid start pm "Product Requirements"
+/aid-start developer 4
+/aid-start pm "Product Requirements"
 ```
 
 ## Quick Reference
@@ -167,5 +167,5 @@ authoritative list.
 - Phase names and descriptions are role-specific
 - Skills are loaded based on role+phase combination
 - Session state persists across conversations
-- Use `/aid status` to check current state
+- Use `/aid-status` to check current state
 - See `memory-system/docs/AGENT.md` for full behavior spec

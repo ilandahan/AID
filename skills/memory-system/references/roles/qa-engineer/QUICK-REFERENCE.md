@@ -1,6 +1,6 @@
 # QA Engineer Role Skill
 
-> **Source**: `../role-qa-engineer/SKILL.md`
+> **Source**: `../../../../role-qa-engineer/SKILL.md`
 >
 > This file is a reference. The main skill definition is in the `.claude/skills/` directory.
 

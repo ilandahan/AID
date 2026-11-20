@@ -69,7 +69,13 @@ PROTECTED_LITERALS = (".aid/hooks", ".aid/integrity", "escalation.json",
 
 # T15-1: .claude/<dir>/ folders Claude Code loads capabilities from (a phase rule, not a
 # control file; .claude/hooks/ is ALSO a control file via PROTECTED_SUFFIXES).
-CLAUDE_CAPABILITY_DIRS = ("skills", "agents", "commands", "output-styles", "rules", "hooks")
+CLAUDE_CAPABILITY_DIRS = ("skills", "agents", "commands", "output-styles", "rules", "hooks",
+                          "workflows", "routines", "agent-memory")      # T16-6 (I-12)
+# T16-6 (I-12): execution-relevant direct children of a project .claude/ (same phase rule).
+CLAUDE_EXEC_FILES = ("launch.json", "scheduled_tasks.json", "loop.md", "claude.md", "agents.md")
+# T16-4: the pipeline's pass thresholds. The Write tools are asked (aid_hooks); a Bash write
+# is refused in every phase (control-file style) by _phase4_check.
+PIPELINE_CONFIG = "/.aid/pipeline/config.json"
 
 # When the cwd is unknown, a relative target with one of these names may be a control file.
 PROTECTED_BASENAMES = {"settings.json", "settings.local.json", "config.json", "escalation.json",
@@ -150,7 +156,26 @@ def _heredoc_bodies(command, i, pending):
     return bodies, i
 
 
-def _lex(command):
+def _arith_cmd(words):
+    """T16-5 (E5): the operands of let / declare -i / typeset -i / local -i are arithmetic."""
+    ws = [w for w in words if not _ASSIGN.match(w)]
+    if not ws:
+        return False
+    return ws[0] == "let" or (ws[0] in ("declare", "typeset", "local")
+                              and any(re.match(r"^[-+][A-Za-z]*i", w) for w in ws[1:]))
+
+
+def _names_session_text(command):
+    """T16-5/T16-7: does the text name aid_session (quotes and backslashes stripped, case-
+    folded), use ANSI-C quoting (which can spell it), or hold a glob/brace word that
+    _may_name_session accepts?"""
+    if "aid_session" in re.sub(r"[\"'`\\\s]", "", command).casefold() or "$'" in command:
+        return True
+    return any(re.search(r"[*?\[{]", t) and not re.search(r"[$`]", t) and _may_name_session(t)
+               for t in re.split(r"[\s\"';&|<>()]+", command) if t)
+
+
+def _lex(command, _brackets=True):
     """
     R2-C1, R3-C1, R3-C2: the simple commands of `command`, split the way the shell does it,
     as dicts {"words", "sep" (what ended it: ; | || & && newline or ""), "bodies" (the
@@ -163,11 +188,16 @@ def _lex(command):
     R4-C1: a `<<` inside arithmetic (`$(( ))`, `(( ))`) is a shift, not a heredoc; a heredoc
     whose delimiter line never appears returns None, like an unterminated quote, so the
     callers fail closed instead of reading the rest of the text as a heredoc body.
+    T16-5 (E5): nor inside `$[ ]`, `${ }`, a `name[ ]=` subscript or the operands of let /
+    declare -i; an unbalanced bracket fails closed only when the text names aid_session,
+    else the text is lexed as before. T16-11: `$( ... )` inside double quotes is read to its
+    matching paren (a heredoc commit message may hold any number of quotes), as lex() does.
     """
     segs, words, cur, has = [], [], [], False
     quote, depth, i, n = None, 0, 0, len(command)
     subs, tick, pending, bodies = [], False, [], []
     arith = []                      # R4-C1: per open paren, is it (inside) arithmetic?
+    brk = []                        # T16-5: open $[ / ${ / name[ brackets (their closers)
     while i < n:
         ch = command[i]
         if quote is None and ch == "#" and (i == 0 or command[i - 1] in " \t\n;&|(") and (
@@ -176,7 +206,8 @@ def _lex(command):
             i = n if nl < 0 else nl
             continue
         if (quote is None and ch == "<" and command[i + 1:i + 2] == "<"
-                and command[i + 2:i + 3] != "<" and not any(arith)):
+                and command[i + 2:i + 3] != "<" and not any(arith) and not brk
+                and not _arith_cmd(words)):
             m = re.match(r"<<(-?)[ \t]*((?:[^\s;&|<>()]|\\.)+)", command[i:])
             if m:
                 if cur or has:
@@ -208,6 +239,16 @@ def _lex(command):
             else:
                 cur.append(ch)
         elif quote in ('"', "$'"):
+            k = None
+            if quote == '"' and ch == "$" and command[i + 1:i + 2] == "(":
+                try:
+                    k = _matching_paren(command, i + 2)         # T16-11
+                except ParseError:
+                    k = None                                    # read it as before
+            if k is not None:
+                cur.append(command[i:k + 1])
+                i = k + 1
+                continue
             if ch == "\\" and i + 1 < n and (quote == "$'" or command[i + 1] in '"\\$`\n'):
                 i += 1
                 cur.append(("\\" if quote == "$'" else "") + command[i])  # $'\x5f' stays unresolved
@@ -250,8 +291,17 @@ def _lex(command):
                 arith = arith[:-1]
             elif ch == "`":
                 tick = not tick
+            elif _brackets and ch in "[{" and (command[i - 1:i] == "$" or brk or (
+                    ch == "[" and not has and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", "".join(cur))
+                    and all(_ASSIGN.match(w) for w in words))):
+                brk.append("]" if ch == "[" else "}")           # T16-5: $[ ${ name[
+            elif brk and ch == brk[-1]:
+                brk.pop()
             cur.append(ch)
         i += 1
+    if brk and quote is None and not pending:
+        # T16-5: an unbalanced bracket: fail closed only when the text names aid_session.
+        return None if _names_session_text(command) else _lex(command, _brackets=False)
     if quote in ("'", '"', "$'") or pending:
         return None         # bash refuses an unterminated quote: nothing runs; R4-C1: a
                             # heredoc that never reaches its delimiter line fails closed
@@ -278,6 +328,19 @@ def _shell_segments(command):
         if k is not None and k != "sh-c":
             for body in s["bodies"]:
                 out.extend(_shell_segments(body) or [])
+    # T16-14: the commands inside $( ... ) and backticks run too (`x="$(python <S> approve)"`).
+    # A body the lexer cannot read fails closed only when it names aid_session.
+    try:
+        subs = lex(command)[1]
+    except ParseError:
+        subs = [command] if "aid_session" in re.sub(r"[\"'`\\\s]", "", command).casefold() else []
+    for body in subs:
+        if body == command:
+            return None
+        got = _shell_segments(body)
+        if got is None and "aid_session" in re.sub(r"[\"'`\\\s]", "", body).casefold():
+            return None
+        out.extend(got or [])
     return out
 
 
@@ -301,13 +364,15 @@ _WRAPPERS = {"timeout", "nice", "ionice", "stdbuf", "winpty", "strace", "ltrace"
 _RUNNERS = {"uv", "poetry", "pipenv", "conda", "mamba", "micromamba", "pdm", "hatch", "rye", "pixi"}
 
 
-def _interpreter_at(words, interp=None, shc=None):
+def _interpreter_at(words, interp=None, shc=None, dyn=True):
     """R2-C1: (index of the command word if it is, or may be, an interpreter matching
     `interp` (python by default), else None; True when xargs feeds it). The command word
     comes after VAR= prefixes, env, command, sudo, ..., and after `sh -c` (whose payload
     `shc` judges: then ("sh-c", xargs)); a word built at run time may be any interpreter.
     R3-C3: after a wrapper (timeout 60, nice -n 5, winpty, stdbuf -oL, uv/poetry/conda run)
-    its options and their values are skipped up to the interpreter."""
+    its options and their values are skipped up to the interpreter.
+    T16-7 (E9): with dyn=False a word built at run time counts only when its literal tail
+    is an interpreter name (`"$VENV/bin/python"`), not `$DOCKER` or `"$JAVA_HOME/bin/java"`."""
     interp = interp or _PY_INTERP
     shc = shc or _unresolved_session_call
     i, xargs, opts, wrap = 0, False, False, False
@@ -341,7 +406,8 @@ def _interpreter_at(words, interp=None, shc=None):
                 return "sh-c", xargs            # bash -c "python \"<s>\" \$X": its payload
             i, opts, wrap = j, False, False
             continue
-        if interp.match(base) or re.search(r"[$`(]", w):
+        if interp.match(base) or (re.search(r"[$`(]", w) and (
+                dyn or interp.match(re.split(r"[$`(){}]", base)[-1]))):
             return i, xargs
         return None, xargs
     return None, xargs
@@ -439,8 +505,9 @@ def _unresolved_session_call(command):
     if segments is None:
         flat = re.sub(r"[\"'`\\\s]", "", command).lower()
         return "aid_session" in flat or bool(_INTERP_THEN_UNRESOLVED.search(command))
+    dyn = _names_session_text(command)          # T16-7 (E9)
     for words in segments:
-        interp, xargs = _interpreter_at(words)
+        interp, xargs = _interpreter_at(words, dyn=dyn)
         if interp == "sh-c":
             return True
         if interp is None:
@@ -540,6 +607,47 @@ def _session_operand(word):
     return last == "aid_session.py" or last.split(".")[-1] == "aid_session"
 
 
+def _runner_script(words):
+    """T16-13: `uv|pdm|hatch|rye|pixi|poetry|pipenv run [options] x.py ...` runs x.py with
+    python: the index of the first .py operand after `<runner> run`, else None."""
+    for i, w in enumerate(words[:-1]):
+        base = re.sub(r"\.exe$", "", re.split(r"[/\\]", w)[-1].lower())
+        if base in _RUNNERS and words[i + 1].lower() in ("run", "exec"):
+            return next((j for j in range(i + 2, len(words)) if not words[j].startswith("-")
+                         and words[j].lower().rstrip(". ").endswith(".py")), None)
+    return None
+
+
+def _carried_lines(words):
+    """R2-04: command lines carried inside one word that a command runs: a git alias
+    (`git -c alias.x="!python <S> approve" x`), `script -qc "..."`, `su|runuser -c "..."`,
+    `make --eval="x:;..."` / `make -E ...`, `env -S "..."` / `--split-string=...`. Only words
+    that name aid_session are returned (newline-joined so each part is its own command)."""
+    out = []
+    lead = next((re.sub(r"\.exe$", "", re.split(r"[/\\]", x)[-1].lower()) for x in words
+                 if x.lower() not in _CMD_PREFIXES - {"env"} and not re.match(r"^[A-Za-z_]\w*=", x)), "")
+    for i, w in enumerate(words):
+        if "aid_session" not in w.lower():
+            continue
+        prev = words[i - 1] if i else ""
+        line = None
+        if lead == "git" and re.match(r"^alias\.[^=]*=!", w, re.I):
+            line = w.split("=!", 1)[1]
+        elif lead in ("script", "su", "runuser") and (re.match(r"^-[A-Za-z]*c$", prev) or prev == "--command"):
+            line = w
+        elif lead in ("script", "su", "runuser") and w.startswith("--command="):
+            line = w.split("=", 1)[1]
+        elif lead == "make" and (w.startswith("--eval=") or prev in ("--eval", "-E")):
+            line = w.split("=", 1)[1] if w.startswith("--eval=") else w
+            line = re.sub(r"^[^:;\n]*::?;?", "", line, count=1) if ":" in line else line
+        elif lead == "env" and (prev in ("-S", "--split-string") or w.startswith(("-S", "--split-string="))):
+            line = w if prev in ("-S", "--split-string") else (
+                w.split("=", 1)[1] if w.startswith("--split-string=") else w[2:])
+        if line:
+            out.append(line.replace(";", "\n"))
+    return out
+
+
 def _runs_session(command, powershell=False):
     """
     R4-C3: does the command really run aid_session.py with a confirmed subcommand (or one
@@ -570,20 +678,41 @@ def _runs_session(command, powershell=False):
             if rest and _runs_session(" ".join(rest), powershell):
                 return True
             continue
+        if not powershell and any(_runs_session(p) for p in _carried_lines(words)):
+            return True                          # R2-04: git alias, script -c, su -c, ...
         k, _ = _interpreter_at(words, shc=lambda p: _runs_session(p, powershell))
         if k == "sh-c":
             return True
-        if k is None:
-            continue
-        kind, j = _script_operand(words, k)
+        r = _runner_script(words)
+        if k is None and r is not None:
+            k, kind, j = r - 1, "script", r      # T16-13: `uv run "<S>" approve`
+        elif k is None:
+            # R2-04: `coverage run [-m] X`, `pipx run X`: X (or a later operand) is what runs.
+            # Only as the command word (after env/command/VAR= prefixes), not `echo coverage ...`.
+            c = next((i for i, x in enumerate(words) if x.lower() not in _CMD_PREFIXES
+                      and not re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", x)), None)
+            if c is None or c + 1 >= len(words) or not re.match(
+                    r"^(?:coverage|pipx)(?:\.exe)?$", re.split(r"[/\\]", words[c])[-1], re.I):
+                continue
+            k, kind, j = c, "module", c + 1
+        else:
+            kind, j = _script_operand(words, k)
         if kind not in ("script", "module") or j is None:
             continue
-        op = re.sub(r"[()+\s\"']", "", words[j]) if powershell else words[j]
+
+        def clean(x):
+            return re.sub(r"[()+\s\"']", "", x) if powershell else x
+        op = clean(words[j])
         named = _session_operand(op)
         if powershell and not named and re.search(r"[*?\[]", op):
             named = fnmatch.fnmatchcase("aid_session.py", re.split(r"[/\\]", op.lower())[-1])
         if not named:
-            continue
+            # R2-04: a script-runner module (`-m runpy|pdb|cProfile|trace|coverage ...`), any
+            # module or script, coverage/pipx: a LATER operand that is the session script runs
+            # it (or is handed to it): `python -m runpy "<S>" approve`, `python x.py "<S>" approve`.
+            j = next((m for m in range(j + 1, len(words)) if _session_operand(clean(words[m]))), None)
+            if j is None:
+                continue
         nxt = next((x for x in words[j + 1:] if not x.startswith("-")), "")
         first = re.split(r"[;&|<>()]", nxt)[0]
         if first.lower() in CONFIRMED_SUBCOMMANDS or (nxt and re.search(r"[$`(]", nxt)):
@@ -606,20 +735,22 @@ def _confirmed_intent(command):
         return True
     if _unresolved_session_call(command) or _inline_session_call(command):
         return True
-    # EVERY occurrence: in `".../AID_SESSION x/../AID_SESSION.PY" jump` the first one is a
-    # directory name, and the word after it is not the subcommand (T3 CI, Linux).
-    for m in re.finditer("aid_session", cleaned.lower()):
-        words = cleaned[m.start():].split()[1:]
-        first = next((w for w in words if not w.startswith("-")), "")
-        # T15-3: `approve; echo x`, `approve>log`, `approve&&x`: the shell ends the word there.
-        first = re.split(r"[;&|<>()]", first)[0]
-        if first.lower() in _T3_SUBCOMMANDS:
-            return True
-    # R4-C3: this text loop keeps HEAD's (T3) subcommands, so `rg "aid_session.py qa-pass"`
-    # or `printf "aid_session.py reset"` is not a new deny inside AID; the T15 additions
-    # (reset, qa-pass) count when an interpreter really runs the script (_runs_session).
     if _runs_session(command):
         return True
+    # T3 text check (5f8f199), EVERY occurrence: in `".../AID_SESSION x/../AID_SESSION.PY"
+    # jump` the first one is a directory name, and the word after it is not the subcommand.
+    # It keeps the T15 A1 residual forms (pythonw, chronic/setsid/flock python, case, eval of
+    # a variable, ...) denied inside AID. T16 B1: as at 5f8f199, prose, commit messages and
+    # echo/grep text that NAME aid_session and a confirmed word are denied too (an accepted
+    # false denial in the safe direction; T16-14 reverted, R4-03).
+    if "aid_session" in cleaned.lower():
+        for m in re.finditer("aid_session", cleaned.lower()):
+            words = cleaned[m.start():].split()[1:]
+            first = next((w for w in words if not w.startswith("-")), "")
+            # T15-3: `approve; echo x`, `approve>log`, `approve&&x`: the shell ends the word.
+            first = re.split(r"[;&|<>()]", first)[0]
+            if first.lower() in _T3_SUBCOMMANDS:
+                return True
     # And on the same words AC-23 accepts: whatever the gate would run as this plugin's
     # script, its subcommand decides.
     if _is_plugin_session(command):
@@ -789,6 +920,424 @@ def mentions_protected(text):
     return any(lit in t for lit in PROTECTED_LITERALS)
 
 
+def is_project_state(norm):
+    """T16-1/2 (E2): a project .aid/state.json in ANY folder (not the user-level file, A5)."""
+    if norm in (None, SUSPICIOUS) or norm in SINKS:
+        return False
+    k = _pkey(norm.rstrip("/"))
+    return k.endswith("/.aid/state.json") and k not in _user_state_files()
+
+
+def is_pipeline_config(norm):
+    """T16-4: a project .aid/pipeline/config.json."""
+    return norm not in (None, SUSPICIOUS) and _pkey(norm.rstrip("/")).endswith(PIPELINE_CONFIG)
+
+
+# R1-06 (T16 fix cycle 1): control files a glob write target may expand to.
+_CONTROL_GLOB_TARGETS = (".aid/state.json", ".aid/pipeline/config.json", ".aid/pipeline/escalation.json",
+                         ".aid/hooks/config.json", ".claude/settings.json", ".claude/settings.local.json")
+
+
+_HOME_PREFIX = re.compile(r"^(?:~|\$HOME|\$\{HOME\})(?=[/\\]|$)")
+
+
+def _expand_home(text):
+    """R2-03: bash expands a leading `~`, `$HOME` or `${HOME}` to the user's home."""
+    return _HOME_PREFIX.sub(lambda _m: os.path.expanduser("~").replace("\\", "/"), text, count=1)
+
+
+def _home_word(w):
+    """R2-03: a word whose only expansion is a leading ~ / $HOME, with that expanded."""
+    if not w.dynamic or not _HOME_PREFIX.match(w.text):
+        return w
+    t = _expand_home(w.text)
+    return Word(t, bool(re.search(r"[$`*?\[{~]", t[len(os.path.expanduser("~")):])))
+
+
+def _brace_words(w, home=True):
+    """R2-01: bash brace expansion is static text: an unquoted `{a,b}` word with no $ or
+    backtick is every one of its alternatives (`.aid/state.{json,x}`, `.aid/{state,x}.json`).
+    A quoted brace is not expanded; the lexer does not keep that, so it counts too (a false
+    denial only on a quoted brace-and-comma name of a control file). home: a leading ~ /
+    $HOME is expanded first (_home_word)."""
+    w = _home_word(w) if home else w
+    if not (w.dynamic and "{" in w.text and "," in w.text) or re.search(r"[$`]", w.text):
+        return [w]
+    alts = _brace_alternatives(w.text)
+    return [Word(a, bool(re.search(r"[*?\[{~]", a))) for a in alts] if len(alts) > 1 else [w]
+
+
+def _user_homes():
+    """R2-03: the folders whose .aid/state.json is the user-level file (T3 A5), as parts."""
+    return {tuple(p for p in k.split("/")[:-2] if p) for k in _user_state_files()}
+
+
+def _glob_names_control(text, vcwd, targets=_CONTROL_GLOB_TARGETS, hidden=False):
+    """R1-06: may this glob write target (`.aid/stat?.json`, `.aid/st*e.json`,
+    `.aid/pipeline/conf?g.json`) expand to one of `targets`? Judged on the trailing path
+    components, case-folded, brace alternatives expanded; vcwd (when known) is prefixed to a
+    relative target, so `cd .aid && echo x > stat?.json` counts.
+    R2-03: a leading ~ / $HOME is the user's home, and the user-level ~/.aid/state.json stays
+    exempt (T3 A5). Bash globs do not match a dot name (`*` is not `.aid`) unless the pattern
+    component starts with a dot; PowerShell wildcards do (hidden=True)."""
+    t = _expand_home(text).replace("\\", "/").casefold()
+    if not re.search(r"[*?\[]", t) or re.search(r"[$`]", t):
+        return False
+    if vcwd and vcwd != SUSPICIOUS and not (t.startswith("/") or re.match(r"^[a-z]:/", t)):
+        t = _key(vcwd).casefold().rstrip("/") + "/" + t
+    homes = _user_homes()
+    for alt in _brace_alternatives(t):
+        parts = [p.rstrip(". ") or p for p in alt.split("/") if p not in ("", ".")]
+        for ctl in targets:
+            c = ctl.split("/")
+            if len(parts) >= len(c) and all(
+                    fnmatch.fnmatchcase(x, p) and (hidden or not x.startswith(".") or p.startswith("."))
+                    for p, x in zip(parts[-len(c):], c)):
+                if ctl == ".aid/state.json" and tuple(parts[:-2]) in homes:
+                    continue                    # the user-level session file (T3 A5)
+                return True
+    return False
+
+
+def _record_assignments(assigns, variables):
+    """R1-06: `f=.aid/state.json; echo x > $f`: remember plain `name=value` shell assignments
+    (a segment of assignments only) so a later bare `$name` target is judged on its value."""
+    for a in assigns:
+        name, _, value = a.text.partition("=")
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
+            variables[name] = Word(value, a.dynamic)
+
+
+def _assigned_word(w, variables):
+    """R1-06: the remembered value of a bare `$name` / `${name}` word, else the word."""
+    m = re.match(r"^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))$", w.text)
+    if w.dynamic and m and (m.group(1) or m.group(2)) in variables:
+        return variables[m.group(1) or m.group(2)]
+    return w
+
+
+def state_file_reason(path):
+    """T16-1/2: the reason given for a write to a project .aid/state.json."""
+    return ("'{}' is the AID project state file (an AID control file, protected in every "
+            "folder). Only aid_session.py writes it; to create it "
+            "run /aid-init, which asks the user to confirm python \"{}/hooks/aid_session.py\" "
+            "init <role> <phase>").format(path, str(LIVE_ROOT).replace("\\", "/"))
+
+
+def write_tool_state_target(path, cwd):
+    """T16-1: does a Write-tool path (no shell expansion) name a project .aid/state.json?
+    Both the Win32 (stripped) and the raw trailing-dot form are judged (AC-35)."""
+    if not isinstance(path, str) or not path:
+        return False
+    norms = [normalize(path, cwd, literal=True, strip=s) for s in (True, False)]
+    if SUSPICIOUS in norms:
+        # R1-04: an NTFS stream spelling (`.aid/state.json::$DATA` is the file itself,
+        # `.aid/STATE.json:alt` creates it) is SUSPICIOUS, which is_project_state does not
+        # judge. Drop each component's `:stream[:$type]` and trailing dots/spaces.
+        p = re.sub(r"^[A-Za-z]:", "", path.replace("\\", "/")).casefold()
+        parts = [re.sub(r":.*$", "", c).rstrip(". ") for c in p.split("/")]
+        if len(parts) >= 2 and parts[-2:] == [".aid", "state.json"]:
+            return True
+    return any(is_project_state(n) for n in norms)
+
+
+_PS_WRITERS = re.compile(r"(?:^|[\s;|&(])(?:set-content|add-content|out-file|new-item|copy-item|"
+                         r"move-item|rename-item|tee-object|sc|ac|ni|cpi|mi|rni|ren|copy|cp|move|mv|"
+                         r"tee)(?=$|[\s;|&)])|>|::(?:write|append)all", re.I)
+# R2-03 / R2-05: PowerShell commands whose first operand is a SOURCE (only the destination is
+# written), and the ones that delete their operands.
+_PS_COPY_CMDS = {"copy-item", "cpi", "copy", "cp", "move-item", "mi", "move", "mv", "rename-item",
+                 "rni", "ren"}
+_PS_REMOVE_CMDS = {"remove-item", "ri", "rm", "del", "erase", "rd", "rmdir", "clear-content", "clc"}
+
+
+def _ps_glob_targets(low, remove=False):
+    """R2-03: the words of a PowerShell command (quotes and backticks removed, case-folded,
+    '/' separators) that it may write: redirect targets; the destination of Copy-Item /
+    Move-Item / Rename-Item (-Destination / -NewName or the second positional), never its
+    source; every operand of another writer (_PS_WRITERS) and, with remove=True (R2-05),
+    of Remove-Item / ri / rm / del / erase / rd / rmdir / Clear-Content."""
+    out = []
+    for seg in re.split(r"[;|&\n]+", low):
+        toks = [t for t in re.split(r"[\s,()]+", seg) if t]
+        for i, t in enumerate(toks):
+            m = re.match(r"^\d?>>?(.*)$", t)
+            if m:
+                out.append(m.group(1) or (toks[i + 1] if i + 1 < len(toks) else ""))
+        if not toks:
+            continue
+        cmd, args = toks[0], toks[1:]
+        if cmd in _PS_COPY_CMDS:
+            pos, dest, k = [], None, 0
+            while k < len(args):
+                a = args[k]
+                if a.startswith("-"):
+                    pname, _, val = a.partition(":")
+                    takes = pname.startswith(("-de", "-ne", "-pa", "-li"))
+                    if takes and not val:
+                        val, k = (args[k + 1] if k + 1 < len(args) else ""), k + 1
+                    if pname.startswith(("-de", "-ne")):
+                        dest = val
+                elif not re.match(r"^\d?>", a):
+                    pos.append(a)
+                k += 1
+            dest = dest if dest is not None else (pos[1] if len(pos) > 1 else None)
+            if dest:
+                out.append(dest)
+        elif (remove and cmd in _PS_REMOVE_CMDS) or _PS_WRITERS.search(seg):
+            out += [a.partition(":")[2] if a.startswith("-") else a for a in args]
+    return [t for t in out if t]
+
+
+_SH_C_OPT = re.compile(r"^-[A-Za-z]*c[A-Za-z]*$")
+# R3-06: text that names a `.aid` path component (quotes and backslashes removed first).
+_NAMES_AID = re.compile(r"(?:^|[^A-Za-z0-9_.-])\.aid(?![A-Za-z0-9_-])", re.I)
+
+
+def _shell_c_bodies(words):
+    """R3-03 (T16 fix cycle 3): the static text a `bash|sh|dash|zsh|ksh -c '<text>'` in this
+    segment runs, also behind nohup/env/timeout/... prefixes: a shell word, its options
+    (-e, -o pipefail, --login), then a -c cluster (-c, -ec, -lc) gives the next word."""
+    out = []
+    for i, w in enumerate(words):
+        if w.dynamic or not _SHELLS.match(re.split(r"[/\\]", w.text)[-1]):
+            continue
+        k = i + 1
+        while k < len(words) and words[k].text.startswith(("-", "+")):
+            a = words[k].text
+            if _SH_C_OPT.match(a):
+                # R4-04(1): `bash -c -- '<text>'`: the body follows the `--`.
+                j = k + 2 if k + 1 < len(words) and words[k + 1].text == "--" else k + 1
+                if j < len(words):
+                    out.append(words[j].text)
+                break
+            # R4-04(1): options that take an argument (--rcfile F, --init-file F, -o/-O opt)
+            # are skipped with it; `--` is skipped too (fail closed: a later -c still counts).
+            k += 2 if a in ("-o", "+o", "-O", "+O", "--rcfile", "--init-file") else 1
+    return out
+
+
+def _env_chdir(words):
+    """R3-03: the folder (a Word) that `env -C DIR` / `env -CDIR` / `env --chdir[=]DIR` runs
+    its command in, else None."""
+    for i, w in enumerate(words):
+        if w.dynamic or re.sub(r"\.exe$", "", re.split(r"[/\\]", w.text)[-1].lower()) != "env":
+            continue
+        k = i + 1
+        while k < len(words):
+            a = words[k].text
+            if a in ("-C", "--chdir"):
+                return words[k + 1] if k + 1 < len(words) else None
+            if a.startswith("--chdir="):
+                return Word(a.split("=", 1)[1], words[k].dynamic)
+            if re.match(r"^-[A-Za-z]*C.+", a) and not a.startswith("--"):
+                return Word(a[a.index("C") + 1:], words[k].dynamic)
+            if a in ("-u", "--unset", "-S", "--split-string"):
+                k += 2
+            elif a.startswith("-") or re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", a):
+                k += 1
+            else:
+                break
+        return None
+    return None
+
+
+def _strip_streams(text):
+    """R3-03: `state.json:x` / `.aid/state.json::$DATA` names the file itself (NTFS stream):
+    each component without its `:stream[:$type]` (a leading drive `C:` kept)."""
+    m = re.match(r"^([A-Za-z]:)(.*)$", text)
+    drive, rest = (m.group(1), m.group(2)) if m else ("", text)
+    return drive + "/".join(c.split(":", 1)[0] for c in rest.replace("\\", "/").split("/"))
+
+
+def state_write_reason(command, cwd, powershell=False, _aid_named=False, _nested=False, in_aid=True):
+    """
+    T16-2 (E2): a Bash / PowerShell command that writes a project .aid/state.json, in EVERY
+    folder: a redirect or writer target (tee, cp, mv, ln, touch, install, dd of=, sed -i)
+    that resolves to it, or (the T15-10 literal rule) a non-read-only command whose text
+    names .aid/state.json. Reads (cat, jq, Get-Content) stay allowed. None if not.
+    R3-03: a static `bash -c '<text>'` body is judged in the folder it runs in, `env -C DIR`
+    runs its command in DIR, `git [-C D] mv SRC DIR/` writes DIR/<basename SRC>, and an NTFS
+    `:stream` suffix names the file itself.
+    T16 B1 (E2 bounded): outside AID projects (in_aid False) a Bash write is judged in the
+    hook's cwd only, on the text it names (the literal name, its quote/brace/glob spellings,
+    a variable or substitution holding it). A write reached through a cwd change (cd,
+    pushd, popd, env -C, git -C), a shell -c body run elsewhere, or interpreter code is an
+    accepted, documented residual (like A1). Inside AID every form is judged.
+    """
+    # R1-02: quote removal and backslashes cannot hide the name from this prefilter.
+    # R1-06: a glob target (`.aid/stat?.json`) is judged below. R2-01: so is a brace word
+    # (`.aid/state.{json,x}`, `.aid/state.js{on,}`) that splits the name.
+    if ("state.json" not in re.sub(r"[\"'\\`]", "", command).casefold()
+            and not re.search(r"[*?\[]", command) and not re.search(r"\{[^{}]*,", command)):
+        return None
+    if powershell:
+        # R1-03: a writer whose text names both the .aid folder and state.json (after
+        # backticks and quotes are removed): `./.aid/./state.json`, `cd .aid; sc state.json`,
+        # `Move-Item state.json .aid`, `".aid\st`ate.json"`. Or a glob that may match it
+        # (R2-03: only a write target: the destination of Copy-Item/Move-Item, not its source).
+        low = re.sub(r"[`\"']", "", command).replace("\\", "/").casefold()
+        if _PS_WRITERS.search(low) and (
+                (re.search(r"(?:^|[^a-z0-9_.-])\.aid(?:$|[^a-z0-9_-])", low) and "state.json" in low)
+                or any(_glob_names_control(t, None, (".aid/state.json",), hidden=True)
+                       for t in _ps_glob_targets(low))):
+            return state_file_reason(".aid/state.json")
+        return None
+    try:
+        segments, subs = lex(command)
+    except ParseError:
+        return state_file_reason(".aid/state.json") if ".aid/state.json" in \
+            command.replace("\\", "/").casefold() else None
+    # R3-06: does this command (or the one whose `bash -c` body this is) name a .aid folder?
+    aid_named = _aid_named or bool(_NAMES_AID.search(re.sub(r"[\"'\\`]", "", command)))
+    for body in subs:
+        # R2-02: a substitution runs in the same folder (a subshell of this one).
+        reason = state_write_reason(body, cwd, _aid_named=aid_named, in_aid=in_aid)
+        if reason:
+            return reason
+
+    variables = {}
+    # R2-02: True once a cd / pushd / popd went somewhere this check cannot resolve: a bare
+    # `state.json` target may then be the project state file. R3-06: only for a directory
+    # stack move (`cd -`, `popd`, `pushd +1`, which can return to a .aid folder of an earlier
+    # call), or when this command names a .aid folder (`cd "$D/.aid"`); `cd "$TMPDIR"` alone
+    # does not (a state.json there is an ordinary application file, as at 5f8f199).
+    unknown = [in_aid and cwd is None and (not _nested or aid_named)]       # T16 B1
+
+    def hit(w, vcwd, target=True):
+        return any(hit_one(a, vcwd, target) for a in _brace_words(_assigned_word(w, variables)))
+
+    def hit_one(w, vcwd, target):
+        if ".aid/state.json" in w.text.replace("\\", "/").casefold():
+            n = None if w.dynamic else normalize(w.text, vcwd)
+            return n in (None, SUSPICIOUS) or not _pkey(n) in _user_state_files()
+        if w.dynamic:       # R1-06: only a write target's glob, not `python x.py .aid/*.json`
+            return target and _glob_names_control(w.text, vcwd, (".aid/state.json",))
+        if target and unknown[0] and not re.match(r"^(?:/|[A-Za-z]:)", w.text.replace("\\", "/")) and [
+                c.split(":", 1)[0].rstrip(". ").casefold() for c in re.split(r"[/\\]", w.text)
+                if c not in ("", ".")] == ["state.json"]:
+            return True
+        n = normalize(w.text, vcwd)
+        if n == SUSPICIOUS:                 # R3-03: `state.json:x` is the state file's stream
+            n = normalize(_strip_streams(w.text), vcwd)
+        return is_project_state(n)
+
+    # R1-06: a redirect target built by a substitution that names the state file.
+    sub_names = any(".aid/state.json" in b.replace("\\", "/").casefold() for b in subs)
+    vcwd = cwd
+    for seg in segments:
+        for w in seg.writes:
+            if hit(w, vcwd) or (sub_names and w.dynamic and re.search(r"[$`]", w.text)):
+                return state_file_reason(w.text)
+        words = list(seg.words)
+        while words and words[0].text in KEYWORDS_PREFIX and not words[0].dynamic:
+            words.pop(0)
+        assigns = []
+        while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?=", words[0].text):
+            assigns.append(words.pop(0))
+        if not words:
+            _record_assignments(assigns, variables)
+            continue
+        t = words[0].text
+        name = t.lower() if not words[0].dynamic and "/" not in t and "\\" not in t else None
+        if name and IS_WIN:
+            name = re.sub(r"\.(exe|cmd|bat)$", "", name)
+        if name in ("builtin", "command") and len(words) > 1 and not words[1].dynamic and \
+                words[1].text.lower() in ("cd", "pushd", "popd"):
+            words = words[1:]                       # R2-02: `builtin cd`, `command cd`
+            name = words[0].text.lower()
+        args = [w.text for w in words[1:]]
+        if name in ("cd", "pushd", "popd") and not in_aid:
+            continue                        # T16 B1: no cwd tracking outside AID (residual)
+        if name in ("cd", "pushd", "popd"):
+            # `mkdir -p .aid && cd .aid`: the folder may exist only once the line runs.
+            # R2-02: options -P -L -e -@ (pushd -n) and `--` are skipped; pushd is a cd.
+            rest = list(words[1:])
+            while rest and not rest[0].dynamic and re.match(r"^-[PLe@n]+$", rest[0].text):
+                rest.pop(0)
+            if rest and rest[0].text == "--" and not rest[0].dynamic:
+                rest.pop(0)
+            stack = name == "popd" or len(rest) > 1 or (name == "pushd" and not rest) or (
+                rest and re.match(r"^[-+]", rest[0].text))
+            if stack:
+                n = None
+            else:
+                dest = _home_word(_assigned_word(rest[0], variables)) if rest else \
+                    Word(os.path.expanduser("~"), False)
+                n = None if dest.dynamic else normalize(dest.text, vcwd)
+            vcwd = n if n not in (None, SUSPICIOUS) else None
+            unknown[0] = vcwd is None and bool(stack or aid_named)     # R3-06
+            continue
+        # R3-03: `env -C DIR cmd` runs cmd in DIR; `bash -c '<text>'` runs <text> in that folder.
+        scwd, s_unknown = vcwd, unknown[0]
+        ecd = _env_chdir(words)
+        if ecd is not None and in_aid:      # T16 B1: env -C outside AID is a residual
+            ed = _home_word(_assigned_word(ecd, variables))
+            n = None if ed.dynamic else normalize(ed.text, vcwd)
+            scwd = n if n not in (None, SUSPICIOUS) else None
+            s_unknown = scwd is None and aid_named
+        for body in _shell_c_bodies(words):
+            reason = state_write_reason(body, scwd, _aid_named=aid_named or s_unknown, _nested=True,
+                                        in_aid=in_aid)
+            if reason:
+                return reason
+        if name == "git":
+            # R3-03: `git [-C D] mv SRC... DEST/` writes DEST/<basename SRC> (like mv).
+            sub, rest, gcwd = _git_split(args, scwd)
+            if sub == "mv" and isinstance(rest, list) and gcwd is not None:
+                pseudo = [Word("mv", False)] + [Word(a, bool(re.search(r"[$`*?\[{~]", a))) for a in rest
+                                                 if a != "--"]
+                for w in _cp_mv_targets("mv", pseudo, [a for a in rest if a != "--"], gcwd, dest_only=True)[0]:
+                    if hit(w, gcwd):
+                        return state_file_reason(w.text)
+        saved_unknown, unknown[0] = unknown[0], s_unknown
+        try:
+            reason = _state_segment_reason(name, words, args, scwd, hit)
+        finally:
+            unknown[0] = saved_unknown
+        if reason:
+            return reason
+    return None
+
+
+def _state_segment_reason(name, words, args, vcwd, hit):
+    """state_write_reason for one simple command run in vcwd (R3-03: split out so an
+    `env -C DIR` command is judged in DIR)."""
+    if _phase4_exempt(name, words, args):
+        return None
+    # R2-03: only a write destination is judged on its resolved path (and its glob or
+    # braces): redirects, the cp/mv/ln/install target, tee/touch/sed -i files, dd of=.
+    # A cp/mv/ln/install source is read or moved away, never written. Any other operand
+    # keeps the T15-10 literal rule (text naming .aid/state.json) only.
+    if name in ("cp", "mv", "ln", "install"):
+        targets, others = _cp_mv_targets(name, words, args, vcwd, dest_only=True)[0], []
+    else:
+        in_place = name == "sed" and any(
+            a.startswith("--in-place") or re.match(r"^-[A-Za-z]*i", a) and not a.startswith("--")
+            for a in args)
+        targets = [w for w in words[1:] if not w.text.startswith("-")] if (
+            name in ("tee", "touch") or in_place) else []
+        targets += [Word(a.split("=", 1)[1], w.dynamic) for w, a in zip(words[1:], args)
+                    if name == "dd" and a.startswith("of=")]
+        others = list(words[1:]) + [Word(a.split("=", 1)[1], w.dynamic) for w, a in zip(words[1:], args)
+                                    if a.startswith("--") and "=" in a]
+    for w in targets:
+        if hit(w, vcwd):
+            return state_file_reason(w.text)
+    if name == "git":
+        # R4-02: `git [-C D] log|diff|show --output[=]<f>` writes <f> (in D).
+        gcwd = _git_split(args, vcwd)[2]
+        for k, a in enumerate(args):
+            out = Word(a.split("=", 1)[1], words[k + 1].dynamic) if a.startswith("--output=") else (
+                words[k + 2] if a == "--output" and k + 2 < len(words) else None)
+            if out is not None and hit(out, gcwd):
+                return state_file_reason(out.text)
+    for w in others:
+        if hit(w, vcwd, False):
+            return state_file_reason(w.text)
+    return None
+
+
 def is_plans_file(norm):
     config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
     plans = _key(os.path.realpath(os.path.join(config_dir, "plans"))).rstrip("/") + "/"
@@ -863,6 +1412,9 @@ def _target_verdict(path, cwd, root, phase, rules, literal, strip):
                 "loaded as skills, agents, commands or rules, so it waits for Phase {} like "
                 "source (.claude/plans/ and other .claude/ files stay writable)").format(
             path, "|".join(CLAUDE_CAPABILITY_DIRS), rules.get("code_write_min_phase", 4))
+    if len(parts) >= 2 and parts[-2] == ".claude" and parts[-1] in CLAUDE_EXEC_FILES:
+        return ("'{}' is a file Claude Code loads or runs (.claude/{}): it waits for Phase {} "
+                "like source").format(path, "|".join(CLAUDE_EXEC_FILES), rules.get("code_write_min_phase", 4))
     for prefix in rules.get("allowed_write_prefixes", []):
         if (rel + "/").startswith(_key(prefix)):
             return None
@@ -1187,6 +1739,16 @@ def _commit_idiom(command, cwd, root, phase, rules, extra):
     return _pre4(tail[4:], cwd, root, phase, rules, extra) or ""
 
 
+def _may_run_named_file(command):
+    """T16-12: may an interpreter (or a shell, or a word built at run time) run something in
+    this command? Read-only text that only names aid_session.py (grep, git log, ls) is not."""
+    segs = _shell_segments(command)
+    if segs is None:
+        return True
+    return any(_interpreter_at(w, _ANY_INTERP, shc=lambda _p: True)[0] is not None
+               or _interpreter_at(w, _SHELLS, shc=lambda _p: True)[0] is not None for w in segs)
+
+
 def _pre4(command, cwd, root, phase, rules, extra):
     """Before Phase 4, block-mode semantics: None = allowed, else the reason."""
     # First, before the heredoc idiom: Git Bash ends a heredoc at "EOF\r" (measured), so a
@@ -1196,7 +1758,7 @@ def _pre4(command, cwd, root, phase, rules, extra):
                 "with it); use plain newlines")
     if _is_plugin_session(command):
         return None
-    if "aid_session" in command.lower():
+    if "aid_session" in command.lower() and _may_run_named_file(command):
         # T3 review: a near-miss used to get the generic "'python' is not on the read-only
         # list", which sent the agent back to the very command it was running.
         return ("this aid_session.py call is not in the one allowed form: a single command, "
@@ -1236,12 +1798,22 @@ def _pre4(command, cwd, root, phase, rules, extra):
             target = normalize(args[0], vcwd, literal=True) if len(args) == 1 and not seg.words[1].glob else None
             parts = re.split(r"[/\\]", args[0]) if len(args) == 1 else []
             # (A trailing ; or newline after the last command is harmless and ignored.)
-            if (k != 0 or (len(segs) > 1 and seg.op != "&&") or target in (None, SUSPICIOUS)
-                    or any(s.op not in ("&&", "|") for s in segs[:-1])
-                    or any(c not in (".", "..") and c[-1:] in (".", " ") for c in parts)
-                    or not _same_dir(target, root)):
-                return ("cd is allowed only as the first command, only to the project root, "
-                        "and only followed by && (cd \"<root>\" && git status)")
+            # T16-9: each refusal names its own cause.
+            usage = " (allowed: cd \"<root>\" && git status)"
+            if k != 0:
+                return "cd is allowed only as the first command" + usage
+            if any(c not in (".", "..") and c[-1:] in (".", " ") for c in parts):
+                return ("cd target '{}' has a path component ending in a dot or space: Git Bash "
+                        "keeps it, so that cd fails".format(args[0] if args else "") + usage)
+            if target in (None, SUSPICIOUS) or not _same_dir(target, root):
+                return ("cd is allowed only to the project root ({}), not '{}'".format(
+                    str(root).replace("\\", "/"), " ".join(args)) + usage)
+            bad = next((s.op for s in ([seg] if len(segs) > 1 and seg.op != "&&" else [])
+                        + [s for s in segs[:-1] if s.op not in ("&&", "|")]), None)
+            if bad:
+                return ("{} after `cd <root> && ...`: a failed cd would not stop the rest; "
+                        "join the commands with && (or |) only".format(
+                            "`;` (or a newline)" if bad == ";" else "`{}`".format(bad)) + usage)
             vcwd = str(root)
             continue
         if name in VERSION_TOOLS and args == ["--version"]:
@@ -1378,11 +1950,13 @@ def _substitutions(text, subs):
         i += 1
 
 
-def lex(command):
+def lex(command, _brackets=True):
     """
     Best-effort split of a command line into Segments for the Phase 4+ check. Raises
     ParseError when the text cannot be parsed. $( ), <( ), >( ) and backtick bodies are
     lexed recursively and returned as extra segments: the shell runs them.
+    T16-5 (E5): no redirection or heredoc inside `$[ ]`, `${ }` or a `name[ ]=` subscript,
+    and no heredoc in the operands of let / declare -i (an unbalanced bracket: lexed as before).
     """
     s = command.replace("\\\r\n", "").replace("\\\n", "")
     segs, subs = [], []
@@ -1390,6 +1964,7 @@ def lex(command):
     seg_start, depth = 0, 0
     pending_heredocs = []      # (delimiter, quoted, strip_tabs)
     pending_redirect = None    # ("w"|"r"|"hd", op)
+    brk = []                   # T16-5: open $[ / ${ / name[ brackets (their closers)
     i, n = 0, len(s)
 
     def end_word():
@@ -1508,6 +2083,23 @@ def lex(command):
             while i < n and s[i] not in "\r\n":
                 i += 1
             continue
+        if _brackets and c in "[{" and (s[i - 1:i] == "$" or brk or (
+                c == "[" and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", "".join(word))
+                and all(_ASSIGN.match(w.text) for w in seg.words))):
+            brk.append("]" if c == "[" else "}")
+        elif brk and c == brk[-1]:
+            brk.pop()
+        if brk and c in "<>":
+            word.append(c)                  # T16-5: a shift or comparison, not a redirection
+            has_word = True
+            i += 1
+            continue
+        if (c == "<" and s[i + 1:i + 2] == "<" and s[i + 2:i + 3] != "<"
+                and _arith_cmd([w.text for w in seg.words])):
+            word.append("<<")               # T16-5: let / declare -i operands: a shift
+            has_word = True
+            i += 2
+            continue
         m = _REDIR.match(s, i) if (c in "<>&" or c.isdigit()) else None
         if m and (m.group(1) == "" or not has_word or "".join(word).isdigit()) and (c != "&" or s[i:i + 2] in ("&>",)):
             if has_word and "".join(word).isdigit():
@@ -1571,6 +2163,8 @@ def lex(command):
         has_word = True
         i += 1
 
+    if brk:
+        return lex(command, _brackets=False)     # T16-5: unbalanced: lexed as before
     if pending_heredocs:
         raise ParseError("heredoc body missing")
     end_segment(n)
@@ -1642,10 +2236,12 @@ def _git_pathspecs(sub, rest, gcwd):
     return []
 
 
-def _cp_mv_targets(name, words, args, vcwd):
+def _cp_mv_targets(name, words, args, vcwd, dest_only=False):
     """
     Write targets of cp/mv, honouring -t/-tX/--target-directory[=X], -T, and copy-into-dir.
     Returns (targets, reason_or_None). Best effort (abbreviated long options are not modelled).
+    dest_only (R2-03, the every-folder state.json rule; also ln/install): the destination
+    only, with no link/recursive verdict and no mv sources.
     """
     flags = _short_flags(args)
     t_dir, skip, operands = None, False, []
@@ -1669,12 +2265,13 @@ def _cp_mv_targets(name, words, args, vcwd):
         dest, sources = t_dir, operands
     else:
         dest, sources = (operands[-1] if operands else None), operands[:-1]
-    if linking and any(is_protected_or_parent(normalize(s.text, vcwd)) for s in sources if not s.dynamic):
+    if not dest_only and linking and any(is_protected_or_parent(normalize(s.text, vcwd))
+                                         for s in sources if not s.dynamic):
         return [], "linking to an AID control file"
     if dest is None:
         return [], None
     dnorm = normalize(dest.text, vcwd) if not dest.dynamic else None
-    if recursive and dnorm not in (None, SUSPICIOUS) and is_protected_or_parent(dnorm):
+    if not dest_only and recursive and dnorm not in (None, SUSPICIOUS) and is_protected_or_parent(dnorm):
         return [], "recursive copy into a folder holding AID control files"
     targets = [dest]
     into_dir = t_dir is not None or (not no_target_dir and (
@@ -1682,7 +2279,7 @@ def _cp_mv_targets(name, words, args, vcwd):
     if into_dir:
         targets += [Word(os.path.join(dest.text, os.path.basename(s.text.rstrip("/\\"))),
                          dest.dynamic or s.dynamic) for s in sources]
-    if name == "mv":
+    if name == "mv" and not dest_only:
         targets += sources                     # moving a file away changes it too
     return targets, None
 
@@ -1691,7 +2288,28 @@ def _write_word_verdict(w, vcwd, root, phase, rules):
     """AC-31: a target that contains a variable keeps the literal check on its text."""
     if w.dynamic and mentions_protected(w.text):
         return "'{}' names an AID control file (protected in every phase)".format(w.text)
-    return write_target_verdict("$dyn" if w.dynamic else w.text, vcwd, root, phase, rules)
+    if w.dynamic and _glob_names_control(w.text, vcwd):
+        return "'{}' may expand to an AID control file (protected in every phase)".format(w.text)
+    return (write_target_verdict("$dyn" if w.dynamic else w.text, vcwd, root, phase, rules)
+            or _pipeline_config_reason(w, vcwd))
+
+
+def _brace_verdict(w, vcwd, root, phase, rules):
+    """R2-01: _write_word_verdict on each brace alternative (and a leading ~ / $HOME
+    expanded) of a write target: `touch .aid/{hooks,x}/config.json` writes both."""
+    alts = _brace_words(w)
+    if len(alts) == 1 and alts[0] is w:
+        return _write_word_verdict(w, vcwd, root, phase, rules)
+    return next((r for r in (_write_word_verdict(a, vcwd, root, phase, rules) for a in alts) if r), None)
+
+
+def _pipeline_config_reason(w, vcwd):
+    """T16-4: a Bash write to .aid/pipeline/config.json (the pipeline's pass thresholds)."""
+    if (PIPELINE_CONFIG[1:] in w.text.replace("\\", "/").casefold()
+            or (not w.dynamic and is_pipeline_config(normalize(w.text, vcwd)))):
+        return ("'{}' holds the pipeline's pass thresholds; only the user changes it (the "
+                "Write and Edit tools ask the user)").format(w.text)
+    return None
 
 
 def _phase4_exempt(name, words, args):
@@ -1701,6 +2319,10 @@ def _phase4_exempt(name, words, args):
     if name != "git" or any(w.dynamic for w in words):
         return False
     sub, _rest, _ = _git_split(args, None)
+    # R4-02: `--output[=]<f>` (log/diff/show/...) writes <f>: never an exempt read; it is
+    # judged as a write to <f> (_phase4_check's git --output rule, and state_write_reason).
+    if any(a == "--output" or a.startswith("--output=") for a in args):
+        return False
     return sub in GIT_EXEMPT and not any(a.startswith("-") and mentions_protected(a) for a in args)
 
 
@@ -1715,25 +2337,43 @@ def _phase4_check(command, cwd, root, phase, rules):
         if reason:
             return reason
 
-    vcwd, depth, saved = cwd, 0, []
+    # R1-06: `echo x > $(echo .aid/state.json)`: a write target built by a substitution whose
+    # text names a control file (the lexer keeps only `$` for that target).
+    sub_names = any(mentions_protected(b) or PIPELINE_CONFIG[1:] in b.replace("\\", "/").casefold()
+                    for b in subs)
+    # R3-01 (T16 fix cycle 3): True after a cd / pushd into an AID control folder (.aid,
+    # .claude, .aid/hooks, ...). A literal such cd is itself denied (T16 B1); for one this
+    # check cannot resolve (`cd "$P/.aid"`), any later command that is not a read (READ_ONLY,
+    # an exempt git read) or another cd is refused: a shell
+    # or interpreter there (`cd .aid && bash -c 'echo x > state.json'`) writes control files
+    # by bare names this check cannot see.
+    vcwd, depth, saved, variables, in_ctl = cwd, 0, [], {}, False
     for seg in segments:
         while depth < seg.depth:
-            saved.append(vcwd)
+            saved.append((vcwd, in_ctl))
             depth += 1
         while depth > seg.depth:
-            vcwd = saved.pop() if saved else vcwd
+            vcwd, in_ctl = saved.pop() if saved else (vcwd, in_ctl)
             depth -= 1
 
         for w in seg.writes:
-            reason = _write_word_verdict(w, vcwd, root, phase, rules)
+            reason = _brace_verdict(_assigned_word(w, variables), vcwd, root, phase, rules)
+            if not reason and sub_names and w.dynamic and re.search(r"[$`]", w.text):
+                reason = "'{}' is built by a command that names an AID control file".format(w.text)
             if reason:
                 return "redirection: " + reason
 
+        if in_ctl and re.search(r"\$\(|`|[<>]\(", seg.raw):
+            # R3-01: a substitution there runs with this check's cwd unknown.
+            return "'{}' runs a command substitution in an AID control folder".format(seg.raw.strip()[:80])
         words = list(seg.words)
         while words and words[0].text in KEYWORDS_PREFIX and not words[0].dynamic:
             words.pop(0)
+        assigns = []
         while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?=", words[0].text):
-            words.pop(0)
+            assigns.append(words.pop(0))
+        if not words:
+            _record_assignments(assigns, variables)     # R1-06: `f=<path>; echo x > $f`
         if not words or (len(words) == 1 and words[0].text in KEYWORDS_ALONE):
             continue
         t = words[0].text
@@ -1742,18 +2382,35 @@ def _phase4_check(command, cwd, root, phase, rules):
             name = re.sub(r"\.(exe|cmd|bat)$", "", name)
         args = [w.text for w in words[1:]]
 
+        if name not in ("cd", "pushd", "popd"):
+            # R3-03: a static `bash -c '<text>'` body runs in this folder; `env -C DIR cmd`
+            # in DIR (a control folder: refused, like a cd there followed by a command).
+            for body in _shell_c_bodies(words):
+                reason = _phase4_check(body, vcwd, root, phase, rules)
+                if reason:
+                    return reason
+            ecd = _env_chdir(words)
+            if ecd is not None and _ctl_dir_word(ecd, vcwd):
+                return "'{}' runs a command in an AID control folder".format(seg.raw.strip()[:80])
+            if in_ctl and not _phase4_exempt(name, words, args):
+                return ("'{}' runs in an AID control folder (after a cd into it): only reads (ls, "
+                        "cat, grep, git status/log/diff) may follow such a cd").format(seg.raw.strip()[:80])
         if _phase4_exempt(name, words, args):
             continue
         if name not in WRITERS:
-            for a in args:
+            # R2-01: each alternative of an unquoted {a,b} operand (`sed -i ... .aid/{hooks,x}/..`).
+            for a in [x.text for w in words[1:] for x in _brace_words(w, home=False)]:
                 cand = a.split("=", 1)[1] if a.startswith("-") and "=" in a else (None if a.startswith("-") else a)
                 # Not a write target: an unreasonable form (`D:`, `test:unit`) is not a control
                 # file. Writer operands and redirect targets keep the SUSPICIOUS denial for
                 # literal words (stream, drive-relative, UNC); words with ~ or $ are dynamic
                 # and get only the mentions_protected check (best effort, N-1).
                 n = normalize(cand, vcwd) if cand else None
+                # T16 B1: T16-10 reverted; `cd .aid` / `cd ~/.aid` stay denied, as at 5f8f199.
                 if mentions_protected(a) or (n != SUSPICIOUS and is_protected_or_parent(n)):
                     return "'{}' would touch an AID control file".format(seg.raw.strip()[:80])
+                if name != "cd" and _pipeline_config_reason(Word(a, True), vcwd):
+                    return "'{}' would touch {}".format(seg.raw.strip()[:80], PIPELINE_CONFIG[1:])
         if name == "git":
             sub, rest, gcwd = _git_split(args, vcwd)
             rest = rest if isinstance(rest, list) else []
@@ -1776,8 +2433,12 @@ def _phase4_check(command, cwd, root, phase, rules):
             else:
                 operands = [w for w in words[1:] if not w.text.startswith("-")]
             for w in operands:
-                reason = _write_word_verdict(w, vcwd, root, phase, rules)
-                if not reason and name in ("rm", "rmdir", "mv") and is_protected_or_parent(normalize(w.text, vcwd)):
+                w = _assigned_word(w, variables)
+                reason = _brace_verdict(w, vcwd, root, phase, rules)
+                if not reason and sub_names and w.dynamic and re.search(r"[$`]", w.text):
+                    reason = "'{}' is built by a command that names an AID control file".format(w.text)
+                if not reason and name in ("rm", "rmdir", "mv") and any(
+                        is_protected_or_parent(normalize(a.text, vcwd)) for a in _brace_words(w)):
                     reason = "'{}' contains AID control files".format(w.text)
                 if reason:
                     return "{}: {}".format(name, reason)
@@ -1785,11 +2446,32 @@ def _phase4_check(command, cwd, root, phase, rules):
             target = None
             if len(words) == 2 and not words[1].dynamic and words[1].text != "-":
                 target = normalize(words[1].text, vcwd) if vcwd is not None or os.path.isabs(words[1].text) else None
+            ops = [w for w in words[1:] if not (w.text.startswith("-") and not w.dynamic)]
+            if ops:
+                in_ctl = _ctl_dir_word(ops[-1], vcwd)               # R3-01
+            elif not args:
+                in_ctl = False                                       # `cd` alone: home
             # A cd that would fail (missing dir) leaves the real cwd unchanged: unknown.
             vcwd = target if target not in (None, SUSPICIOUS) and os.path.isdir(target) else None
         elif name in ("pushd", "popd"):
+            ops = [w for w in words[1:] if not re.match(r"^[-+]", w.text) or w.dynamic]
+            if name == "pushd" and ops:
+                in_ctl = _ctl_dir_word(ops[-1], vcwd)               # R3-01
             vcwd = None
     return None
+
+
+def _ctl_dir_word(w, vcwd):
+    """R3-01: is the cd / pushd / env -C folder word an AID control folder or one holding
+    control files (.aid, .claude, .aid/hooks, ...)? A word this check cannot resolve counts
+    when its text ends in such a component (`"$HOME/.aid"`, `$P/.claude/`)."""
+    w = _home_word(w)
+    n = None if w.dynamic else normalize(w.text, vcwd)
+    if n not in (None, SUSPICIOUS):
+        return is_protected_or_parent(n)
+    # Unresolved, or a drive-relative / stream form (`cd D:`): judged on its text.
+    t = re.sub(r"[\"'\\]", "/", _strip_streams(w.text) if n == SUSPICIOUS else w.text).rstrip("/. ")
+    return bool(re.search(r"(?:^|/)\.(?:aid|claude)(?:/(?:hooks|pipeline|plugins|integrity))?$", t, re.I))
 
 
 def evaluate_bash(command, cwd, root, phase, rules, extra_allowed=()):
@@ -1888,6 +2570,12 @@ def evaluate_powershell(command, cwd, root, phase, rules):
     hit = next((lit for lit in PS_PROTECTED_LITERALS if lit in low), None)
     if hit:
         return "this PowerShell command names an AID control file ({})".format(hit)
+    # R2-05: a wildcard a writer or Remove-Item/ri/del/... may expand to a control file
+    # (`Remove-Item .aid\pipeline\ESC*.json`, `del .aid\*`); PowerShell wildcards match dot names.
+    glob = next((t for t in _ps_glob_targets(re.sub(r"[\"']", "", low), remove=True)
+                 if _glob_names_control(t, cwd, hidden=True)), None)
+    if glob:
+        return "'{}' may expand to an AID control file (protected in every phase)".format(glob)
     return _phase4_check(norm, cwd, root, phase, rules)
 
 
@@ -2028,6 +2716,78 @@ def plugin_script_ask(command, project_root=None):
     return None
 
 
+# T16-3 (E4, I-13): resolving a pipeline escalation is the user's decision.
+_GATE_REL = ("skills", "pipeline-orchestrator", "gate.mjs")
+_RESOLVE_CALL = re.compile(r"^node (\"[^\"\n$`]*[^\"\n$`\\]\"|'[^'\n]+'|[^\s\"'$`;&|<>(){}]+)"
+                           r" --resolve (\"[^\"$`\\\r\n]{1,500}\"|'[^'\r\n]{1,500}'|[A-Za-z0-9._=:-]+)$")
+RESOLVE_ASK_REASON = ("AID asks before a pipeline escalation is resolved: gate.mjs --resolve clears "
+                      ".aid/pipeline/ESCALATION.json, a decision only the user makes. The user must "
+                      "confirm it.")
+
+
+def resolve_user_line():
+    """I-13: the line the user runs (the agent shows it and never runs it)."""
+    return '! node "{}/{}" --resolve "<what was decided>"'.format(
+        str(LIVE_ROOT).replace("\\", "/"), "/".join(_GATE_REL))
+
+
+def resolve_ask(command, project_root=None):
+    """T16-3: the I-13 exact form `node "<IR>/skills/pipeline-orchestrator/gate.mjs" --resolve <A>`."""
+    m = _RESOLVE_CALL.match(command)
+    if not m:
+        return None
+    path = m.group(1)
+    path = path[1:-1] if path[:1] in "\"'" else path
+    if not (os.path.isabs(path.replace("\\", "/")) or re.match(r"^[A-Za-z]:[/\\]", path)):
+        return None
+    n = normalize(path, None, literal=True)
+    if any(n == _key(os.path.realpath(os.path.join(r, *_GATE_REL)))
+           for r in installed_plugin_roots(project_root)):
+        return RESOLVE_ASK_REASON
+    return None
+
+
+# R1-05: runtimes and package-runner wrappers that run a .mjs script, and the subcommand
+# words between such a wrapper and the script.
+_RESOLVE_INTERP = re.compile(r"^(?:python[0-9.]*|py|node(?:js)?|deno|bunx?|tsx|ts-node(?:-esm)?|"
+                             r"npx|pnpx|pnpm|yarn|npm|esno|vite-node|perl|ruby|php|pwsh|powershell)"
+                             r"(?:\.exe|\.cmd)?$", re.I)
+_RESOLVE_SUBWORDS = {"dlx", "exec", "x", "run", "node", "nodejs", "tsx", "ts-node", "bun", "deno"}
+
+
+def resolve_denied(command, powershell=False):
+    """T16-3 (I-13): inside AID, any other command that runs an interpreter and names gate.mjs
+    and resolve, or runs a script operand built at run time followed by --resolve."""
+    text = command.replace("`", "") if powershell else command
+    # R1-05: judged with quotes, backslashes and backticks removed (`--res\olve`,
+    # `--reso""lve`, `"gate.m"js`), as the shell runs it.
+    low = re.sub(r"[\"'\\`]", "", text).casefold()
+    names = "gate.mjs" in low and "resolve" in low
+    segs = _shell_segments(text)
+    if segs is None:
+        return names
+    for words in segs:
+        k, _ = _interpreter_at(words, _RESOLVE_INTERP, shc=lambda p: resolve_denied(p, powershell))
+        if k == "sh-c":
+            return True
+        if k is None:
+            continue
+        if names:
+            return True
+        rest = [re.sub(r"[\"'\\`]", "", w) for w in words[k + 1:]]
+        ops = [w for w in rest if not w.startswith("-")]
+        while ops and ops[0].lower() in _RESOLVE_SUBWORDS:
+            ops.pop(0)                          # npx node <P>, pnpm dlx <P>, yarn node <P>
+        # A script operand built at run time, or a glob (`g?te.mjs`, `g*.mjs`), with --resolve.
+        if "resolve" in low and any(re.search(r"[*?\[{]", w) and any(
+                fnmatch.fnmatchcase("gate.mjs", re.split(r"[/\\]", a.lower())[-1])
+                for a in _brace_alternatives(w)) for w in ops):
+            return True
+        if ops and re.search(r"[$`(*?\[{]", ops[0]) and "--resolve" in rest:
+            return True
+    return False
+
+
 def session_ask_verdict(command, project_root=None, powershell=False):
     """
     T15 (D1, D2): decided before any phase rule, in every folder. Returns (kind, reason):
@@ -2044,7 +2804,7 @@ def session_ask_verdict(command, project_root=None, powershell=False):
         # T15-6 (D2, A2; docs review NEW-1): the exact plugin-root breather installer /
         # init-project.sh call is asked from the PowerShell tool too, as from Bash. Only the
         # exact form: no $, backtick, ;, |, redirect or ( ) can follow the quoted path.
-        why = plugin_script_ask(command, project_root)
+        why = plugin_script_ask(command, project_root) or resolve_ask(command, project_root)
         if why:
             return "ask", why
         # T15-4: only the exact canonical call is asked; any other PowerShell spelling that
@@ -2062,7 +2822,7 @@ def session_ask_verdict(command, project_root=None, powershell=False):
         if not bad:
             return _confirmed_call_verdict(command, project_root)
         return "deny", _form_reason(command) or PS_SESSION_REASON
-    why = plugin_script_ask(command, project_root)
+    why = plugin_script_ask(command, project_root) or resolve_ask(command, project_root)
     if why:
         return "ask", why
     if ("aid_session" not in re.sub(r"[\"'`\\\s]", "", command).casefold()

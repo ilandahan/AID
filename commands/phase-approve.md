@@ -23,9 +23,17 @@ This command provides a gate check before moving to the next phase. It ensures:
 
 ## Flow
 
-1. **Check Current Phase**: Read `.aid/state.json`
-2. **Display Phase Summary**: Show what was accomplished
-3. **Show Checklist**: Display deliverables for this phase
+**MANDATORY OUTPUT FIRST. Before any Bash call, print `## Phase N Summary` and
+`## Phase N Checklist`** (N = the current phase from `.aid/state.json`). You MUST show both
+sections to the user, as headings in your reply, before you ask for feedback and before the
+`aid_session.py approve` call. The user signs off on what they saw; an approval without the
+summary and checklist on screen is not a sign-off. Never skip them, even when the user asks
+to approve quickly.
+
+1. **Check Current Phase**: Read `.aid/state.json` (the Read tool, not Bash)
+2. **Display Phase Summary (MANDATORY)**: Print `## Phase N Summary`: what was accomplished
+3. **Show Checklist (MANDATORY)**: Print `## Phase N Checklist`: the deliverables for this
+   phase (see Phase Checklists below), each marked done or not done
 4. **Collect Mandatory Feedback** (REQUIRED before approval):
    - Ask for rating (1-5)
    - Ask what worked well
@@ -118,7 +126,10 @@ Before showing the approval prompt, Claude MUST:
 ```
 Phase Approval: PRD (Phase 1)
 
-Checklist:
+## Phase 1 Summary
+PRD for user authentication written and reviewed (docs/prd/2026-11-19-user-auth.md).
+
+## Phase 1 Checklist
 [x] Requirements documented in docs/prd/
 [x] User stories defined
 [x] Acceptance criteria specified
@@ -167,7 +178,7 @@ Once approved (the user typed `approve` AND confirmed the `aid_session.py approv
 When this command is invoked:
 
 1. Read `.aid/state.json` to get current phase
-2. Display phase-specific checklist
+2. Print `## Phase N Summary` and `## Phase N Checklist` (MANDATORY, before any Bash call)
 3. **MANDATORY: Collect feedback** (rating, worked well, to improve)
 4. Condense the feedback into one note (rating plus short summary, allowed characters only)
 5. Ask for human confirmation (`approve` / `reject`)

@@ -10,7 +10,7 @@ Session tracking, recovery, and continuity patterns.
 ┌─────────────────────────────────────────────────────────────────┐
 │  SESSION LIFECYCLE                                              │
 │                                                                 │
-│  /good-morning ──▶ Work Session ──▶ /aid end                    │
+│  /good-morning ──▶ Work Session ──▶ /aid-end                    │
 │       │                │                │                       │
 │       ▼                ▼                ▼                       │
 │    Load             Update            Save                      │
@@ -184,7 +184,7 @@ Events automatically logged to `session_log`:
 | Task completed | Finishing a task | `task_completed` |
 | Blocker noted | Encountering blocker | `blocker_noted` |
 | Phase changed | Phase transition | `phase_changed` |
-| Session ended | /aid end | `session_ended` |
+| Session ended | /aid-end | `session_ended` |
 
 ### Log Size Management
 
@@ -208,7 +208,7 @@ function trimSessionLog(log) {
 
 ## Session End Flow
 
-### /aid end Command
+### /aid-end Command
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -280,7 +280,7 @@ def end_session(rating, worked_well, to_improve):
 
 ### Unexpected Session End
 
-If session ends without /aid end (crash, timeout, etc.):
+If session ends without /aid-end (crash, timeout, etc.):
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -377,7 +377,7 @@ function calculateSessionMetrics(history) {
 |---------|-------------|
 | `/good-morning` | Start new session with full context load |
 | `/context` | Show current session state |
-| `/aid end` | End session with feedback |
+| `/aid-end` | End session with feedback |
 | `/session log` | Show session log entries |
 | `/session history` | Show recent session history |
 
@@ -396,7 +396,7 @@ function calculateSessionMetrics(history) {
 3. Note blockers with `blocker_noted` entries
 
 ### Session End
-1. Always run `/aid end` before stopping work
+1. Always run `/aid-end` before stopping work
 2. Provide honest feedback (helps improve methodology)
 3. Note what worked and what didn't
 

@@ -276,7 +276,7 @@ Patterns identified: {patterns_count}
 
 Changes will take effect in next session. 🚀
 
-Start a new session? [/aid start]
+Start a new session? [/aid-start]
 ```
 
 ---
@@ -290,7 +290,7 @@ if len(feedback_batch) == 0:
     display("""
     📭 No feedback items waiting for analysis.
     
-    Feedback is collected automatically at the end of each phase (/aid end).
+    Feedback is collected automatically at the end of each phase (/aid-end).
     Continue working and we'll improve when there's enough data!
     """)
     return

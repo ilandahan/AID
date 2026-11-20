@@ -468,9 +468,16 @@ def save_recommendations(recommendations: List[Dict[str, Any]]) -> Path:
     # T15-30: an entry stored under its pre-T15 id still counts as seen under its new id.
     seen = {r.get("id") for r in known} | {_content_id(r) for r in known if _id_matches_content(r)}
     for rec in recommendations:
-        if isinstance(rec, dict) and rec.get("id") and rec["id"] not in seen:
-            queue.append(redact_obj(rec, default_names(), skip_keys=("id", "generated_at")))
-            seen.add(rec["id"])
+        if not (isinstance(rec, dict) and rec.get("id")):
+            continue
+        clean = redact_obj(rec, default_names(), skip_keys=("id", "generated_at"))
+        # T16-33: a NEW entry always gets its sha256 content id, whatever id it came with, so
+        # a legacy SHA-1 id is only ever accepted from an entry queued before T15 (sunset:
+        # docs/MIGRATION.md).
+        clean["id"] = _content_id(clean)
+        if clean["id"] not in seen:
+            queue.append(clean)
+            seen.add(clean["id"])
     _write_list(_queue_file(), queue)
     return _queue_file()
 
@@ -511,9 +518,11 @@ def apply_recommendation(rec_id: str, refs_root: Optional[Path] = None) -> Dict[
         return {"ok": False, "reason": "recommendation {!r} does not match its content (the queue "
                 "was edited); run memory-preview and confirm the id it shows".format(rec.get("id"))}
     clean = redact_obj(rec, default_names(), skip_keys=("id", "generated_at"))
-    block = "\n## Applied learning ({}, recommendation {})\n\n- {}\n  - Why: {}\n".format(
+    # T16-27: no empty "- Why: " line when the proposal has no rationale.
+    why = _one_line(clean.get("rationale"))
+    block = "\n## Applied learning ({}, recommendation {})\n\n- {}\n{}".format(
         datetime.utcnow().strftime("%Y-%m-%d"), clean["id"], _one_line(clean.get("proposed_change")),
-        _one_line(clean.get("rationale")))
+        "  - Why: {}\n".format(why) if why else "")
     with open(path, "a", encoding="utf-8", newline="") as f:
         f.write(block)
     queue.pop(i)
@@ -551,7 +560,11 @@ def _one_line(value: Any) -> str:
     """Plain text on one line: no newlines and no leading Markdown heading, quote or list
     marks, so an applied proposal cannot add headings or structure to a learnings file."""
     text = " ".join(str(value if value is not None else "").split())
-    return re.sub(r"^[#>*+\s-]+", "", text)[:1000]
+    # T16-27: a leading "**" is bold, not a list mark: keep it, so "- **Ask**: x" stays
+    # "**Ask**: x" instead of "Ask**: x". Unbalanced "**" left over are all removed.
+    lead = r"^(?:[#>+\s-]|\*(?!\*))+"
+    text = re.sub(lead, "", text)[:1000]
+    return re.sub(lead, "", text.replace("**", "")) if text.count("**") % 2 else text
 
 
 def mark_recommendation_applied(rec_id: str) -> bool:

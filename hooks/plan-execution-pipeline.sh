@@ -29,7 +29,7 @@ case "$input" in *'"ExitPlanMode"'*) ;; *) exit 0 ;; esac
 # skip so a stale SKIP_PIPELINE_GATE env var can't quietly disable brief-freeze + pipeline init
 # on a later implementation plan. (Static message, no control chars — safe to emit literally.)
 if [ "${SKIP_PIPELINE_GATE:-}" = "1" ]; then
-  printf '%s\n' '{"systemMessage":"plan-execution-pipeline: SKIP_PIPELINE_GATE=1 set — pipeline gate bypassed; brief.md NOT frozen and pipeline NOT initialized. Unset SKIP_PIPELINE_GATE to re-enable."}'
+  printf '%s\n' '{"systemMessage":"plan-execution-pipeline: SKIP_PIPELINE_GATE=1 set - pipeline gate bypassed; brief.md NOT frozen and pipeline NOT initialized. Unset SKIP_PIPELINE_GATE to re-enable."}'
   exit 0
 fi
 
@@ -132,7 +132,7 @@ json_enc() { node -e 'let b=[];process.stdin.on("data",c=>b.push(c));process.std
   || { printf '"'; sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\t\n\r' '   ' | tr -d '\000-\010\013\014\016-\037'; printf '"'; }; }
 plan_line=""
 if [ -n "$plan_text" ]; then
-  plan_line="The approved plan (verbatim, from the ExitPlanMode payload — use it as the DEVELOP plan in the brief):
+  plan_line="The approved plan (verbatim, from the ExitPlanMode payload - use it as the DEVELOP plan in the brief):
 <<<APPROVED_PLAN
 ${plan_text}
 APPROVED_PLAN
@@ -142,7 +142,7 @@ else
   # unreliable (shared plans dir, many stale plans), so flag it as best-effort and
   # tell the model to defer to the approved plan already in its context.
   plan_file=$(ls -t "$HOME/.claude/plans"/*.md 2>/dev/null | head -1)
-  [ -n "$plan_file" ] && plan_line="Best-effort plan-file guess: $plan_file (newest by mtime — NOT confirmed to be the plan you just approved). If this isn't the plan you just approved, IGNORE it and use the approved plan from your context. "
+  [ -n "$plan_file" ] && plan_line="Best-effort plan-file guess: $plan_file (newest by mtime - NOT confirmed to be the plan you just approved). If this isn't the plan you just approved, IGNORE it and use the approved plan from your context. "
 fi
 
 # Announce a payload extraction failure, in BOTH channels: systemMessage so the human sees it, and
@@ -150,7 +150,7 @@ fi
 # otherwise.
 fail_line=""
 if [ -n "$_hk_fail" ]; then
-  fail_line="WARNING: the approved plan text could not be extracted — ${_hk_fail}. Proceed with the work; the brief-freeze step below will fall back to the plan already in your context.
+  fail_line="WARNING: the approved plan text could not be extracted - ${_hk_fail}. Proceed with the work; the brief-freeze step below will fall back to the plan already in your context.
 "
 fi
 [ -n "$_hk_dir" ] && rm -rf "$_hk_dir" 2>/dev/null
@@ -173,16 +173,16 @@ else
 fi
 # No bypass switch is named in additionalContext (A-28): it is read by the model, and an instruction
 # that teaches the agent how to switch the gate off is not a gate. The systemMessage (human) keeps it.
-instr="A plan was just approved. The dev pipeline (pipeline-orchestrator + reflection + autoresearch) ships with the AID plugin and is available in this project regardless of AID — BUT it must only drive IMPLEMENTATION plans.
-${fail_line}${plan_line}INTENT GATE — do this FIRST, before anything else:
-Classify the just-approved plan as either (a) IMPLEMENTATION (it will write/modify/delete code, config, or other project files) or (b) READ-ONLY (research, analysis, investigation, debugging-to-understand, audit, explanation — it produces findings/answers but makes no source changes).
+instr="A plan was just approved. The dev pipeline (pipeline-orchestrator + reflection + autoresearch) ships with the AID plugin and is available in this project regardless of AID - BUT it must only drive IMPLEMENTATION plans.
+${fail_line}${plan_line}INTENT GATE - do this FIRST, before anything else:
+Classify the just-approved plan as either (a) IMPLEMENTATION (it will write/modify/delete code, config, or other project files) or (b) READ-ONLY (research, analysis, investigation, debugging-to-understand, audit, explanation - it produces findings/answers but makes no source changes).
 - If READ-ONLY: do NOT initialize or drive the dev pipeline. Do NOT freeze a brief, do NOT create/refresh .aid/pipeline/state.json, do NOT bootstrap config. Stay advisory-only and just carry out the approved plan. (Steps 1-3 below do not apply.)
 - If IMPLEMENTATION: proceed with steps 1-3 below BEFORE writing implementation code.
-1. INITIALIZE the pipeline (pipeline-orchestrator skill): if .aid/pipeline/config.json is missing, BOOTSTRAP it by copying \"${_cfg_default}\"; then create/refresh .aid/pipeline/state.json (pipeline_status=running, current_step=DEVELOP${_sid_field}, counters).
+1. INITIALIZE the pipeline (pipeline-orchestrator skill): if .aid/pipeline/config.json is missing, BOOTSTRAP it with the Write tool (read \"${_cfg_default}\" and Write its content to .aid/pipeline/config.json; a Bash cp/redirect to that file is denied, an Edit of an existing one is asked); then create/refresh .aid/pipeline/state.json (pipeline_status=running, current_step=DEVELOP${_sid_field}, counters).
 2. FREEZE THE TASK BRIEF now, while the original prompt is still in context: write .aid/pipeline/<task_id>/brief.md ONCE (never overwrite) with the VERBATIM original request, the STATED_WHY, and the approved plan above as the DEVELOP plan. Use the verbatim APPROVED_PLAN block when present; if only a best-effort plan-file guess was given, prefer the approved plan from your own context over that file on any mismatch. AR_ACCEPTANCE validates against this; it survives a later compaction.
-3. DRIVE all implementation through the orchestrator: DEVELOP → CODE_REVIEW (≤2) → AR_DESIGN → TDD (≤2) → AR_FUNCTION → VISUAL_QA → TEST_REVIEW → PHASE_GATE (≤2 re-examine) → AR_ACCEPTANCE. Resolve agents/criteria project-first, else the plugin's. ${enrich} Do not finish the turn until the pipeline is satisfied (the dev-pipeline-gate Stop hook also enforces this)."
-msg="plan approved → classify intent: IMPLEMENTATION plans run the pipeline (freeze brief + DEVELOP→…→AR_ACCEPTANCE); read-only/research/analysis plans stay advisory-only. SKIP_PIPELINE_GATE=1 to bypass."
-[ -n "$_hk_fail" ] && msg="approved plan text could not be extracted — ${_hk_fail}. Plan execution continues; the brief-freeze step falls back to the plan already in context. ${msg}"
+3. DRIVE all implementation through the orchestrator: DEVELOP -> CODE_REVIEW (<=2) -> AR_DESIGN -> TDD (<=2) -> AR_FUNCTION -> VISUAL_QA -> TEST_REVIEW -> PHASE_GATE (<=2 re-examine) -> AR_ACCEPTANCE. Resolve agents/criteria project-first, else the plugin's. ${enrich} Do not finish the turn until the pipeline is satisfied (the dev-pipeline-gate Stop hook also enforces this)."
+msg="plan approved -> classify intent: IMPLEMENTATION plans run the pipeline (freeze brief + DEVELOP->...->AR_ACCEPTANCE); read-only/research/analysis plans stay advisory-only. SKIP_PIPELINE_GATE=1 to bypass."
+[ -n "$_hk_fail" ] && msg="approved plan text could not be extracted - ${_hk_fail}. Plan execution continues; the brief-freeze step falls back to the plan already in context. ${msg}"
 
 ac=$(printf '%s' "$instr" | json_enc)
 sm=$(printf '%s' "$msg"  | json_enc)

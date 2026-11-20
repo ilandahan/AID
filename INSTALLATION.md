@@ -69,9 +69,9 @@ You're ready to go! See the [README.md](README.md) for your daily workflow and a
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Claude Code CLI | Latest | Required |
+| Claude Code CLI | 2.1.295 or later | Required. Fail-closed PreToolUse gates (`onFailure: "block"`) need Claude Code >= 2.1.295 |
 | Python | 3.8+ | Enforcement hooks, memory-system CLI |
-| Node.js | 18+ | Optional: MCP servers, Storybook, Cucumber |
+| Node.js | 18+ | Required: AID's hook runner and `link-project` run on `node` (MCP servers, Storybook and Cucumber need it too) |
 
 ### Install as a plugin (recommended)
 
@@ -112,7 +112,46 @@ commands, skills, agents and hooks; your repo keeps its own state.
 | Editing the methodology yourself | fork the repo | edit in place, projects see it instantly |
 | Best for | using AID | developing AID |
 
-Both are supported and read the same files. The clone route is unchanged.
+Both are supported, read the same files and register the same gates. The plugin registers
+AID's hooks from `.claude-plugin/plugin.json`. `link-project` (`link-project.sh` /
+`link-project.bat`, through `scripts/link-settings.mjs`) registers the same SessionStart,
+PreToolUse and Stop hooks in the project's `.claude/settings.json`, with absolute paths to
+your AID clone and the same `onFailure: "block"` setting, so a linked project is enforced
+exactly like a plugin project. The difference is outside linked projects: the plugin's
+hooks also act in folders that are not AID projects (the asks for confirmed commands and
+the refusal of `.aid/state.json` in every folder), but on the clone route a folder that is
+not linked runs no AID hooks. In detail (I-9):
+
+- `link-project` needs `node` on `PATH`. Without it, it exits 1 before writing anything, with
+  a message that names node: a project is never linked with hooks that cannot run.
+- It runs `node <AID>/scripts/link-settings.mjs <target> <AID>`. That script reads the
+  `hooks` of `.claude-plugin/plugin.json` and writes them into
+  `<target>/.claude/settings.json` with `${CLAUDE_PLUGIN_ROOT}` replaced by the absolute path
+  of your AID clone and `onFailure: "block"` kept. The merge keeps your own keys and hooks,
+  and a second run changes nothing.
+- It creates the project state only by running `aid_session.py init <role> 0` (Phase 0).
+  `--role <name|number>` picks the role; the default is `1`, the first entry of the role
+  menu. `init` also creates `.aid/context.json`.
+- With no working `python` it still links the project, prints the exact `aid_session.py init`
+  command for you to run in the project, and exits 0 with a warning: the project has no
+  state until you run that command.
+- `install.sh` and `install.bat` no longer create `.aid/state.json`; `aid_session.py` is its
+  only writer.
+
+The gates are identical, but the phase commands are not: `/aid-init`, `/aid-start`,
+`/phase-approve`, `/phase-advance`, `/gate-check`, `/aid-status`, `/aid-end` and
+`/aid-improve` call `aid_session.py` through `${CLAUDE_PLUGIN_ROOT}`, which Claude Code
+fills in only for a plugin. A linked project gets these commands through its
+`.claude/commands` link, with no plugin root, so they stop and say they need the plugin.
+In a linked project, either install the plugin as well (`claude plugin install aid@AID`),
+or run the state commands yourself with `!`, using the path to your AID clone:
+`! python "<AID>/hooks/aid_session.py" init <role> 0` (the command `link-project`
+prints), and later `! python "<AID>/hooks/aid_session.py" approve --note "<rating> <summary>"` and
+`! python "<AID>/hooks/aid_session.py" advance`.
+
+Fail-closed gates need Claude Code 2.1.295 or later (`claude --version`): from that version
+a PreToolUse gate that crashes or times out blocks the call (`onFailure: "block"`) instead
+of letting it through. See [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md#both-install-routes-run-the-same-gates).
 
 ### Quick Install (clone)
 
@@ -139,8 +178,10 @@ cp .mcp.json.windows .mcp.json  # Windows
 # 3. Export your API tokens as environment variables (see "MCP Integrations Setup").
 #    .mcp.json reads them via ${VAR} - never paste a token into the file.
 
-# 4. Initialize AI.D
-# Open Claude Code and type: /aid-init
+# 4. Initialize AI.D in your project. /aid-init needs the plugin
+#    (claude plugin install aid@AID). Without the plugin, run in the project:
+#    python "<AID>/hooks/aid_session.py" init <role> 0
+#    (with ! in Claude Code); see "Which install should I use?" above.
 ```
 
 ### Post-Installation
@@ -308,8 +349,10 @@ copy "..\AI.D\CLAUDE.md" "CLAUDE.md"
 cd my-project
 claude
 
-# Initialize AI.D phases
+# Initialize AI.D phases: with the plugin installed
 /aid-init
+# without the plugin (a linked or copied project), run it yourself with !
+! python "<AID>/hooks/aid_session.py" init <role> 0
 ```
 
 ### Verify Setup
@@ -374,7 +417,10 @@ MCP (Model Context Protocol) connects Claude to external tools.
 | Windows | `cmdkey /generic:aid-atlassian /user:you@company.com /pass` | PowerShell (module `CredentialManager`): `$env:ATLASSIAN_API_TOKEN = (Get-StoredCredential -Target aid-atlassian).GetNetworkCredential().Password` |
 
 Use the same pattern with `aid-github` for `GITHUB_PERSONAL_ACCESS_TOKEN`.
-`ATLASSIAN_SITE_URL` and `ATLASSIAN_USER_EMAIL` are not secrets; export them directly.
+`ATLASSIAN_SITE_NAME` and `ATLASSIAN_USER_EMAIL` are not secrets; export them directly.
+`ATLASSIAN_SITE_NAME` is the subdomain only (`your-company` for
+`your-company.atlassian.net`): that is the name the pinned `@aashari/mcp-server-atlassian-*`
+3.3.0 servers read.
 
 ### Jira / Atlassian Setup
 
@@ -387,7 +433,7 @@ To use the bundled `jira`/`confluence` servers (pinned `@aashari/mcp-server-atla
 1. Go to [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 2. Click "Create API token", give it an expiry date
 3. Store it in your OS keystore as `aid-atlassian` (table above) and export
-   `ATLASSIAN_SITE_URL`, `ATLASSIAN_USER_EMAIL` and `ATLASSIAN_API_TOKEN`
+   `ATLASSIAN_SITE_NAME` (subdomain only), `ATLASSIAN_USER_EMAIL` and `ATLASSIAN_API_TOKEN`
 
 ### GitHub Setup
 

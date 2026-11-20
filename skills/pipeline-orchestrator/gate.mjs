@@ -14,7 +14,8 @@
 // Usage:
 //   node gate.mjs --step CODE_REVIEW --scores '{"overall":9.6,...}' [--root <repo>] [--dry-run]
 //   node gate.mjs --check-escalation [--root <repo>]     # exit 2 if one is open
-//   node gate.mjs --resolve "<how it was resolved>" [--root <repo>]
+//   node gate.mjs --resolve "<how it was resolved>" [--root <repo>]   # the USER runs this, as a `!`
+//                                                                     # line; an agent never does (E4)
 //   node gate.mjs --should-spawn-dual --step CODE_REVIEW [--round N] [--prev-score X] [--root <repo>]
 //
 // Exit codes (the contract the orchestrator and the hook rely on):
@@ -32,7 +33,12 @@ import { fileURLToPath } from "node:url";
 // The command a human is told to run names THIS file (R-03): the copy that ships in the plugin,
 // absolute, forward slashes. Never ~/.claude/skills, which the plugin does not install.
 export const GATE_PATH = fileURLToPath(import.meta.url).replaceAll("\\", "/");
-const RESOLVE_CMD = `node "${GATE_PATH}" --resolve "<reason>". `;
+// T16-21 (E4, I-13): resolving is the user's decision. The text hands the user a `!` line (run at the
+// Claude Code prompt) and tells the agent to show it and never run it itself.
+const RESOLVE_LINE = `! node "${GATE_PATH}" --resolve "<what was decided>"`;
+const RESOLVE_CMD =
+  `The user records the decision by running this line at the Claude Code prompt: ${RESOLVE_LINE} ` +
+  "Show this line to the user. Never run it yourself and never resolve the escalation on the user's behalf. ";
 
 export const STEP_CONFIG = {
   CODE_REVIEW: { threshold: "code_review_pass", counter: "code_review" },
@@ -632,7 +638,7 @@ function main() {
         opened_at: new Date().toISOString(),
         how_to_resolve:
           "Decide as the human: split the task into one brief per surface, raise " +
-          "thresholds.max_surfaces in .aid/pipeline/config.json, or accept this width. Then run: " +
+          "thresholds.max_surfaces in .aid/pipeline/config.json, or accept this width. " +
           RESOLVE_CMD +
           "The Stop hook blocks while this is open.",
       });
@@ -812,7 +818,7 @@ function main() {
       opened_at: new Date().toISOString(),
       how_to_resolve:
         "Decide as the human: raise the code to clear the threshold, lower the threshold in " +
-        ".aid/pipeline/config.json, or accept this result. Then run: " +
+        ".aid/pipeline/config.json, or accept this result. " +
         RESOLVE_CMD +
         "The Stop hook blocks while this is open.",
     });

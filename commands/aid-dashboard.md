@@ -8,8 +8,8 @@ Generate a quality dashboard report with metrics and visualizations.
 
 ## Skills Loaded
 
-This command loads:
-- `skills/memory-system/SKILL.md`
+**First, before any other step, load the `memory-system` skill with the Skill tool** (as a
+plugin skill it is `aid:memory-system`; its file is `skills/memory-system/SKILL.md`).
 
 ## When to Use
 

@@ -151,7 +151,7 @@ Replaced entries are logged in `memory-tracking.json` under `retirement_history`
 ### View All Entries
 
 ```
-/aid memory list
+/aid-memory list
 ```
 
 Output:
@@ -180,7 +180,7 @@ Learned (0/10):
 ### View Statistics
 
 ```
-/aid memory stats
+/aid-memory stats
 ```
 
 Output:
@@ -306,7 +306,9 @@ Rebuilding tracking file...
 ### Force Sync
 
 ```
-/aid memory sync
+/aid-improve
 ```
+
+(its `aid_session.py memory-sync` step, which Claude Code asks you to confirm)
 
 This rebuilds `memory-tracking.json` from the state of `$AID_HOME/memory/slots.json`.

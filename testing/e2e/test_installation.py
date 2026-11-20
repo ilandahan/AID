@@ -30,6 +30,10 @@ needs_npm = pytest.mark.skipif(
     NO_NODE_MODULES, reason="dependencies not installed - run `npm install` first"
 )
 
+from test_t15_docs import _cucumber_runnable  # noqa: E402  (T16-69: one engines rule)
+
+_CUCUMBER_SKIP = _cucumber_runnable()
+
 
 class TestAIDInstallation:
     """Verify AID directory structure and core files."""
@@ -151,6 +155,9 @@ class TestNodeDependencies:
         node_modules = os.path.join(REPO_ROOT, 'node_modules')
         assert os.path.isdir(node_modules), "node_modules not found — run npm install"
 
+    # T16-69 (FR-34): the same engines skip as test_t15_docs (T15-43): cucumber-js refuses to
+    # run on a node outside package.json engines (Node 23), which says nothing about AID.
+    @pytest.mark.skipif(_CUCUMBER_SKIP is not None, reason=str(_CUCUMBER_SKIP))
     def test_cucumber_installed(self):
         result = subprocess.run(
             'npx cucumber-js --version', cwd=REPO_ROOT,

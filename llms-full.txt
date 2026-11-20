@@ -1,7 +1,7 @@
 AID - AI Development Methodology for Claude Code
 Complete Technical Documentation
 
-VERSION: 1.0.0
+VERSION: 3.0.8
 AUTHOR: Ilan Dahan
 BUILT WITH: Claude Code (Anthropic)
 
@@ -88,7 +88,7 @@ Exit Criteria (ALL required):
 - PRD approved (marker file: .aid/approvals/prd-approved.md)
 
 Artifacts:
-- docs/prd/ (the PRD)
+- docs/prd/YYYY-MM-DD-<feature>.md (the PRD)
 - .aid/approvals/prd-approved.md
 
 Blocked Actions:
@@ -122,7 +122,7 @@ Exit Criteria (ALL required):
 - Tech Spec approved
 
 Artifacts:
-- docs/tech-spec/
+- docs/tech-spec/YYYY-MM-DD-<feature>.md
 - .aid/approvals/tech-spec-approved.md
 
 Blocked Actions:
@@ -477,7 +477,7 @@ Configuration: .mcp.json (project root)
 JIRA / ATLASSIAN
 
 Environment Variables:
-- ATLASSIAN_SITE_URL: https://your-domain.atlassian.net
+- ATLASSIAN_SITE_NAME: your-company (subdomain only, for your-company.atlassian.net)
 - ATLASSIAN_USER_EMAIL: your-email@company.com
 - ATLASSIAN_API_TOKEN: API token from Jira
 
@@ -617,9 +617,9 @@ PHASE 5: QA & SHIP
 
 PROJECT LAYOUT
 
-aid-existing/
-├── .claude/                    # Claude Code integration
-│   └── commands/               # 44 slash commands
+AID/
+├── .claude-plugin/             # plugin.json (name, version, hooks) + marketplace.json
+├── commands/                   # 44 slash commands
 ├── skills/                     # 27 skills
 │   ├── phase-enforcement/
 │   ├── context-tracking/
@@ -627,20 +627,25 @@ aid-existing/
 │   ├── atomic-design/
 │   ├── atomic-page-builder/
 │   ├── code-review/
-│   └── test-driven/
-├── memory-system/              # Learning system
-│   ├── skills/
-│   │   ├── roles/              # 5 role quick references
-│   │   └── phases/             # 6 phase quick references
+│   ├── test-driven/
+│   └── memory-system/
+│       └── references/
+│           ├── roles/          # 5 role quick references
+│           └── phases/         # 6 phase quick references
+├── agents/                     # 39 sub-agents (flat, one .md each)
+├── agent-assets/               # Agent calibration examples + AGENT-STANDARD.md
+├── rules/                      # Rules loaded per skill
+├── references/                 # Role/phase terminology
+├── hooks/                      # Phase gates, QA gate, pipeline hooks
+├── memory-system/              # Learning system (Python package memory_system)
+│   ├── memory_system/
 │   ├── docs/
 │   └── templates/
 ├── docs/                       # Documentation
-├── integrations/               # MCP integration guides
-├── templates/                  # Project templates
-├── scripts/                    # Automation scripts
-├── prisma/                     # Database schema
-├── src/                        # Application source
-├── .mcp.json                   # MCP server config
+├── integrations/               # MCP integration guides, breather installer
+├── scripts/                    # Automation scripts (init-project.sh)
+├── testing/                    # The repository's own tests
+├── .mcp.json.example           # MCP server config template
 ├── package.json                # npm dependencies
 ├── tsconfig.json               # TypeScript config
 ├── CLAUDE.md                   # AID instructions
@@ -716,7 +721,7 @@ Preference order: SSO/OAuth > OS keystore > environment variable > never a plain
             $env:GITHUB_PERSONAL_ACCESS_TOKEN = (Get-StoredCredential -Target aid-github).GetNetworkCredential().Password
    Same pattern with aid-atlassian for ATLASSIAN_API_TOKEN.
 3. Environment variable: the MCP templates read the tokens through ${VAR} expansion.
-Not secrets (export directly): ATLASSIAN_SITE_URL, ATLASSIAN_USER_EMAIL.
+Not secrets (export directly): ATLASSIAN_SITE_NAME (subdomain only), ATLASSIAN_USER_EMAIL.
 See INSTALLATION.md, "MCP Integrations Setup".
 
 ================================================================================
@@ -801,6 +806,6 @@ Files:
 END OF DOCUMENTATION
 ================================================================================
 
-Version: 1.0.0
-Last Updated: 2025-12-11
+Version: 3.0.8
+Last Updated: 2026-11-19
 Created by: Ilan Dahan

@@ -1,9 +1,9 @@
 {
   "name": "aid-methodology",
-  "version": "1.0.0",
+  "version": "3.0.8",
   "description": "AID - AI Development Methodology. Transform requirements into production-ready software using Claude Code.",
   "author": "Ilan Dahan",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "LicenseRef-AID-Community-License-1.0",
   "private": true,
   "scripts": {
     "setup": "./install.sh",
@@ -34,7 +34,7 @@
     "chrome-devtools-mcp": "1.12.0"
   },
   "engines": {
-    "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
   },
   "keywords": [
     "claude-code",
@@ -51,6 +51,6 @@
     "ts-node": "^10.9.2"
   },
   "dependencies": {
-    "@cucumber/cucumber": "^12.9.0"
+    "@cucumber/cucumber": "^13.3.0"
   }
 }

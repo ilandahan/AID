@@ -27,7 +27,8 @@ Generate a Product Requirements Document (PRD) for a feature.
    - Out of scope items
 
 3. **Saves Document**
-   - Location: `docs/prd/PRD-<feature-name>.md`
+   - Location: `docs/prd/YYYY-MM-DD-<feature>.md` (today's date, then the feature name in
+     kebab-case, for example `docs/prd/2026-11-19-user-auth.md`)
 
 ## PRD Structure
 
@@ -84,7 +85,7 @@ Questions that need answers
 
 1. Review and refine the PRD
 2. Get stakeholder approval
-3. Move to Phase 3: Technical Specification
+3. Move to Phase 2: Technical Specification
    ```
    /tech-spec
    ```

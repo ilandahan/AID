@@ -1,6 +1,6 @@
 # Discovery Phase Skill
 
-> **Source**: `../pre-prd-research/SKILL.md`, `../aid-discovery/SKILL.md`
+> **Source**: `../../../../pre-prd-research/SKILL.md`, `../../../../aid-discovery/SKILL.md`
 >
 > This file is a quick reference. The main skill definitions are in the `.claude/skills/` directory.
 
@@ -83,7 +83,7 @@ docs/research/YYYY-MM-DD-[project-name]/
 |---------|---------|
 | `/discovery` | Start Phase 0 research |
 | `/gate-check` | Check Phase 0 → 1 requirements |
-| `/aid end` | Complete phase with feedback |
+| `/aid-end` | Complete phase with feedback |
 | `/phase-advance` | Move to Phase 1 (PRD) |
 
 ## Cumulative Learnings

@@ -47,7 +47,9 @@ Tell the user what breather does and get a yes first. breather is optional and i
 ## Notes
 
 - Safe to re-run anytime — it refreshes files and re-patches settings.
-- Coming back from a break? `node ~/.claude/hooks/breather/mark.mjs resumed`
+- Coming back from a break? Ask the user to type `! node ~/.claude/hooks/breather/mark.mjs resumed`
+  themselves (with the leading `!`). In an AID project the phase gate refuses this command to
+  Claude, because it runs a file under `~/.claude/hooks`.
 
 ## Related
 

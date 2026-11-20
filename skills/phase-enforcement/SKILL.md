@@ -22,7 +22,7 @@ Before any work:
 4. Check if work is allowed in current phase
 5. REFUSE if not allowed (show violation)
 6. At phase completion: mandatory sub-agent review
-7. After review passes: collect feedback via /aid end
+7. After review passes: collect feedback via /aid-end
 
 ## Mandatory: Sub-Agent Review at Transitions
 
@@ -147,7 +147,7 @@ This work belongs to Phase [X].
 
 Complete first: [List]
 
-Commands: /phase, /gate-check, /aid end
+Commands: /phase, /gate-check, /aid-end
 ```
 
 ## Sub-Agent Review Prompts

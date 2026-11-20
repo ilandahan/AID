@@ -18,7 +18,7 @@ Enforces AID phase gates with mandatory quality feedback collection. Claude MUST
 │  3. Check if work is allowed in current phase                   │
 │  4. REFUSE if not allowed (show violation template)             │
 │  5. At phase completion: MANDATORY SUB-AGENT REVIEW             │
-│  6. After review passes: collect feedback via /aid end          │
+│  6. After review passes: collect feedback via /aid-end          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -58,7 +58,7 @@ Enforces AID phase gates with mandatory quality feedback collection. Claude MUST
                          │                      │                     │
                          ▼                      ▼                     ▼
                    ┌──────────┐          ┌──────────┐          ┌──────────┐
-                   │ /aid end │          │  Fix &   │          │  Fix &   │
+                   │ /aid-end │          │  Fix &   │          │  Fix &   │
                    │ Feedback │          │  Re-run  │          │  Re-run  │
                    └──────────┘          └──────────┘          └──────────┘
 ```
@@ -208,7 +208,7 @@ Result: PASS
 
 All gate requirements verified. Proceeding to feedback collection.
 
-Run: /aid end
+Run: /aid-end
 ```
 
 **On PARTIAL:**
@@ -245,10 +245,11 @@ Cannot override critical failures.
 
 ## Phase Structure
 
-### 5-Phase Development Lifecycle
+### 6-Phase Development Lifecycle (Phases 0-5)
 
 | Phase | Name | Document Output | Folder |
 |-------|------|-----------------|--------|
+| 0 | Discovery | Research Report | `docs/research/` |
 | 1 | PRD | Product Requirements | `docs/prd/` |
 | 2 | Tech Spec | Technical Specification | `docs/tech-spec/` |
 | 3 | Implementation Plan | Task Breakdown | `docs/implementation-plan/` |
@@ -328,11 +329,11 @@ const PHASE_OUTPUT_FOLDERS = {
 │  MANDATORY FEEDBACK COLLECTION                                  │
 │                                                                 │
 │  At EVERY phase completion:                                     │
-│  1. Run /aid end to collect user feedback                       │
+│  1. Run /aid-end to collect user feedback                       │
 │  2. Rating (1-5) + What worked + What to improve                │
-│  3. /aid end saves it via aid_session.py end (redacted, best    │
+│  3. /aid-end saves it via aid_session.py end (redacted, best    │
 │     effort); never write feedback files by hand                 │
-│  4. Use feedback in /aid improve for skill enhancement          │
+│  4. Use feedback in /aid-improve for skill enhancement          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -340,13 +341,13 @@ const PHASE_OUTPUT_FOLDERS = {
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Phase N    │────▶│   /aid end   │────▶│   Feedback   │
+│   Phase N    │────▶│   /aid-end   │────▶│   Feedback   │
 │  Complete    │     │   (Rating)   │     │    Stored    │
 └──────────────┘     └──────────────┘     └──────┬───────┘
                                                  │
                                                  ▼
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│    Skill     │◀────│ /aid improve │◀────│   3+ Items   │
+│    Skill     │◀────│ /aid-improve │◀────│   3+ Items   │
 │   Updated    │     │  (Analysis)  │     │   Pending    │
 └──────────────┘     └──────────────┘     └──────────────┘
 ```
@@ -373,7 +374,7 @@ const PHASE_OUTPUT_FOLDERS = {
 - [ ] All user stories defined
 - [ ] Acceptance criteria complete
 - [ ] **⚠️ SUB-AGENT REVIEW PASSED** (mandatory)
-- [ ] **Feedback collected** via `/aid end`
+- [ ] **Feedback collected** via `/aid-end`
 
 ### Phase 2 → Phase 3 Gate
 - [ ] Tech Spec exists in `docs/tech-spec/YYYY-MM-DD-[feature].md`
@@ -381,7 +382,7 @@ const PHASE_OUTPUT_FOLDERS = {
 - [ ] API contracts defined
 - [ ] Security assessment complete
 - [ ] **⚠️ SUB-AGENT REVIEW PASSED** (mandatory)
-- [ ] **Feedback collected** via `/aid end`
+- [ ] **Feedback collected** via `/aid-end`
 
 ### Phase 3 → Phase 4 Gate
 - [ ] Implementation Plan in `docs/implementation-plan/YYYY-MM-DD-[feature].md`
@@ -390,7 +391,7 @@ const PHASE_OUTPUT_FOLDERS = {
 - [ ] Test strategy defined
 - [ ] **Step-by-step implementation order explicit**
 - [ ] **⚠️ SUB-AGENT REVIEW PASSED** (mandatory)
-- [ ] **Feedback collected** via `/aid end`
+- [ ] **Feedback collected** via `/aid-end`
 
 ### Phase 4 → Phase 5 Gate
 - [ ] All code implemented
@@ -398,7 +399,7 @@ const PHASE_OUTPUT_FOLDERS = {
 - [ ] Coverage meets threshold
 - [ ] Code reviewed
 - [ ] **⚠️ SUB-AGENT REVIEW PASSED** (mandatory)
-- [ ] **Feedback collected** via `/aid end`
+- [ ] **Feedback collected** via `/aid-end`
 
 ## Violation Template
 
@@ -420,7 +421,7 @@ Documents required:
 Commands:
   /phase        - See current status
   /gate-check   - See what's needed
-  /aid end      - Complete current phase with feedback
+  /aid-end      - Complete current phase with feedback
 ```
 
 ## Phase Completion Template
@@ -437,7 +438,7 @@ Deliverables:
 Before advancing to Phase [N+1], Claude must:
 1. Spawn review sub-agent to validate deliverables
 2. Address any issues found
-3. Collect feedback via /aid end
+3. Collect feedback via /aid-end
 
 This ensures quality gates are enforced.
 ```
@@ -448,7 +449,7 @@ This ensures quality gates are enforced.
 - Reading/viewing files (exploration)
 - Documentation updates (non-phase docs)
 - Answering questions
-- Running `/phase`, `/gate-check`, `/aid end`, `/aid improve`
+- Running `/phase`, `/gate-check`, `/aid-end`, `/aid-improve`
 
 ### With Warning
 - Fixing earlier phase artifacts (show warning but allow)
@@ -505,5 +506,5 @@ This skill coordinates with other skills based on phase:
 | `/phase` | Show current phase status | Any |
 | `/gate-check` | Check gate requirements | Any |
 | `/phase approve` | Approve phase advancement | End of phase |
-| `/aid end` | Complete phase with feedback | End of phase (after sub-agent review) |
-| `/aid improve` | Run improvement analysis | Any (3+ feedback) |
+| `/aid-end` | Complete phase with feedback | End of phase (after sub-agent review) |
+| `/aid-improve` | Run improvement analysis | Any (3+ feedback) |

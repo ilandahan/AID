@@ -469,7 +469,7 @@ def test_t15_6_docs_exact_form_only_for_breather_and_init_project(gate):
 def test_t15_31_phase_gates_names_the_bash_gate_among_global_hooks():
     """R3-E4: PHASE-GATES counted two global hooks and left out the Bash gate."""
     text = flat("docs/PHASE-GATES.md")
-    assert "but three of AID's hooks are not limited to them" in text
+    assert "but four of AID's hooks are not limited to them" in text  # T16 E-R1-6: + Write gate
     assert "**The Bash gate (PreToolUse)** answers \"ask\" in every folder" in text
 
 
@@ -547,7 +547,8 @@ SECRET_KEY = re.compile(r"(TOKEN|API_KEY|SECRET|PASSWORD|_PAT)\s*=")
 def test_t15_34_env_example_holds_no_secret_keys():
     text = read(".env.example")
     assert not SECRET_KEY.search(text), SECRET_KEY.findall(text)
-    assert "NODE_ENV=" in text and "ATLASSIAN_SITE_URL=" in text     # non-secret settings kept
+    # T16 (owner 2026-11-19): T16-47, the pinned Atlassian servers read ATLASSIAN_SITE_NAME.
+    assert "NODE_ENV=" in text and "ATLASSIAN_SITE_NAME=" in text    # non-secret settings kept
     assert "INSTALLATION.md" in text and "keystore" in text.lower()
 
 

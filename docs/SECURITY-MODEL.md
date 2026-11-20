@@ -14,6 +14,39 @@ not approve a call; the call still goes through the normal permission flow
 ([hooks guide](https://code.claude.com/docs/en/hooks-guide.md)). For a hard allow or deny,
 use the permission system ([hooks reference](https://code.claude.com/docs/en/hooks.md)).
 
+## Both install routes run the same gates
+
+The plugin install (`claude plugin install aid@AID`) registers AID's hooks from
+`.claude-plugin/plugin.json`. A clone + `link-project` install registers the same hooks:
+`link-project.sh` and `link-project.bat` run `scripts/link-settings.mjs`, which copies the
+SessionStart, PreToolUse (`Write|Edit|MultiEdit|NotebookEdit` and `Bash|PowerShell`),
+PostToolUse (ExitPlanMode) and Stop entries of `plugin.json` into the project's
+`.claude/settings.json`. The only change is that `${CLAUDE_PLUGIN_ROOT}` becomes the absolute
+path of the AID install, and the entries keep the same fail-closed runner
+(`onFailure: "block"`). Everything on this page holds for a linked project. The every-folder
+behaviours ([Hooks that act outside AID projects](#hooks-that-act-outside-aid-projects), the
+every-folder refusal of `.aid/state.json` and the every-folder asks) need the plugin: on the
+clone route only linked projects run AID hooks, and a folder that is not linked has none.
+
+How `link-project` does it (I-9, implemented):
+
+- It needs `node`. Without `node` on `PATH` it exits 1 before writing anything, so a project
+  is never linked with hooks that cannot run.
+- It runs `node <AID>/scripts/link-settings.mjs <target> <AID>`, which writes `plugin.json`'s
+  hooks, with absolute paths and `onFailure: "block"`, into `<target>/.claude/settings.json`.
+  The merge is additive and idempotent; an unparseable existing file is left untouched and
+  the script exits non-zero.
+- It creates the project state only with `aid_session.py init <role> 0` (`--role <name|number>`,
+  default `1`). With no python it prints that command and exits 0 with a warning; the
+  project has no state until it is run.
+- `install.sh` and `install.bat` no longer create `.aid/state.json`.
+
+**Minimum Claude Code version: 2.1.295.** The PreToolUse gates fail closed only on Claude
+Code 2.1.295 or later, the version whose hooks reference documents `onFailure` (and `args`)
+for hooks: with `onFailure: "block"` a gate that crashes or times out blocks the call instead
+of letting it through. An older Claude Code does not apply that setting. Check with
+`claude --version`.
+
 ## Enforcement levels
 
 Since 3.0.8 the two phase gates **block by default** in every AID project. An AID project
@@ -51,7 +84,9 @@ whether or not it changed since the last session.
 
 ## Hooks that act outside AID projects
 
-The phase rules apply only in AID projects, but these hooks are not limited to them:
+The phase rules apply only in AID projects, but these hooks are not limited to them. This
+needs the plugin install: on the clone route only linked projects run AID hooks, so a folder
+that is not linked has none of them.
 
 - **dev-pipeline-gate (Stop)** runs in every git repo. When a turn ends with changed
   source files, it may run the repo's own checkers (for example
@@ -60,8 +95,14 @@ The phase rules apply only in AID projects, but these hooks are not limited to t
 - **plan-execution-pipeline (ExitPlanMode)** runs in every project. When a plan is approved
   it injects the pipeline instructions and writes `~/.claude/.loop1-kickoff/<session_id>`.
 - **The Bash gate** answers "ask" for the confirmed `aid_session.py` commands, the breather
-  installer and `scripts/init-project.sh` in every folder (next section), from the Bash tool
-  and from the PowerShell tool, in the exact forms the next section gives.
+  installer, `scripts/init-project.sh` and the pipeline's `gate.mjs --resolve` in every folder
+  (next section), from the Bash tool and from the PowerShell tool, in the exact forms the
+  next section gives.
+- **The Write and Bash gates** refuse a write to a project `.aid/state.json` in every folder,
+  AID project or not (see [The three layers](#the-three-layers)). Outside AID projects a
+  shell write is refused only when its own text names `.aid/state.json`; a write reached
+  through a change of folder, a shell `-c` body or interpreter code is not caught there (see
+  [What AID does not promise](#what-aid-does-not-promise)).
 
 ## Human confirmation ("ask")
 
@@ -85,6 +126,17 @@ project or not) and at every gate level, for:
   level; other PowerShell spellings of the two scripts get the PowerShell rules below (run
   without a prompt outside AID projects and from Phase 4 on or at `log` or `warn`, refused
   before Phase 4 at `block`).
+- the pipeline's escalation resolve,
+  `node "<plugin>/skills/pipeline-orchestrator/gate.mjs" --resolve "<what was decided>"` (one
+  plain command, no `--root`, no redirect), from the Bash tool and from the PowerShell tool,
+  for every installed copy of the plugin. It clears `.aid/pipeline/ESCALATION.json`, a
+  decision only you make, so the agent shows you this line to run with a leading `!` and
+  never runs it itself. Inside an AID project the gate denies the other spellings it can
+  parse (chained, a `$(...)` argument, a relative or variable path, `--root`, another
+  runtime such as `bun`); this is best effort, and a spelling it cannot parse (for example
+  inside a `case` arm) is not caught, so it runs without a prompt from Phase 4 on or at `log`
+  or `warn`. Outside AID projects a non-exact spelling is not caught:
+  an accepted limit of a text gate, as for the two scripts above.
 
 Any other spelling of a confirmed call (upper-case interpreter, quoted subcommand, chained,
 redirected, script name or subcommand built at run time) is denied, with the exact form to
@@ -102,7 +154,19 @@ use: a confirmed call whose script name or subcommand comes from a variable, `$(
 backticks, a glob, `$'...'` quoting or `xargs` with the script path written out
 (`echo approve | xargs python "<plugin>/hooks/aid_session.py"`). That includes a call behind `timeout` or
 `winpty`, a call whose script name and subcommand both come from variables, a call followed
-by a `#` comment, and an `eval` whose quoted text holds the call.
+by a `#` comment, and an `eval` whose quoted text holds the call. An `aid_session.py` call
+with a confirmed subcommand (`approve`, `advance`, `jump`, `init`, `init --repair`,
+`memory-sync`, `memory-apply`, `reset`, `qa-pass`) inside a command substitution, `$(...)`
+or backticks (for example ``echo "$(python "<plugin>/hooks/aid_session.py" approve)"``), is
+denied in every folder, AID project or not: run it as one plain command instead. Read-only
+subcommands such as `status` are not affected by this rule; inside `$(...)` they follow the
+ordinary Bash phase rules (refused before Phase 4 at `block` in an AID project, allowed
+elsewhere). Two more groups of spellings are denied in every folder, phase and level, with
+the exact form to use: a module runner in front of the script (`python -m cProfile`, `pdb`,
+`profile`, `trace` or `runpy`, `coverage run`, `pipx run`), for example
+`python -m cProfile "<plugin>/hooks/aid_session.py" jump 1 5`; and a word that carries a
+whole command line holding a confirmed call (`git -c alias.<name>=!...`, `script -c`,
+`su -c`, `make --eval`, `env -S`).
 
 Deliberately obfuscated spellings are an accepted limit of a text gate. These forms are not
 caught: an interpreter name the gate does not match (`pythonw`, `pyw`); a wrapper prefix
@@ -114,6 +178,21 @@ through `/dev/stdin`, `/dev/fd/N` or `<( )` (`python /dev/stdin approve < "$S"`)
 followed by a confirmed subcommand (`python <(cat "$S") approve`) is denied in every folder;
 what is missed is code built inside the `<( )` that runs the script itself (for example with
 `runpy`). Outside AID projects these run without a prompt.
+
+Close variants of the module runners and command-line words denied above are not caught
+outside AID projects either: option letters
+combined into one word (`env -iS "python <plugin>/hooks/aid_session.py approve"`,
+`sh -lc "..."`) and a runner name the gate does not know (`coverage3 run`). Inside an AID
+project the gate denies the combined-letter forms in every phase and level; an unknown
+runner name follows the phase and level rules below.
+
+Bash arithmetic is not mistaken for a heredoc any more: a `<<` inside `$(( ))`, `(( ))`,
+`$[ ]`, `${ }` (for example `${x:1<<1}` or `${x:off:len}`), an array subscript
+(`a[1<<2]=1`) or the operands of `let`, `declare -i`, `typeset -i` and `local -i` starts no
+heredoc, so a confirmed call on a later line is caught and denied in every folder like any
+other spelling. When the gate cannot parse a command at all (an unbalanced quote or bracket,
+a heredoc that never ends), it refuses it if the text names `aid_session`. Apart from these
+arithmetic forms, the list of forms that are not caught is unchanged.
 
 In an AID project the result depends on the phase and the level. Before Phase 4 at `block`,
 the Bash allow-list refuses all of these forms. From Phase 4 on, or from Phase 0 when
@@ -146,7 +225,7 @@ hook's "ask" does. So outside AID projects, and for the breather installer and
 |-------|--------------|--------------------|
 | **A. Permission deny rules** | At session start AID adds deny rules for its control files to the project's `.claude/settings.json`: `Edit(/.aid/hooks/**)`, `Edit(/.aid/pipeline/ESCALATION.json)`, `Edit(/.claude/settings.json)`, `Edit(/.claude/settings.local.json)` and `Edit(/.claude/hooks/**)`. `.aid/state.json` is deliberately NOT in this list: Claude Code merges `Edit` deny paths into the sandbox's `denyWrite`, which would stop AID's own `aid_session.py` from writing it. `state.json` is protected instead by layer C (the Write and Bash gates, in every phase and at every level) plus the ask rules. AID also adds **ask** rules for the human-confirmed commands (`aid_session.py approve`, `advance`, `jump`, `init` including `init --repair`, `memory-sync`, `memory-apply`, `reset` and `qa-pass`). These are the second layer: the gate itself already asks for them in every folder (see [Human confirmation](#human-confirmation-ask)), and in AID projects these rules ask again for Bash-tool calls whatever a hook returns, in every permission mode (they are Bash rules and do not cover the PowerShell tool, where the gate's ask is the only layer). In `-p`, headless or dontAsk sessions nobody can answer the prompt, so Claude Code denies these calls: they need an interactive session. | Claude Code applies these rules itself, whatever any hook returns: "PreToolUse hook decisions don't bypass permission rules" ([permissions](https://code.claude.com/docs/en/permissions.md#precedence-among-rules-hooks-and-mods)). They cover the Write and Edit tools, file commands Claude Code recognises in Bash (`cat`, `head`, `tail`, `sed`, `tee`) and redirect targets (`>`, `>>`, `2>`). One caveat from the same page: a Claude Code mod that you install can approve a call that these rules would ask about, so install only mods you trust. |
 | **B. Integrity baseline** | At session start AID records the gate configuration and the deny and ask rules (under `~/.aid/integrity/`, or `$AID_HOME/integrity/`). Every gated call compares them with that record. If AID's `.aid` folder disappears mid-session, Claude's writes and commands are refused until the folder is restored, or until you resume the session, run `/clear` or restart Claude Code. | A change made mid-session that would switch a gate off is denied on the next call, at the level the session started with. |
-| **C. The Write and Bash gates** | By default, before Phase 4, writes are allowed only under `docs/`, `.aid/`, `.claude/` (not its `skills`, `agents`, `commands`, `output-styles`, `rules` or `hooks` folders), `features/`, `testing/` and `tests/`, Bash is limited to an allow-list of commands that do not run project code (`ls`, `cat`, `grep`, `git status`/`log`/`diff`/`add`/`commit`, `mkdir` and similar), and PowerShell commands are refused, except the exact forms the gate asks about (see below). The project can change these lists in `phase_gate_rules`. In every phase and at every level, writes to the control files (the files above, the project `.aid/state.json`, QA markers under `.aid/qa/` (`*.qa-passed`, `*-review*.json`), your user-level `~/.claude/settings.json`, and Claude Code's `plugins/known_marketplaces.json` and `plugins/installed_plugins.json`) are refused. The only writer of `.aid/state.json` is AID's `aid_session.py`, run as one plain Bash command. | Out-of-phase work by a cooperating agent is refused, with a reason that tells it what to do instead. Claude cannot use the Write tool to rewrite AID's configuration. |
+| **C. The Write and Bash gates** | By default, before Phase 4, writes are allowed only under `docs/`, `.aid/`, `.claude/` (not its `skills`, `agents`, `commands`, `output-styles`, `rules`, `hooks`, `workflows`, `routines` or `agent-memory` folders, nor `launch.json`, `scheduled_tasks.json`, `loop.md`, `CLAUDE.md` or `AGENTS.md` directly in it), `features/`, `testing/` and `tests/`, Bash is limited to an allow-list of commands that do not run project code (`ls`, `cat`, `grep`, `git status`/`log`/`diff`/`add`/`commit`, `mkdir` and similar), and PowerShell commands are refused, except the exact forms the gate asks about (see below). The project can change these lists in `phase_gate_rules`. In every phase and at every level, writes to the control files (the files above, the project `.aid/state.json`, QA markers under `.aid/qa/` (`*.qa-passed`, `*-review*.json`), your user-level `~/.claude/settings.json`, and Claude Code's `plugins/known_marketplaces.json` and `plugins/installed_plugins.json`) are refused. The only writer of `.aid/state.json` is AID's `aid_session.py`, run as one plain Bash command. A project `.aid/state.json` is refused in every folder, AID project or not, to the Write, Edit, MultiEdit and NotebookEdit tools, so `/aid-init` creates it only with `aid_session.py init`, which you confirm. Bash and PowerShell writes (redirects, `tee`, `cp`, `mv`, `ln`, `touch`, `install`, `dd of=`, `sed -i`, `Set-Content`, `Out-File`, `Copy-Item` and similar) are refused in every form inside an AID project; outside one they are refused only when the command text itself names `.aid/state.json`. A write reached through a folder change (`cd .aid`, `pushd`, `env -C`) or inside `sh -c` there is a documented residual: such a folder has no AID gates to bypass. Reading it with the Read tool or a read-only command (`cat`, or `cp` with it as the source) stays allowed, within the phase rules. | Out-of-phase work by a cooperating agent is refused, with a reason that tells it what to do instead. Claude cannot use the Write tool to rewrite AID's configuration. |
 
 The Write gate sees every file-editing tool: Write, Edit, MultiEdit and NotebookEdit. For
 NotebookEdit it checks `notebook_path`, and when a call carries both `file_path` and
@@ -205,7 +284,9 @@ macOS and WSL it is opt-in. Since 3.0.8 AID's command gate handles it with its o
   without a prompt.
 - **From Phase 4 on**, a PowerShell command whose text names a control file is refused, even
   one that only reads it (Claude can read with the Read tool or Bash). This is best effort,
-  as for Bash: a path built at run time is not caught.
+  as for Bash: a path built at run time is not caught. It is also an accepted false denial:
+  reads are refused too, for example `Test-Path .aid` or `Get-Content .aid\state.json` in an
+  AID project at Phase 4. Use the Read tool or the Bash tool for these reads.
 
 ### Agents, commands and untrusted content
 
@@ -245,9 +326,81 @@ These limits are accepted on purpose. The next section lists what covers them.
   on them there.
 - **From Phase 4, a project's `.claude/skills`, `.claude/agents` and `.claude/commands`
   are writable.** Before Phase 4 the Write and Bash gates refuse writes into
-  `.claude/{skills,agents,commands,output-styles,rules,hooks}/`. From Phase 4 on they are
-  ordinary project folders, so Claude (or project code) can add a skill, agent or command
-  that a later session loads. `.claude/hooks/` stays a control file in every phase.
+  `.claude/{skills,agents,commands,output-styles,rules,hooks,workflows,routines,agent-memory}/`
+  and to the files Claude Code runs or loads straight from `.claude/`: `launch.json`,
+  `scheduled_tasks.json`, `loop.md`, `CLAUDE.md` and `AGENTS.md` (matched case-insensitively,
+  trailing dots and spaces ignored). From Phase 4 on these are ordinary project folders and
+  files, so Claude (or project code) can add a skill, agent, command, workflow, routine,
+  scheduled task or launch configuration that a later session loads or runs. At `log` or
+  `warn` they are writable from Phase 0. `.claude/hooks/` stays a control file in every phase.
+  Other `.claude/` files, such as `.claude/plans/` and `.claude/notes.md`, stay writable
+  before Phase 4.
+- **`.aid/state.json` written through a name built at run time, outside AID projects.** The
+  every-folder refusal of `.aid/state.json` reads the command text. In a folder that is not
+  an AID project, a Bash or PowerShell write whose target name is built at run time (from
+  variables, `$(...)`, string joins or `[char]`) is not caught. Inside an AID project such a
+  write is refused only before Phase 4 at `block`, where the Bash and PowerShell gates refuse
+  every command that is not on their allow-lists. From Phase 4, or at `log` or `warn`, it is
+  not caught there either (for example `n=state; echo {} > .aid/$n.json`); the control-file
+  check reads the command text and does not see the built name.
+- **`.aid/state.json` written through a folder change, a shell `-c` body or interpreter
+  code, outside AID projects.** Outside AID projects a Bash command is refused only when its
+  own text names `.aid/state.json` (`echo x > .aid/state.json`,
+  `bash -c 'echo x > .aid/state.json'`, `python -c "open('.aid/state.json','w')"`). A write
+  that reaches the file another way is not caught there: through a change of folder
+  (`cd .aid && echo x > state.json`, `pushd .aid && echo x > state.json`,
+  `env -C .aid touch state.json`), through a shell `-c` body that changes folder
+  (`sh -c 'cd .aid && echo x > state.json'`), or through interpreter code that builds the
+  path (`python -c "import os; open(os.path.join('.aid','state.json'),'w')"`). Inside an AID
+  project the folder-change and `-c` forms are refused at every phase and level; interpreter
+  code that builds the name is refused only before Phase 4 at `block`, as in the previous
+  item.
+- **Non-exact `gate.mjs --resolve` spellings, outside AID projects.** Only the exact form
+  `node "<plugin>/skills/pipeline-orchestrator/gate.mjs" --resolve "<what was decided>"` is
+  asked everywhere. Inside an AID project the gate denies the other spellings it can parse
+  (chained, relative path, variable path, another runtime such as `bun` or `deno`); like
+  every text check this is best effort, so a spelling it cannot parse is not caught. Outside
+  AID projects a non-exact spelling is not caught.
+- **PowerShell reads of control files are refused (accepted false denial).** In an AID
+  project, at every phase and level, any PowerShell command that names a control file is
+  refused, reads included (`Get-Content .aid\state.json`, `Test-Path .aid`), also at `log`
+  or `warn` where other PowerShell commands are allowed. (Before Phase 4 at `block` every
+  PowerShell command that is not on the allow-list is refused anyway.) Outside AID projects
+  these reads are allowed. Read with the Read tool or the Bash tool instead.
+- **An interpreter with a script operand built at run time is refused in every folder
+  (accepted false denial).** From the Bash tool, `python "$SCRIPT" "$INPUT"`,
+  `py -3 "$TOOL" "$ARG"` or `for f in *.py; do python "$f" "$OUT"; done` could run
+  `aid_session.py`, so the gate denies them in every folder, phase and level, even when the
+  script is harmless. For the same reason a script that takes the session script and a
+  confirmed subcommand as later operands (`python <script> "<plugin>/hooks/aid_session.py" approve`)
+  is denied in every folder; with a read-only subcommand such as `status` it is not. This is a Bash rule: the PowerShell form with bare variables
+  (`python $env:SCRIPT $env:INPUT`) is not refused for this reason and runs without a prompt
+  outside AID projects, from Phase 4 and at `log` or `warn` (see the bare-variable operand
+  limit in [The PowerShell tool](#the-powershell-tool)). Write the script
+  path out, or run the command yourself with `!`. A command whose first word is a variable
+  and that names no python interpreter (`$DOCKER $CMD $IMAGE`,
+  `"$JAVA_HOME/bin/java" -jar "$JAR" "$CONFIG"`) is not refused for this reason.
+- **Archiving `.aid/state.json` is refused in every folder (accepted false denial).** A Bash
+  command that is not read-only and names `.aid/state.json` is refused in every folder,
+  phase and level, even when it only reads the file (`tar czf b.tgz .aid/state.json`,
+  `zip b.zip .aid/state.json`): back it up with `cp` or read it with `cat`.
+- **Inside AID projects, bare `state.json` writes after an unknown `cd`, a `cd` into
+  `.aid`, and text that names `aid_session` with a confirmed word are refused (accepted
+  false denial).** In an AID project, at every phase and level:
+  - After a `cd`, `pushd` or `popd` whose target the gate cannot resolve (`cd "$D"`,
+    `cd -`, `popd`), a write to a bare `state.json` (`cd "$D" && echo x > state.json`,
+    `popd && touch state.json`) is refused, so a subfolder that keeps its own `state.json`
+    is affected. Name the folder in the path instead, or run the command yourself with `!`.
+  - A `cd` into the project's `.aid` folder or your user-level `~/.aid` folder is refused,
+    even when only reads follow (`cd .aid && ls`, `cd ~/.aid && ls`). Use `ls .aid`,
+    `ls ~/.aid` or the Read tool instead.
+  - A command whose text names `aid_session` with a confirmed subcommand as the next word is
+    refused, even when it only prints or searches text
+    (`echo "run aid_session approve later"`, `git log --grep "aid_session approve"`,
+    `git commit -m "aid_session approve flow"`). Reword the text, or run the command
+    yourself with `!`.
+
+  Outside AID projects these commands are allowed.
 - **Interpreters resolve from `PATH` (accepted).** AID's hooks and confirmed commands start
   `python`, `node` and `bash` by name, so whichever one comes first on `PATH` runs. Whoever
   can change your `PATH` or put a binary ahead of the real one can run code in their place.
@@ -346,8 +499,11 @@ locations are listed in the
 | Windows | `C:\Program Files\ClaudeCode\managed-settings.json` |
 
 The first two keys below apply when AID is installed as a plugin (`claude plugin install
-aid@AID`). With a clone + `link-project` install, AID's hooks come from project settings:
-deploy them in managed settings instead, or switch to the plugin.
+aid@AID`). With a clone + `link-project` install, AID's hooks are registered in the
+project's `.claude/settings.json` (see
+[Both install routes run the same gates](#both-install-routes-run-the-same-gates)), which a
+user or project file can change: to make them stick, deploy the same entries in managed
+settings, or switch to the plugin.
 
 Recommended keys:
 - **Force-enable AID** with managed `enabledPlugins`, for example

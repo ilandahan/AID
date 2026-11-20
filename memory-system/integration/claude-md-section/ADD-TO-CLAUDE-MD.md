@@ -12,18 +12,18 @@ AID includes a learning system that improves Claude's assistance over time by co
 
 | Command | Description |
 |---------|-------------|
-| `/aid init` | Initialize memory system (first time only) |
-| `/aid start` | Start work session - select role & phase |
-| `/aid status` | Show current state |
-| `/aid end` | End phase and provide feedback |
+| `/aid-init` | Initialize memory system (first time only) |
+| `/aid-start` | Start work session - select role & phase |
+| `/aid-status` | Show current state |
+| `/aid-end` | End phase and provide feedback |
 | `/aid-improve` | Run learning cycle (weekly) |
-| `/aid memory list` | Show AID's local memory entries |
+| `/aid-memory list` | Show AID's local memory entries |
 
 ### Session Flow
 
-1. **Start**: `/aid start` → Select role (PM/Dev/QA/Lead) → Select phase → Skills loaded
+1. **Start**: `/aid-start` → Select role (PM/Dev/QA/Lead) → Select phase → Skills loaded
 2. **Work**: Claude applies loaded skills automatically
-3. **End**: `/aid end` → Rate session (1-5) → Describe what worked/didn't
+3. **End**: `/aid-end` → Rate session (1-5) → Describe what worked/didn't
 4. **Learn**: `/aid-improve` → Analyze feedback → Update skills → Promote to memory
 
 ### Skills Location
@@ -43,7 +43,7 @@ Session state stored in `~/.aid/state.json`:
 
 ### Feedback Collection
 
-At phase end (`/aid end`):
+At phase end (`/aid-end`):
 1. Summarize work completed
 2. Ask for rating (1-5)
 3. Ask: "What worked well?"

@@ -490,7 +490,8 @@ rules/               - Rules loaded per skill
 references/          - Shared lookup data (role/phase terminology)
 hooks/               - Phase gate, QA gate, pipeline enforcement
 .claude-plugin/      - plugin.json (name, version, hook registration) + marketplace.json
-.claude/settings.json - Project-mode permissions/hooks; this is what link-project copies
+.claude/settings.json - Project-mode permissions; link-project starts a target's settings
+                       from it and registers plugin.json's hooks (absolute paths) there
 
 # .claude/{skills,agents,commands,rules,references,hooks} are per-machine MIRRORS of the
 # directories above, created by install.sh and gitignored. Never edit a mirror.

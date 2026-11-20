@@ -1,6 +1,6 @@
 # QA & Ship Phase Skill
 
-> **Source**: `../aid-qa-ship/SKILL.md`
+> **Source**: `../../../../aid-qa-ship/SKILL.md`
 >
 > This file is a reference. The main skill definition is in the `.claude/skills/` directory.
 

@@ -90,7 +90,7 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@1.12.0
 
 ## Usage by Phase
 
-### Phase 5: Development
+### Phase 4: Development
 
 ```
 "Navigate to localhost:3000 and take a screenshot of the homepage"
@@ -98,7 +98,7 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@1.12.0
 "Fill in the login form with test credentials and verify redirect"
 ```
 
-### Phase 6: Testing
+### Phase 5: QA & Ship (testing)
 
 ```
 "Take screenshots of all main pages for visual regression"
@@ -106,7 +106,7 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@1.12.0
 "Verify all API calls complete successfully on the checkout flow"
 ```
 
-### Phase 7: Code Review
+### Phases 4-5: Code Review
 
 ```
 "Analyze the network requests on page load - are there any unnecessary calls?"

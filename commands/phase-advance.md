@@ -75,7 +75,7 @@ Research deliverables:
 
 Next steps:
 - Run /aid-start to begin a PRD session
-- Use /prd to create Product Requirements Document
+- Use /prd to create the Product Requirements Document (docs/prd/YYYY-MM-DD-<feature>.md)
 - Link requirements to research IDs (RES-XXX)
 
 Use /phase to see current phase details.
@@ -91,7 +91,7 @@ Current:  Phase 2 (Tech Spec)
 Next steps:
 - Run /aid-start to begin a Tech Spec session
 - Use /architecture to design the system
-- Create docs/tech-spec/YYYY-MM-DD-[feature].md
+- Create docs/tech-spec/YYYY-MM-DD-<feature>.md
 
 Use /phase to see current phase details.
 ```

@@ -277,10 +277,11 @@ const createTestUser = (overrides = {}) => ({
 });
 
 // GOOD - For integration tests
-// Store secrets in .env.test (gitignored)
-// .env.test:
-// TEST_API_KEY=<test-api-key>
-// TEST_DB_URL=postgresql://test:test@localhost:5432/test_db
+// Secrets come from the OS keystore (or the CI secret store) as environment
+// variables: SSO > OS keystore > env var, never a file.
+// .env.test (gitignored) holds non-secret settings only:
+// TEST_DB_HOST=localhost
+// TEST_DB_NAME=test_db
 ```
 
 ### Security Checklist

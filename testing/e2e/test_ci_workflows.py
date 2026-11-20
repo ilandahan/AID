@@ -106,3 +106,91 @@ def test_t15_44_windows_job_runs_init_project_tests_under_git_bash():
     assert job.get('defaults', {}).get('run', {}).get('shell') == 'bash'
     run = '\n'.join(s.get('run', '') for s in job['steps'])
     assert 'testing/e2e/test_t15_scripts.py' in run and 'HOME=' in run
+
+
+# --- T16-51: the version-bump guard fires before the first v* tag (A-24) -----------------
+
+def _guard_script():
+    jobs = _ci_jobs()
+    job = [j for j in jobs.values()
+           if any("--match 'v*'" in s.get('run', '') for s in j.get('steps', []))][0]
+    return '\n'.join(s['run'] for s in job['steps'] if "--match 'v*'" in s.get('run', ''))
+
+
+def _git(cwd, *args):
+    import subprocess
+    p = subprocess.run(['git', '-c', 'user.name=t16', '-c', 'user.email=t16@example.invalid',
+                        '-c', 'commit.gpgsign=false', '-c', 'init.defaultBranch=main', *args],
+                       cwd=str(cwd), capture_output=True, text=True)
+    assert p.returncode == 0, (args, p.stderr)
+    return p.stdout
+
+
+def test_t16_51_version_guard_compares_with_origin_main_when_untagged(tmp_path):
+    """No v* tag: a shipped change without a plugin.json bump against origin/main fails;
+    the same change with a bump passes. Before T16 the guard skipped with a notice."""
+    import json
+    import shutil
+    import subprocess
+    import sys
+    bash = shutil.which('bash')
+    if not bash or not shutil.which('git'):
+        pytest.skip('bash and git are needed')
+    # python3 may be absent (or the Windows Store stub): run the guard with this interpreter.
+    script = _guard_script().replace('python3', '"{}"'.format(sys.executable.replace('\\', '/')))
+    (tmp_path / 'guard.sh').write_text(script, encoding='utf-8', newline='\n')
+    origin, work = tmp_path / 'origin', tmp_path / 'work'
+    origin.mkdir()
+    _git(origin, 'init', '-q')
+    (origin / '.claude-plugin').mkdir()
+    (origin / '.claude-plugin' / 'plugin.json').write_text(json.dumps({'version': '1.0.0'}))
+    (origin / 'hooks').mkdir()
+    (origin / 'hooks' / 'a.txt').write_text('a\n')
+    _git(origin, 'add', '-A')
+    _git(origin, 'commit', '-q', '-m', 'base')
+    _git(tmp_path, 'clone', '-q', str(origin), str(work))
+
+    import os
+    # Git Bash would rewrite the `origin/main:<path>` argument as a Windows path.
+    env = dict(os.environ, MSYS_NO_PATHCONV='1', MSYS2_ARG_CONV_EXCL='*')
+
+    def run_guard():
+        return subprocess.run([bash, str(tmp_path / 'guard.sh')], cwd=str(work),
+                              capture_output=True, text=True, env=env)
+
+    (work / 'hooks' / 'a.txt').write_text('changed\n')
+    _git(work, 'commit', '-q', '-am', 'shipped change, no bump')
+    p = run_guard()
+    assert p.returncode == 1 and '::error::' in p.stdout, p.stdout + p.stderr
+    (work / '.claude-plugin' / 'plugin.json').write_text(json.dumps({'version': '1.0.1'}))
+    _git(work, 'commit', '-q', '-am', 'bump')
+    p = run_guard()
+    assert p.returncode == 0 and 'version guard ok' in p.stdout, p.stdout + p.stderr
+
+
+# --- T16-57: CI Python deps are pinned with hashes (FR-36) ---------------------------------
+
+REQ = WF_DIR.parent / 'requirements-ci.txt'
+
+
+def test_t16_57_ci_installs_python_deps_from_hashed_requirements():
+    steps = [s for job in _ci_jobs().values() for s in job.get('steps', [])]
+    pip = [s['run'] for s in steps if 'pip install' in s.get('run', '')]
+    assert pip, 'no pip install step'
+    for run in pip:
+        assert '--require-hashes -r .github/requirements-ci.txt' in run, run
+        assert not re.search(r'pip install\s+pytest', run), run
+    text = REQ.read_text(encoding='utf-8')
+    reqs = re.findall(r'(?m)^([A-Za-z0-9_.-]+)==(\S+) \\$', text)
+    names = {n.lower() for n, _ in reqs}
+    assert {'pytest', 'pyyaml', 'pluggy', 'iniconfig', 'packaging', 'pygments', 'colorama'} <= names
+    blocks = re.split(r'(?m)^(?=[A-Za-z0-9_.-]+==)', text)[1:]
+    for block in blocks:
+        assert re.search(r'--hash=sha256:[0-9a-f]{64}', block), block
+
+
+def test_t16_57_dependabot_has_a_pip_entry_with_cooldown():
+    cfg = _load(WF_DIR.parent / 'dependabot.yml')
+    pip = [u for u in cfg['updates'] if u['package-ecosystem'] == 'pip']
+    assert pip and pip[0]['directory'] == '/.github'
+    assert pip[0]['cooldown']['default-days'] == 7

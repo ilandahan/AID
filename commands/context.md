@@ -72,7 +72,9 @@ Syncing to Phase {state_phase}...
 ```
 No .aid/context.json found.
 
-Run /good-morning or /aid-init to set up context tracking.
+Run /aid-init to set up context tracking: its `aid_session.py init` call creates
+.aid/context.json (it never overwrites an existing one). In a project that already has
+.aid/state.json, /good-morning shows where you are.
 ```
 
 ### Empty context

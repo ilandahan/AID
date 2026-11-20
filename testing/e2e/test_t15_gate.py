@@ -415,14 +415,16 @@ def test_t15_3_ordinary_shifts_and_heredocs_stay_allowed(base, cmd):
 # measured by running HEAD 2db6933's hook on the same commands.
 T15_FALSE_DENIAL_CORPUS = [
     ('Bash', 'git commit -m "aid_session: fix init"', 'ALLOW', 'ALLOW'),
-    ('Bash', 'git commit -m "aid_session approve flow"', 'ALLOW', 'DENY'),
-    ('Bash', 'cat <<EOF\nthe aid_session approve step is described here\nEOF', 'ALLOW', 'DENY'),
-    ('Bash', 'grep -n aid_session.py approve docs/', 'ALLOW', 'DENY'),
-    ('Bash', 'echo "run aid_session.py approve to sign off"', 'ALLOW', 'DENY'),
+    # T16 B1 (owner amendment, 2026-11-19): T16-14 reverted to 5f8f199: text naming
+    # aid_session plus a confirmed word is an accepted false denial at Phase 4 (DENY).
+    ('Bash', 'git commit -m "aid_session approve flow"', 'ALLOW', 'DENY'),    # T16 B1
+    ('Bash', 'cat <<EOF\nthe aid_session approve step is described here\nEOF', 'ALLOW', 'DENY'),    # T16 B1
+    ('Bash', 'grep -n aid_session.py approve docs/', 'ALLOW', 'DENY'),    # T16 B1
+    ('Bash', 'echo "run aid_session.py approve to sign off"', 'ALLOW', 'DENY'),    # T16 B1
     ('Bash', 'printf \'%s\\n\' "aid_session.py reset"', 'ALLOW', 'ALLOW'),
-    ('Bash', 'git log --oneline --grep "aid_session init"', 'ALLOW', 'DENY'),
+    ('Bash', 'git log --oneline --grep "aid_session init"', 'ALLOW', 'DENY'),    # T16 B1
     ('Bash', 'rg "aid_session.py qa-pass" docs', 'ALLOW', 'ALLOW'),
-    ('Bash', 'python -m pytest tests/test_aid_session.py -k approve', 'ALLOW', 'DENY'),
+    ('Bash', 'python -m pytest tests/test_aid_session.py -k approve', 'ALLOW', 'DENY'),    # T16 B1
     ('Bash', 'git diff hooks/aid_session.py', 'ALLOW', 'ALLOW'),
     ('Bash', 'cat hooks/aid_session.py | head -n 5', 'ALLOW', 'ALLOW'),
     ('Bash', 'npm test', 'ALLOW', 'ALLOW'),

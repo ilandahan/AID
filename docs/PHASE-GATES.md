@@ -57,7 +57,9 @@ its level, whether or not it changed since the last session.
 
 ### Hooks that act outside AID projects
 
-The phase rules apply only in AID projects, but three of AID's hooks are not limited to them:
+The phase rules apply only in AID projects, but four of AID's hooks are not limited to them
+once the plugin is installed (on the clone route only linked projects run AID hooks, so a
+folder that is not linked has none of them):
 
 - **dev-pipeline-gate (Stop)** runs in every git repo. When a turn ends with changed
   source files, it may run the repo's own checkers (for example
@@ -70,7 +72,17 @@ The phase rules apply only in AID projects, but three of AID's hooks are not lim
   Bash and the PowerShell tool, in their exact forms only (other spellings of the two
   scripts are not asked outside AID projects, from Phase 4 on, or at `log` or `warn`), and
   denies other spellings of a confirmed call that it can parse (see
-  [SECURITY-MODEL.md](SECURITY-MODEL.md#human-confirmation-ask)).
+  [SECURITY-MODEL.md](SECURITY-MODEL.md#human-confirmation-ask)). It also asks in every
+  folder before the pipeline's `gate.mjs --resolve` runs, in its exact form
+  (`node "<plugin>/skills/pipeline-orchestrator/gate.mjs" --resolve "<what was decided>"`);
+  a non-exact spelling is not caught outside AID projects (see
+  [SECURITY-MODEL.md](SECURITY-MODEL.md#what-aid-does-not-promise)).
+- **The Write and Bash gates (PreToolUse)** refuse a write to a project `.aid/state.json`
+  in every folder, AID project or not: from the Write, Edit, MultiEdit and NotebookEdit
+  tools and from Bash and PowerShell commands that name it. Only `aid_session.py` writes
+  it. Outside AID projects a name built at run time, or a write reached through a change of
+  folder, a shell `-c` body or interpreter code, is not caught (see
+  [SECURITY-MODEL.md](SECURITY-MODEL.md#what-aid-does-not-promise)).
 
 To lower a gate for one project, set it in `.aid/hooks/config.json`. Levels are
 case-insensitive, and an unknown value counts as `block`:

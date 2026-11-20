@@ -317,7 +317,7 @@ After deployment:
 - Document lessons learned
 - Update documentation if needed
 - Close out project artifacts
-- Collect feedback via `/aid end`
+- Collect feedback via `/aid-end`
 
 ---
 

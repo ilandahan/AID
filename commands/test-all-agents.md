@@ -26,36 +26,30 @@ Run comprehensive tests for all 4 AID sub-agents to verify they work correctly.
 
 ## Test Execution
 
-When invoked, run all agent tests:
+When invoked, run the four tests yourself, in this session, one after the other. Each test
+spawns its agent by name; the agent returns its result as text (its verdict JSON) and is
+not asked to write any file. You, the parent session, write every report file from the
+returned results.
 
-```
-Task(
-  subagent_type: "general-purpose",   # no AID agent for this job
-  prompt: "Run comprehensive tests for all AID agents.
+OUTPUT TO: `.aid/agent-tests/full-suite-{timestamp}/`
 
-OUTPUT TO: .aid/agent-tests/full-suite-{timestamp}/
+### Test Sequence
 
-## Test Sequence
+1. **AID Test Agent**: follow `/aid-test --quick`. Expected: all phases pass, QA validation
+   works. Then write `aid-test-agent/report.md` from the returned results.
+2. **Reflection Agent**: follow `/test-reflection --quick`. Expected: isolation verified,
+   scoring accurate. Then write `reflection-agent/report.md` from the returned results.
+3. **QA Validator Agent**: follow `/test-qa-validator --quick`. Expected: criteria checking
+   accurate. Then write `qa-validator-agent/report.md` from the returned results.
+4. **Phase Review Agent**: follow `/test-phase-review --quick`. Expected: gate validation
+   accurate. Then write `phase-review-agent/report.md` from the returned results.
 
-### 1. AID Test Agent
-Run /aid-test --quick
-Expected: All phases pass, QA validation works
+Each `report.md` holds the test table (test, expected, actual, pass) built from what the
+agent returned. Do not ask a sub-agent to write it.
 
-### 2. Reflection Agent
-Run /test-reflection --quick
-Expected: Isolation verified, scoring accurate
+### Generate Combined Report
 
-### 3. QA Validator Agent
-Run /test-qa-validator --quick
-Expected: Criteria checking accurate
-
-### 4. Phase Review Agent
-Run /test-phase-review --quick
-Expected: Gate validation accurate
-
-## Generate Combined Report
-
-Create full-suite-report.md:
+Then write `full-suite-report.md` yourself:
 
 ```
 AID Agent Test Suite - Complete
@@ -79,10 +73,6 @@ Individual Reports:
 - reflection-agent/report.md
 - qa-validator-agent/report.md
 - phase-review-agent/report.md
-```
-",
-  description: "Run all agent tests"
-)
 ```
 
 ## Expected Output

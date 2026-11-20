@@ -65,20 +65,36 @@ const createTestUser = (overrides = {}) => ({
 
 ## Environment Variables for Tests
 
-Create `.env.test` (gitignored):
+`.env.test` (gitignored) holds **non-secret settings only**: hosts, ports, database names,
+feature flags. Never put a key, token or password in it, even a test one: a plaintext file
+gets copied, synced, attached and committed by mistake.
 
 ```bash
-# .env.test (ADD TO .gitignore)
-TEST_DB_URL=postgresql://test:testpassword@localhost:5432/test_db
-TEST_API_KEY=<test-api-key>
+# .env.test (ADD TO .gitignore) - non-secret settings only
+TEST_DB_HOST=localhost
+TEST_DB_PORT=5432
+TEST_DB_NAME=test_db
+TEST_BASE_URL=http://localhost:3000
 ```
 
-Create `.env.example` (safe to commit):
+Test keys and passwords come from, in order of preference: SSO/OAuth (no key at all), then
+the OS keystore (macOS Keychain `security`, Windows Credential Manager `cmdkey` /
+`Get-StoredCredential`, Linux `secret-tool`), loaded into the shell's environment, then an
+environment variable set by the CI secret store. Never a file. For example (macOS):
+
+```bash
+export TEST_API_KEY=$(security find-generic-password -s aid-test-api -w)
+export TEST_DB_PASSWORD=$(security find-generic-password -s aid-test-db -w)
+```
+
+`.env.example` (safe to commit) lists the same non-secret settings, and names the secrets
+the tests read from the environment without a value:
 
 ```bash
 # .env.example (SAFE TO COMMIT)
-TEST_DB_URL=postgresql://user:password@localhost:5432/test_db
-TEST_API_KEY=your_test_api_key_here
+TEST_DB_HOST=localhost
+TEST_DB_NAME=test_db
+# Secrets (TEST_API_KEY, TEST_DB_PASSWORD) come from the OS keystore or the CI secret store.
 ```
 
 ---

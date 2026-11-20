@@ -262,7 +262,7 @@ Recovery procedure: see **When a spawned agent reports no result** in `SKILL.md`
 ### Config File Missing
 
 If `.aid/pipeline/config.json` doesn't exist:
-- Create with default values
+- Create it with the Write tool from the plugin's `config.default.json` (never a Bash `cp`/redirect: AID denies a Bash write to this file; a Write that creates it is allowed)
 - Display: "Created pipeline config with defaults. Edit `.aid/pipeline/config.json` to customize."
 
 ### Test Command Not Found

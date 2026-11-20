@@ -40,6 +40,10 @@ Usage (T3: this script is the ONLY writer of .aid/state.json, a protected file):
                                             --all adds memory/; never integrity/)        [confirmed]
   aid_session.py qa-pass <task_id> [--note TEXT]   record a QA pass for .aid/qa/<task_id>.yaml
                                             (phase 4-5; read by the QA Stop gate)          [confirmed]
+  aid_session.py status [--format text|json]  project, session, feedback, improvement stats,
+                                            memory slots and queue length (read-only)
+  T16: init also creates .aid/context.json when absent (never overwrites it); memory-sync and
+  memory-apply update $AID_HOME/metrics/improvement.json.
   T8: feedback text is redacted before it is written (memory_system/redact.py, best effort).
   [confirmed] = Claude Code asks the user first: SessionStart installs permission ask rules
   for exactly these calls (aid_guard.ASK_RULES), and the phase gate refuses any other
@@ -161,6 +165,23 @@ def save_json(path, data):
         raise
 
 
+def ensure_context_file():
+    """T16-16 (E2, G1-09; I-10): `init` also creates <root>/.aid/context.json, the file
+    /context reads, when it is absent. Exclusive create: an existing context.json (the
+    user's work notes) is never overwritten, also not by `init --repair`."""
+    path = STATE_FILE.parent / "context.json"
+    data = {"$schema": "aid-context-v1", "version": "1.0", "last_updated": now_iso(),
+            "current_task": None, "current_step": None,
+            "progress": {"steps_completed": [], "steps_pending": []},
+            "session_notes": [], "blockers": []}
+    try:
+        fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+    except FileExistsError:
+        return
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(json.dumps(data, indent=2) + "\n")
+
+
 PHASE_NAMES = ["Discovery", "PRD", "Tech Spec", "Impl Plan", "Development", "QA & Ship"]
 
 
@@ -193,12 +214,34 @@ def require_state():
     return state
 
 
-def set_phase(state, phase, role=None, role_display=None):
+def phase_terms(role, phase):
+    """T16-17 (G4-14): the terminology entry {name, description} for a role's phase.
+    'other' and unknown roles use the developer terms, as the menus do. None when the
+    terminology file cannot be read (the caller then keeps the generic PHASE_NAMES)."""
+    phases = (load_json(TERMS_FILE) or {}).get("phases")
+    if not isinstance(phases, dict):
+        return None
+    table = phases.get(role) if isinstance(phases.get(role), dict) else phases.get("developer")
+    entry = table.get(str(phase)) if isinstance(table, dict) else None
+    return entry if isinstance(entry, dict) else None
+
+
+def set_phase(state, phase, role=None, role_display=None, phase_desc=None):
     """One place that moves the phase, so the flat keys, current_session and phase_name
-    never disagree (A-18: readers used current_session, the writer only flat keys)."""
+    never disagree (A-18: readers used current_session, the writer only flat keys).
+    T16-17 (G4-14): it also sets phase_display / phase_description for the new phase and
+    status "active" (current_session.active is True), so advance never leaves the previous
+    phase's label behind. A custom phase_desc applies only to the call that passes it."""
     state["current_phase"] = phase
     state["phase"] = phase
     state["phase_name"] = PHASE_NAMES[phase]
+    terms = phase_terms(role or state.get("role"), phase)
+    if terms:
+        state["phase_display"] = terms.get("name") or PHASE_NAMES[phase]
+        state["phase_description"] = phase_desc or terms.get("description", "")
+    elif phase_desc:
+        state["phase_description"] = phase_desc
+    state["status"] = "active"
     session = state.get("current_session") if isinstance(state.get("current_session"), dict) else {}
     session.update({"active": True, "role": role or session.get("role") or state.get("role"),
                     "phase": phase, "started": session.get("started") or now_iso()})
@@ -395,8 +438,11 @@ def _begin(args, state):
         "skills_loaded": skills,
     })
     state["current_session"] = {}            # a new session, not a continuation
-    set_phase(state, new_phase, role=role, role_display=state["role_display"])
+    set_phase(state, new_phase, role=role, role_display=state["role_display"],
+              phase_desc=args.phase_desc)
     save_json(STATE_FILE, state)
+    if args.fn is cmd_init:
+        ensure_context_file()
 
     print("✅ Session started\n")
     print(f"Role:  {state['role_display']}")
@@ -495,10 +541,44 @@ def cmd_memory_feedback(args):
     print(json.dumps(entries, indent=2, ensure_ascii=False))
 
 
+def _improvement_file():
+    return _aid_home() / "metrics" / "improvement.json"
+
+
+def read_improvement():
+    """I-11: the improvement-run statistics, with defaults for a missing or malformed file."""
+    stats = {"last_improvement_run": None, "runs": 0, "feedback_processed": 0, "skills_updated": 0}
+    data = load_json(_improvement_file())
+    if isinstance(data, dict):
+        for k in ("runs", "feedback_processed", "skills_updated"):
+            v = data.get(k)
+            if isinstance(v, int) and not isinstance(v, bool) and v >= 0:
+                stats[k] = v
+        if isinstance(data.get("last_improvement_run"), str):
+            stats["last_improvement_run"] = data["last_improvement_run"]
+    return stats
+
+
+def record_improvement(run=False, processed=0, skills=0):
+    """T16-18 (g8-improve-stat; I-11): written only by an approved memory-sync (run=True)
+    and a successful memory-apply (skills=1). Previews, rejects and refusals write nothing."""
+    stats = read_improvement()
+    if run:
+        stats["last_improvement_run"] = now_iso()
+        stats["runs"] += 1
+        stats["feedback_processed"] += processed
+    stats["skills_updated"] += skills
+    save_json(_improvement_file(), stats)
+
+
 def cmd_memory_sync(args):
     _memory_system()
     from memory_system.subagent import LearningSubAgent, print_sync_result
-    print_sync_result(LearningSubAgent(days=args.days).sync_to_memory(days=args.days, approve=True))
+    result = LearningSubAgent(days=args.days).sync_to_memory(days=args.days, approve=True)
+    print_sync_result(result)
+    if isinstance(result, dict) and not result.get("dry_run"):
+        processed = result.get("processed", [])        # I-11: WS-D fills it; may be absent
+        record_improvement(run=True, processed=len(processed) if isinstance(processed, list) else 0)
 
 
 def cmd_memory_queue(args):
@@ -542,6 +622,7 @@ def cmd_memory_apply(args):
     result = apply_recommendation(args.id)
     if not result["ok"]:
         sys.exit("memory-apply refused: " + result["reason"])
+    record_improvement(skills=1)
     print("✅ Applied {} to {}".format(result["id"], result["target"]))
 
 
@@ -690,6 +771,87 @@ def cmd_qa_pass(args):
     print("✅ QA pass recorded for {} (criteria sha256 {}).".format(args.task_id, digest[:12]))
 
 
+# ---------------------------------------------------------------------------
+# T16-19 (g8-aid-status; I-10): status, the read-only data source for /aid-status.
+# Not a confirmed subcommand (not in I-1): it writes nothing.
+# ---------------------------------------------------------------------------
+
+def _feedback_counts():
+    base = _aid_home() / "feedback"
+    pending = sorted((base / "pending").glob("*.json")) if (base / "pending").is_dir() else []
+    processed = list((base / "processed").glob("*.json")) if (base / "processed").is_dir() else []
+    stamps = [d.get("timestamp") for d in (load_json(p) for p in pending)
+              if isinstance(d, dict) and isinstance(d.get("timestamp"), str)]
+    return {"pending": len(pending), "processed": len(processed),
+            "newest_pending": max(stamps) if stamps else None}
+
+
+def _memory_and_queue():
+    """Memory slots used/total and the recommendation queue length, from memory-system.
+    None for each when the package cannot be imported. Reading creates nothing."""
+    try:
+        _memory_system()
+        from memory_system.analysis.memory_sync import MemorySlotManager
+        from memory_system.recommendations.generator import load_recommendation_queue
+    except ImportError:
+        return None, None
+    usage = MemorySlotManager().get_slot_usage()
+    memory = {"used": sum(u["used"] for u in usage.values()),
+              "total": sum(u["max"] for u in usage.values())}
+    return memory, {"queued": len(load_recommendation_queue())}
+
+
+def collect_status():
+    sys.path.insert(0, str(HERE))
+    import aid_hooks                      # noqa: E402  (bundled beside this file)
+    root = STATE_FILE.parent.parent
+    project = session = None
+    if aid_hooks.is_aid_root(root):
+        state, problem = read_state()
+        project = {"root": str(root), "initialized": state is not None,
+                   "phase": state["current_phase"] if state else None,
+                   "phase_name": PHASE_NAMES[state["current_phase"]] if state else None}
+        if problem:
+            project["problem"] = problem
+        if state:
+            cs = state.get("current_session") if isinstance(state.get("current_session"), dict) else {}
+            session = {"role": state.get("role"), "role_display": state.get("role_display"),
+                       "phase_display": state.get("phase_display"),
+                       "started": cs.get("started") or state.get("session_start"),
+                       "active": cs.get("active") is True, "status": state.get("status")}
+    memory, recs = _memory_and_queue()
+    return {"project": project, "session": session, "feedback": _feedback_counts(),
+            "improvement": read_improvement(), "memory": memory, "recommendations": recs}
+
+
+def cmd_status(args):
+    sys.dont_write_bytecode = True           # "writes nothing" includes __pycache__
+    st = collect_status()
+    if args.format == "json":
+        print(json.dumps(st, indent=2, ensure_ascii=False))
+        return
+    p, s, fb, imp, mem, rec = (st[k] for k in ("project", "session", "feedback", "improvement",
+                                               "memory", "recommendations"))
+    if p is None:
+        print("Project: not an AID project (not initialized)")
+    elif not p["initialized"]:
+        print("Project: {} (not initialized{})".format(p["root"], ": " + p["problem"] if p.get("problem") else ""))
+    else:
+        print("Project: {}  Phase: {}. {}".format(p["root"], p["phase"], p["phase_name"]))
+    if s:
+        print("Session: role {}  phase {}  started {}  {}".format(
+            s["role_display"] or s["role"], s["phase_display"], s["started"],
+            "active" if s["active"] else "not active"))
+    print("Feedback: {} pending, {} processed (newest pending: {})".format(
+        fb["pending"], fb["processed"], fb["newest_pending"] or "-"))
+    print("Improvement: last run {}  runs {}  feedback processed {}  skills updated {}".format(
+        imp["last_improvement_run"] or "never", imp["runs"], imp["feedback_processed"],
+        imp["skills_updated"]))
+    print("Memory: {}".format("{}/{} slots used".format(mem["used"], mem["total"]) if mem
+                              else "unavailable (memory-system not found)"))
+    print("Recommendations queued: {}".format(rec["queued"] if rec else "unavailable"))
+
+
 def main():
     global STATE_FILE
     # T3 A2: no abbreviations (`--rep` must not act as --repair past the ask rules).
@@ -764,6 +926,11 @@ def main():
     qp.add_argument("task_id")
     qp.add_argument("--note", default=None)
     qp.set_defaults(fn=cmd_qa_pass)
+
+    st = sub.add_parser("status", help="print project, session, feedback, improvement, memory "
+                                       "and queue status (read-only)")
+    st.add_argument("--format", choices=["text", "json"], default="text")
+    st.set_defaults(fn=cmd_status)
 
     args = p.parse_args()
     STATE_FILE = project_state_file()

@@ -22,7 +22,8 @@
 > README.md - Main documentation
 
 # Core Concept
-> 5-phase gated methodology with human approval between phases:
+> 6-phase gated methodology (phases 0-5) with human approval between phases:
+> 0. Discovery - Research and Go/No-Go
 > 1. PRD - Product Requirements
 > 2. Tech Spec - Architecture Design
 > 3. Breakdown - Jira Task Creation
@@ -37,7 +38,7 @@
 > - 44 slash commands
 
 # Technology Stack
-> Next.js 16, React 19, TypeScript, PostgreSQL, Prisma, Jest
+> Stack-agnostic methodology. The /start-project scaffold uses Next.js, React, TypeScript and Jest.
 
 # Essential Commands
 > /good-morning - Daily startup

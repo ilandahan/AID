@@ -15,7 +15,7 @@ Generate a Technical Specification document from a PRD.
 ## What It Does
 
 1. **Reads PRD**
-   - Parses `docs/prd/PRD-<feature-name>.md`
+   - Parses `docs/prd/YYYY-MM-DD-<feature>.md` (the newest PRD for the feature)
    - Extracts requirements
 
 2. **Generates Technical Spec**
@@ -26,7 +26,7 @@ Generate a Technical Specification document from a PRD.
    - Security considerations
 
 3. **Saves Document**
-   - Location: `docs/tech-spec/TECH-SPEC-<feature-name>.md`
+   - Location: `docs/tech-spec/YYYY-MM-DD-<feature>.md` (same `<feature>` name as the PRD)
 
 ## Technical Spec Structure
 

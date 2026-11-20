@@ -18,7 +18,7 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 │  1. READ context before starting any work                       │
 │  2. UPDATE context on every significant change                  │
 │  3. READ phase state (.aid/state.json, read-only)               │
-│  4. INTEGRATE with feedback system (/aid end)                   │
+│  4. INTEGRATE with feedback system (/aid-end)                   │
 │  5. SAVE context at conversation end                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -234,7 +234,7 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 | `progress_update` | Significant progress milestone | Percentage, notes |
 | `blocker_noted` | Hit a blocker | Description |
 | `phase_changed` | Phase transition | From/to phase |
-| `feedback_collected` | /aid end completed | Rating |
+| `feedback_collected` | /aid-end completed | Rating |
 | `context_saved` | Manual context save | Reason |
 | `session_ended` | End of work session | Summary |
 
@@ -252,12 +252,12 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 │       ▼                                                         │
 │  Check: Is this phase ending?                                   │
 │       │                                                         │
-│       ├── Yes ──▶ Prompt: "/aid end for phase feedback"         │
+│       ├── Yes ──▶ Prompt: "/aid-end for phase feedback"         │
 │       │                                                         │
 │       ▼                                                         │
 │  Check: Sessions since feedback >= 3?                           │
 │       │                                                         │
-│       ├── Yes ──▶ Remind: "Consider /aid end for feedback"      │
+│       ├── Yes ──▶ Remind: "Consider /aid-end for feedback"      │
 │       │                                                         │
 │       ▼                                                         │
 │  Continue to next task                                          │
@@ -268,9 +268,9 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 
 | Condition | Reminder |
 |-----------|----------|
-| Phase ending | "Run /aid end before advancing to next phase" |
-| 3+ sessions without feedback | "Consider /aid end to share what worked" |
-| 5+ tasks completed | "Good time for /aid end checkpoint" |
+| Phase ending | "Run /aid-end before advancing to next phase" |
+| 3+ sessions without feedback | "Consider /aid-end to share what worked" |
+| 5+ tasks completed | "Good time for /aid-end checkpoint" |
 
 ## Integration with Commands
 
@@ -280,8 +280,8 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 | `/context` | Display current context state |
 | `/context update` | Manual context update |
 | `/phase` | Copy phase from state.json into context (read-only on state) |
-| `/aid end` | Update feedback tracking, save context |
-| `/aid improve` | Reset feedback counters |
+| `/aid-end` | Update feedback tracking, save context |
+| `/aid-improve` | Reset feedback counters |
 
 ## Error Handling
 
