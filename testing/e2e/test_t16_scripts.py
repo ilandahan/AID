@@ -222,7 +222,10 @@ def test_t16_63_link_registers_plugin_hooks_and_they_gate(base, link):
         assert data['hooks'][event] == want[event], (event, data['hooks'].get(event))
     for g in data['hooks']['PreToolUse']:
         assert [(h['onFailure'], h['timeout']) for h in g['hooks']] == [('block', 10)], g
-    assert "'" in R and ' ' in R, 'the test must use the real AID path (spaces + apostrophe)'
+    if os.name == 'nt':
+        # On the owner's machine the real AID path has spaces and an apostrophe, the hard quoting
+        # case; a CI checkout (/home/runner/work/AID/AID) has neither.
+        assert "'" in R and ' ' in R, 'the test must use the real AID path (spaces + apostrophe)'
     # The permissions block comes from the AID settings template.
     tmpl = json.loads((REPO / '.claude' / 'settings.json').read_text(encoding='utf-8'))
     assert data['permissions'] == tmpl['permissions']

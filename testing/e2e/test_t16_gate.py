@@ -149,10 +149,15 @@ def test_t16_1_write_tools_refuse_project_state_in_every_folder(base, place):
 @pytest.mark.parametrize('tool', sorted(TOOL_INPUT))
 def test_t16_1_every_spelling_is_refused_outside_aid(base, tool):
     w = _w(base, 'non-AID')
-    for p in (str(w.P / '.aid' / 'state.json'), '.AID/STATE.JSON', 'sub/.aid/state.json',
-              'x/../.aid/state.json', '.aid/state.json.', '.aid./state.json ', 'new/dir/.aid/state.json',
-              # R1-04: NTFS stream spellings (the main stream is the file; an alt stream creates it)
-              '.aid/state.json::$DATA', '.aid/STATE.json:alt', '.AID\\state.json:x:$DATA'):
+    spellings = [str(w.P / '.aid' / 'state.json'), '.AID/STATE.JSON', 'sub/.aid/state.json',
+                 'x/../.aid/state.json', 'new/dir/.aid/state.json']
+    if os.name == 'nt':
+        # Windows-only aliases (as in AC-35): Win32 drops trailing dots/spaces, '\' is a separator,
+        # and an NTFS stream spelling names the file (R1-04). On Linux/macOS each of these is a
+        # different file name, so the gate rightly allows it there.
+        spellings += ['.aid/state.json.', '.aid./state.json ', '.aid/state.json::$DATA',
+                      '.aid/STATE.json:alt', '.AID\\state.json:x:$DATA']
+    for p in spellings:
         v = w.write(p, tool)
         assert v[0] == 'DENY', (p, tool, v)
     assert not (w.P / '.aid').exists()
