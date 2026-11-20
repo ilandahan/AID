@@ -56,7 +56,7 @@ def sess(cwd, home, *args, **env):
 @pytest.fixture
 def probe(tmp_path):
     """An empty folder at the drive root (no AID marker above it) and a fake home H."""
-    d = Path(tempfile.mkdtemp(prefix="aid-t16-", dir=Path(tmp_path).anchor))
+    d = Path(tempfile.mkdtemp(prefix="aid-t16-", dir=Path(tmp_path).anchor if os.name == "nt" else None))
     H = tmp_path / "H"
     H.mkdir()
     yield d, H

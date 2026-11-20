@@ -51,7 +51,9 @@ def _marker_above(p):
 @pytest.fixture
 def base(tmp_path):
     """A probe directory with no AID marker above it (drive root, contract section 4)."""
-    alt = Path(tempfile.mkdtemp(prefix='aid-t16-', dir=Path(tmp_path).anchor))
+    # Drive root only on Windows (to leave C:/Users/<me>); on Linux/macOS / is not writable
+    # and the temp dir has no AID marker above it anyway.
+    alt = Path(tempfile.mkdtemp(prefix='aid-t16-', dir=Path(tmp_path).anchor if os.name == 'nt' else None))
     if _marker_above(alt):
         shutil.rmtree(alt, ignore_errors=True)
         pytest.skip('no directory without an AID marker ancestor is available')

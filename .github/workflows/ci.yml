@@ -48,7 +48,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version: "22"
       - run: node --test
         working-directory: skills/pipeline-orchestrator
 
@@ -83,7 +83,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version: "22"
       - run: npm ci --ignore-scripts
       - run: npm audit --audit-level=high
       - name: cucumber smoke profile on an empty health root (T15-43)

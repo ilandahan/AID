@@ -99,7 +99,7 @@ def _safe_rmtree(root):
 @pytest.fixture
 def base(tmp_path):
     """A drive-root temp dir with no AID marker above it."""
-    alt = Path(tempfile.mkdtemp(prefix='aid-t16f-', dir=tmp_path.anchor))
+    alt = Path(tempfile.mkdtemp(prefix='aid-t16f-', dir=tmp_path.anchor if os.name == 'nt' else None))
     if _marker_above(alt):
         _safe_rmtree(alt)
         pytest.skip('no directory without an AID marker ancestor is available')

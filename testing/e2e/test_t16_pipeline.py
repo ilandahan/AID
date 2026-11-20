@@ -66,7 +66,7 @@ BASE_PRELUDE = 'unset CLAUDE_PROJECT_DIR CLAUDE_CONFIG_DIR SKIP_PIPELINE_GATE SK
 @pytest.fixture
 def probe(tmp_path):
     """A probe dir at the drive root (outside C:/Users/<me>), removed afterwards."""
-    d = Path(tempfile.mkdtemp(prefix='aid-t16-', dir=Path(tmp_path).anchor))
+    d = Path(tempfile.mkdtemp(prefix='aid-t16-', dir=Path(tmp_path).anchor if os.name == 'nt' else None))
     try:
         yield d
     finally:
