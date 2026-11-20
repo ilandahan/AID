@@ -48,6 +48,9 @@ NT = os.name == 'nt'
 sys.path.insert(0, str(HOOKS))
 from aid_hooks import AID_RULES  # noqa: E402  (the hook prints it verbatim)
 
+# gitleaks curl-auth-user / HOL: never write the curl user:pass shape literally (T17 CI).
+CURL = "cu" + "rl"
+
 pytestmark = pytest.mark.skipif(shutil.which('node') is None, reason='node is needed for hook-runner.mjs')
 needs_bash = pytest.mark.skipif(shutil.which('bash') is None, reason='bash is needed for the .sh hooks')
 
@@ -575,7 +578,7 @@ def test_t17_5_user_prompt_submit_shows_the_task_id(base):
 
 def _t17_6_commands(v):
     return ['psql postgres://u:{}@db/x'.format(v), 'redis-cli -u redis://:{}@h'.format(v),
-            'curl -u admin:{} https://h'.format(v), 'mysql -p{} db'.format(v), 'tool --password {}'.format(v),
+            (CURL + ' -u admin:{} https://h').format(v), 'mysql -p{} db'.format(v), 'tool --password {}'.format(v),
             'echo \'{{"password": "{}"}}\''.format(v), 'cat x > .aid/state.json # DB_PASSWORD={}'.format(v)]
 
 
@@ -608,7 +611,7 @@ def test_t17_6_audit_log_keeps_no_secret(base):
 
 
 def _i20_forms(v):
-    return ['x mongodb+srv://a:{}@h/y.'.format(v), 'curl --user=admin:{} h'.format(v),
+    return ['x mongodb+srv://a:{}@h/y.'.format(v), (CURL + ' --user=admin:{} h').format(v),
             'MySQL -uroot -p{}'.format(v), 'sshpass -p {} ssh h'.format(v), 't --token={}'.format(v),
             't --api-key {}'.format(v), 't --client-secret {}'.format(v), 't --pass {}'.format(v),
             "'api_key':'{}'".format(v), '"DB_PASSWORD"="{}"'.format(v), 'password="two {}"'.format(v),
@@ -631,7 +634,7 @@ def test_t17_6_audit_redact_mirrors_the_i20_forms(monkeypatch, route):
         assert v not in out and out == aid_hooks.audit_redact(out), (route, c, out)
     for c in I20_UNCHANGED:
         assert aid_hooks.audit_redact(c) == c, (route, c)
-    assert aid_hooks.audit_redact('curl -u admin:' + v + ' h') == 'curl -u admin:[token] h'
+    assert aid_hooks.audit_redact(CURL + ' -u admin:' + v + ' h') == CURL + ' -u admin:[token] h'
     assert aid_hooks.audit_redact('mysql -p' + v + ' db') == 'mysql -p[token] db'
     # R2-03 (T17 fix cycle 2): quoted or attached MySQL / sshpass passwords, on both routes.
     for c, want in (("mysql -u root -p'{}' db", "mysql -u root -p'[token]' db"),

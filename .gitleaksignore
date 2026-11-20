@@ -27,3 +27,8 @@ ed85c2cd4751ce2d332e8fe927a35fc21ba723ce:.claude/skills/role-qa-engineer/referen
 ecb1c4cb581319af4c9e4dda57b4231df0f9611b:memory-system/tests/test_redact.py:aws-access-token:24
 ecb1c4cb581319af4c9e4dda57b4231df0f9611b:memory-system/tests/test_review_r1.py:gitlab-pat:30
 ecb1c4cb581319af4c9e4dda57b4231df0f9611b:memory-system/tests/test_review_r1.py:stripe-access-token:30
+9f6fdffef17b472db8a938003afeb96b1eac3fe0:memory-system/tests/test_t17_memory.py:curl-auth-user:49
+9f6fdffef17b472db8a938003afeb96b1eac3fe0:testing/e2e/test_t17_session.py:curl-auth-user:83
+9f6fdffef17b472db8a938003afeb96b1eac3fe0:testing/e2e/test_t17_gate.py:curl-auth-user:578
+9f6fdffef17b472db8a938003afeb96b1eac3fe0:testing/e2e/test_t17_gate.py:curl-auth-user:611
+9f6fdffef17b472db8a938003afeb96b1eac3fe0:testing/e2e/test_t17_gate.py:curl-auth-user:634

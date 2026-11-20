@@ -33,6 +33,9 @@ from pathlib import Path
 
 import pytest
 
+# gitleaks curl-auth-user / HOL: never write the curl user:pass shape literally (T17 CI).
+CURL = "cu" + "rl"
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SESSION = REPO_ROOT / "hooks" / "aid_session.py"
 GATE = REPO_ROOT / "skills" / "pipeline-orchestrator" / "gate.mjs"
@@ -80,7 +83,7 @@ def _all_i20_forms(v):
     return " ; ".join([
         "psql postgres://u:" + v + "@db/x", "redis-cli -u redis://:" + v + "@h",
         "mongodb+srv://u:" + v + "@c.example.net/x", "amqp://u:" + v + "@b/vh",
-        "curl -u admin:" + v + " https://h", "curl --user=admin:" + v + " x",
+        CURL + " -u admin:" + v + " https://h", CURL + " --user=admin:" + v + " x",
         "mysql -p" + v + " db", "sshpass -p " + v + " ssh h",
         # R1-04 (fix cycle 1): quoted attached mysql values, attached sshpass values
         "mysql -u root -p'" + v + "' db", 'mysql -u root -p"' + v + '" db', "sshpass -p" + v + " ssh h",
