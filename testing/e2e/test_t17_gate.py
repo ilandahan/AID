@@ -759,7 +759,9 @@ def test_t17_10_restriction_line_matches_the_level(base, level):
 
 # --- T17-11 no constant-folded fake token in a .pyc --------------------------------------
 
-def test_t17_11_no_github_pat_prefix_in_compiled_tests(tmp_path):
+def test_t17_11_no_gh_token_prefix_in_compiled_tests(tmp_path):
+    # Named without the fine-grained PAT prefix: `github` + `_pat_` + text is a token shape
+    # to secret scanners (the HOL scanner flagged the old name as a hardcoded secret).
     prefix = ''.join(['gh', 'p_']).encode('ascii')
     here = Path(__file__).resolve().parent
     files = [here / 'test_t16_gate.py'] + sorted(here.glob('test_t17_*.py'))
