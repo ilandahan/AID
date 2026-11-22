@@ -108,7 +108,8 @@ Reports saved to:
 - Generates valid outputs for Phases 0-4
 - Quality checks catch violations
 - QA validation detects pass/fail correctly
-- Phase gates enforced
+- Gate rules reported; human-only steps (`aid_session.py approve`, `advance`, `jump`,
+  which the user confirms) listed as not run: a test agent cannot run the real gate
 
 ### reflection-agent
 - Context isolation (no conversation bias)

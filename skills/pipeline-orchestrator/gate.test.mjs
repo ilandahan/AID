@@ -670,6 +670,65 @@ test("t17_20: without --usage the documented estimate is recorded, marked estima
   }
 });
 
+// #10: --usage is self-reported, so it can lower the brake but must not be able to zero or break it.
+test("t17_20: a zero --usage still records at least the documented estimate", () => {
+  const root = t17Root("gate-t17-zero-");
+  try {
+    const r = runGate(["--step", "CODE_REVIEW", "--scores", '{"overall":9.6}', "--usage", '{"input_tokens":0,"output_tokens":0}'], root);
+    assert.equal(r.status, 0, r.out);
+    const s = t17State(root);
+    assert.equal(s.cost.total_input_tokens, 4000);
+    assert.equal(s.cost.total_output_tokens, 2000);
+    assert.ok(Math.abs(s.cost.estimated_cost_usd - T17_USD) < 1e-12);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("t17_20: a huge --usage is clamped, so the running cost stays finite and never reads back as 0", () => {
+  const root = t17Root("gate-t17-huge-");
+  try {
+    const huge = JSON.stringify({ input_tokens: 1e308, output_tokens: 1e308 });
+    runGate(["--step", "CODE_REVIEW", "--scores", '{"overall":8}', "--usage", huge], root);
+    runGate(["--step", "CODE_REVIEW", "--scores", '{"overall":8}', "--usage", huge], root);
+    const s = t17State(root);
+    assert.equal(s.cost.total_input_tokens, 2 * 5_000_000);
+    assert.equal(s.cost.total_output_tokens, 2 * 5_000_000);
+    assert.ok(Number.isFinite(s.cost.estimated_cost_usd) && s.cost.estimated_cost_usd > 0, String(s.cost.estimated_cost_usd));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("t17_20: a corrupted persisted running cost does not reset the brake to 0", () => {
+  for (const bad of [null, "12", -5]) {
+    const root = t17Root("gate-t17-corrupt-");
+    try {
+      writeFileSync(join(root, ".aid/pipeline/state.json"), JSON.stringify({ cost: { estimated_cost_usd: bad } }));
+      runGate(["--step", "CODE_REVIEW", "--scores", '{"overall":9.6}', "--usage", T17_USAGE], root);
+      const s = t17State(root);
+      assert.ok(Number.isFinite(s.cost.estimated_cost_usd), JSON.stringify(bad));
+      assert.ok(s.cost.estimated_cost_usd >= 1e300, `${JSON.stringify(bad)} -> ${s.cost.estimated_cost_usd}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("T20 audit: a present but non-object cost (or one missing its running total) does not reset the brake", () => {
+  for (const bad of [null, [], "x", 7, {}, { total_input_tokens: 5 }]) {
+    const root = t17Root("gate-t20-costshape-");
+    try {
+      writeFileSync(join(root, ".aid/pipeline/state.json"), JSON.stringify({ cost: bad }));
+      runGate(["--step", "CODE_REVIEW", "--scores", '{"overall":9.6}', "--usage", T17_USAGE], root);
+      const s = t17State(root);
+      assert.ok(s.cost.estimated_cost_usd >= 1e300, `${JSON.stringify(bad)} -> ${s.cost.estimated_cost_usd}`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("t17_20: a bad --usage exits 3 and writes nothing", () => {
   for (const bad of ["[1,2]", "7", "not json", '{"input_tokens":-1,"output_tokens":2}', '{"input_tokens":1}']) {
     const root = t17Root("gate-t17-bad-");

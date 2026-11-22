@@ -27,6 +27,10 @@ Applies: every session, whenever work starts, a step/task changes, phase changes
 | Phase change | Re-read phase from state.json (never write it) |
 | End conversation | Final save with timestamp |
 
+Timestamps (`last_updated`, session ids) come ONLY from the AID hook line
+`Current time (UTC): ...` in the session context. Never invent a time. If that line is
+absent, write `null`.
+
 ## Context Structure
 
 The one schema, `aid-context-v1` (field types, writers and readers:

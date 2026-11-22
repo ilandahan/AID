@@ -1,7 +1,7 @@
 AID - AI Development Methodology for Claude Code
 Complete Technical Documentation
 
-VERSION: 3.1.0
+VERSION: 3.1.1
 AUTHOR: Ilan Dahan
 BUILT WITH: Claude Code (Anthropic)
 
@@ -775,6 +775,6 @@ Files:
 END OF DOCUMENTATION
 ================================================================================
 
-Version: 3.1.0
+Version: 3.1.1
 Last Updated: 2026-11-22
 Created by: Ilan Dahan

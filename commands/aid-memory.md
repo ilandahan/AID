@@ -14,6 +14,10 @@ built-in memory.
 
 Show all AID-related entries in AID's local memory.
 
+Get the list ONLY from the output of `python -m memory_system --memories` run from the
+plugin's `memory-system/` folder: it redacts secrets, paths and project names on display.
+Never Read `slots.json` directly to build this list (older entries may hold unredacted text).
+
 ```
 AID Memory Entries
 ==================

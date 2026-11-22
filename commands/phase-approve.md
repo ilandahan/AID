@@ -36,9 +36,24 @@ to approve quickly.
    `## Phase N Summary` (phase, role, approved, feedback, the documents in the phase folder)
    and contains `## Phase N Checklist` (the items for the current phase, Phase 0 included).
 2. **Display Phase Summary and Checklist (MANDATORY)**: reproduce its `## Phase N Summary`
-   and `## Phase N Checklist` in your reply. Mark each checklist item done or not done, with
-   the evidence (a file path, a test run, a review result). Do not add, drop or reword items:
-   the subcommand is the one source.
+   and `## Phase N Checklist`, that is, write `## Phase N Summary` and
+   `## Phase N Checklist` as assistant text in your reply BEFORE the `approve` call. The
+   `checklist` tool output alone does not count: the user does not see a tool result as your
+   answer. Mark each checklist item done or not done, with the evidence (a file path, a test
+   run, a review result). Do not add, drop or reword items: the subcommand is the one source.
+   Never go from the `checklist` call straight to the `approve` call.
+
+   Example reply text (before any `approve` call):
+
+   ```
+   ## Phase 2 Summary
+   Phase: 2 (Tech Spec) | Role: Tech Lead | Approved: no | Feedback: no
+   Documents: docs/tech-spec/2026-11-19-user-auth.md
+
+   ## Phase 2 Checklist
+   [x] <item 1 from the checklist output> - evidence: docs/tech-spec/2026-11-19-user-auth.md
+   [ ] <item 2 from the checklist output> - not done: <why>
+   ```
 3. **Collect Mandatory Feedback** (REQUIRED before approval):
    - Ask for rating (1-5)
    - Ask what worked well
@@ -158,8 +173,9 @@ Once approved (the user typed `approve` AND confirmed the `aid_session.py approv
 When this command is invoked:
 
 1. Run ONE Bash call: `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" checklist`
-2. Print its `## Phase N Summary` and `## Phase N Checklist`, each item marked done or not
-   done with evidence (MANDATORY, before the `approve` call)
+2. Write its `## Phase N Summary` and `## Phase N Checklist` as assistant text in your
+   reply, each item marked done or not done with evidence (MANDATORY, before the `approve`
+   call; the tool output alone does not count)
 3. **MANDATORY: Collect feedback** (rating, worked well, to improve)
 4. Condense the feedback into one note (rating plus short summary, allowed characters only)
 5. Ask for human confirmation (`approve` / `reject`)

@@ -234,7 +234,7 @@ _AUDIT_TEXT_KEYS = ("command", "file", "reason", "enforcement_message", "agent_d
 # T17 I-20 (F5): it mirrors the redactor's added forms (any URL scheme, CLI flags, mysql -p,
 # sshpass -p, curl -u, quoted names and values, the exact name `pass`, any Authorization).
 _FB_KEYS = (r"password|passwd|pwd|secret|api[_-]?key|access[_-]?key|private[_-]?key|token"
-            r"|credential")
+            r"|credential|passphrase")
 
 
 def _fb_url(m):
@@ -259,6 +259,20 @@ def _fb_quoted(m):
     return m.group(1) + q + "[token]" + (q if q and len(s) >= 2 and s.endswith(q) else "")
 
 
+def _fb_after(cmd, flag):
+    """T20 #8: the redactor's _after: CMD ... FLAG V (docker login -p, redis-cli -a, openssl -k)."""
+    return re.compile(r"((?i:(?<![\w-])" + cmd + r")\b[^\n;|&]{0,300}?(?<![\w-])" + flag
+                      + r"[ \t]+)(?![\"']?\[token\])(\"[^\"\n]{1,256}\"|'[^'\n]{1,256}'|[\"']?[^\s\"',;]+)")
+
+
+def _fb_secretish(m):
+    """T20 #8: the redactor's _secretish (>= 8 chars with a digit, or lower + later upper)."""
+    v = m.group(2)
+    if any(c.isdigit() for c in v) or (any(c.islower() for c in v) and any(c.isupper() for c in v[1:])):
+        return m.group(1) + "[token]"
+    return m.group(0)
+
+
 _FALLBACK_SECRETS = (
     # I-20 rule 7: any URL scheme; the start is a lookbehind (as the redactor), not \b.
     (re.compile(r"(?i)(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*://[^\s\"'<>]+|\bwww\.[^\s\"'<>]+"), _fb_url),
@@ -273,22 +287,37 @@ _FALLBACK_SECRETS = (
                 r"(?![\"']?\[)(\"[^\"\n]{1,256}\"|'[^'\n]{1,256}'|[\"']?[^\s\"',;]+)"), _fb_quoted),
     (re.compile(r"((?i:(?<![\w-])sshpass)[ \t]+-p[ \t]*)(?![\"']?\[token\])(\"[^\"\n]{1,256}\""
                 r"|'[^'\n]{1,256}'|[\"']?[^\s\"',;]+)"), _fb_quoted),
-    # rule 2: --<name with a keyword, or exactly pass> =V / V (V not starting with -)
-    (re.compile(r"(?i)((?<![\w-])--(?:[A-Za-z0-9_-]{0,64}?(?:" + _FB_KEYS + r")[A-Za-z0-9_-]{0,64}|pass)"
+    # T20 #8: docker login -p V, redis-cli -a V, openssl -k V, htpasswd -b FILE USER V.
+    (_fb_after(r"docker[ \t]+login", "-p"), _fb_quoted), (_fb_after("redis-cli", "-a"), _fb_quoted),
+    (_fb_after("openssl", "-k"), _fb_quoted),
+    (re.compile(r"((?i:(?<![\w-])htpasswd)(?:[ \t]+-[A-Za-z]{1,8}(?:[ \t]+\d{1,3})?){1,4}"
+                r"[ \t]+[^\s-]\S*[ \t]+\S+[ \t]+)(?![\"']?\[token\])(\"[^\"\n]{1,256}\""
+                r"|'[^'\n]{1,256}'|[\"']?[^\s\"',;]+)"), _fb_quoted),
+    # T20 #8: mysql -p V (space form) and `token|api_key|secret V`, V only when secret-like.
+    (re.compile(r"((?i:(?<![\w-])(?:mysqldump|mysqladmin|mysql|mariadb-dump|mariadb)\b)"
+                r"[^\n;|&]{0,300}?(?<![\w-])-p[ \t]+)([^\s\"',;]{8,})"), _fb_secretish),
+    (re.compile(r"(?<![\w-])((?i:token|api[_-]?key|secret)[ \t]+)([^\s\"',;]{8,})"), _fb_secretish),
+    # rule 2: --<name with a keyword, or exactly pass, or *-pass / *_pass> =V / V (V not starting with -)
+    (re.compile(r"(?i)((?<![\w-])--(?:[A-Za-z0-9_-]{0,64}?(?:" + _FB_KEYS + r")[A-Za-z0-9_-]{0,64}"
+                r"|(?:[A-Za-z0-9_-]{0,64}?[_-])?pass)"
                 r"(?:=|[ \t]+(?=[^\s-])))" + _FB_QVAL), _fb_value),
     # rules 1 and 5: NAME / "NAME" / 'NAME' then : or = then V, "V words" or 'V'; exact `pass`
     (re.compile(r"(?i)((?:(?:" + _FB_KEYS + r")[A-Za-z0-9_.-]{0,64}"
-                r"|(?<![A-Za-z0-9_.-])pass(?![A-Za-z0-9_.-]))[\"']?\s*[:=]\s*)" + _FB_QVAL), _fb_value),
+                r"|(?<![A-Za-z0-9_.-])pass(?![A-Za-z0-9_.-])|[_.-]pass(?![A-Za-z0-9_.-]))"
+                r"[\"']?\s*[:=]\s*)" + _FB_QVAL), _fb_value),
     # rule 6: Authorization: <any scheme word> V
     (re.compile(r"(?i)\b(authorization[\"']?\s*[:=]\s*[\"']?[A-Za-z][\w-]{0,30})[ \t]+[^\s\"',;]+"),
      r"\1 [token]"),
+    # T20 #8: a Cookie / Set-Cookie header value, to the closing quote or the end of the line.
+    (re.compile(r"(?i)\b((?:set-)?cookie[\"']?[ \t]*:[ \t]*)(\"[^\"\n]{1,4096}\"?"
+                r"|'[^'\n]{1,4096}'?|[^\"'\n]+)"), _fb_quoted),
     (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{16,}"
                 r"|(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{10,}|glpat-[A-Za-z0-9_-]{16,}|npm_[A-Za-z0-9]{20,}"
                 r"|AIza[0-9A-Za-z_-]{30,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}"
                 r"|eyJ[\w-]{8,}\.[\w-]{8,}\.[\w-]{2,})"), "[token]"),
     (re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}"), r"\1 [token]"),
 )
-_REDACT = []
+_REDACT: list = []    # lazily holds [redact function or None]
 
 
 def audit_redact(text):
@@ -425,6 +454,9 @@ def output_allow(additional_context="", system_message=None):
     silently drops additionalContext -- which made every SessionStart context injection
     and every "warn" enforcement level a no-op.
     """
+    if additional_context and EVENT in ("SessionStart", "UserPromptSubmit"):
+        # T20 #2: `date` is refused before Phase 4, so agents invented timestamps; say the time.
+        additional_context += "\nCurrent time (UTC): " + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     if additional_context or system_message:
         out = {}
         if system_message:
@@ -553,6 +585,13 @@ def context_task_id(context):
     return ""
 
 
+def _banner(text):
+    """T20 #11: one banner field from context.json (agent-written): line breaks become one
+    space and it is cut at 80 characters with an ellipsis, so it cannot add banner lines."""
+    text = re.sub(r"[\r\n\v\f\x1c-\x1e\x85\u2028\u2029]+", " ", text)
+    return text if len(text) <= 80 else text[:80] + "…"
+
+
 def context_lines(context):
     """T17 I-21 (F6): the banner lines for .aid/context.json, read field by field. Any field
     of an unexpected type is skipped; a non-object document gives no lines."""
@@ -561,14 +600,15 @@ def context_lines(context):
     lines = []
     task = context.get("current_task")
     title = task.get("title") if isinstance(task, dict) else None
-    parts = [p for p in (context_task_id(context), title if isinstance(title, str) else "") if p.strip()]
+    parts = [_banner(p) for p in (context_task_id(context), title if isinstance(title, str) else "")
+             if p.strip()]
     if parts:
         lines.append("\nCurrent Task: {}".format(" - ".join(parts)))
     step = context.get("current_step")
     if isinstance(step, dict):
         step = step.get("name")
     if isinstance(step, str) and step.strip():
-        lines.append("Current Step: {}".format(step))
+        lines.append("Current Step: {}".format(_banner(step)))
     blockers = context.get("blockers")
     shown = []
     for b in (blockers if isinstance(blockers, list) else []):
@@ -580,7 +620,7 @@ def context_lines(context):
     if shown:
         lines.append("Blockers: {}".format(len(shown)))
         for sev, desc in shown[:3]:  # show max 3
-            lines.append("  - [{}] {}".format(sev, desc[:80]))
+            lines.append("  - [{}] {}".format(_banner(sev), _banner(desc)))
     return lines
 
 
@@ -739,8 +779,8 @@ def handle_session_start(input_data, config):
     if isinstance(pipeline_state, dict) and pipeline_state.get("pipeline_status") in ("running", "paused"):
         lines.append(
             "\nACTIVE PIPELINE: Task {} at step {} (status: {})".format(
-                pipeline_state.get("task_id", "?"),
-                pipeline_state.get("current_step", "?"),
+                _banner(str(pipeline_state.get("task_id", "?"))),       # T20 audit: same cap
+                _banner(str(pipeline_state.get("current_step", "?"))),
                 pipeline_state.get("pipeline_status")))
 
     lines.append("=== END AID CONTEXT ===")
@@ -781,7 +821,7 @@ def handle_user_prompt_submit(input_data, config):
 
     tag = "[AID: Phase {} | {}".format(phase, role)
     if task_key:
-        tag += " | Task: {}".format(task_key)
+        tag += " | Task: {}".format(_banner(task_key))
     tag += "]"
 
     output_allow(tag)

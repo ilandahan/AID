@@ -138,6 +138,11 @@ top-level `current_step` string, never a field of `current_task`. Use `null` for
 }
 ```
 
+**Timestamps.** Take `last_updated` (and any `session_log` timestamp) ONLY from the AID hook
+line `Current time (UTC): ...` in this session's context (the UserPromptSubmit and
+SessionStart hooks print it). Never invent a time or copy the example above. If that line is
+absent, write `null` rather than a guess.
+
 The task id must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` (letters, digits, `.`, `_`,
 `-`; no `/` and no `..`), the same rule `aid_session.py qa-pass` uses.
 

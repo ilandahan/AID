@@ -43,7 +43,7 @@ Pass:
                     before redaction existed may hold unredacted text.
 {{CURRENT_SKILLS}} - Section headers from skills/memory-system/references/
 {{TREND_DATA}} - Contents of ~/.aid/metrics/trends.json
-{{MEMORY_ENTRIES}} - Current AID:* entries in AID's local memory ($AID_HOME/memory/slots.json)
+{{MEMORY_ENTRIES}} - Current AID:* entries: the output of `python -m memory_system --memories` run from `memory-system/` (redacted on display; never Read slots.json directly)
 ```
 
 Agent returns:

@@ -88,6 +88,11 @@ Return a summary when complete.",
 )
 ```
 
+**After the sub-agent returns (every mode, `--quick` included):** If
+`.aid/test-outputs/test-{timestamp}/report.md` does not exist, write it yourself from the
+result the sub-agent returned (for example when its Write was refused). Say in the report
+that the parent wrote it. Never end the run without `report.md`.
+
 ## Isolation
 
 The sub-agent:

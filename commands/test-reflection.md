@@ -70,7 +70,10 @@ Same request, but OUTPUT_TO_EVALUATE is:
 - No connection documentation
 - Missing test coverage
 
-Expected: score < 7, pass = false, revision_guidance includes 'Add WHY header'
+Expected: score < 7, pass = false, and revision_guidance.required_changes has at least one
+entry for a `why_alignment` or `completeness` issue (the purpose is not documented, tests
+are missing). The rubric scores WHY alignment and completeness, not a header, so do not
+require a fixed phrase such as a specific header name.
 
 ## Test 3: Phase Violation (Should FAIL < 6)
 

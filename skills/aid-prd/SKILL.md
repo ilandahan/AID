@@ -42,7 +42,7 @@ Gherkin is REQUIRED because acceptance criteria become the tests; no PRD-to-QA t
 7. **`prd-validator`** (independent gate check), then `/gate-check` and `/phase-approve` (human).
 
 Seed cases come from real examples; expert-written cases are allowed, tagged `source: SME:<role>` and kept distinct from real examples. `INSUFFICIENT_EXAMPLES` must be resolved before the Phase 1 gate: by collecting real examples, by adding SME cases, or by a recorded PM + tech lead decision to proceed with fewer.
-Timing: seed cases are written here; QA grows the golden set and held-out split in parallel with Phases 2-4 (it does not block the tech spec); complete only for the Phase 5 release gate.
+Timing: seed cases are written here; QA grows the golden set and held-out split in parallel with Phases 2-4 (it does not block the tech spec); complete only for the Phase 5 release gate. Golden cases in `tests/evals/golden/` come from real data too: golden-set de-identification is a PM sign-off item, as for SEED-EVALS ("De-identification checked by: [PM], [date]" at the top of each golden file, before it is committed).
 
 ## Solution-Shape Ladder (§1.5)
 

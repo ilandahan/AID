@@ -7,8 +7,8 @@ versions are not maintained.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 3.1.0 (current, `main`) | :white_check_mark: |
-| < 3.1.0 | :x: |
+| 3.1.1 (current, `main`) | :white_check_mark: |
+| < 3.1.1 | :x: |
 
 The `version` field in `.claude-plugin/plugin.json` identifies the release you
 are running; please include it in your report.

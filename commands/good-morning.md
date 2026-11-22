@@ -66,6 +66,11 @@ Update `.aid/context.json`, changing only these fields and keeping every other k
 - Update the `last_updated` timestamp
 - Set a new `session_id`
 
+Take every timestamp ONLY from the AID hook line `Current time (UTC): ...` in this session's
+context (the SessionStart and UserPromptSubmit hooks print it), and build the `session_id`
+from the date in that line (for example `2026-11-20-morning`). Never invent a time or a
+session id. If that line is absent, write `null` rather than a guess.
+
 If a system check finds a blocker (for example Docker is not running), add it to `blockers`
 only as a `{"description": "<text>", "severity": "low"|"medium"|"high"}` object, never as a
 plain string.

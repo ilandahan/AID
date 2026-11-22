@@ -21,6 +21,8 @@ try:
         load_recommendation_queue,
         format_recommendations_report
     )
+    from ..redact import redact_obj
+    from ..feedback.collector import default_names
 except ImportError:
     from feedback.collector import load_feedback_by_date_range, get_feedback_stats
     from analysis.metrics import MetricsCalculator, generate_metrics_report
@@ -30,6 +32,8 @@ except ImportError:
         load_recommendation_queue,
         format_recommendations_report
     )
+    from redact import redact_obj
+    from feedback.collector import default_names
 
 # Configuration
 # T8-3: $AID_HOME, else ~/.aid, read on every call.
@@ -111,7 +115,9 @@ class QualityDashboard:
             "metrics": self.metrics,
             "patterns": self.patterns,
             "recommendations": self.recommendations,
-            "pending_recommendations": load_recommendation_queue(),
+            # T20 #3: the queue is redacted when shown (disk unchanged)
+            "pending_recommendations": redact_obj(load_recommendation_queue(), default_names(),
+                                                  skip_keys=("id", "generated_at")),
             "action_items": self._generate_action_items()
         }
 

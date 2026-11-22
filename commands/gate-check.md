@@ -71,14 +71,15 @@ companion files (`WHY-SHAPE-BRIEF-<feature>.md`, `SEED-EVALS-<feature>.md`,
 `ADR-SHAPE-<feature>.md`) keep their fixed names with no date.
 
 ### Phase 3: Implementation Plan
+The checks are the Phase 3 items of `aid_session.py checklist --phase 3` (`PHASE_CHECKLISTS`
+in `hooks/aid_session.py`); this table follows that code.
+
 | Check | File/Artifact |
 |-------|---------------|
-| Plan Document | `docs/implementation-plan/YYYY-MM-DD-[feature].md` |
-| Tasks | Tasks < 4 hours each |
-| Dependencies | Dependencies identified |
-| Test Strategy | Test strategy defined |
-| Sub-Agent Review | Implementation Plan review PASSED |
-| Feedback | `/aid-end` completed |
+| Jira Epic created | Epic in Jira, or in `docs/implementation-plan/jira-export-YYYY-MM-DD.json` when there is no Jira |
+| Stories broken down | Stories in `docs/implementation-plan/YYYY-MM-DD-[feature].md` |
+| Tasks estimated | Each task estimated (tasks < 4 hours each) |
+| Sprint planned | Sprint plan recorded in the implementation plan |
 
 ### Phase 4: Development
 | Check | File/Artifact |

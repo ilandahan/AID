@@ -621,7 +621,11 @@ def cmd_memory_preview(args):
     from memory_system.recommendations.generator import load_recommendation_queue
     print("Memory sync preview (nothing is written):")
     print_sync_result(LearningSubAgent(days=args.days).sync_to_memory(days=args.days, approve=False))
-    print("\n".join([""] + _queue_lines(load_recommendation_queue())))
+    # T20 #3: a queue written before redaction or edited by hand is shown redacted.
+    from memory_system.redact import redact_obj
+    from memory_system.feedback.collector import default_names
+    queue = redact_obj(load_recommendation_queue(), default_names(), skip_keys=("id", "generated_at"))
+    print("\n".join([""] + _queue_lines(queue)))
 
 
 def cmd_memory_feedback(args):

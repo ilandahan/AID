@@ -508,7 +508,7 @@ def test_t17_4_no_banned_phrase_in_hook_text():
 
 # --- T17-5 SessionStart / UserPromptSubmit never crash on context.json -------------------
 
-INIT_DOC = {'$schema': 'aid-context-v1', 'version': '1.0', 'last_updated': '2026-11-20T10:00:00Z',
+INIT_DOC: dict = {'$schema': 'aid-context-v1', 'version': '1.0', 'last_updated': '2026-11-20T10:00:00Z',
             'current_task': None, 'current_step': None,
             'progress': {'steps_completed': [], 'steps_pending': []}, 'session_notes': [], 'blockers': []}
 SHAPES = {

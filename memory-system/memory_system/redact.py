@@ -46,6 +46,11 @@ _PATTERNS = (
     # T17-14 (I-20 rule 6): Authorization: <any scheme word> V (Token, Digest, ApiKey, ...).
     ("token", re.compile(r"(?i)\b(authorization[\"']?\s*[:=]\s*[\"']?[A-Za-z][\w-]{0,30})[ \t]+"
                          r"[^\s\"',;]+"), r"\1 [token]"),
+    # T20 #8: a Cookie / Set-Cookie header value, to the closing quote or the end of the line.
+    # A quoted value ("Cookie": "V" in a JSON / Python / JS dict) keeps its quotes around [token].
+    ("token", re.compile(r"(?i)\b((?:set-)?cookie[\"']?[ \t]*:[ \t]*)(\"[^\"\n]{1,4096}\"?"
+                         r"|'[^'\n]{1,4096}'?|[^\"'\n]+)"),
+     lambda m: m.group(1) + _quoted_token(m.group(2))),
     # T16-26 (I-14): a secret NAME may carry a prefix and a suffix (AWS_SECRET_ACCESS_KEY=,
     # client_secret:, GITHUB_TOKEN=). Applied by _named_secrets (rx None), not by re.sub.
     ("token", None, None),
@@ -148,7 +153,7 @@ _CLOSE = {")": "(", "]": "[", "}": "{"}
 # since the next character must be a separator, and the leftmost start of a run always matches
 # when a later one does), the keyword is checked on that run, then the value is matched.
 _KEYWORD = re.compile(r"(?i)password|passwd|pwd|secret|api[_-]?key|access[_-]?key|private[_-]?key"
-                      r"|token|credential")
+                      r"|token|credential|passphrase")
 # T17-14 (I-20 rule 1): an optional closing quote after the name ({"password": "V"},
 # 'api_key':'V', "DB_PASSWORD"="V"). It is part of the separator group, so it is kept.
 _NAME_SEP = re.compile(r"(?<![A-Za-z0-9_.-])([A-Za-z0-9_.-]+)([\"']?\s*[:=]\s*)")
@@ -167,6 +172,35 @@ _MYSQL_P = re.compile(r"((?i:(?<![\w-])(?:mysqldump|mysqladmin|mysql|mariadb-dum
 _SSHPASS = re.compile(r"((?i:(?<![\w-])sshpass)[ \t]+-p[ \t]*)(?![\"']?\[token\])(\"[^\"\n]{1,256}\""
                       r"|'[^'\n]{1,256}'|[\"']?[^\s\"',;]+)")
 # T17-14 (I-20 rule 4): curl -u / --user / --user= user:pass -> user:[token].
+# T20 #8: a password option that always takes the password as its next word.
+_QVAL = r"(\"[^\"\n]{1,256}\"|'[^'\n]{1,256}'|[\"']?[^\s\"',;]+)"
+
+
+def _after(cmd: str, flag: str):
+    return re.compile(r"((?i:(?<![\w-])" + cmd + r")\b[^\n;|&]{0,300}?(?<![\w-])" + flag
+                      + r"[ \t]+)(?![\"']?\[token\])" + _QVAL)
+
+
+_CMD_FLAGS = (_after(r"docker[ \t]+login", "-p"), _after("redis-cli", "-a"), _after("openssl", "-k"))
+# T20 #8: htpasswd -b [flags] FILE USER PASSWORD: the operand after file and user.
+_HTPASSWD = re.compile(r"((?i:(?<![\w-])htpasswd)(?:[ \t]+-[A-Za-z]{1,8}(?:[ \t]+\d{1,3})?){1,4}"
+                       r"[ \t]+[^\s-]\S*[ \t]+\S+[ \t]+)(?![\"']?\[token\])" + _QVAL)
+# T20 #8: `token V`, `api_key V`, `secret V` and `mysql -p V` (space form): V only when secret-like
+# (_secretish), so prose (`the token expires`) and `mysql -p db` (a database name) stay.
+_SPACED = re.compile(r"(?<![\w-])((?i:token|api[_-]?key|secret)[ \t]+)([^\s\"',;]{8,})")
+_MYSQL_SP = re.compile(r"((?i:(?<![\w-])(?:mysqldump|mysqladmin|mysql|mariadb-dump|mariadb)\b)"
+                       r"[^\n;|&]{0,300}?(?<![\w-])-p[ \t]+)([^\s\"',;]{8,})")
+
+
+def _secretish(m) -> str:
+    """>= 8 characters (the regex) with a digit, or a lower-case letter and an upper-case
+    letter after the first character (a capitalised word is not mixed case)."""
+    v = m.group(2)
+    if any(c.isdigit() for c in v) or (any(c.islower() for c in v) and any(c.isupper() for c in v[1:])):
+        return m.group(1) + "[token]"
+    return m.group(0)
+
+
 _CURL_USER = re.compile(r"((?i:(?<![\w-])curl\b)[^\n;|&]{0,300}?(?<![\w-])(?:-u[ \t]*|--user(?:=|[ \t]+))"
                         r"[\"']?[^\s:\"']+:)(?!\[token\])[^\s\"']+")
 
@@ -174,7 +208,9 @@ _CURL_USER = re.compile(r"((?i:(?<![\w-])curl\b)[^\n;|&]{0,300}?(?<![\w-])(?:-u[
 def _is_secret_name(name: str) -> bool:
     """I-14 keyword anywhere in the name, or (T17-14, I-20 rule 5) the exact name ``pass``
     (bypass, pass_rate and passes are not secret names)."""
-    return bool(_KEYWORD.search(name)) or name.lstrip("-").lower() == "pass"
+    n = name.lstrip("-").lower()
+    # T20 #8: DB_PASS, db.pass, --db-pass (env-style *PASS); bypass is not one.
+    return bool(_KEYWORD.search(name)) or n == "pass" or n.endswith(("_pass", ".pass", "-pass"))
 
 
 def _value_out(v) -> str:
@@ -212,6 +248,10 @@ def _cli_secrets(text: str) -> str:
     # T17 R1-04: an attached quoted value keeps its quotes: -p'V' -> -p'[token]'.
     text = _MYSQL_P.sub(lambda m: m.group(1) + _quoted_token(m.group(2)), text)
     text = _SSHPASS.sub(lambda m: m.group(1) + _quoted_token(m.group(2)), text)
+    for rx in _CMD_FLAGS + (_HTPASSWD,):
+        text = rx.sub(lambda m: m.group(1) + _quoted_token(m.group(2)), text)
+    text = _MYSQL_SP.sub(_secretish, text)
+    text = _SPACED.sub(_secretish, text)
     return _CURL_USER.sub(r"\1[token]", text)
 # T16-26: a PEM private-key block, through its END line (or the end of the text).
 _PEM = re.compile(r"-----BEGIN ([A-Z0-9 ]*)PRIVATE KEY-----.*?(?:-----END \1PRIVATE KEY-----|\Z)",

@@ -181,8 +181,8 @@ criteria:
     - "Accessible error announcements"
 
 files_to_review:
-  - "test-outputs/phase-4/email-validator.ts"
-  - "test-outputs/phase-4/email-validator.test.ts"
+  - ".aid/test-outputs/test-{{TIMESTAMP}}/phase-4/email-validator.ts"
+  - ".aid/test-outputs/test-{{TIMESTAMP}}/phase-4/email-validator.test.ts"
 ```
 
 2. **Generate code that PASSES QA**:
@@ -268,7 +268,7 @@ files_to_review:
    └── Verify QA catch rate
 
 5. REPORT
-   └── Generate COMPLETE-TEST-REPORT.md
+   └── Generate report.md
 ```
 
 ---
@@ -364,7 +364,7 @@ files_to_review:
 │   ├── TEST-EMAIL-001.yaml
 │   ├── TEST-EMAIL-001-pass-review.json
 │   └── TEST-EMAIL-001-fail-review.json
-└── COMPLETE-TEST-REPORT.md
+└── report.md
 ```
 
 ---
@@ -842,7 +842,7 @@ Date: {{date}}
 
 ## Test Artifacts
 
-- **Report**: `.aid/test-outputs/test-{{test_id}}/COMPLETE-TEST-REPORT.md`
+- **Report**: `.aid/test-outputs/test-{{test_id}}/report.md`
 - **Thinking Log**: `.aid/test-outputs/test-{{test_id}}/thinking-log.md`
 - **Session Data**: `.aid/test-outputs/test-{{test_id}}/session.json`
 - **QA Reviews**: `.aid/test-outputs/test-{{test_id}}/qa/`
@@ -898,8 +898,8 @@ criteria:
 
 # Files to review (populated by test)
 files_to_review:
-  - "test-outputs/phase-4/email-validator.ts"
-  - "test-outputs/phase-4/email-validator.test.ts"
+  - ".aid/test-outputs/test-{{TIMESTAMP}}/phase-4/email-validator.ts"
+  - ".aid/test-outputs/test-{{TIMESTAMP}}/phase-4/email-validator.test.ts"
 
 # Completion protocol
 completion_protocol:

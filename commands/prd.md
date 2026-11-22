@@ -127,6 +127,9 @@ the PRD is for example `docs/prd/2026-11-19-user-auth.md`.
    for the PM. Never write unredacted real data: this file is committed to the repository.
    Tell the PM to confirm the de-identification (record "De-identification checked by: [PM],
    [date]" at the top of the file) before it is committed or used in a spike.
+   Suggest a pre-commit secret scanner (for example gitleaks) over `docs/prd/SEED-EVALS-*.md`
+   and `tests/evals/golden/`: the redaction above is done by the model and checked by a
+   person, so a scanner is a second net, not a guarantee. AID does not install or run it.
    Then save the seed eval cases as `docs/prd/SEED-EVALS-<feature>.md`: a table of ID, input, expected behaviour, never-do flag and source (real examples cite their research ID; expert-written cases are tagged `source: SME:<role>` and listed apart from the real ones), plus the "examples to collect" list when the solution-shaper reported `INSUFFICIENT_EXAMPLES`. Link it from §7A.6. `INSUFFICIENT_EXAMPLES` must be resolved before the Phase 1 gate: by collecting real examples, by adding SME cases (`source: SME:<role>`), or by a recorded PM + tech lead decision to proceed with fewer (recorded in the level ADR).
 5. **Report conflicts to the PM; never resolve them silently.** Collect every disagreement between drafts (e.g. a never-do item in the charter with no never-do check in the eval plan, a metric in §1.4 that differs from the writer's placeholder, the proposed level vs the brief's hypothesis, a tool the charter allows that a requirement does not need) and every `conflicts`, `to_confirm` and `missing_inputs` entry the agents returned. List them in a "Merge conflicts for the PM" block at the top of the PRD and show them to the user. Leave both versions in place until the PM decides.
 

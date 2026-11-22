@@ -1545,7 +1545,7 @@ def test_t3_a2_script_uses_the_gates_project_root(clean_tmp):
 
 def _plugin_install(home):
     """A real plugin layout: <home>/.claude/plugins/cache/AID/aid/<ver>/{hooks,references}."""
-    root = home / '.claude' / 'plugins' / 'cache' / 'AID' / 'aid' / '3.1.0'
+    root = home / '.claude' / 'plugins' / 'cache' / 'AID' / 'aid' / '3.1.1'
     shutil.copytree(os.path.join(REPO_ROOT, 'hooks'), str(root / 'hooks'),
                     ignore=shutil.ignore_patterns('__pycache__'))
     shutil.copytree(os.path.join(REPO_ROOT, 'references'), str(root / 'references'))
@@ -1758,7 +1758,7 @@ def test_t7_6_manifest_version_license_and_layout():
     """WHY (A-44): non-SPDX license string, and a root brace indented 4 spaces."""
     raw = open(PLUGIN_JSON, 'rb').read().decode('utf-8').replace('\r\n', '\n')
     data = json.loads(raw)
-    assert data['version'] == '3.1.0'
+    assert data['version'] == '3.1.1'
     assert data['license'] == 'LicenseRef-AID-Community-License-1.0'
     assert raw == json.dumps(data, indent=2, ensure_ascii=False) + '\n'
 

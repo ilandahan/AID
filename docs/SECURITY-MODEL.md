@@ -364,10 +364,14 @@ These limits are accepted on purpose. The next section lists what covers them.
   secret shapes are redacted (Authorization and API-key headers, `--password`, URL
   credentials, `curl -u`, variables such as `PGPASSWORD` and `AWS_SECRET_ACCESS_KEY`, quoted
   JSON keys), but not every
-  spelling: for example a `-p`/`-k`/`-a` value after `docker login`, `openssl`, `redis-cli`
-  or `mysql -p <value>`, `gpg --passphrase`, a `Cookie:` header, or a key and value split by
-  a space. Do not put secrets in commands; read them from a keystore or an environment
-  variable instead.
+  spelling: for example a value attached to its flag (`docker login -pV`, `openssl -kV`,
+  `redis-cli -aV`), a value after `token` / `api_key` / `mysql -p` and a space when it is
+  shorter than 8 characters or has no digit and no mixed case (the same rule as `secret V`),
+  `password V` / `passwd V` split by a space, other key words split by a space
+  (`access_token V`, `secret_key V`), `curl -b` / `--cookie` values, `openssl -K`, a global
+  flag between `docker` and `login`, `htpasswd -nb` (no file operand), `MYSQL_PWD V` and
+  `REDISCLI_AUTH=V`. Do not put secrets in commands; read them from a keystore or an
+  environment variable instead.
 - **`.aid/state.json` written through a name built at run time, outside AID projects.** The
   every-folder refusal of `.aid/state.json` reads the command text. In a folder that is not
   an AID project, a Bash or PowerShell write whose target name is built at run time (from

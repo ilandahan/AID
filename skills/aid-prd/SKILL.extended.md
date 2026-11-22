@@ -411,7 +411,7 @@ WHY + shape brief (PM)  →  /prd
 
 **Seed evals file** (`SEED-EVALS-<feature>.md`): one row per case with ID, input (from a real example), expected behaviour, never-do flag and source. Seed cases come from real examples; expert-written cases are allowed, tagged `source: SME:<role>` and kept distinct from real examples. `INSUFFICIENT_EXAMPLES` must be resolved before the Phase 1 gate: by collecting real examples, by adding SME cases, or by a recorded PM + tech lead decision to proceed with fewer. At levels 0-1 it may be a cross-reference to the §4 Gherkin acceptance criteria (A4).
 
-**Timing (no relay):** the seed cases are written in Phase 1. QA grows the golden set and its held-out split IN PARALLEL with Phases 2-4; it does not block the tech spec, and it must be complete only for the Phase 5 release gate. The data scientist calibrates the LLM judge in Phase 4, when a judge is introduced.
+**Timing (no relay):** the seed cases are written in Phase 1. QA grows the golden set and its held-out split IN PARALLEL with Phases 2-4; it does not block the tech spec, and it must be complete only for the Phase 5 release gate. Golden cases in `tests/evals/golden/` come from real data too: golden-set de-identification is a PM sign-off item, as for SEED-EVALS ("De-identification checked by: [PM], [date]" at the top of each golden file, before it is committed). The data scientist calibrates the LLM judge in Phase 4, when a judge is introduced.
 
 ---
 

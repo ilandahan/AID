@@ -52,6 +52,8 @@ try:
         reject_recommendation
     )
     from . import paths
+    from .redact import redact_obj
+    from .feedback.collector import default_names
 except ImportError:
     from feedback.collector import (
         FeedbackCollector,
@@ -78,6 +80,8 @@ except ImportError:
         reject_recommendation
     )
     import paths
+    from redact import redact_obj
+    from feedback.collector import default_names
 
 
 # Configuration. T8-3: $AID_HOME, else ~/.aid, read on every call.
@@ -280,7 +284,7 @@ class LearningSubAgent:
             "generated_at": self.state["last_recommendations"],
             "recommendations_count": len(recommendations),
             "recommendations": recommendations,
-            "pending_queue": load_recommendation_queue()
+            "pending_queue": self.get_pending_recommendations()  # T20 #3: redacted for display
         }
 
     # =========================================================================
@@ -409,8 +413,10 @@ class LearningSubAgent:
     # =========================================================================
 
     def get_pending_recommendations(self) -> List[Dict[str, Any]]:
-        """Get pending recommendations awaiting approval."""
-        return load_recommendation_queue()
+        """Get pending recommendations awaiting approval, redacted for display (T20 #3: a
+        queue written before redaction or edited by hand is never shown raw; disk unchanged)."""
+        return redact_obj(load_recommendation_queue(), default_names(),
+                          skip_keys=("id", "generated_at"))
 
     def approve_skill_update(self, recommendation_id: str) -> bool:
         """

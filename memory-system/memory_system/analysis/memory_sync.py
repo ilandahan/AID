@@ -17,13 +17,13 @@ try:
     from ..feedback import collector
     from .patterns import PatternDetector
     from .. import paths
-    from ..redact import redact
+    from ..redact import redact, redact_obj
 except ImportError:
     from feedback.collector import load_feedback_by_date_range, default_names
     from feedback import collector
     from analysis.patterns import PatternDetector
     import paths
-    from redact import redact
+    from redact import redact, redact_obj
 
 
 # Configuration. T8-3: from paths.aid_home() on every call ($AID_HOME, else ~/.aid).
@@ -410,14 +410,18 @@ def get_current_memories() -> Dict[str, Any]:
         Dictionary with memories by category and usage stats
     """
     manager = MemorySlotManager()
+    # T20 #3: redacted for display. Slots written before redaction (3.0.7) or edited by
+    # hand are never shown raw; the file on disk is unchanged.
+    names = default_names()
 
     return {
         "usage": manager.get_slot_usage(),
         "memories": {
-            category: manager.get_memories(category)
+            category: redact_obj(manager.get_memories(category), names,
+                                 skip_keys=("added_at",))
             for category in SLOT_ALLOCATION.keys()
         },
-        "formatted": manager.format_for_claude_memory()
+        "formatted": [redact(m, names) for m in manager.format_for_claude_memory()]
     }
 
 

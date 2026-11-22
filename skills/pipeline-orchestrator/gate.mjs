@@ -253,6 +253,7 @@ export function recordDecision(root, { step, decision, scores, review = null }) 
 
 // T17-20 (I-23): the documented per-review estimate, used when the caller has no real usage.
 export const ESTIMATED_USAGE = { input_tokens: 4000, output_tokens: 2000 };
+export const MAX_TOKENS_PER_CALL = 5_000_000;
 
 /**
  * Parse `--usage '{"input_tokens":N,"output_tokens":M}'`. Returns { usage, estimated } or
@@ -274,7 +275,9 @@ export function parseUsage(raw) {
     if (!Number.isInteger(v) || v < 0) {
       return { error: `--usage.${k} must be a non-negative integer (got ${JSON.stringify(v)})` };
     }
-    out[k] = v;
+    // #10: self-reported, so it may not go below the estimate (a 0 would freeze the $ brake) or
+    // above a sane per-call ceiling (1e308 summed to Infinity, which JSON writes as null -> read as 0).
+    out[k] = Math.max(ESTIMATED_USAGE[k], Math.min(v, MAX_TOKENS_PER_CALL));
   }
   return { usage: out, estimated: false };
 }
@@ -306,11 +309,20 @@ export function applyReview(state, { step, decision, usage, estimated, pricing }
   const n = usage.input_tokens;
   const m = usage.output_tokens;
   const usd = (n / 1e6) * pricing.input_per_mtok + (m / 1e6) * pricing.output_per_mtok;
-  const cost = state.cost && typeof state.cost === "object" && !Array.isArray(state.cost) ? state.cost : {};
+  const costIsObj = state.cost && typeof state.cost === "object" && !Array.isArray(state.cost);
+  const cost = costIsObj ? state.cost : {};
+  // T20 audit: a cost key that is present but not an object, or an object without its running
+  // total, is corruption too - never a fresh start at 0 (an absent key is a fresh run).
+  const costCorrupt = Object.prototype.hasOwnProperty.call(state, "cost")
+    && (!costIsObj || !Object.prototype.hasOwnProperty.call(cost, "estimated_cost_usd"));
   const num = (v) => (Number.isFinite(v) ? v : 0);
   cost.total_input_tokens = num(cost.total_input_tokens) + n;
   cost.total_output_tokens = num(cost.total_output_tokens) + m;
-  cost.estimated_cost_usd = num(cost.estimated_cost_usd) + usd;
+  // #10: a present but corrupted running cost (null, string, negative) is treated as at-or-over any
+  // brake, never as 0. MAX_VALUE is finite, so it survives JSON and stays there after the addition.
+  const prevUsd = cost.estimated_cost_usd;
+  const prevOk = !costCorrupt && (prevUsd === undefined || (Number.isFinite(prevUsd) && prevUsd >= 0));
+  cost.estimated_cost_usd = prevOk ? (prevUsd ?? 0) + usd : Number.MAX_VALUE;
   cost.per_step = cost.per_step && typeof cost.per_step === "object" ? cost.per_step : {};
   const prev = cost.per_step[step] && typeof cost.per_step[step] === "object" ? cost.per_step[step] : {};
   cost.per_step[step] = {
