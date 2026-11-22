@@ -31,7 +31,7 @@
     "security:audit": "npm audit"
   },
   "optionalDependencies": {
-    "chrome-devtools-mcp": "1.12.0"
+    "chrome-devtools-mcp": "1.13.0"
   },
   "engines": {
     "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
