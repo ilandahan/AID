@@ -558,7 +558,9 @@ test("mostRecentScore: no matching entry returns undefined, never a phantom scor
 
 function runGate(args, root) {
   try {
-    const out = execFileSync(process.execPath, [GATE_MJS, ...args, "--root", root], { encoding: "utf8" });
+    // GIT_CEILING_DIRECTORIES: a tmpdir inside some outer git repo must not move a test's ledger there.
+    const out = execFileSync(process.execPath, [GATE_MJS, ...args, "--root", root],
+      { encoding: "utf8", env: { ...process.env, GIT_CEILING_DIRECTORIES: tmpdir() } });
     return { status: 0, out };
   } catch (err) {
     return { status: err.status, out: (err.stdout ?? "") + (err.stderr ?? "") };
@@ -761,6 +763,304 @@ test("--should-spawn-dual: round 1 with valid config exits 0 (DUAL), proving the
     const r = runGate(["--should-spawn-dual", "--step", "CODE_REVIEW", "--round", "1"], root);
     assert.equal(r.status, 0);
     assert.match(r.out, /DUAL/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── T21: the $ brake is enforced by the gate, from a ledger the agent cannot lower via state.json ──
+function t21Root(prefix, costLimits) {
+  const root = t17Root(prefix);
+  if (costLimits) {
+    writeFileSync(join(root, ".aid/pipeline/config.json"), JSON.stringify({ ...CONFIG, cost_limits: costLimits }));
+  }
+  return root;
+}
+const t21Escalation = (root) => join(root, ".aid/pipeline/ESCALATION.json");
+const t21Ledger = (root) => join(root, ".aid/pipeline/cost-ledger.json");
+const t21Run = (root, overall = 9.6) =>
+  runGate(["--step", "CODE_REVIEW", "--scores", JSON.stringify({ overall }), "--usage", T17_USAGE], root);
+
+test("T21: a scoring run at or above max_per_run_usd escalates and opens ESCALATION.json", () => {
+  // Fresh run: total = 0 + T17_USD exactly, so limit T17_USD is "at", half of it is "above".
+  for (const limit of [T17_USD, T17_USD / 2]) {
+    const root = t21Root("gate-t21-brake-", { max_per_run_usd: limit });
+    try {
+      const r = t21Run(root);
+      assert.equal(r.status, 2, r.out);
+      assert.match(r.out, /cost brake: \$\S+ >= \$\S+/);
+      const e = JSON.parse(readFileSync(t21Escalation(root), "utf8"));
+      assert.equal(e.status, "open");
+      assert.match(e.why, /^cost brake: \$/);
+      assert.ok(openEscalation(root));
+      const l = JSON.parse(readFileSync(t21Ledger(root), "utf8"));
+      assert.equal(l.estimated_cost_usd, T17_USD);
+      assert.equal(l.total_input_tokens, 4000);
+      assert.equal(l.total_output_tokens, 2000);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("T21b: an unparsable config.json exits 3, not 1 (= FIX, a free loop at $0)", () => {
+  const root = t21Root("gate-t21b-cfg-");
+  try {
+    writeFileSync(join(root, ".aid/pipeline/config.json"), "{");
+    const r = t21Run(root, 5);
+    assert.equal(r.status, 3, r.out);
+    assert.match(r.out, /unparsable config/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("T21b: a plain FIX loop is stopped by the brake, even if one half of the total is lost", () => {
+  // The brake's own threat model: a cooperating agent looping on reviews. 3 FIX runs stay
+  // under 3.5 calls' worth; the 4th reaches it and escalates, whichever half was tampered with.
+  for (const tamper of ["none", "delete-ledger", "zero-state-cost"]) {
+    const root = t21Root("gate-t21b-loop-", { max_per_run_usd: T17_USD * 3.5 });
+    try {
+      for (let i = 0; i < 3; i++) assert.equal(t21Run(root, 5).status, 1, `${tamper} run ${i + 1}`);
+      if (tamper === "delete-ledger") rmSync(t21Ledger(root));
+      if (tamper === "zero-state-cost") {
+        const sp = join(root, ".aid/pipeline/state.json");
+        const s = JSON.parse(readFileSync(sp, "utf8"));
+        s.cost.estimated_cost_usd = 0;
+        writeFileSync(sp, JSON.stringify(s));
+      }
+      const r = t21Run(root, 5);
+      assert.equal(r.status, 2, `${tamper}: ${r.out}`);
+      assert.equal(JSON.parse(readFileSync(t21Escalation(root), "utf8")).cost_brake, true, tamper);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("T21b: in a git repo, ordinary git cleanup between FIX runs never rolls the total back", () => {
+  // Re-audit high: with the ledger in the worktree, `git checkout -- .` (after .aid/pipeline was
+  // committed), `git clean -fd(x)` and `git stash -u` reset or rolled back the total. Each is one
+  // ordinary command a cooperating agent runs to throw away a failed fix.
+  const git = (root, ...a) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...a],
+    { cwd: root, encoding: "utf8", stdio: "pipe" });
+  const cases = [
+    { cleanup: ["checkout", "--", "."] }, { cleanup: ["stash", "-u"] }, { cleanup: ["reset", "--hard"] },
+    // AID's own layout: .aid/pipeline/* ignored except config.json, never committed
+    { cleanup: ["clean", "-fdx"], ignore: ".aid/pipeline/*\n!.aid/pipeline/config.json\n" },
+  ];
+  for (const { cleanup, ignore } of cases) {
+    const root = t21Root("gate-t21b-git-", { max_per_run_usd: T17_USD * 3.5 });
+    try {
+      git(root, "init", "-q");
+      writeFileSync(join(root, "a.js"), "1\n");
+      if (ignore) writeFileSync(join(root, ".gitignore"), ignore);
+      assert.equal(t21Run(root, 5).status, 1);
+      git(root, "add", "-A");          // without .gitignore the worst case: .aid/pipeline committed
+      git(root, "commit", "-qm", "base");
+      for (let i = 0; i < 2; i++) {
+        writeFileSync(join(root, "a.js"), `${i}\n`);
+        assert.equal(t21Run(root, 5).status, 1, `${cleanup.join(" ")} run ${i + 2}`);
+        git(root, ...cleanup);
+        if (!existsSync(join(root, ".aid/pipeline/config.json"))) {
+          writeFileSync(join(root, ".aid/pipeline/config.json"), JSON.stringify({ ...CONFIG, cost_limits: { max_per_run_usd: T17_USD * 3.5 } }));
+        }
+      }
+      const r = t21Run(root, 5);
+      assert.equal(r.status, 2, `${cleanup.join(" ")}: ${r.out}`);
+      assert.match(r.out, /cost brake/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("T21b: two AID projects in one repo keep separate budgets, so a resolve sticks", () => {
+  // Re-audit high (cycle 2): one repo-wide ledger let project B's stale state.cost write A's old
+  // total back right after the user's resolve in A.
+  const repo = mkdtempSync(join(tmpdir(), "gate-t21b-two-"));
+  const lim = { max_per_run_usd: T17_USD * 2.5 };
+  const mk = (n) => {
+    const r = join(repo, n);
+    mkdirSync(join(r, ".aid/pipeline"), { recursive: true });
+    writeFileSync(join(r, ".aid/pipeline/config.json"), JSON.stringify({ ...CONFIG, cost_limits: lim }));
+    return r;
+  };
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: repo });
+    const a = mk("a"), b = mk("b");
+    assert.equal(t21Run(a, 5).status, 1);
+    assert.equal(t21Run(b, 5).status, 1);           // B's spend does not count against A
+    assert.equal(t21Run(a, 5).status, 1);
+    assert.equal(t21Run(a, 5).status, 2);           // A trips on its own 3rd review
+    const res = runGate(["--resolve", "user: new budget"], a);
+    assert.equal(res.status, 0, res.out);
+    assert.equal(t21Run(b, 5).status, 1);           // B's 2nd review: under its own limit
+    assert.equal(t21Run(a, 5).status, 1, "A's resolve must stick after B runs");
+    // and both ledgers really are in the repo's git dir, not the project fallback
+    assert.equal(existsSync(join(a, ".aid/pipeline/cost-ledger.json")), false);
+    assert.equal(existsSync(join(b, ".aid/pipeline/cost-ledger.json")), false);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("T21b: when the git-dir ledger cannot be written, the charge falls back to the project path", () => {
+  const root = t21Root("gate-t21b-ro-", { max_per_run_usd: T17_USD * 2.5 });
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    writeFileSync(join(root, ".git/aid"), "not a folder");   // mkdir .git/aid/<key> fails
+    assert.equal(t21Run(root, 5).status, 1);
+    assert.equal(JSON.parse(readFileSync(t21Ledger(root), "utf8")).estimated_cost_usd, T17_USD);
+    assert.equal(t21Run(root, 5).status, 1);
+    assert.equal(t21Run(root, 5).status, 2);
+    // and the user's resolve still works in that state (it used to crash on the git-dir write)
+    const res = runGate(["--resolve", "user: new budget"], root);
+    assert.equal(res.status, 0, res.out);
+    assert.equal(t21Run(root, 5).status, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("T21 audit: --dry-run past the brake exits 2, not PASS, and writes nothing", () => {
+  const root = t21Root("gate-t21-dry-", { max_per_run_usd: T17_USD / 2 });
+  try {
+    writeFileSync(t21Ledger(root), JSON.stringify({ estimated_cost_usd: T17_USD }));
+    const r = runGate(["--step", "CODE_REVIEW", "--scores", JSON.stringify({ overall: 9.6 }),
+      "--usage", T17_USAGE, "--dry-run"], root);
+    assert.equal(r.status, 2, r.out);
+    assert.match(r.out, /cost brake: \$/);
+    assert.equal(existsSync(t21Escalation(root)), false);
+    assert.equal(JSON.parse(readFileSync(t21Ledger(root), "utf8")).estimated_cost_usd, T17_USD);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("T21 fix-2: on a brake run every record says ESCALATE, not the original PASS", () => {
+  // WHY: the records were written with the PASS decision before the brake replaced it, so
+  // pipeline-status and the dashboard showed PASS while ESCALATION.json was open.
+  const root = t21Root("gate-t21-records-", { max_per_run_usd: T17_USD / 2 });
+  try {
+    const r = t21Run(root, 9.6);
+    assert.equal(r.status, 2, r.out);
+    const s = t17State(root);
+    assert.equal(s.last_review_result.result, "ESCALATE");
+    assert.equal(s.step_history.at(-1).result, "ESCALATE");
+    assert.match(s.step_history.at(-1).note, /cost brake/);
+    assert.doesNotMatch(r.out, /→ PASS/);
+    assert.match(r.out, /across tasks/, "the brake says the total is cumulative");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("T21: below the limit the verdict is unchanged, and a nonsense limit falls back to the default", () => {
+  for (const [limits, overall, status] of [
+    [undefined, 9.6, 0], [undefined, 8, 1], [{ max_per_run_usd: 0 }, 9.6, 0], [{ max_per_run_usd: "x" }, 8, 1],
+  ]) {
+    const root = t21Root("gate-t21-below-", limits);
+    try {
+      const r = t21Run(root, overall);
+      assert.equal(r.status, status, `${JSON.stringify(limits)} ${r.out}`);
+      assert.doesNotMatch(r.out, /cost brake|cost warning/);
+      assert.equal(existsSync(t21Escalation(root)), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("T21: deleting, zeroing or replacing state.cost does not lower the total while the ledger exists", () => {
+  // Two runs cost 2 * T17_USD; the limit sits between one and two runs.
+  const tampers = [
+    () => null, // delete state.json entirely
+    (s) => ({ ...s, cost: undefined }), // delete the cost key
+    (s) => ({ ...s, cost: { ...s.cost, estimated_cost_usd: 0 } }), // zero it
+    (s) => ({ ...s, cost: { estimated_cost_usd: 0, total_input_tokens: 0, total_output_tokens: 0 } }),
+  ];
+  for (const [i, tamper] of tampers.entries()) {
+    const root = t21Root("gate-t21-tamper-", { max_per_run_usd: T17_USD * 1.5 });
+    try {
+      assert.equal(t21Run(root).status, 0, "first run is below the limit");
+      const statePath = join(root, ".aid/pipeline/state.json");
+      const next = tamper(t17State(root));
+      if (next === null) rmSync(statePath);
+      else writeFileSync(statePath, JSON.stringify(next));
+      const r = t21Run(root);
+      assert.equal(r.status, 2, `tamper ${i}: ${r.out}`);
+      assert.match(r.out, /cost brake/);
+      assert.ok(JSON.parse(readFileSync(t21Ledger(root), "utf8")).estimated_cost_usd >= T17_USD * 1.5);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("T21 fix-1: a state.json that is not an object (or not JSON) still charges the ledger", () => {
+  // WHY: applyReview threw on null/5/"x" and the catch skipped the ledger write, so writing `null`
+  // into state.json before every gate call kept the total frozen below the brake.
+  for (const bad of ["null", "5", '"x"', "true", "not json"]) {
+    const root = t21Root("gate-t21-statebad-", { max_per_run_usd: T17_USD * 1.5 });
+    try {
+      assert.equal(t21Run(root).status, 0, "first run is below the limit");
+      writeFileSync(join(root, ".aid/pipeline/state.json"), bad);
+      const r = t21Run(root);
+      assert.equal(r.status, 2, `${bad}: ${r.out}`);
+      assert.match(r.out, /cost brake/);
+      assert.equal(JSON.parse(readFileSync(t21Ledger(root), "utf8")).estimated_cost_usd, 2 * T17_USD, bad);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("T21 fix-1: resolving a cost-brake escalation resets the total; resolving another kind does not", () => {
+  // WHY: nothing reset the ledger, so after one brake every later review escalated again at once.
+  const root = t21Root("gate-t21-reset-", { max_per_run_usd: T17_USD * 1.5 });
+  try {
+    assert.equal(t21Run(root).status, 0);
+    assert.equal(t21Run(root).status, 2, "second run trips the brake");
+    const e = JSON.parse(readFileSync(t21Escalation(root), "utf8"));
+    assert.equal(e.cost_brake, true);
+    assert.match(e.how_to_resolve, /resets the running total/);
+    assert.equal(runGate(["--resolve", "continue with a new budget"], root).status, 0);
+    assert.equal(JSON.parse(readFileSync(t21Ledger(root), "utf8")).estimated_cost_usd, 0);
+    assert.equal(t17State(root).cost.estimated_cost_usd, 0);
+    const r = t21Run(root);
+    assert.equal(r.status, 0, `after reset the next review runs under the limit: ${r.out}`);
+    assert.equal(JSON.parse(readFileSync(t21Ledger(root), "utf8")).estimated_cost_usd, T17_USD);
+    // A non-cost escalation (no cost_brake flag) leaves the total alone.
+    writeFileSync(t21Escalation(root), JSON.stringify({ status: "open", why: "threshold" }));
+    assert.equal(runGate(["--resolve", "accepted"], root).status, 0);
+    assert.equal(JSON.parse(readFileSync(t21Ledger(root), "utf8")).estimated_cost_usd, T17_USD);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("T21: a corrupt ledger escalates the next scoring run under any positive limit", () => {
+  for (const bad of ["not json", "[]", "7", "null", "{}", '{"estimated_cost_usd":-1}', '{"estimated_cost_usd":"5"}']) {
+    const root = t21Root("gate-t21-corrupt-", { max_per_run_usd: 1e300 });
+    try {
+      writeFileSync(t21Ledger(root), bad);
+      const r = t21Run(root);
+      assert.equal(r.status, 2, `${bad}: ${r.out}`);
+      assert.equal(openEscalation(root)?.status, "open", bad);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("T21: warn_at_usd adds a warning line and changes nothing else", () => {
+  const root = t21Root("gate-t21-warn-", { warn_at_usd: T17_USD, max_per_run_usd: 50 });
+  try {
+    const r = t21Run(root);
+    assert.equal(r.status, 0, r.out);
+    assert.match(r.out, /cost warning: \$\S+ >= warn \$\S+/);
+    assert.equal(existsSync(t21Escalation(root)), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

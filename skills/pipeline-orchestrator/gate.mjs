@@ -28,8 +28,10 @@
 //
 // --should-spawn-dual has its OWN exit contract (0 = spawn two reviewers, 1 = spawn one, 3 = usage
 // error) — never conflate with the PASS/FIX/ESCALATE/ERROR contract above.
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, realpathSync } from "node:fs";
+import { join, dirname, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 // The command a human is told to run names THIS file (R-03): the copy that ships in the plugin,
@@ -201,13 +203,41 @@ export function logLoopEvent(payload, root = process.cwd()) {
  * agent must count toward is decorative. Now the gate increments on FIX and appends a step_history
  * row for every non-ERROR decision. Never fatal: a bookkeeping failure must not change the exit code.
  */
-export function recordDecision(root, { step, decision, scores, review = null }) {
+export function recordDecision(root, { step, decision, scores, review = null, costLimits = null }) {
   try {
+    // T21 fix-1: charge the ledger FIRST, before state.json is read, so no shape of state.json
+    // (null, 5, unparsable) can make a later throw skip the charge.
+    let charged = null;
+    if (review) {
+      const prev = readLedger(root);
+      charged = {
+        estimated_cost_usd: prev.estimated_cost_usd + reviewUsd(review.usage, review.pricing),
+        total_input_tokens: prev.total_input_tokens + review.usage.input_tokens,
+        total_output_tokens: prev.total_output_tokens + review.usage.output_tokens,
+      };
+      writeLedger(root, charged);
+    }
     const statePath = join(root, ".aid/pipeline/state.json");
-    const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : {};
+    let state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : {};
+    if (!state || typeof state !== "object" || Array.isArray(state)) state = {};
     // T17-20 (I-23, G5-X1): the review result and its cost are written by the gate, in this same
     // write, never by an agent. `review` is null for steps that are not scored reviews.
-    if (review) applyReview(state, { step, decision, ...review });
+    if (review) {
+      // T21: the running total is max(ledger, state.cost) after this review, written to both.
+      applyReview(state, { step, decision, ...review });
+      const c = state.cost;
+      c.estimated_cost_usd = Math.max(c.estimated_cost_usd, charged.estimated_cost_usd);
+      c.total_input_tokens = Math.max(c.total_input_tokens, charged.total_input_tokens);
+      c.total_output_tokens = Math.max(c.total_output_tokens, charged.total_output_tokens);
+      writeLedger(root, c);
+      // T21 fix-2: the brake verdict is decided BEFORE the records are written, so state.json,
+      // step_history and the exit code all say ESCALATE (they used to say the original PASS/FIX).
+      const why = costLimits && costBrakeWhy(c.estimated_cost_usd, costLimits);
+      if (why) {
+        decision = { ...decision, result: "ESCALATE", exit: 2, why };
+        state.last_review_result.result = "ESCALATE";
+      }
+    }
     const counter = STEP_CONFIG[step]?.counter;
     state.iterations ??= {};
     if (decision.result === "FIX" && counter) {
@@ -295,6 +325,136 @@ export function pricingFor(config) {
   return { input_per_mtok: 5, output_per_mtok: 25 };
 }
 
+export function reviewUsd(usage, pricing) {
+  return (usage.input_tokens / 1e6) * pricing.input_per_mtok + (usage.output_tokens / 1e6) * pricing.output_per_mtok;
+}
+
+// T21: the cost ledger. A control file (aid_guard denies agent writes); only gate.mjs writes it.
+const LEDGER_FILE = ".aid/pipeline/cost-ledger.json";
+
+/**
+ * T21b: inside a git repo the ledger lives in the git directory (`<git-dir>/aid/<key>/`, key =
+ * sha1 of the lowercased real project path, first 12 hex), where
+ * checkout, restore, stash, reset and clean never reach, so ordinary cleanup cannot roll the total
+ * back. The project path stays the fallback (no git) and is still read, so an upgrade keeps its total.
+ */
+function ledgerPaths(root) {
+  const legacy = join(root, LEDGER_FILE);
+  try {
+    // --git-dir is per worktree; the key is per project folder, so worktrees and sibling AID
+    // projects in one repo keep separate budgets and one project's resolve sticks (T21b cycle 2).
+    const r = spawnSync("git", ["rev-parse", "--git-dir"], { cwd: root, encoding: "utf8", timeout: 5000 });
+    const dir = r.status === 0 ? r.stdout.trim() : "";
+    if (dir) {
+      // .native expands Windows 8.3 short names, so both spellings of one folder share a key
+      let real;
+      try {
+        real = realpathSync.native(root);
+      } catch {
+        real = realpathSync(root);
+      }
+      const key = createHash("sha1").update(real.toLowerCase()).digest("hex").slice(0, 12);
+      return [resolve(root, dir, "aid", key, "cost-ledger.json"), legacy];
+    }
+  } catch {
+    // no git: the project path only
+  }
+  return [legacy];
+}
+
+function readOne(p) {
+  if (!existsSync(p)) return { estimated_cost_usd: 0, total_input_tokens: 0, total_output_tokens: 0 };
+  let l;
+  try {
+    l = JSON.parse(readFileSync(p, "utf8"));
+  } catch {
+    l = null;
+  }
+  const num = (v) => (Number.isFinite(v) && v >= 0 ? v : 0);
+  if (!l || typeof l !== "object" || Array.isArray(l) || !Number.isFinite(l.estimated_cost_usd) || l.estimated_cost_usd < 0) {
+    return { estimated_cost_usd: Number.MAX_VALUE, total_input_tokens: 0, total_output_tokens: 0, corrupt: true };
+  }
+  return { estimated_cost_usd: l.estimated_cost_usd, total_input_tokens: num(l.total_input_tokens), total_output_tokens: num(l.total_output_tokens) };
+}
+
+/** Absent -> a fresh run (all 0). Corrupt (unparsable, non-object, bad total) -> MAX_VALUE, never 0. Max over both paths. */
+export function readLedger(root) {
+  return ledgerPaths(root).map(readOne).reduce((a, b) => (b.estimated_cost_usd > a.estimated_cost_usd ? b : a));
+}
+
+function writeLedger(root, { estimated_cost_usd, total_input_tokens, total_output_tokens }, all = false) {
+  const paths = ledgerPaths(root);
+  const body = `${JSON.stringify({ estimated_cost_usd, total_input_tokens, total_output_tokens }, null, 2)}\n`;
+  const put = (p) => {
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, body);
+  };
+  if (all) {
+    // --resolve: reset every home that exists; if the git dir cannot be written, the project path
+    // must still be reset, else the user's resolve crashes and the escalation never closes.
+    let ok = false;
+    for (const p of paths) {
+      if (p !== paths[0] && !existsSync(p) && ok) continue;
+      try {
+        put(p);
+        ok = true;
+      } catch (e) {
+        if (p === paths[paths.length - 1] && !ok) throw e;
+      }
+    }
+    return;
+  }
+  try {
+    put(paths[0]);
+  } catch (e) {
+    // T21b cycle 2: a git dir we cannot write must not lose the charge; fall back to the project path.
+    if (paths.length < 2) throw e;
+    put(paths[1]);
+  }
+}
+
+/**
+ * T21 fix-1: the only reset of the running total. Called from `--resolve` (user-only; aid_guard asks)
+ * when the open escalation is a cost brake, so the user's decision to continue starts a new budget.
+ * Zeroes both halves of max(ledger, state.cost), else the stale state.cost would re-trip the brake.
+ */
+function resetCost(root) {
+  writeLedger(root, { estimated_cost_usd: 0, total_input_tokens: 0, total_output_tokens: 0 }, true);
+  const sp = join(root, ".aid/pipeline/state.json");
+  try {
+    const s = JSON.parse(readFileSync(sp, "utf8"));
+    if (s?.cost && typeof s.cost === "object") {
+      Object.assign(s.cost, { estimated_cost_usd: 0, total_input_tokens: 0, total_output_tokens: 0 });
+      writeFileSync(sp, `${JSON.stringify(s, null, 2)}\n`);
+    }
+  } catch {
+    // absent or unparsable state.json: nothing to zero; the ledger alone is then the total
+  }
+}
+
+/** cost_limits from the project config, else config.default.json; non-finite or <= 0 -> the default. */
+export function costLimitsFor(config) {
+  let def = {};
+  try {
+    def = JSON.parse(readFileSync(join(dirname(GATE_PATH), "config.default.json"), "utf8"))?.cost_limits ?? {};
+  } catch {
+    // fall through to the hard defaults
+  }
+  const pick = (k, hard) => [config?.cost_limits?.[k], def[k], hard].find((v) => Number.isFinite(v) && v > 0);
+  return { warn: pick("warn_at_usd", 25), max: pick("max_per_run_usd", 50) };
+}
+
+/**
+ * T21 fix-2: the brake's `why` for a running total, or null below the limit. One source for
+ * recordDecision and main(). The total is cumulative: it spans tasks and resets only when the user
+ * resolves a cost-brake escalation (resetCost), so the text says so.
+ */
+export function costBrakeWhy(total, lim) {
+  return total >= lim.max
+    ? `cost brake: $${total.toFixed(2)} >= $${lim.max} (running total across tasks since the last cost-brake resolve)`
+    : null;
+}
+
 /** I-23: last_review_result and the accumulated cost, applied to a state object in place. */
 export function applyReview(state, { step, decision, usage, estimated, pricing }) {
   const now = new Date().toISOString();
@@ -308,7 +468,7 @@ export function applyReview(state, { step, decision, usage, estimated, pricing }
   };
   const n = usage.input_tokens;
   const m = usage.output_tokens;
-  const usd = (n / 1e6) * pricing.input_per_mtok + (m / 1e6) * pricing.output_per_mtok;
+  const usd = reviewUsd(usage, pricing);
   const costIsObj = state.cost && typeof state.cost === "object" && !Array.isArray(state.cost);
   const cost = costIsObj ? state.cost : {};
   // T20 audit: a cost key that is present but not an object, or an object without its running
@@ -827,6 +987,7 @@ function main() {
       process.exit(3);
     }
     const e = JSON.parse(readFileSync(p, "utf8"));
+    if (e.cost_brake === true) resetCost(root);
     writeEscalation(root, { ...e, status: "resolved", resolved_how: how, resolved_at: new Date().toISOString() });
     console.log("gate: escalation resolved");
     process.exit(0);
@@ -880,12 +1041,62 @@ function main() {
     console.error(`gate: no config at ${configPath}`);
     process.exit(3);
   }
-  const config = JSON.parse(readFileSync(configPath, "utf8"));
-  const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : {};
+  let config;
+  try {
+    config = JSON.parse(readFileSync(configPath, "utf8"));
+  } catch (e) {
+    // T21b: an uncaught throw exits 1 (= FIX) before any charge: a free loop past the $ brake.
+    console.error(`gate: unparsable config at ${configPath}: ${e.message}`);
+    process.exit(3);
+  }
+  // T21 fix-1: an unparsable state.json used to crash here (exit 1 = FIX) before any charge.
+  let state = {};
+  try {
+    state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : {};
+  } catch {
+    // treated as empty; recordDecision still charges the ledger
+  }
   const counter = STEP_CONFIG[step]?.counter;
   const iterationsUsed = Number(state?.iterations?.[counter] ?? 0);
 
-  const d = decide({ step, scores, config, iterationsUsed });
+  let d = decide({ step, scores, config, iterationsUsed });
+  // RECORD FIRST, THEN EXIT (2026-09-04). These two lines used to be the other way round, so an
+  // ERROR left step_history untouched and a dead or malformed reviewer was invisible in the record:
+  // `SELECT count(*) FROM pipeline_steps WHERE result='ERROR'` returned 0 by construction, not by
+  // absence of the event. That is why "3 of 4 spawned agents produced nothing this session" could not
+  // be counted, and why those rounds were being charged to FIX_CODE instead.
+  //
+  // recordDecision is already correct for ERROR with no change: result !== "FIX" so no counter
+  // increments, and with no `overall` key the dashboard's pickScore yields NULL, so an ERROR row can
+  // never pollute a score average.
+  const review = STEP_CONFIG[step]
+    ? { usage: usageArg.usage, estimated: usageArg.estimated, pricing: pricingFor(config) }
+    : null;
+  let costBrake = false;
+  if (!has("dry-run")) {
+    const lim = costLimitsFor(config);
+    const recorded = recordDecision(root, { step, decision: d, scores, review, costLimits: lim });
+    // T21: the $ brake, in code. total = max(ledger, state.cost), the same total recordDecision used
+    // to write ESCALATE into state.json (T21 fix-2); recomputed here so a failed state write still
+    // brakes from the ledger. At or over max_per_run_usd the run ESCALATES through the escalation file.
+    if (review) {
+      const total = Math.max(readLedger(root).estimated_cost_usd, recorded?.cost?.estimated_cost_usd ?? 0);
+      const why = costBrakeWhy(total, lim);
+      if (why) {
+        costBrake = true;
+        d = { ...d, result: "ESCALATE", exit: 2, why };
+      } else if (total >= lim.warn) {
+        console.log(`gate: cost warning: $${total.toFixed(2)} >= warn $${lim.warn} (brake at $${lim.max})`);
+      }
+    }
+  } else if (review) {
+    // T21 audit: a dry run charges and writes nothing, but must not report PASS past the brake.
+    const sc = state?.cost?.estimated_cost_usd;
+    const total = Math.max(readLedger(root).estimated_cost_usd, typeof sc === "number" ? sc : 0);
+    const why = costBrakeWhy(total, costLimitsFor(config));
+    if (why) d = { ...d, result: "ESCALATE", exit: 2, why };
+  }
+  // T21 fix-2: printed and logged once, after the brake, so every record of one decision agrees.
   console.log(`gate: ${step} → ${d.result} (${d.why})`);
   // Instrument every decision, including ERROR: a gate that could not decide is exactly the event a
   // loops view needs to show, and it is invisible in state.json.
@@ -905,19 +1116,6 @@ function main() {
     cap: d.cap ?? null,
     problem: d.result === "PASS" ? null : d.why,
   }, root);
-  // RECORD FIRST, THEN EXIT (2026-09-04). These two lines used to be the other way round, so an
-  // ERROR left step_history untouched and a dead or malformed reviewer was invisible in the record:
-  // `SELECT count(*) FROM pipeline_steps WHERE result='ERROR'` returned 0 by construction, not by
-  // absence of the event. That is why "3 of 4 spawned agents produced nothing this session" could not
-  // be counted, and why those rounds were being charged to FIX_CODE instead.
-  //
-  // recordDecision is already correct for ERROR with no change: result !== "FIX" so no counter
-  // increments, and with no `overall` key the dashboard's pickScore yields NULL, so an ERROR row can
-  // never pollute a score average.
-  const review = STEP_CONFIG[step]
-    ? { usage: usageArg.usage, estimated: usageArg.estimated, pricing: pricingFor(config) }
-    : null;
-  if (!has("dry-run")) recordDecision(root, { step, decision: d, scores, review });
   if (d.result === "ERROR") process.exit(3);
 
   if (d.result === "ESCALATE" && !has("dry-run")) {
@@ -932,9 +1130,14 @@ function main() {
       why: d.why,
       scores,
       opened_at: new Date().toISOString(),
+      ...(costBrake ? { cost_brake: true } : {}),
       how_to_resolve:
-        "Decide as the human: raise the code to clear the threshold, lower the threshold in " +
-        ".aid/pipeline/config.json, or accept this result. " +
+        (costBrake
+          ? "Decide as the human: stop here, or continue with a new budget. Resolving this cost brake " +
+            "resets the running total (cost-ledger.json and state.cost) to $0. The total is cumulative " +
+            "across tasks: it resets only here, never when a new task starts. "
+          : "Decide as the human: raise the code to clear the threshold, lower the threshold in " +
+            ".aid/pipeline/config.json, or accept this result. ") +
         RESOLVE_CMD +
         "The Stop hook blocks while this is open.",
     });

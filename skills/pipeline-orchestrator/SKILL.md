@@ -556,7 +556,7 @@ with a 6.0 carrying one real MAJOR yields 6.0 and not 7.8. It also emits `review
 never averages against a phantom. If NEITHER produced a score, that is ERROR — see
 **When a spawned agent reports no result**.
 
-- If cost limit hit during iteration → ESCALATE (user decides: continue or stop)
+- If the cost brake trips, `gate.mjs --step` itself returns ESCALATE (exit 2) and opens `.aid/pipeline/ESCALATION.json` (T21); stop and show the user the resolve line (user decides: continue with a new budget, or stop)
 - Keep the FULL response (including `scores`, `score_justification`, `biggest_gaps`) for the fix step and the step summary. `last_review_result` and `cost` are written by `gate.mjs --step` (T17-20), never by you: pass `--usage '{"input_tokens":N,"output_tokens":M}'` from the Task result when known
 - **On iteration 1 only**, also add `"self_review_overall": <the number SELF_REVIEW claimed>` to the
   scores object. It carries no weight in any decision — `decide()` never reads it — and exists so the
@@ -619,7 +619,7 @@ blanks forever afterwards. (Corrected 2026-09-06: they used to reach the Current
 gate's event log, because the dashboard loader discarded the round, cap and threshold the gate had
 already written into `step_history`. It now reads them from the entry, so both paths carry the same
 numbers and neither invents one from today's config.)
-- If cost limit hit during iteration → ESCALATE (user decides: continue or stop)
+- If the cost brake trips, `gate.mjs --step` itself returns ESCALATE (exit 2) and opens `.aid/pipeline/ESCALATION.json` (T21); stop and show the user the resolve line (user decides: continue with a new budget, or stop)
 - Keep the FULL response (including `scores`, `score_justification`, `biggest_gaps`) for the fix step and the step summary. `last_review_result` and `cost` are written by `gate.mjs --step` (T17-20), never by you: pass `--usage '{"input_tokens":N,"output_tokens":M}'` from the Task result when known
 - Add `"top_finding": "<pattern of the highest-severity finding>"` to the scores object handed to
   `gate.mjs`, exactly as CODE_REVIEW does, so a repeated test defect class is queryable.
@@ -980,16 +980,18 @@ In the same write as the `step_history` row, `gate.mjs` (not `--dry-run`):
 
 Without `--usage` it records the documented estimate (4000 input, 2000 output) with `estimated: true`. A non-object or negative `--usage` is exit 3 and nothing is written. No agent writes `cost` or `last_review_result` itself.
 
-### Cost Limits
+### Cost Limits (enforced by gate.mjs, T21)
 
-Read limits from `config.cost_limits`:
+The brake is code, not an instruction. Limits come from the project `.aid/pipeline/config.json` `cost_limits`, else `config.default.json` (a missing, non-finite or non-positive value falls back to the default: `warn_at_usd` 25, `max_per_run_usd` 50).
 
-| Threshold | Action |
+On every scored `gate.mjs --step` (not `--dry-run`) the gate first charges the review to the cost ledger (`<git-dir>/aid/<project key>/cost-ledger.json` inside a git repo, one per project folder and worktree, where git cleanup never reaches; `.aid/pipeline/cost-ledger.json` outside one), then sets the running total to `max(ledger, state.cost)` and writes it to both. Deleting, zeroing or corrupting `state.cost` or the ledger alone never lowers it; a corrupt value counts as over the limit.
+
+| Running total | What the gate does |
 |-----------|--------|
-| `cost >= warn_at_usd` | Display: "Cost warning: $X.XX spent (limit: $Y.YY)" |
-| `cost >= max_per_run_usd` | ESCALATE: "Pipeline cost limit reached ($X.XX / $Y.YY). Continue? (y/n)" |
+| `>= warn_at_usd` | Prints `gate: cost warning: $X.XX >= warn $W (brake at $M)`; the decision is unchanged |
+| `>= max_per_run_usd` | Returns ESCALATE (exit 2) whatever the score, records ESCALATE in `state.json` and `step_history`, and opens `.aid/pipeline/ESCALATION.json` with `cost_brake: true`. The Stop hook blocks until it is resolved |
 
-Cost escalation uses the same protocol as iteration escalation — user can resume, override, or abort.
+The total is cumulative across tasks: a new task does not reset it. Only the user's resolve line for a cost-brake escalation (the `!` line in ESCALATION.json) resets it, zeroing both the ledger and `state.cost` (a new budget). `cost-ledger.json` is a control file: agent tool writes to it are refused (see docs/SECURITY-MODEL.md).
 
 ### Display in Pipeline Status
 
@@ -1125,8 +1127,8 @@ Read from `.aid/pipeline/config.json`:
 | `thresholds.visual_qa_pass` | 7.0 | Minimum visual QA score (1-10) |
 | `thresholds.auto_fail_on_critical_security` | true | Auto-fail on security issues |
 | `thresholds.min_coverage_percent` | 80 | Minimum test coverage % |
-| `cost_limits.warn_at_usd` | 25.00 | Show warning when cost exceeds this |
-| `cost_limits.max_per_run_usd` | 50.00 | Escalate when cost exceeds this |
+| `cost_limits.warn_at_usd` | 25.00 | gate.mjs prints a warning when the running total reaches this |
+| `cost_limits.max_per_run_usd` | 50.00 | gate.mjs escalates when the running total reaches this |
 | `cost_limits.pricing.model` | `claude-opus-4-8` | Model whose published rate the pricing reflects (provenance for the rates below) |
 | `cost_limits.pricing.input_per_mtok` | 5.00 | $/million input tokens (claude-opus-4-8 — verified from the Claude model catalog) |
 | `cost_limits.pricing.output_per_mtok` | 25.00 | $/million output tokens (claude-opus-4-8 — verified from the Claude model catalog) |

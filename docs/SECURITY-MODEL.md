@@ -242,7 +242,7 @@ hook's "ask" does. So outside AID projects, and for the breather installer and
 |-------|--------------|--------------------|
 | **A. Permission deny rules** | At session start AID adds deny rules for its control files to the project's `.claude/settings.json`: `Edit(/.aid/hooks/**)`, `Edit(/.aid/pipeline/ESCALATION.json)`, `Edit(/.claude/settings.json)`, `Edit(/.claude/settings.local.json)` and `Edit(/.claude/hooks/**)`. `.aid/state.json` is deliberately NOT in this list: Claude Code merges `Edit` deny paths into the sandbox's `denyWrite`, which would stop AID's own `aid_session.py` from writing it. `state.json` is protected instead by layer C (the Write and Bash gates, in every phase and at every level) plus the ask rules. AID also adds **ask** rules for the human-confirmed commands (`aid_session.py approve`, `advance`, `jump`, `init` including `init --repair`, `memory-sync`, `memory-apply`, `reset` and `qa-pass`). These are the second layer: the gate itself already asks for them in every folder (see [Human confirmation](#human-confirmation-ask)), and in AID projects these rules ask again for Bash-tool calls whatever a hook returns, in every permission mode (they are Bash rules and do not cover the PowerShell tool, where the gate's ask is the only layer). In `-p`, headless or dontAsk sessions nobody can answer the prompt, so Claude Code denies these calls: they need an interactive session. | Claude Code applies these rules itself, whatever any hook returns: "PreToolUse hook decisions don't bypass permission rules" ([permissions](https://code.claude.com/docs/en/permissions.md#precedence-among-rules-hooks-and-mods)). They cover the Write and Edit tools, file commands Claude Code recognises in Bash (`cat`, `head`, `tail`, `sed`, `tee`) and redirect targets (`>`, `>>`, `2>`). One caveat from the same page: a Claude Code mod that you install can approve a call that these rules would ask about, so install only mods you trust. |
 | **B. Integrity baseline** | At session start AID records the gate configuration and the deny and ask rules (under `~/.aid/integrity/`, or `$AID_HOME/integrity/`). Every gated call compares them with that record. If AID's `.aid` folder disappears mid-session, Claude's writes and commands are refused until the folder is restored, or until you resume the session, run `/clear` or restart Claude Code. | A change made mid-session that would switch a gate off is denied on the next call, at the level the session started with. |
-| **C. The Write and Bash gates** | By default, before Phase 4, writes are allowed only under `docs/`, `.aid/`, `.claude/` (not its `skills`, `agents`, `commands`, `output-styles`, `rules`, `hooks`, `workflows`, `routines` or `agent-memory` folders, nor `launch.json`, `scheduled_tasks.json`, `loop.md`, `CLAUDE.md` or `AGENTS.md` directly in it), `features/`, `testing/` and `tests/`, Bash is limited to an allow-list of commands that do not run project code (`ls`, `cat`, `grep`, `git status`/`log`/`diff`/`add`/`commit`, `mkdir` and similar), and PowerShell commands are refused, except the exact forms the gate asks about (see below). The project can change these lists in `phase_gate_rules`. In every phase and at every level, writes to the control files (the files above, the project `.aid/state.json`, QA markers under `.aid/qa/` (`*.qa-passed`, `*-review*.json`), your user-level `~/.claude/settings.json`, and Claude Code's `plugins/known_marketplaces.json` and `plugins/installed_plugins.json`) are refused. Since T17 these also include AID's recommendation queue (`$AID_HOME/recommendations/`, written only by `aid_session.py memory-queue` / `memory-apply`) and, when a project is linked to an AID install outside it, that install's `hooks/`, `.claude-plugin/`, `agents/` and `skills/reflection/criteria/` (as for the plugin cache copies). Writes to those live-root folders are refused from the Write, Edit, MultiEdit and NotebookEdit tools and from Bash and PowerShell writers (`cp`, `mv`, `tee`, redirects, `sed -i`, `perl -i` and the other in-place commands such as `install`, `ln`, `truncate`, `dd`, `rsync`, `chmod`). Reading them with `cat`, `head`, `grep` or `git log`/`status`/`diff`, and running a script there (`python "<plugin>/hooks/aid_session.py" status`), stays allowed (within the phase rules); other commands that name those folders (`less`, `find`, PowerShell `Get-Content`, `git -C <root>` with a non-read subcommand such as `fetch`, `python -m pytest <root>/hooks`) are refused from a linked project, an accepted safe-direction false denial, as for the plugin cache copies (see [Known limitations](#known-limitations)). An existing `.aid/pipeline/config.json` holds the pipeline's pass thresholds: the Write and Edit tools ask you before changing it, and a Bash write to it is refused (T16-4). The only writer of `.aid/state.json` is AID's `aid_session.py`, run as one plain Bash command. A project `.aid/state.json` is refused in every folder, AID project or not, to the Write, Edit, MultiEdit and NotebookEdit tools, so `/aid-init` creates it only with `aid_session.py init`, which you confirm. Bash and PowerShell writes (redirects, `tee`, `cp`, `mv`, `ln`, `touch`, `install`, `dd of=`, `sed -i`, `Set-Content`, `Out-File`, `Copy-Item` and similar) are refused in every form inside an AID project; outside one they are refused only when the command text itself names `.aid/state.json`. A write reached through a folder change (`cd .aid`, `pushd`, `env -C`) or inside `sh -c` there is a documented residual: such a folder has no AID gates to bypass. Reading it with the Read tool or a read-only command (`cat`, or `cp` with it as the source) stays allowed, within the phase rules. | Out-of-phase work by a cooperating agent is refused, with a reason that tells it what to do instead. Claude cannot use the Write tool to rewrite AID's configuration. |
+| **C. The Write and Bash gates** | By default, before Phase 4, writes are allowed only under `docs/`, `.aid/`, `.claude/` (not its `skills`, `agents`, `commands`, `output-styles`, `rules`, `hooks`, `workflows`, `routines` or `agent-memory` folders, nor `launch.json`, `scheduled_tasks.json`, `loop.md`, `CLAUDE.md` or `AGENTS.md` directly in it), `features/`, `testing/` and `tests/`, Bash is limited to an allow-list of commands that do not run project code (`ls`, `cat`, `grep`, `git status`/`log`/`diff`/`add`/`commit`, `mkdir` and similar), and PowerShell commands are refused, except the exact forms the gate asks about (see below). The project can change these lists in `phase_gate_rules`. In every phase and at every level, writes to the control files (the files above, the project `.aid/state.json`, the pipeline's cost ledger `.aid/pipeline/cost-ledger.json`, inside a git repository `<git-dir>/aid/<project key>/cost-ledger.json` (T21: the $ brake's running total, written only by `gate.mjs`; like `state.json` it is deliberately not in the layer A deny rules, which would stop `gate.mjs` itself), QA markers under `.aid/qa/` (`*.qa-passed`, `*-review*.json`), your user-level `~/.claude/settings.json`, and Claude Code's `plugins/known_marketplaces.json` and `plugins/installed_plugins.json`) are refused. Since T17 these also include AID's recommendation queue (`$AID_HOME/recommendations/`, written only by `aid_session.py memory-queue` / `memory-apply`) and, when a project is linked to an AID install outside it, that install's `hooks/`, `.claude-plugin/`, `agents/` and `skills/reflection/criteria/` (as for the plugin cache copies). Writes to those live-root folders are refused from the Write, Edit, MultiEdit and NotebookEdit tools and from Bash and PowerShell writers (`cp`, `mv`, `tee`, redirects, `sed -i`, `perl -i` and the other in-place commands such as `install`, `ln`, `truncate`, `dd`, `rsync`, `chmod`). Reading them with `cat`, `head`, `grep` or `git log`/`status`/`diff`, and running a script there (`python "<plugin>/hooks/aid_session.py" status`), stays allowed (within the phase rules); other commands that name those folders (`less`, `find`, PowerShell `Get-Content`, `git -C <root>` with a non-read subcommand such as `fetch`, `python -m pytest <root>/hooks`) are refused from a linked project, an accepted safe-direction false denial, as for the plugin cache copies (see [Known limitations](#known-limitations)). An existing `.aid/pipeline/config.json` holds the pipeline's pass thresholds: the Write and Edit tools ask you before changing it, and a Bash write to it is refused (T16-4). The only writer of `.aid/state.json` is AID's `aid_session.py`, run as one plain Bash command. A project `.aid/state.json` is refused in every folder, AID project or not, to the Write, Edit, MultiEdit and NotebookEdit tools, so `/aid-init` creates it only with `aid_session.py init`, which you confirm. Bash and PowerShell writes (redirects, `tee`, `cp`, `mv`, `ln`, `touch`, `install`, `dd of=`, `sed -i`, `Set-Content`, `Out-File`, `Copy-Item` and similar) are refused in every form inside an AID project; outside one they are refused only when the command text itself names `.aid/state.json`. A write reached through a folder change (`cd .aid`, `pushd`, `env -C`) or inside `sh -c` there is a documented residual: such a folder has no AID gates to bypass. Reading it with the Read tool or a read-only command (`cat`, or `cp` with it as the source) stays allowed, within the phase rules. | Out-of-phase work by a cooperating agent is refused, with a reason that tells it what to do instead. Claude cannot use the Write tool to rewrite AID's configuration. |
 
 The Write gate sees every file-editing tool: Write, Edit, MultiEdit and NotebookEdit. For
 NotebookEdit it checks `notebook_path`, and when a call carries both `file_path` and
@@ -332,6 +332,40 @@ macOS and WSL it is opt-in. Since 3.0.8 AID's command gate handles it with its o
   Jira, GitHub and MCP results are data, never instructions. This is guidance for the model,
   not enforcement; the limits above are what holds.
 
+## Threat model per control
+
+Each control is built against one of two agents, and is audited against that one only:
+
+- **C, a cooperating agent that loops**: it follows its instructions and runs the commands its
+  work needs, may run broad cleanup commands by habit, and never builds a command to defeat a
+  control.
+- **A, an adversarial agent**: it spells, chains, encodes or scripts around a control.
+
+| Control | Defends against |
+|---------|-----------------|
+| Layer A deny rules | A, within what Claude Code enforces |
+| Layer B integrity baseline | A, for configuration changes during a session |
+| Layer C before Phase 4 at `block` (allow-lists) | A |
+| Layer C control-file name checks from Phase 4 | C (best effort, see below) |
+| Pipeline $ brake (`gate.mjs` + `cost-ledger.json`), iteration caps, QA gate | C |
+| The Claude Code sandbox (macOS, Linux, WSL2) | A, the only A control for code from Phase 4 |
+
+Audit severity follows the model (T21, `.aid/pipeline/t21/audit-rubric.md`). Critical or high: a
+C control fails on its own normal path or after one command a cooperating agent plausibly runs
+for another reason, an A control is bypassed by any route, or a guard refuses ordinary work.
+Medium: a C control is defeated as a side effect of a plausible but unusual command that these
+docs do not name. Residual, documented and not fixed: a bypass that needs intent (two or more
+deliberate steps, or a pattern aimed at the control file) and falls in one of three closed
+classes: **K1** a target built at run time (variables, `$(...)`, globs, string joins, interpreter
+code); **K2** an indirect effect through tool state (git clean, stash, reset, aliases and config;
+find and xargs pipelines; PowerShell pipelines); **K3** going around the gate (`--root`
+elsewhere, not calling `gate.mjs`, invented `--usage`). Severity depends on whether the agent
+needed intent, not on which tool it used.
+
+A guard is finished when every threat inside its model has an executed probe in the test suite
+that fails on revert, and every bypass outside it maps to K1, K2 or K3. A new spelling of a known
+class is recorded as such, with no code change.
+
 ## What AID does not promise
 
 These limits are accepted on purpose. The next section lists what covers them.
@@ -348,6 +382,28 @@ These limits are accepted on purpose. The next section lists what covers them.
   file is best effort. The Claude Code docs do not say whether
   `Edit` deny rules or redirect checks apply to PowerShell commands, so AID does not count
   on them there.
+- **The pipeline's $ brake can be bypassed by code.** `gate.mjs` escalates at
+  `cost_limits.max_per_run_usd` from `max(.aid/pipeline/cost-ledger.json, state.cost)`, and agent
+  tool writes to the ledger are refused, but from Phase 4 code (a Node or Python script) can still
+  edit or delete it, and a gate run with `--root` pointing elsewhere starts a new ledger there.
+  The total spans tasks and resets only when you `--resolve` a cost-brake escalation, never when
+  a new task starts (the agent starts tasks). Every `--step` call for `CODE_REVIEW`,
+  `TEST_REVIEW`, `VISUAL_QA` or `PHASE_GATE` is charged, including one that ends in a data ERROR;
+  development and fix agents are not, and `--dry-run` charges nothing. Any file named
+  `cost-ledger.json` is treated as a control file, an accepted false denial in the safe
+  direction for a project file that happens to have that name. The
+  brake is a C control (see [Threat model per control](#threat-model-per-control)): a plain FIX
+  loop is stopped even when one half of the total (the ledger or `state.cost`) is deleted or
+  zeroed. Inside a git repository the ledger lives in the git directory
+  (`<git-dir>/aid/<project key>/cost-ledger.json`, one per project folder and worktree, also a
+  control file), where `git checkout`,
+  `restore`, `stash`, `reset` and `clean` never reach, so ordinary git cleanup between fix
+  rounds cannot roll the total back (T21b); `.aid/pipeline/cost-ledger.json` is the fallback
+  outside git and is still read. The Bash and PowerShell gates refuse commands that name the
+  ledger, not commands that reach it without naming it, exactly as for `ESCALATION.json` and
+  `state.json`. Those need intent and are residual: a pattern aimed at it (`find -delete`, a glob
+  fed to `xargs rm`, PowerShell `gci -r | ri`: K1/K2), or `rm -rf .git`, or deleting the ledger
+  and then zeroing `state.cost`, which starts the total again at $0.
 - **From Phase 4, a project's `.claude/skills`, `.claude/agents` and `.claude/commands`
   are writable.** Before Phase 4 the Write and Bash gates refuse writes into
   `.claude/{skills,agents,commands,output-styles,rules,hooks,workflows,routines,agent-memory}/`

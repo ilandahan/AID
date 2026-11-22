@@ -44,6 +44,8 @@ PROTECTED_SUFFIXES = (
     "/.aid/hooks/",
     "/.aid/integrity/",
     "/.aid/pipeline/ESCALATION.json",
+    "/.aid/pipeline/cost-ledger.json",   # T21: the $ brake's running total; only gate.mjs writes it
+    "/cost-ledger.json",                 # T21b: its home inside a git repo, <git-dir>/aid/<project key>/
     "/.claude/settings.json",
     "/.claude/settings.local.json",
     "/.claude/hooks/",
@@ -65,7 +67,8 @@ PROTECTED_PARENTS = ("/.aid", "/.claude", "/.aid/hooks", "/.aid/pipeline", "/.cl
 PROTECTED_LITERALS = (".aid/hooks", ".aid/integrity", "escalation.json",
                       ".claude/settings.json", ".claude/settings.local.json",
                       ".claude/hooks", ".claude/plugins/cache",
-                      ".aid/state.json", ".qa-passed")        # T15 I-4 (AC-33 reads stay exempt)
+                      ".aid/state.json", ".qa-passed",        # T15 I-4 (AC-33 reads stay exempt)
+                      "cost-ledger.json")                     # T21 fix 1 (PS_PROTECTED_LITERALS inherits)
 
 # T15-1: .claude/<dir>/ folders Claude Code loads capabilities from (a phase rule, not a
 # control file; .claude/hooks/ is ALSO a control file via PROTECTED_SUFFIXES).
@@ -1036,7 +1039,8 @@ def is_pipeline_config(norm):
 
 # R1-06 (T16 fix cycle 1): control files a glob write target may expand to.
 _CONTROL_GLOB_TARGETS = (".aid/state.json", ".aid/pipeline/config.json", ".aid/pipeline/escalation.json",
-                         ".aid/hooks/config.json", ".claude/settings.json", ".claude/settings.local.json")
+                         ".aid/hooks/config.json", ".claude/settings.json", ".claude/settings.local.json",
+                         ".aid/pipeline/cost-ledger.json")     # T21
 
 
 _HOME_PREFIX = re.compile(r"^(?:~|\$HOME|\$\{HOME\})(?=[/\\]|$)")
@@ -2385,8 +2389,19 @@ def _cp_mv_targets(name, words, args, vcwd, dest_only=False):
     return targets, None
 
 
+def _short_in_control_dir(text):
+    """T21 audit: an 8.3 short name (`~N`) inside .aid/ or .claude/ may alias a control file
+    (`.aid/pipeline/COST-L~1.JSO`). Revisions and versions (`HEAD~1`, `@~20`) never match."""
+    return bool(re.search(r"~\d", text)) and bool(
+        re.search(r"(?:^|[/\\])\.(?:aid|claude)(?:[/\\]|$)", text, re.I))
+
+
 def _write_word_verdict(w, vcwd, root, phase, rules):
     """AC-31: a target that contains a variable keeps the literal check on its text."""
+    if _short_in_control_dir(w.text):
+        # T21 fix 1: the lexer makes a `~` word dynamic, so normalize's 8.3 check never saw
+        # `> .aid/pipeline/COST-L~1.JSO`; refused in every phase, as the Write tool does.
+        return "refusing an obfuscated path form ({!r})".format(w.text)
     if w.dynamic and mentions_protected(w.text):
         return "'{}' names an AID control file (protected in every phase)".format(w.text)
     if w.dynamic and _glob_names_control(w.text, vcwd):
@@ -2520,7 +2535,8 @@ def _phase4_check(command, cwd, root, phase, rules):
                 live_ok = bool(lp) and (a == run_word or name in ("cd", "pushd")) and not _edits_in_place(
                     name, args) and (_live_root_only(n) or _live_parent(n, lp))
                 # T16 B1: T16-10 reverted; `cd .aid` / `cd ~/.aid` stay denied, as at 5f8f199.
-                if mentions_protected(a) or (n != SUSPICIOUS and is_protected_or_parent(n) and not live_ok) or (
+                if mentions_protected(a) or _short_in_control_dir(a) or (
+                        n != SUSPICIOUS and is_protected_or_parent(n) and not live_ok) or (
                         lp and not live_ok and a not in sh_bodies and (
                             _mentions_live(a, lp) or _live_parent(n, lp))):
                     # T17-9: running or reading a live-root file is not writing it.

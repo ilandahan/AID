@@ -28,6 +28,11 @@ review, or the documented 4000 input / 2000 output estimate when none was passed
 when any entry does. If `cost` or `last_review_result` is missing (no review has been scored
 yet), show "none recorded yet".
 
+The $ brake does not read `cost` alone: `gate.mjs` escalates at `cost_limits.max_per_run_usd`
+from `max(cost ledger, cost.estimated_cost_usd)` (T21; the ledger is `.git/aid/<project key>/cost-ledger.json`
+in a git repo, else `.aid/pipeline/cost-ledger.json`). Show that running
+total against the limit; when the ledger is higher than `cost`, say so.
+
 ## Display Format
 
 ```
