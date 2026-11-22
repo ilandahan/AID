@@ -22,11 +22,11 @@ try:
     from .. import paths
     from ..redact import redact_obj
 except ImportError:
-    from analysis.metrics import MetricsCalculator
-    from analysis.patterns import PatternDetector
-    from feedback.collector import load_pending_feedback, load_feedback_by_date_range, default_names
-    import paths
-    from redact import redact_obj
+    from analysis.metrics import MetricsCalculator  # type: ignore[no-redef]
+    from analysis.patterns import PatternDetector  # type: ignore[no-redef]
+    from feedback.collector import load_pending_feedback, load_feedback_by_date_range, default_names  # type: ignore[no-redef]
+    import paths  # type: ignore[no-redef]
+    from redact import redact_obj  # type: ignore[no-redef]
 
 # T8-2 (D3): an approved proposal may only APPEND to one of these learnings files, inside
 # this plugin's own skills/memory-system/references/. Nothing else is ever written.
@@ -188,7 +188,7 @@ class RecommendationGenerator:
 
     def _recommendations_from_debates(self) -> List[Dict[str, Any]]:
         """Generate recommendations from debate patterns."""
-        recommendations = []
+        recommendations: List[Dict[str, Any]] = []
         debate_patterns = self.patterns.get('repeated_debates', {})
 
         if not debate_patterns.get('patterns_found'):
@@ -234,7 +234,7 @@ class RecommendationGenerator:
 
     def _recommendations_from_ratings(self) -> List[Dict[str, Any]]:
         """Generate recommendations from rating patterns."""
-        recommendations = []
+        recommendations: List[Dict[str, Any]] = []
         rating_patterns = self.patterns.get('low_rating_patterns', {})
 
         if not rating_patterns.get('patterns_found'):
@@ -262,7 +262,7 @@ class RecommendationGenerator:
 
     def _recommendations_from_roles(self) -> List[Dict[str, Any]]:
         """Generate recommendations from role mismatch patterns."""
-        recommendations = []
+        recommendations: List[Dict[str, Any]] = []
         role_patterns = self.patterns.get('role_mismatch', {})
 
         if not role_patterns.get('patterns_found'):
@@ -312,7 +312,7 @@ class RecommendationGenerator:
 
     def _recommendations_from_verbosity(self) -> List[Dict[str, Any]]:
         """Generate recommendations from verbosity signals."""
-        recommendations = []
+        recommendations: List[Dict[str, Any]] = []
         verbosity = self.patterns.get('verbosity_preference', {})
 
         if verbosity.get('confidence') not in ['high', 'medium']:
@@ -358,7 +358,7 @@ class RecommendationGenerator:
 
     def _recommendations_from_phases(self) -> List[Dict[str, Any]]:
         """Generate recommendations from phase struggle patterns."""
-        recommendations = []
+        recommendations: List[Dict[str, Any]] = []
         phase_patterns = self.patterns.get('phase_struggles', {})
 
         if not phase_patterns.get('patterns_found'):
@@ -755,7 +755,7 @@ def format_recommendations_report(recommendations: List[Dict[str, Any]]) -> str:
     lines.append("")
 
     # Group by priority
-    by_priority = {"high": [], "medium": [], "low": []}
+    by_priority: Dict[str, List[Any]] = {"high": [], "medium": [], "low": []}
     for rec in recommendations:
         by_priority[rec['priority']].append(rec)
 

@@ -19,11 +19,11 @@ try:
     from .. import paths
     from ..redact import redact, redact_obj
 except ImportError:
-    from feedback.collector import load_feedback_by_date_range, default_names
-    from feedback import collector
-    from analysis.patterns import PatternDetector
-    import paths
-    from redact import redact, redact_obj
+    from feedback.collector import load_feedback_by_date_range, default_names  # type: ignore[no-redef]
+    from feedback import collector  # type: ignore[no-redef]
+    from analysis.patterns import PatternDetector  # type: ignore[no-redef]
+    import paths  # type: ignore[no-redef]
+    from redact import redact, redact_obj  # type: ignore[no-redef]
 
 
 # Configuration. T8-3: from paths.aid_home() on every call ($AID_HOME, else ~/.aid).
@@ -269,7 +269,7 @@ class MemorySyncEngine:
         """
         if not self.patterns:
             return []
-        planned = []
+        planned: List[Dict[str, Any]] = []
 
         def add(category, content, meta):
             clean = redact(content, default_names())

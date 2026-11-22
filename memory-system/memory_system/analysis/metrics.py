@@ -15,7 +15,7 @@ from pathlib import Path
 try:
     from ..feedback.collector import load_pending_feedback, load_feedback_by_date_range
 except ImportError:
-    from feedback.collector import load_pending_feedback, load_feedback_by_date_range
+    from feedback.collector import load_pending_feedback, load_feedback_by_date_range  # type: ignore[no-redef]
 
 
 class MetricsCalculator:
@@ -29,7 +29,7 @@ class MetricsCalculator:
             feedback_entries: List of feedback entry dictionaries
         """
         self.entries = feedback_entries
-        self._cache = {}
+        self._cache: Dict[str, Any] = {}
 
     def calculate_all_metrics(self) -> Dict[str, Any]:
         """
@@ -127,7 +127,7 @@ class MetricsCalculator:
             }
 
         total = len(debate_entries)
-        outcomes = defaultdict(int)
+        outcomes: Dict[str, int] = defaultdict(int)
 
         for entry in debate_entries:
             outcome = entry.get('debate', {}).get('outcome', 'unknown')
@@ -141,7 +141,7 @@ class MetricsCalculator:
         change_rate = changed / total if total > 0 else 0
 
         # Analyze debate topics
-        topic_changes = defaultdict(lambda: {"total": 0, "changed": 0})
+        topic_changes: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "changed": 0})
         for entry in debate_entries:
             topic = entry.get('decision', {}).get('topic_category', 'other')
             topic_changes[topic]["total"] += 1

@@ -24,16 +24,16 @@ try:
     from ..redact import redact_obj
     from ..feedback.collector import default_names
 except ImportError:
-    from feedback.collector import load_feedback_by_date_range, get_feedback_stats
-    from analysis.metrics import MetricsCalculator, generate_metrics_report
-    from analysis.patterns import PatternDetector
-    from recommendations.generator import (
+    from feedback.collector import load_feedback_by_date_range, get_feedback_stats  # type: ignore[no-redef]
+    from analysis.metrics import MetricsCalculator, generate_metrics_report  # type: ignore[no-redef]
+    from analysis.patterns import PatternDetector  # type: ignore[no-redef]
+    from recommendations.generator import (  # type: ignore[no-redef]
         RecommendationGenerator,
         load_recommendation_queue,
         format_recommendations_report
     )
-    from redact import redact_obj
-    from feedback.collector import default_names
+    from redact import redact_obj  # type: ignore[no-redef]
+    from feedback.collector import default_names  # type: ignore[no-redef]
 
 # Configuration
 # T8-3: $AID_HOME, else ~/.aid, read on every call.

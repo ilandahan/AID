@@ -55,23 +55,23 @@ try:
     from .redact import redact_obj
     from .feedback.collector import default_names
 except ImportError:
-    from feedback.collector import (
+    from feedback.collector import (  # type: ignore[no-redef]
         FeedbackCollector,
         load_feedback_by_date_range,
         get_feedback_stats,
         mark_feedback_processed
     )
-    from analysis.metrics import MetricsCalculator, generate_metrics_report
-    from analysis.patterns import PatternDetector
-    from analysis.dashboard import QualityDashboard, generate_dashboard, save_dashboard
-    from analysis.memory_sync import (
+    from analysis.metrics import MetricsCalculator, generate_metrics_report  # type: ignore[no-redef]
+    from analysis.patterns import PatternDetector  # type: ignore[no-redef]
+    from analysis.dashboard import QualityDashboard, generate_dashboard, save_dashboard  # type: ignore[no-redef]
+    from analysis.memory_sync import (  # type: ignore[no-redef]
         MemorySyncEngine,
         MemorySlotManager,
         sync_memory_from_feedback,
         get_current_memories,
         add_context_memory
     )
-    from recommendations.generator import (
+    from recommendations.generator import (  # type: ignore[no-redef]
         RecommendationGenerator,
         load_recommendation_queue,
         save_recommendations,
@@ -79,9 +79,9 @@ except ImportError:
         approve_recommendation,
         reject_recommendation
     )
-    import paths
-    from redact import redact_obj
-    from feedback.collector import default_names
+    import paths  # type: ignore[no-redef]
+    from redact import redact_obj  # type: ignore[no-redef]
+    from feedback.collector import default_names  # type: ignore[no-redef]
 
 
 # Configuration. T8-3: $AID_HOME, else ~/.aid, read on every call.

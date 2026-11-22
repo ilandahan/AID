@@ -15,7 +15,7 @@ from pathlib import Path
 try:
     from ..feedback.collector import load_pending_feedback, load_feedback_by_date_range
 except ImportError:
-    from feedback.collector import load_pending_feedback, load_feedback_by_date_range
+    from feedback.collector import load_pending_feedback, load_feedback_by_date_range  # type: ignore[no-redef]
 
 
 class PatternDetector:
@@ -362,7 +362,7 @@ class PatternDetector:
 
         verbose_signals = 0
         detail_signals = 0
-        signal_examples = {"verbose": [], "detail": []}
+        signal_examples: Dict[str, List[Any]] = {"verbose": [], "detail": []}
 
         for entry in verbal_entries:
             verbal = entry['feedback']['verbal'].lower()
@@ -547,7 +547,7 @@ class PatternDetector:
             }
 
         # Analyze by category
-        category_stats = defaultdict(lambda: {
+        category_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
             "count": 0,
             "ratings": [],
             "debate_count": 0
