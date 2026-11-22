@@ -36,7 +36,7 @@ Test the qa-validator-agent to verify it:
 | All criteria met | Email validation | Good validator | PASS |
 | Must_achieve violated | Error display | No error UI | FAIL |
 | Must_not violated | No console logs | Has console.log | FAIL |
-| Best practice missed | Unit tests | No tests | FAIL (warn) |
+| Best practice missed | Unit tests | No tests | PASS, non-empty `warnings` |
 
 ## Test Execution
 
@@ -114,11 +114,12 @@ Create no-tests-validator.ts that:
 - All must_not met ✓
 - NO unit tests ✗ (best_practices)
 
-Expected: verdict = PASS with warnings, best_practices[0] status = fail
+Expected: verdict = PASS (not a third verdict), best_practices[0] status = fail, and a
+non-empty `warnings` array naming the missed best practice
 
 ## Report Format
 
-Generate qa-validator-test-report.md with results table.
+Generate report.md in the output folder above with results table.
 ",
   description: "Test QA validator agent"
 )
@@ -135,7 +136,7 @@ Test Results:
   Test 1 (All Pass):        PASS ✓ (expected PASS)
   Test 2 (Must Achieve):    FAIL ✓ (expected FAIL)
   Test 3 (Must Not):        FAIL ✓ (expected FAIL)
-  Test 4 (Best Practices):  PASS* ✓ (expected PASS with warning)
+  Test 4 (Best Practices):  PASS ✓ (expected PASS, warnings: 1)
 
 Criteria Detection:
   must_achieve violations:   1/1 detected ✓

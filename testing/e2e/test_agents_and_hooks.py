@@ -13,6 +13,7 @@ WHY THIS TEST:
 - SUCCESS: every agent folder has a valid registerable definition whose referenced files
   exist, and the hook blocks and allows in the right conditions when actually executed.
 """
+import hashlib
 import json
 import os
 import re
@@ -161,14 +162,20 @@ class TestQAGateHookBehavior:
         """Inject a project fixture. Never reads the real .aid state."""
         aid = tmp_path / '.aid' / 'qa'
         aid.mkdir(parents=True)
-        (tmp_path / '.aid' / 'state.json').write_text(
-            json.dumps({'current_phase': phase}))
+        state = {'current_phase': phase}
         (tmp_path / '.aid' / 'context.json').write_text(
             json.dumps({'current_task': {'id': task}}))
         if criteria:
             (aid / f'{task}.yaml').write_text('criteria:\n  - it works\n')
         if passed:
-            (aid / f'{task}-review.json').write_text(json.dumps({'verdict': 'PASS'}))
+            # T15 (owner 2026-11-19): a QA pass is only the state.json qa_passed record
+            # (written by `aid_session.py qa-pass`) whose criteria_sha256 matches the
+            # current yaml bytes (I-3/D3). A *-review.json verdict file no longer passes.
+            yaml_bytes = (aid / f'{task}.yaml').read_bytes()
+            state['qa_passed'] = {
+                task: {'criteria_sha256': hashlib.sha256(yaml_bytes).hexdigest()}
+            }
+        (tmp_path / '.aid' / 'state.json').write_text(json.dumps(state))
         return tmp_path
 
     @staticmethod

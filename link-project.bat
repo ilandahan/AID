@@ -2,8 +2,10 @@
 REM ============================================
 REM AID - Link Project Script
 REM Creates junctions/links from project to AID
-REM Usage: link-project.bat [path] [--force] [--copy]
+REM Usage: link-project.bat [path] [--force] [--copy] [--role name-or-number]
 REM NOTE: Uses junctions (no admin required)
+REM Needs node (registers the AID hooks, T16 I-9) and python (creates the project
+REM state through hooks\aid_session.py init, T16 I-10).
 REM ============================================
 
 setlocal enabledelayedexpansion
@@ -24,18 +26,35 @@ echo.
 REM Check for flags
 set "FORCE_MODE=0"
 set "COPY_MODE=0"
-for %%a in (%*) do (
-    if /i "%%a"=="--force" set "FORCE_MODE=1"
-    if /i "%%a"=="-f" set "FORCE_MODE=1"
-    if /i "%%a"=="--copy" set "COPY_MODE=1"
-)
-
-REM Get target project path (skip flags)
+REM The role aid_session.py init starts the project with (a name or a menu number).
+set "ROLE=1"
+set "ROLE_NEXT=0"
 set "TARGET_PATH="
 for %%a in (%*) do (
-    if /i not "%%a"=="--force" if /i not "%%a"=="-f" if /i not "%%a"=="--copy" (
-        if "!TARGET_PATH!"=="" set "TARGET_PATH=%%~a"
+    set "ARG_USED=0"
+    if "!ROLE_NEXT!"=="1" (
+        set "ROLE=%%~a"
+        set "ROLE_NEXT=0"
+        set "ARG_USED=1"
     )
+    if "!ARG_USED!"=="0" (
+        if /i "%%~a"=="--force" set "FORCE_MODE=1" & set "ARG_USED=1"
+        if /i "%%~a"=="-f" set "FORCE_MODE=1" & set "ARG_USED=1"
+        if /i "%%~a"=="--copy" set "COPY_MODE=1" & set "ARG_USED=1"
+        if /i "%%~a"=="--role" set "ROLE_NEXT=1" & set "ARG_USED=1"
+    )
+    REM Get target project path (the first argument that is not a flag)
+    if "!ARG_USED!"=="0" if "!TARGET_PATH!"=="" set "TARGET_PATH=%%~a"
+)
+
+REM The role is passed to aid_session.py and printed in a command line: accept only a
+REM plain name or number.
+set "ROLE_REST=#!ROLE!"
+for %%c in (a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9 _ -) do set "ROLE_REST=!ROLE_REST:%%c=!"
+if "!ROLE!"=="" set "ROLE_REST=empty"
+if not "!ROLE_REST!"=="#" (
+    echo [ERROR] --role must be a role name or menu number - letters, digits, _ and -
+    exit /b 1
 )
 
 REM If no path provided, ask for it
@@ -123,6 +142,21 @@ for %%D in (commands skills agents references rules hooks) do (
         pause
         exit /b 1
     )
+)
+
+REM ============================================
+REM node is required (T16 I-9)
+REM WHY: the hooks registered in the project's .claude\settings.json run `node`. A
+REM project linked with gates that cannot run would look protected and not be. Stop
+REM before anything is written.
+REM ============================================
+node -e "" >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] node was not found on PATH.
+    echo         AID's phase gates run with node; install Node.js and run link-project again.
+    echo         Nothing was changed in "!TARGET_PATH!".
+    pause
+    exit /b 1
 )
 
 REM ============================================
@@ -342,14 +376,15 @@ REM ============================================
 echo.
 echo Copying project-specific files...
 
-REM Copy settings.json template (project may customize)
-if not exist "!TARGET_PATH!\.claude\settings.json" (
-    if exist "!AID_PATH!\.claude\settings.json" (
-        copy "!AID_PATH!\.claude\settings.json" "!TARGET_PATH!\.claude\settings.json" >nul
-        echo   [COPY] .claude\settings.json (customize as needed)
-    )
-) else (
-    echo   [SKIP] settings.json already exists
+REM Register the AID hooks in the project's settings.json (T16 I-9). The ONE generator is
+REM scripts\link-settings.mjs: it reads .claude-plugin\plugin.json, keeps the user's own
+REM keys and hooks, and leaves an unparseable file untouched (and fails).
+node "!AID_REAL!\scripts\link-settings.mjs" "!TARGET_REAL!" "!AID_REAL!"
+if errorlevel 1 (
+    echo   [ERROR] .claude\settings.json was not updated: the AID hooks are NOT registered.
+    echo           Fix the problem above and run link-project again.
+    pause
+    exit /b 1
 )
 
 REM ============================================
@@ -360,21 +395,51 @@ echo Creating project state directory...
 if not exist "!TARGET_PATH!\.aid" mkdir "!TARGET_PATH!\.aid"
 if not exist "!TARGET_PATH!\.aid\qa" mkdir "!TARGET_PATH!\.aid\qa"
 
-REM Create state.json if doesn't exist
-if not exist "!TARGET_PATH!\.aid\state.json" (
-    call :create_state_json
-    echo   [OK] state.json created
-) else (
+REM The project state is created ONLY by hooks\aid_session.py (T16 I-10, E3): this
+REM script runs its `init`, with cwd and CLAUDE_PROJECT_DIR = the target, and never
+REM writes state.json or context.json itself. init also creates .aid\context.json.
+if exist "!TARGET_PATH!\.aid\state.json" (
     echo   [SKIP] state.json already exists
+    goto :after_state
 )
-
-REM Create context.json if doesn't exist
-if not exist "!TARGET_PATH!\.aid\context.json" (
-    call :create_context_json
-    echo   [OK] context.json created
+REM python3, python, py -3; the Windows Store stub exits 9009, so only a python that
+REM really runs counts.
+set "PY_CMD="
+python3 -c "import sys" >nul 2>&1 && set "PY_CMD=python3"
+if not defined PY_CMD python -c "import sys" >nul 2>&1 && set "PY_CMD=python"
+if not defined PY_CMD py -3 -c "import sys" >nul 2>&1 && set "PY_CMD=py -3"
+set "INIT_RC=1"
+if defined PY_CMD (
+    pushd "!TARGET_REAL!"
+    set "CLAUDE_PROJECT_DIR=!TARGET_REAL!"
+    !PY_CMD! "!AID_REAL!\hooks\aid_session.py" init !ROLE! 0
+    set "INIT_RC=!ERRORLEVEL!"
+    set "CLAUDE_PROJECT_DIR="
+    popd
+)
+if "!INIT_RC!"=="0" if exist "!TARGET_PATH!\.aid\state.json" (
+    echo   [OK] state.json created by aid_session.py init
+    goto :after_state
+)
+if not defined PY_CMD (
+    echo   [WARNING] No working python found - tried python3, python, py -3.
+    set "PY_CMD=python"
 ) else (
-    echo   [SKIP] context.json already exists
+    echo   [WARNING] aid_session.py init failed - exit !INIT_RC!.
 )
+REM R1-09: init resolves to the nearest AID root above the target (INV-2) and refuses
+REM there, so the printed command would fail the same way. Name that ancestor.
+set "AID_ANCESTOR="
+call :find_aid_ancestor "!TARGET_REAL!"
+if defined AID_ANCESTOR (
+    echo   [WARNING] The project is inside another AID project: !AID_ANCESTOR!
+    echo   [WARNING] init uses that project's state and refuses; the command below fails
+    echo             the same way until the project is moved out of !AID_ANCESTOR!.
+)
+echo   [WARNING] The project state was NOT created. Run this yourself in the project:
+echo       cd /d "!TARGET_REAL!"
+echo       !PY_CMD! "!AID_REAL!\hooks\aid_session.py" init !ROLE! 0
+:after_state
 
 REM ============================================
 REM Create docs directory structure
@@ -401,16 +466,14 @@ if not exist "!TARGET_PATH!\.mcp.json" (
         echo   [ERROR] .mcp.json.windows template not found
     )
 ) else (
-    echo   [SKIP] .mcp.json already exists (preserving your tokens^)
+    echo   [SKIP] .mcp.json already exists - kept; tokens come from environment variables / OS keystore, not this file
 )
-REM .mcp.json is per-user config; keep it out of the project's git history.
-REM Idempotent: only appends when no exact line exists. Leading blank line guards
-REM against a .gitignore that does not end in a newline.
-findstr /X /L /C:".mcp.json" "!TARGET_PATH!\.gitignore" >nul 2>nul
-if errorlevel 1 (
-    (echo.& echo .mcp.json)>>"!TARGET_PATH!\.gitignore"
-    echo   [OK] .mcp.json added to .gitignore
-)
+REM .mcp.json is per-user config and .aid/audit/ is the hook audit log: keep both out of
+REM the project's git history. T17 I-26: the one helper, shared with link-project.sh, adds
+REM a line only when no existing line equals it (a trailing CR, spaces and tabs ignored),
+REM in the file's own line ending, so any mix of sh/bat runs adds it once.
+node "!AID_REAL!\scripts\ensure-gitignore.mjs" "!TARGET_REAL!" ".mcp.json" ".aid/audit/"
+if errorlevel 1 echo   [WARNING] .gitignore was not updated: add .mcp.json and .aid/audit/ to it yourself
 
 REM ============================================
 REM Summary
@@ -429,6 +492,7 @@ if "!COPY_MODE!"=="1" (
     echo   .claude\agents\     - Sub-agents
     echo   .claude\references\ - Reference docs
     echo   .claude\rules\      - Rules
+    echo   .claude\hooks\      - Phase gate hooks
     echo   CLAUDE.md           - AID instructions
     echo.
     echo NOTE: Files were COPIED, not linked.
@@ -440,14 +504,15 @@ if "!COPY_MODE!"=="1" (
     echo   .claude\agents\     -^> AID
     echo   .claude\references\ -^> AID
     echo   .claude\rules\      -^> AID
+    echo   .claude\hooks\      -^> AID
     echo   CLAUDE.md           -^> AID
 )
 echo.
-echo Project-specific (copied):
-echo   .claude\settings.json - Permissions
-echo   .aid\state.json       - Phase tracking
-echo   .aid\context.json     - Work context
-echo   .mcp.json             - MCP config (your tokens)
+echo Project-specific (not linked):
+echo   .claude\settings.json - Permissions + AID hooks (phase gates)
+echo   .aid\state.json       - Phase tracking (aid_session.py init)
+echo   .aid\context.json     - Work context (aid_session.py init)
+echo   .mcp.json             - MCP config (tokens come from environment variables / OS keystore, not this file)
 echo   docs\                 - Phase outputs
 echo.
 echo Next steps:
@@ -458,68 +523,28 @@ echo 2. Open Claude Code in the project:
 echo    cd "!TARGET_PATH!"
 echo    claude
 echo.
-echo 3. Run /aid-start to begin working
+echo 3. /aid-start, /aid-status, /phase-approve and /phase-advance need the plugin
+echo    - claude plugin install aid@AID. Without it, run the session steps yourself
+echo    in Claude Code, starting the line with an exclamation mark, for example:
+echo    python "!AID_PATH!\hooks\aid_session.py" status   - also: start, approve, advance
 echo.
 echo ========================================
 echo.
 pause
 goto :eof
 
-REM ============================================
-REM Subroutines
-REM ============================================
-
-:create_state_json
-(
-echo {
-echo   "$schema": "aid-state-v1",
-echo   "version": "1.0",
-echo   "initialized_at": "%DATE% %TIME%",
-echo   "last_updated": "%DATE% %TIME%",
-echo   "current_phase": 0,
-echo   "phase_name": "Discovery",
-echo   "phase_approved": false,
-echo   "current_session": {
-echo     "active": false,
-echo     "role": null,
-echo     "phase": null,
-echo     "started_at": null,
-echo     "revision_count": 0
-echo   },
-echo   "last_session": {
-echo     "role": null,
-echo     "phase": null,
-echo     "completed_at": null
-echo   },
-echo   "statistics": {
-echo     "total_sessions": 0,
-echo     "total_feedback_collected": 0,
-echo     "pending_feedback_count": 0,
-echo     "last_improvement_run": null,
-echo     "sessions_since_last_improvement": 0
-echo   },
-echo   "notifications": {
-echo     "improvement_suggested": false,
-echo     "reason": null
-echo   }
-echo }
-) > "!TARGET_PATH!\.aid\state.json"
-goto :eof
-
-:create_context_json
-(
-echo {
-echo   "$schema": "aid-context-v1",
-echo   "version": "1.0",
-echo   "last_updated": "%DATE% %TIME%",
-echo   "current_task": null,
-echo   "current_step": null,
-echo   "progress": {
-echo     "steps_completed": [],
-echo     "steps_pending": []
-echo   },
-echo   "session_notes": [],
-echo   "blockers": []
-echo }
-) > "!TARGET_PATH!\.aid\context.json"
+REM Sets AID_ANCESTOR to the nearest folder above %1 whose .aid holds state.json or
+REM hooks\config.json (an AID project root). The user-level .aid (USERPROFILE, AID_HOME)
+REM is not a project and is skipped.
+:find_aid_ancestor
+set "FA_DIR=%~f1"
+:fa_loop
+for %%P in ("!FA_DIR!\..") do set "FA_PARENT=%%~fP"
+if /i "!FA_PARENT!"=="!FA_DIR!" goto :eof
+set "FA_DIR=!FA_PARENT!"
+if "!FA_DIR:~-1!"=="\" (set "FA_AID=!FA_DIR!.aid") else (set "FA_AID=!FA_DIR!\.aid")
+if not exist "!FA_AID!\state.json" if not exist "!FA_AID!\hooks\config.json" goto fa_loop
+if /i "!FA_AID!"=="%USERPROFILE%\.aid" goto fa_loop
+if defined AID_HOME if /i "!FA_AID!"=="%AID_HOME%" goto fa_loop
+set "AID_ANCESTOR=!FA_DIR!"
 goto :eof

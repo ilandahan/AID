@@ -194,7 +194,7 @@ Every task MUST have these 8 fields to be considered complete:
 │  5. Execute Work with Loaded Skills                             │
 │          │                                                      │
 │          ▼                                                      │
-│  6. Phase Complete? ──▶ Prompt for /aid end                     │
+│  6. Phase Complete? ──▶ Prompt for /aid-end                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -515,7 +515,6 @@ All skills contribute to the feedback system:
 
 | Command | Description |
 |---------|-------------|
-| `/skills` | List available skills for current phase |
-| `/skills --all` | List all skills with phase requirements |
-| `/skill load [name]` | Manually load a skill (phase-checked) |
-| `/aid status` | Show skill usage and feedback status |
+| `/aid-start` | Pick a role and phase; loads the matching skills |
+| Skill tool | Load one skill by name (for example `aid:test-driven`); the phase gates still apply to what it does |
+| `/aid-status` | Show skill usage and feedback status |

@@ -21,7 +21,8 @@ C = {"id": "abc", "timestamp": "2026-11-18T09:00:00Z", "session_id": "s1",
 
 def test_all_three_shapes_normalise_to_one():
     a, d, c = normalize_entry(A), normalize_entry(D), normalize_entry(C)
-    assert (a["feedback"]["rating"], a["context"]["role"], a["context"]["phase"]) == (4, "developer", "Technical Design")
+    # T17 (owner 2026-11-20): T17-18 takes the phase (0-5) before phase_display.
+    assert (a["feedback"]["rating"], a["context"]["role"], a["context"]["phase"]) == (4, "developer", "2")
     assert "[email]" in a["feedback"]["verbal"] and "a@b.io" not in json.dumps(a)
     assert (d["feedback"]["rating"], d["context"]["role"]) == (2, "qa") and d["timestamp"]
     assert c["feedback"]["rating"] == 5 and c["id"] == "abc" and c["session_id"] == "s1"
@@ -77,8 +78,8 @@ def test_apply_appends_only_to_an_allowed_learnings_file(aid_home, tmp_path):
     assert result["ok"], result
     text = target.read_text(encoding="utf-8")
     assert "Lead with impact" in text and "boss@corp.io" not in text
-    other = generator.load_recommendation_queue()[0]
-    assert not generator.apply_recommendation(other["id"], refs_root=refs)["ok"]  # no target
+    # T17 (owner 2026-11-20): T17-18 never queues a proposal with no allowed target_file.
+    assert generator.load_recommendation_queue() == []
     assert not generator.apply_recommendation("nope-nope", refs_root=refs)["ok"]
 
 

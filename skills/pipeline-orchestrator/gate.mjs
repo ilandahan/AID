@@ -13,8 +13,11 @@
 //
 // Usage:
 //   node gate.mjs --step CODE_REVIEW --scores '{"overall":9.6,...}' [--root <repo>] [--dry-run]
+//                 [--usage '{"input_tokens":N,"output_tokens":M}']   # T17-20: recorded in cost
+//                 (without --usage the 4000/2000 estimate is recorded, marked estimated)
 //   node gate.mjs --check-escalation [--root <repo>]     # exit 2 if one is open
-//   node gate.mjs --resolve "<how it was resolved>" [--root <repo>]
+//   node gate.mjs --resolve "<how it was resolved>" [--root <repo>]   # the USER runs this, as a `!`
+//                                                                     # line; an agent never does (E4)
 //   node gate.mjs --should-spawn-dual --step CODE_REVIEW [--round N] [--prev-score X] [--root <repo>]
 //
 // Exit codes (the contract the orchestrator and the hook rely on):
@@ -27,6 +30,17 @@
 // error) — never conflate with the PASS/FIX/ESCALATE/ERROR contract above.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// The command a human is told to run names THIS file (R-03): the copy that ships in the plugin,
+// absolute, forward slashes. Never ~/.claude/skills, which the plugin does not install.
+export const GATE_PATH = fileURLToPath(import.meta.url).replaceAll("\\", "/");
+// T16-21 (E4, I-13): resolving is the user's decision. The text hands the user a `!` line (run at the
+// Claude Code prompt) and tells the agent to show it and never run it itself.
+const RESOLVE_LINE = `! node "${GATE_PATH}" --resolve "<what was decided>"`;
+const RESOLVE_CMD =
+  `The user records the decision by running this line at the Claude Code prompt: ${RESOLVE_LINE} ` +
+  "Show this line to the user. Never run it yourself and never resolve the escalation on the user's behalf. ";
 
 export const STEP_CONFIG = {
   CODE_REVIEW: { threshold: "code_review_pass", counter: "code_review" },
@@ -187,10 +201,13 @@ export function logLoopEvent(payload, root = process.cwd()) {
  * agent must count toward is decorative. Now the gate increments on FIX and appends a step_history
  * row for every non-ERROR decision. Never fatal: a bookkeeping failure must not change the exit code.
  */
-export function recordDecision(root, { step, decision, scores }) {
+export function recordDecision(root, { step, decision, scores, review = null }) {
   try {
     const statePath = join(root, ".aid/pipeline/state.json");
     const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : {};
+    // T17-20 (I-23, G5-X1): the review result and its cost are written by the gate, in this same
+    // write, never by an agent. `review` is null for steps that are not scored reviews.
+    if (review) applyReview(state, { step, decision, ...review });
     const counter = STEP_CONFIG[step]?.counter;
     state.iterations ??= {};
     if (decision.result === "FIX" && counter) {
@@ -232,6 +249,79 @@ export function recordDecision(root, { step, decision, scores }) {
   } catch {
     return null; // bookkeeping must never become a new failure mode for the gate
   }
+}
+
+// T17-20 (I-23): the documented per-review estimate, used when the caller has no real usage.
+export const ESTIMATED_USAGE = { input_tokens: 4000, output_tokens: 2000 };
+
+/**
+ * Parse `--usage '{"input_tokens":N,"output_tokens":M}'`. Returns { usage, estimated } or
+ * { error }. Absent -> the documented estimate, marked estimated. A non-object, a missing or
+ * negative or non-integer count is an error (exit 3, nothing written).
+ */
+export function parseUsage(raw) {
+  if (raw === undefined) return { usage: { ...ESTIMATED_USAGE }, estimated: true };
+  let u;
+  try {
+    u = JSON.parse(raw);
+  } catch (err) {
+    return { error: `--usage is not JSON: ${err.message}` };
+  }
+  if (!u || typeof u !== "object" || Array.isArray(u)) return { error: "--usage must be a JSON object" };
+  const out = {};
+  for (const k of ["input_tokens", "output_tokens"]) {
+    const v = u[k];
+    if (!Number.isInteger(v) || v < 0) {
+      return { error: `--usage.${k} must be a non-negative integer (got ${JSON.stringify(v)})` };
+    }
+    out[k] = v;
+  }
+  return { usage: out, estimated: false };
+}
+
+/** Pricing from the project config's cost_limits.pricing, else config.default.json's. */
+export function pricingFor(config) {
+  const ok = (p) => p && Number.isFinite(p.input_per_mtok) && Number.isFinite(p.output_per_mtok);
+  if (ok(config?.cost_limits?.pricing)) return config.cost_limits.pricing;
+  try {
+    const def = JSON.parse(readFileSync(join(dirname(GATE_PATH), "config.default.json"), "utf8"));
+    if (ok(def?.cost_limits?.pricing)) return def.cost_limits.pricing;
+  } catch {
+    // fall through
+  }
+  return { input_per_mtok: 5, output_per_mtok: 25 };
+}
+
+/** I-23: last_review_result and the accumulated cost, applied to a state object in place. */
+export function applyReview(state, { step, decision, usage, estimated, pricing }) {
+  const now = new Date().toISOString();
+  state.last_review_result = {
+    step,
+    result: decision.result,
+    overall: decision.overall ?? null,
+    threshold: decision.threshold ?? null,
+    round: (decision.iterationsUsed ?? 0) + 1,
+    timestamp: now,
+  };
+  const n = usage.input_tokens;
+  const m = usage.output_tokens;
+  const usd = (n / 1e6) * pricing.input_per_mtok + (m / 1e6) * pricing.output_per_mtok;
+  const cost = state.cost && typeof state.cost === "object" && !Array.isArray(state.cost) ? state.cost : {};
+  const num = (v) => (Number.isFinite(v) ? v : 0);
+  cost.total_input_tokens = num(cost.total_input_tokens) + n;
+  cost.total_output_tokens = num(cost.total_output_tokens) + m;
+  cost.estimated_cost_usd = num(cost.estimated_cost_usd) + usd;
+  cost.per_step = cost.per_step && typeof cost.per_step === "object" ? cost.per_step : {};
+  const prev = cost.per_step[step] && typeof cost.per_step[step] === "object" ? cost.per_step[step] : {};
+  cost.per_step[step] = {
+    input_tokens: num(prev.input_tokens) + n,
+    output_tokens: num(prev.output_tokens) + m,
+    cost_usd: num(prev.cost_usd) + usd,
+    timestamp: now,
+    estimated: prev.estimated === true || estimated === true,
+  };
+  state.cost = cost;
+  return state;
 }
 
 const ESCALATION_FILE = ".aid/pipeline/ESCALATION.json";
@@ -488,15 +578,18 @@ export function mergeReviews(reviews) {
 
   if (present.length === 1) {
     const only = present[0];
-    return { ...only, reviewers_used: 1, reviewers: [{ overall: only.overall }], spread: null,
+    const soloCap = minCap(capFromFindings(collectFindings(only)), capFromSummary(only));
+    return { ...only, overall: Math.min(only.overall, soloCap ?? 10), reviewers_used: 1,
+      reviewers: [{ overall: only.overall }], spread: null,
       findings: collectFindings(only), critical_security: hasCriticalSecurity(only),
-      cap: capFromFindings(collectFindings(only)),
+      cap: soloCap,
       merge_note: "one reviewer only — used as-is, never averaged against a phantom" };
   }
 
   const [a, b] = present;
   const findings = unionFindings(collectFindings(a), collectFindings(b));
-  const cap = capFromFindings(findings);
+  // T18: a reviewer may report a blocking severity only in its summary counts (no findings list).
+  const cap = minCap(capFromFindings(findings), capFromSummary(a), capFromSummary(b));
 
   const dims = {};
   for (const d of Object.keys(REVIEW_WEIGHTS)) {
@@ -532,7 +625,7 @@ export function mergeReviews(reviews) {
     spread: Math.round(Math.abs(a.overall - b.overall) * 100) / 100,
     merge_note: cap === null
       ? "no blocking severity in the union; composite is the weighted mean of both reviewers"
-      : `capped at ${cap} by the UNION of findings — one reviewer's blocking finding caps the merged review`,
+      : `capped at ${cap} by the UNION of findings and summary counts — one reviewer's blocking finding caps the merged review`,
   };
 }
 
@@ -544,6 +637,20 @@ export function capFromFindings(findings) {
   if (worst === 2) return 6;
   return null;
 }
+
+/** T18: the same step function on a review's summary counts ({critical, major}). */
+export function capFromSummary(review) {
+  const s = review?.summary;
+  if (!s || typeof s !== "object") return null;
+  if (Number(s.critical) > 0) return 4;
+  if (Number(s.major) > 0) return 6;
+  return null;
+}
+
+const minCap = (...caps) => {
+  const set = caps.filter((c) => c !== null);
+  return set.length ? Math.min(...set) : null;
+};
 
 /**
  * Union of two finding lists, deduped on file + pattern and NEVER on line number.
@@ -626,8 +733,8 @@ function main() {
         opened_at: new Date().toISOString(),
         how_to_resolve:
           "Decide as the human: split the task into one brief per surface, raise " +
-          "thresholds.max_surfaces in .aid/pipeline/config.json, or accept this width. Then run: " +
-          'node ~/.claude/skills/pipeline-orchestrator/gate.mjs --resolve "<reason>". ' +
+          "thresholds.max_surfaces in .aid/pipeline/config.json, or accept this width. " +
+          RESOLVE_CMD +
           "The Stop hook blocks while this is open.",
       });
       console.error(`gate: wrote ${p} — the Stop hook will block until it is resolved.`);
@@ -726,6 +833,12 @@ function main() {
     console.error(`gate: --scores is not JSON: ${err.message}`);
     process.exit(3);
   }
+  // T17-20 (I-23): validated before anything is written; a bad --usage is a usage error.
+  const usageArg = parseUsage(arg("usage"));
+  if (usageArg.error) {
+    console.error(`gate: ${usageArg.error}`);
+    process.exit(3);
+  }
 
   // C5: a second independent review of the same diff. Merged HERE, in code, rather than by the
   // orchestrator: the orchestrator is the party that wants to advance, so asking it to arbitrate two
@@ -789,7 +902,10 @@ function main() {
   // recordDecision is already correct for ERROR with no change: result !== "FIX" so no counter
   // increments, and with no `overall` key the dashboard's pickScore yields NULL, so an ERROR row can
   // never pollute a score average.
-  if (!has("dry-run")) recordDecision(root, { step, decision: d, scores });
+  const review = STEP_CONFIG[step]
+    ? { usage: usageArg.usage, estimated: usageArg.estimated, pricing: pricingFor(config) }
+    : null;
+  if (!has("dry-run")) recordDecision(root, { step, decision: d, scores, review });
   if (d.result === "ERROR") process.exit(3);
 
   if (d.result === "ESCALATE" && !has("dry-run")) {
@@ -806,8 +922,8 @@ function main() {
       opened_at: new Date().toISOString(),
       how_to_resolve:
         "Decide as the human: raise the code to clear the threshold, lower the threshold in " +
-        ".aid/pipeline/config.json, or accept this result. Then run: " +
-        "node ~/.claude/skills/pipeline-orchestrator/gate.mjs --resolve \"<reason>\". " +
+        ".aid/pipeline/config.json, or accept this result. " +
+        RESOLVE_CMD +
         "The Stop hook blocks while this is open.",
     });
     console.error(`gate: wrote ${p} — the Stop hook will block until it is resolved.`);

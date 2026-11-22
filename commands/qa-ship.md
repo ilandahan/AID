@@ -8,10 +8,21 @@ Run Phase 5 QA validation, acceptance testing, and release preparation.
 
 ## Skills Loaded
 
-This command loads:
-- `skills/aid-qa-ship/SKILL.md`
-- `skills/cucumber-bdd/SKILL.md` (for Gherkin acceptance verification)
-- `skills/test-driven/SKILL.md` (for test quality validation)
+**First, before any other step, load these three skills with the Skill tool** (as plugin
+skills they are `aid:aid-qa-ship`, `aid:cucumber-bdd` and `aid:test-driven`):
+- `aid-qa-ship` (`skills/aid-qa-ship/SKILL.md`)
+- `cucumber-bdd` (`skills/cucumber-bdd/SKILL.md`, for Gherkin acceptance verification)
+- `test-driven` (`skills/test-driven/SKILL.md`, for test quality validation)
+
+Do not start the process below until all three are loaded; their checklists are the QA
+criteria.
+
+## Scratch and mutation scripts
+
+Put every mutation-test or scratch script under the project, in `.aid/qa/tmp/` (create it
+if needed; it is gitignored), never in `%TEMP%`, `$TMPDIR` or `/tmp`. A script outside the
+project is invisible to the user and to the phase gates, and is left behind after the run.
+Delete `.aid/qa/tmp/` when QA is done.
 
 ## When to Use
 
@@ -38,7 +49,7 @@ This command loads:
    - Run tests in random order (`--randomize`) — verify independence
    - Check for hardcoded credentials in test code
    - Verify all existing tests still pass (no regressions)
-   - Mutation test — verify tests catch real bugs
+   - Mutation test — verify tests catch real bugs (mutation scripts in `.aid/qa/tmp/`)
 
 3. **Non-Functional Validation**
    - Performance meets requirements

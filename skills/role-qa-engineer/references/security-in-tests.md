@@ -127,14 +127,20 @@ const user = createTestUser();
 const adminUser = createTestUser({ role: 'admin' });
 ```
 
-### ✅ .env.test File (Gitignored)
+### ✅ .env.test File (Gitignored, non-secret settings only)
 
 ```bash
-# .env.test (ADD TO .gitignore)
-TEST_DB_URL=postgresql://test:testpassword@localhost:5432/test_db
-TEST_API_KEY=<test-api-key>
-TEST_PAYMENT_PROVIDER_KEY=<test-api-key>
+# .env.test (ADD TO .gitignore) - no keys, tokens or passwords here
+TEST_DB_HOST=localhost
+TEST_DB_PORT=5432
+TEST_DB_NAME=test_db
+TEST_BASE_URL=http://localhost:3000
 ```
+
+Keys and passwords for tests come from the OS keystore (macOS Keychain `security`, Windows
+Credential Manager `cmdkey` / `Get-StoredCredential`, Linux `secret-tool`) or, in CI, the CI
+secret store, as environment variables: SSO/OAuth first, then the keystore, then an
+environment variable, never a file.
 
 ```gitignore
 # .gitignore
@@ -147,9 +153,10 @@ TEST_PAYMENT_PROVIDER_KEY=<test-api-key>
 
 ```bash
 # .env.example (SAFE TO COMMIT)
-TEST_DB_URL=postgresql://user:password@localhost:5432/test_db
-TEST_API_KEY=your_test_api_key_here
-TEST_PAYMENT_PROVIDER_KEY=your_test_api_key_here
+TEST_DB_HOST=localhost
+TEST_DB_NAME=test_db
+# Secrets (TEST_API_KEY, TEST_PAYMENT_PROVIDER_KEY, TEST_DB_PASSWORD) come from the
+# OS keystore or the CI secret store, never from this file or .env.test.
 ```
 
 ### ✅ README with Placeholders
@@ -158,8 +165,8 @@ TEST_PAYMENT_PROVIDER_KEY=your_test_api_key_here
 <!-- GOOD - README.md -->
 ## Running Tests
 
-1. Copy `.env.example` to `.env.test`
-2. Fill in your test credentials
+1. Copy `.env.example` to `.env.test` (non-secret settings only)
+2. Load the test credentials from your OS keystore into the shell's environment
 3. Run `npm test`
 
 See `.env.example` for required variables.
@@ -238,9 +245,11 @@ Add to CI pipeline:
 
 ### For Local Development
 
-1. Create `.env.test` (gitignored)
-2. Add real test/sandbox credentials there
-3. Never commit this file
+1. Store the test/sandbox credentials in your OS keystore (SSO/OAuth if the service
+   offers it), never in a file
+2. Load them into the shell's environment before running the tests, for example
+   `export TEST_API_KEY=$(security find-generic-password -s aid-test-api -w)` (macOS)
+3. Keep only non-secret settings in `.env.test` (gitignored)
 
 ### For CI/CD
 
@@ -274,4 +283,4 @@ Use sandbox/test API keys provided by services:
 | Need database URL | Env var with localhost default |
 | Need to document setup | .env.example with placeholders |
 | Running in CI | Repository secrets |
-| Local development | .env.test (gitignored) |
+| Local development | OS keystore -> environment (settings in .env.test, no secrets) |

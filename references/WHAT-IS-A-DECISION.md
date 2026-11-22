@@ -161,10 +161,10 @@ Alternatives considered: TypeORM, Drizzle, raw SQL
 
 ## Manual Logging
 
-User can explicitly request decision logging:
+There is no slash command for this. The user asks in plain words, for example:
 
 ```
-/log-decision "Title of decision"
+Log this decision: Title of decision
 ```
 
 Claude then prompts for:
@@ -250,6 +250,5 @@ When a decision IS logged, it goes to `.aid/decisions/{YYYY-MM-DD}-{slug}.json`:
 
 ## Related Files
 
-- Decision Log Schema: `docs/research/2025-12-31-phase-gate-enforcement.md` (Section 13)
-- Decision Storage: `.aid/decisions/`
-- Reading Decisions: See CLAUDE.md "Decision Context Loading" section
+- Decision Log Schema: the JSON example in [Decision Log Entry Format](#decision-log-entry-format) above
+- Decision Storage: `.aid/decisions/` (in the project)

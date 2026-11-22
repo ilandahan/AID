@@ -497,6 +497,31 @@ def print_sync_result(result: Dict[str, Any]):
     print(result.get("reason", "Nothing to sync"))
 
 
+def _json_mode(args, agent: "LearningSubAgent") -> bool:
+    """Print the requested operation's result as one JSON document. False when no
+    operation was requested (the caller prints the help)."""
+    if args.analyze or args.dashboard:
+        result = agent.analyze_quality(days=args.days)
+        if args.save:
+            result = dict(result, saved_to=str(agent.save_report(days=args.days, format="json")))
+    elif args.sync_memory:
+        result = agent.sync_to_memory(days=args.days)          # dry run, writes nothing
+    elif args.recommendations:
+        result = agent.weekly_recommendations()
+    elif args.pending:
+        result = {"pending": agent.get_pending_recommendations()}
+    elif args.status:
+        result = agent.get_agent_status()
+    elif args.stats:
+        result = agent.get_stats()
+    elif args.memories:
+        result = agent.get_memories()
+    else:
+        return False
+    print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+    return True
+
+
 def main():
     """CLI entry point for the sub-agent."""
     for stream in (sys.stdout, sys.stderr):      # Windows consoles: emoji in reports
@@ -582,6 +607,11 @@ Examples:
     # Initialize agent
     agent = LearningSubAgent(days=args.days)
 
+    # T15-27 (L3-2g): --format json prints ONE JSON document for every operation (no
+    # banner), so a caller can json.loads the whole output. The text output is unchanged.
+    if args.format == "json" and _json_mode(args, agent):
+        return
+
     # Execute requested operation
     if args.analyze:
         print("Running quality analysis...")
@@ -607,6 +637,8 @@ Examples:
                     print(f"  - Acceptance: {metrics['acceptance_rate']*100:.0f}%")
                 if metrics.get("debate_rate") is not None:
                     print(f"  - Debate Rate: {metrics['debate_rate']*100:.0f}%")
+                else:
+                    print("  - Debate Rate: n/a")      # T17-19 (L3c-2e): no decision data
 
                 # Action items
                 items = result.get("action_items", [])

@@ -375,7 +375,7 @@ Feature: [Story Title]
 
 ## Output Location
 
-Save PRD to: `docs/prd/PRD-<feature>.md` (the `/prd` merge), next to `docs/prd/WHY-SHAPE-BRIEF-<feature>.md` and `docs/prd/SEED-EVALS-<feature>.md`.
+Save PRD to: `docs/prd/YYYY-MM-DD-<feature>.md` (the `/prd` merge), next to `docs/prd/WHY-SHAPE-BRIEF-<feature>.md` and `docs/prd/SEED-EVALS-<feature>.md`.
 
 ---
 
@@ -390,21 +390,21 @@ WHY + shape brief (PM)  →  /prd
    ├─ aid:phase1-solution-shaper     §1.5 + 20-30 seed eval cases
    ├─ aid:phase1-charter-drafter     7A.1-7A.4
    └─ aid:phase1-eval-planner        7A.5-7A.8 + §1.4 with guardrail
-   merge → PRD-<feature>.md + SEED-EVALS-<feature>.md
+   merge → YYYY-MM-DD-<feature>.md + SEED-EVALS-<feature>.md
 → PM review → shaping session (PM + tech lead; optional spike; tech lead signs the level ADR)
 → prd-validator → /gate-check → /phase-approve
 ```
 
 1. **WHY + shape brief.** The PM runs the WHY conversation (`why-driven-decision`): WHY / 5 Whys, then ALWAYS the 6 shape questions from §1.5, on whose behalf the solution acts, who bears the cost of an error and what must never happen (who approves actions is Q6). Output: `docs/prd/WHY-SHAPE-BRIEF-<feature>.md` with a level HYPOTHESIS (0-5). It is the shared input of every Phase 1 agent.
 2. **Aggregate.** `/prd` runs `prd-research-aggregator` alone, first: it reads the Phase 0 research and the brief and produces the research brief.
-3. **Fan out.** In ONE message, spawn in parallel (`aid:<name>`, fallback `<name>`):
+3. **Fan out.** In ONE message, spawn in parallel (`aid:<name>`; the bare name only on the link-project route, per `rules/agents/sub-agents.md`; never `general-purpose`):
    - `prd-writer`: §1-§7 and §8-§13; it leaves §1.5 and §7A to the merge;
    - `phase1-solution-shaper`: walks the ladder from the brief and research, proposes the LOWEST level that works with a justification per step up (multi-agent only with one of the four justifications), and drafts §1.5 plus 20-30 seed eval cases from real examples (input, expected behaviour, never-do flag);
    - `phase1-charter-drafter`: 7A.1 Charter, 7A.2 Tools & Permissions, 7A.3 Context & Data, 7A.4 Failure Modes & Guardrails (including the lethal trifecta);
    - `phase1-eval-planner`: 7A.5 Why-Chain, 7A.6 Eval Plan (criteria, A3 thresholds, case sources, offline vs online), 7A.7 Telemetry & Traces, 7A.8 Rollout & Kill Switch outline, and the §1.4 metrics with a guardrail.
 
    The three `phase1-*` agents are read-only and write no files; each returns a draft.
-4. **Merge.** Merge the drafts into `docs/prd/PRD-<feature>.md` with `references/prd-template-extended.md`, and the seed cases into `docs/prd/SEED-EVALS-<feature>.md`. Report every conflict between drafts to the PM; never resolve one silently.
+4. **Merge.** Merge the drafts into `docs/prd/YYYY-MM-DD-<feature>.md` with `references/prd-template-extended.md`, and the seed cases into `docs/prd/SEED-EVALS-<feature>.md`. Report every conflict between drafts to the PM; never resolve one silently.
 5. **PM review.** The PM reviews the merged PRD and resolves the reported conflicts.
 6. **Shaping session.** The PM and the tech lead review the proposed level and the seed cases together. Optionally, the tech lead runs a time-boxed spike that runs the lowest level against the seed cases: a human runs it OUTSIDE the AID project, never Claude in Phase 1 (adding the command to `extra_allowed_commands` weakens the phase gate and is only the human's call), uses de-identified seed cases only, uses a model provider setup approved for that data (7A.3), and its result is recorded in the ADR (`docs/prd/ADR-SHAPE-<feature>.md`). The tech lead then signs the level as an ADR: this is the A1 decision (RACI in `SKILL.md`).
 7. **Gate.** `prd-validator` runs as the independent gate check, then `/gate-check` and `/phase-approve` (human).

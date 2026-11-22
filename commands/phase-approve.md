@@ -23,16 +23,30 @@ This command provides a gate check before moving to the next phase. It ensures:
 
 ## Flow
 
-1. **Check Current Phase**: Read `.aid/state.json`
-2. **Display Phase Summary**: Show what was accomplished
-3. **Show Checklist**: Display deliverables for this phase
-4. **Collect Mandatory Feedback** (REQUIRED before approval):
+**MANDATORY OUTPUT FIRST. Before the `approve` call, print `## Phase N Summary` and
+`## Phase N Checklist`** (N = the current phase from `.aid/state.json`). You MUST show both
+sections to the user, as headings in your reply, before you ask for feedback and before the
+`aid_session.py approve` call. The user signs off on what they saw; an approval without the
+summary and checklist on screen is not a sign-off. Never skip them, even when the user asks
+to approve quickly.
+
+1. **Get the checklist from code**: run ONE Bash call, exactly
+   `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" checklist`. It is read-only (it
+   writes nothing, and the gate allows it without a prompt). Its output starts with
+   `## Phase N Summary` (phase, role, approved, feedback, the documents in the phase folder)
+   and contains `## Phase N Checklist` (the items for the current phase, Phase 0 included).
+2. **Display Phase Summary and Checklist (MANDATORY)**: reproduce its `## Phase N Summary`
+   and `## Phase N Checklist` in your reply. Mark each checklist item done or not done, with
+   the evidence (a file path, a test run, a review result). Do not add, drop or reword items:
+   the subcommand is the one source.
+3. **Collect Mandatory Feedback** (REQUIRED before approval):
    - Ask for rating (1-5)
    - Ask what worked well
    - Ask what could improve
    - Do NOT write a feedback file yourself: the feedback travels in the `approve --note`
-5. **Request Approval**: Ask human to confirm
-6. **Record Approval**: Run `aid_session.py approve` (see Implementation). It sets
+4. **Request Approval**: Ask human to confirm
+5. **Record Approval**: Run the one `aid_session.py approve --note` call (see
+   Implementation); `approve` prints the same Summary and Checklist block before it writes. It sets
    `phase_approved` and `feedback_provided` for the current phase. Claude Code asks the
    user to confirm the call; if the user declines, nothing changes.
 
@@ -83,46 +97,23 @@ Before showing the approval prompt, Claude MUST:
 
 ## Phase Checklists
 
-### Phase 1: PRD
-- [ ] Requirements documented in `docs/prd/`
-- [ ] User stories defined
-- [ ] Acceptance criteria specified
-- [ ] Scope agreed upon
-
-### Phase 2: Tech Spec
-- [ ] Technical specification in `docs/tech-spec/`
-- [ ] Database schema designed
-- [ ] API endpoints defined
-- [ ] Architecture decisions documented
-
-### Phase 3: Breakdown
-- [ ] Jira Epic created
-- [ ] Stories broken down
-- [ ] Tasks estimated
-- [ ] Sprint planned
-
-### Phase 4: Development
-- [ ] All features implemented
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
-
-### Phase 5: QA & Ship
-- [ ] QA testing complete
-- [ ] No critical bugs
-- [ ] Performance acceptable
-- [ ] Ready for deployment
+The checklist items for every phase (0 Discovery to 5 QA & Ship) come from one source,
+`PHASE_CHECKLISTS` in `hooks/aid_session.py`. Get them with
+`python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" checklist` (add `--phase N` for another
+phase, or `--format json` for a machine-readable copy). This page does not restate them.
 
 ## Example Output
 
 ```
 Phase Approval: PRD (Phase 1)
 
-Checklist:
-[x] Requirements documented in docs/prd/
-[x] User stories defined
-[x] Acceptance criteria specified
-[x] Scope agreed upon
+## Phase 1 Summary
+Phase: 1 (PRD) | Role: Product Manager | Approved: no | Feedback: no
+Documents: docs/prd/2026-11-19-user-auth.md
+
+## Phase 1 Checklist
+[x] <item 1 from the checklist output> - evidence: docs/prd/2026-11-19-user-auth.md
+[ ] <item 2 from the checklist output> - not done: <why>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 MANDATORY FEEDBACK (required before approval)
@@ -166,8 +157,9 @@ Once approved (the user typed `approve` AND confirmed the `aid_session.py approv
 
 When this command is invoked:
 
-1. Read `.aid/state.json` to get current phase
-2. Display phase-specific checklist
+1. Run ONE Bash call: `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" checklist`
+2. Print its `## Phase N Summary` and `## Phase N Checklist`, each item marked done or not
+   done with evidence (MANDATORY, before the `approve` call)
 3. **MANDATORY: Collect feedback** (rating, worked well, to improve)
 4. Condense the feedback into one note (rating plus short summary, allowed characters only)
 5. Ask for human confirmation (`approve` / `reject`)

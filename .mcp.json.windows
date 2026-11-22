@@ -8,14 +8,14 @@
     "chrome-devtools": {
       "type": "stdio",
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "chrome-devtools-mcp@1.12.0"]
+      "args": ["/c", "npx", "-y", "chrome-devtools-mcp@1.12.0", "--no-usage-statistics", "--no-performance-crux"]
     },
     "jira": {
       "type": "stdio",
       "command": "cmd",
       "args": ["/c", "npx", "-y", "@aashari/mcp-server-atlassian-jira@3.3.0"],
       "env": {
-        "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL:-}",
+        "ATLASSIAN_SITE_NAME": "${ATLASSIAN_SITE_NAME:-}",
         "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL:-}",
         "ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN:-}"
       }
@@ -25,7 +25,7 @@
       "command": "cmd",
       "args": ["/c", "npx", "-y", "@aashari/mcp-server-atlassian-confluence@3.3.0"],
       "env": {
-        "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL:-}",
+        "ATLASSIAN_SITE_NAME": "${ATLASSIAN_SITE_NAME:-}",
         "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL:-}",
         "ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN:-}"
       }

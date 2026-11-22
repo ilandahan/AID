@@ -102,7 +102,7 @@ Thanks for the feedback! 🙏
 
 {IF pending >= threshold:}
 I now have {pending_count} feedback items for analysis.
-When ready, run `/aid improve` to enhance skills.
+When ready, run `/aid-improve` to enhance skills.
 
 Continue to next phase? [Yes] [No, done for today]
 ```
@@ -126,7 +126,7 @@ Statistics:
 • Sessions since last improvement: {sessions_since_improvement}
 
 {IF improvement_suggested:}
-💡 Recommended: Run /aid improve
+💡 Recommended: Run /aid-improve
 ```
 
 ---
@@ -161,7 +161,7 @@ Review recommendations one by one? [Yes] [Just summary]
 📌 Recommendation {current}/{total}: Skill Update
 
 Type: Update cumulative.md
-Target: skills/roles/product-manager/cumulative.md
+Target: skills/memory-system/references/roles/product-manager/cumulative.md
 Section: High-Confidence Patterns
 Confidence: {confidence}%
 
@@ -198,7 +198,7 @@ Patterns identified: {patterns_count}
 
 Changes will take effect in next session. 🚀
 
-Start a new session? [/aid start]
+Start a new session? [/aid-start]
 ```
 
 ---
@@ -209,7 +209,7 @@ Start a new session? [/aid start]
 ```
 📭 No feedback items waiting for analysis.
 
-Feedback is collected automatically at the end of each phase (/aid end).
+Feedback is collected automatically at the end of each phase (/aid-end).
 Continue working and we'll improve when there's enough data!
 ```
 
@@ -286,19 +286,19 @@ Promotion Candidates:
 Created:
 • ~/.aid/config.yaml - Settings
 • ~/.aid/state.json - System state
-• ~/.aid/skills/ - Skill files (4 roles × 5 phases)
+• Skill references: skills/memory-system/references/ (in the plugin, not copied)
 • ~/.aid/feedback/ - Feedback directories
 • ~/.aid/metrics/ - Metrics files
 
-Let's begin! Run /aid start [role] [phase]
+Let's begin! Run /aid-start [role] [phase]
 ```
 
 ### Already Initialized
 ```
 ✅ AID Memory System already initialized.
 
-Run /aid status to see current state.
-Run /aid start to begin a session.
+Run /aid-status to see current state.
+Run /aid-start to begin a session.
 ```
 
 ---

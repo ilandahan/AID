@@ -22,6 +22,7 @@ Since 3.0.8 (T2) the shipped default is "block" for the two phase gates, "log" o
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -460,8 +461,10 @@ class TestProtectedPaths:
 
     # T3 (owner 2026-11-17): .aid/state.json flipped to protected (T3-1); see
     # test_t3_1_state_json_is_a_control_file.
+    # T15 (owner 2026-11-19): '.claude/commands/x.md' moved out of this list; before Phase 4
+    # the .claude capability folders are a phase rule (T15-1, test_t15_gate.py).
     @pytest.mark.parametrize('path', ['.aid/pipeline/state.json', '.aid/qa/T1.yaml', 'docs/prd.md',
-                                      '.claude/plans/x.md', '.claude/commands/x.md'])
+                                      '.claude/plans/x.md', '.claude/notes.md'])
     def test_other_aid_and_claude_files_stay_writable(self, tmp_path, path):
         """Other .aid/.claude files stay writable; only the control files are refused."""
         p = make_project(tmp_path, phase=1, enforcement={'phase_gate_write': 'block'})
@@ -497,13 +500,13 @@ def spawn(cwd, event, action, home, payload=None, raw=None, project_dir=None):
 
 
 def decision(out):
-    """('DENY', reason) / ('ALLOW', additionalContext-or-None)."""
+    """('DENY', reason) / ('ASK', reason) / ('ALLOW', additionalContext-or-None)."""
     if not out:
         return 'ALLOW', None
     hso = json.loads(out).get('hookSpecificOutput', {})
-    if hso.get('permissionDecision') == 'deny':
+    if hso.get('permissionDecision') in ('deny', 'ask'):   # T15 (owner 2026-11-19): ask is not allow
         assert hso.get('hookEventName') == 'PreToolUse' and hso.get('permissionDecisionReason')
-        return 'DENY', hso['permissionDecisionReason']
+        return hso['permissionDecision'].upper(), hso['permissionDecisionReason']
     return 'ALLOW', hso.get('additionalContext')
 
 
@@ -1440,7 +1443,11 @@ def test_t3_4b_the_asked_spelling_passes_the_gate(acp, cmd):
     """The lower-case AC-23 forms pass AID's gate; Claude Code then asks the user (T3-P1)."""
     acp.start('s1')
     v = acp.bash(cmd.format(s=SESSION_FWD, b=SESSION.replace('/', '\\')))
-    assert v == ('ALLOW', None), v
+    # T15 (owner 2026-11-19, D1): the gate itself now asks for the confirmed subcommands.
+    if cmd.split()[2] in aid_guard.CONFIRMED_SUBCOMMANDS:
+        assert v[0] == 'ASK', v
+    else:
+        assert v == ('ALLOW', None), v
 
 
 def test_t3_4b_ask_rules_match_the_spellings_they_must():
@@ -1484,6 +1491,13 @@ def test_t3_5_commands_call_the_script_in_the_gate_form():
         for line in text.splitlines():
             s = line.strip()
             if s.startswith(('python ', 'python3 ', 'py ')) and 'aid_session.py' in s:
+                # T16 (owner 2026-11-19), I-10 / E-R1-3: link-project.md shows the user the line
+                # to type in a terminal for a linked install (no plugin, so no
+                # ${CLAUDE_PLUGIN_ROOT}): python "<AID install>/hooks/aid_session.py" init|status.
+                if f.name == 'link-project.md' and re.match(
+                        r'^python "?(?:<AID-main>|[A-Za-z]:[\\/]|~/)[^"\s]*[\\/]hooks[\\/]aid_session\.py"? '
+                        r'(?:init|status)\b', s):
+                    continue
                 if not s.startswith(('python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py"',
                                      'python "${CLAUDE_PROJECT_DIR}/.claude/hooks/aid_session.py"')):
                     bad.append('{}: {}'.format(f.name, s))
@@ -1531,7 +1545,7 @@ def test_t3_a2_script_uses_the_gates_project_root(clean_tmp):
 
 def _plugin_install(home):
     """A real plugin layout: <home>/.claude/plugins/cache/AID/aid/<ver>/{hooks,references}."""
-    root = home / '.claude' / 'plugins' / 'cache' / 'AID' / 'aid' / '3.0.8'
+    root = home / '.claude' / 'plugins' / 'cache' / 'AID' / 'aid' / '3.1.0'
     shutil.copytree(os.path.join(REPO_ROOT, 'hooks'), str(root / 'hooks'),
                     ignore=shutil.ignore_patterns('__pycache__'))
     shutil.copytree(os.path.join(REPO_ROOT, 'references'), str(root / 'references'))
@@ -1556,9 +1570,10 @@ def test_t3_a3_plugin_install_runs_its_script_in_every_phase(acp, phase):
                                              'tool_input': {'command': cmd}}),
                            capture_output=True, text=True, cwd=str(acp.P), env=env, timeout=60)
         return decision(p.stdout.strip())
-    for sub in ('approve', 'advance', 'review {} PASS'.format(phase), 'end --rating 4',
-                'start developer {}'.format(phase)):
+    for sub in ('review {} PASS'.format(phase), 'end --rating 4', 'start developer {}'.format(phase)):
         assert gate('python "{}" {}'.format(script, sub)) == ('ALLOW', None), sub
+    for sub in ('approve', 'advance'):      # T15 (owner 2026-11-19, D1): asked, not silently allowed
+        assert gate('python "{}" {}'.format(script, sub))[0] == 'ASK', sub
     v = gate('PYTHON "{}" approve'.format(script))
     assert v[0] == 'DENY', v
 
@@ -1696,13 +1711,21 @@ def test_t7_4_aid_session_never_runs_from_powershell(acp, phase, cmd):
     acp.start('s1')
     acp.state(phase)
     v = _ps(acp, cmd.format(s=SESSION_FWD))
+    # T15 (owner 2026-11-19, T15-4 amends T7-4): exactly the canonical call of a confirmed
+    # subcommand to the installed plugin root is asked; every other aid_session call is denied.
+    if cmd in ('python "{s}" approve', 'python "{s}" advance', 'py "{s}" init developer 2'):
+        assert v[0] == 'ASK' and 'confirm' in v[1], v
+        return
     assert v[0] == 'DENY' and 'Bash tool' in v[1] and 'ask' in v[1], v
 
 
 def test_t7_4_powershell_session_refusal_blocks_at_log_level(clean_tmp):
     acp = AC(clean_tmp, {'enforcement': {'phase_gate_write': 'log', 'phase_gate_bash': 'log'}})
     acp.start('s1')
-    assert _ps(acp, 'python "{}" approve'.format(SESSION_FWD))[0] == 'DENY'
+    # T15 (owner 2026-11-19): the canonical call is asked (T15-4); other spellings stay denied.
+    assert _ps(acp, 'python "{}" approve'.format(SESSION_FWD))[0] == 'ASK'
+    assert _ps(acp, 'PYTHON "{}" approve'.format(SESSION_FWD))[0] == 'DENY'
+    assert _ps(acp, 'python "{}" review 1 PASS'.format(SESSION_FWD))[0] == 'DENY'
 
 
 @pytest.mark.parametrize('cmd', [
@@ -1735,7 +1758,7 @@ def test_t7_6_manifest_version_license_and_layout():
     """WHY (A-44): non-SPDX license string, and a root brace indented 4 spaces."""
     raw = open(PLUGIN_JSON, 'rb').read().decode('utf-8').replace('\r\n', '\n')
     data = json.loads(raw)
-    assert data['version'] == '3.0.8'
+    assert data['version'] == '3.1.0'
     assert data['license'] == 'LicenseRef-AID-Community-License-1.0'
     assert raw == json.dumps(data, indent=2, ensure_ascii=False) + '\n'
 
@@ -1778,7 +1801,15 @@ def test_t7_7_qa_gate_from_a_subfolder_uses_the_project_root(clean_tmp):
     assert json.loads(p.stdout).get('decision') == 'block'
     assert not (D / '.aid').exists()
     assert (P / '.aid' / 'qa' / 'enforcement.log').is_file()
+    # T15 (owner 2026-11-19, T15-15 / I-3): only a qa_passed record in state.json whose
+    # criteria_sha256 matches the yaml passes; a .qa-passed marker file no longer does.
+    import hashlib
     (P / '.aid' / 'qa' / 'T-1.qa-passed').write_text('', encoding='utf-8')
+    assert json.loads(_qa(D, H).stdout).get('decision') == 'block'
+    sha = hashlib.sha256((P / '.aid' / 'qa' / 'T-1.yaml').read_bytes()).hexdigest()
+    (P / '.aid' / 'state.json').write_text(json.dumps({'current_phase': 4, 'qa_passed': {
+        'T-1': {'at': '2026-11-19T00:00:00+00:00', 'criteria_sha256': sha, 'note': ''}}}),
+        encoding='utf-8')
     p = _qa(D, H)
     assert p.returncode == 0 and p.stdout.strip() == '', p.stdout
 
@@ -1791,6 +1822,8 @@ def test_t7_7_qa_gate_from_a_subfolder_uses_the_project_root(clean_tmp):
 def test_t3_ci_every_aid_session_occurrence_is_judged(cmd, refused):
     """WHY (T3 CI on Linux): only the FIRST "aid_session" was judged; when it was a directory
     name the subcommand after the real script was missed and the call was not refused."""
+    # T16 (owner 2026-11-19): fix cycle 1 (R1-01): a later operand that is the session script
+    # keeps HEAD 5f8f199's T3 verdict (T16-14: "every T3 actual-call deny stays").
     assert aid_guard._confirmed_intent(cmd)
     assert bool(aid_guard.confirmed_form_verdict(cmd)) is refused
 
@@ -1801,5 +1834,7 @@ def test_t7_review_powershell_tool_name_in_any_case(acp):
     acp.state(5)
     v = decision(spawn(acp.P, 'PreToolUse', 'phase_gate_bash', acp.H, {
         'session_id': 's1', 'cwd': str(acp.P), 'tool_name': 'powershell',
-        'tool_input': {'command': 'python "{}" approve'.format(SESSION_FWD)}}))
+        # T15 (owner 2026-11-19): the canonical confirmed call is asked from PowerShell now
+        # (T15-4), so an unconfirmed subcommand shows the PowerShell rules (Bash allows it).
+        'tool_input': {'command': 'python "{}" review 1 PASS'.format(SESSION_FWD)}}))
     assert v[0] == 'DENY' and 'PowerShell' in v[1], v

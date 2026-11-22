@@ -30,6 +30,10 @@ needs_npm = pytest.mark.skipif(
     NO_NODE_MODULES, reason="dependencies not installed - run `npm install` first"
 )
 
+from test_t15_docs import _cucumber_runnable  # noqa: E402  (T16-69: one engines rule)
+
+_CUCUMBER_SKIP = _cucumber_runnable()
+
 
 class TestAIDInstallation:
     """Verify AID directory structure and core files."""
@@ -50,10 +54,30 @@ class TestAIDInstallation:
         assert 'current_phase' in data
         assert 'phase_name' in data
 
-    @needs_init
-    def test_context_file_exists(self):
-        context_path = os.path.join(AID_DIR, 'context.json')
-        assert os.path.isfile(context_path), ".aid/context.json not found"
+    def test_context_file_exists(self, tmp_path):
+        """
+        WHY hermetic: context.json is a per-project runtime file (gitignored),
+        written by the linker, the installer or /context-update. The old check
+        looked in THIS repo's .aid/ and was gated on .aid/state.json, but
+        aid_session.py also writes state.json on its own (any session started in
+        the repo), so a stray state.json turned the skip into a red suite that
+        said nothing about the product. The repo is the plugin, not a linked
+        project (link-project.sh refuses to link AID to itself), so the
+        assertion is made where context.json is actually created: a project
+        linked by the real link-project.sh.
+        """
+        from test_link_project_guards import _make_aid_fixture, _run_link
+
+        aid = _make_aid_fixture(str(tmp_path / 'aid'))
+        (tmp_path / 'project').mkdir()
+        result = _run_link(aid, '../project', home=str(tmp_path / 'home'))
+        assert result.returncode == 0, f"link-project.sh failed:\n{result.stdout}"
+
+        context_path = tmp_path / 'project' / '.aid' / 'context.json'
+        assert context_path.is_file(), ".aid/context.json not found"
+        with open(context_path, 'r') as f:
+            data = json.load(f)
+        assert 'current_task' in data
 
     def test_pipeline_config_exists(self):
         config_path = os.path.join(AID_DIR, 'pipeline', 'config.json')
@@ -131,6 +155,9 @@ class TestNodeDependencies:
         node_modules = os.path.join(REPO_ROOT, 'node_modules')
         assert os.path.isdir(node_modules), "node_modules not found — run npm install"
 
+    # T16-69 (FR-34): the same engines skip as test_t15_docs (T15-43): cucumber-js refuses to
+    # run on a node outside package.json engines (Node 23), which says nothing about AID.
+    @pytest.mark.skipif(_CUCUMBER_SKIP is not None, reason=str(_CUCUMBER_SKIP))
     def test_cucumber_installed(self):
         result = subprocess.run(
             'npx cucumber-js --version', cwd=REPO_ROOT,

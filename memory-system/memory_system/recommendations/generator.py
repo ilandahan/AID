@@ -36,6 +36,32 @@ _ROLE_DIRS = {"pm": "product-manager", "product-manager": "product-manager", "qa
               "qa-engineer": "qa-engineer", "lead": "tech-lead", "tech-lead": "tech-lead",
               "developer": "developer", "dev": "developer", "data-scientist": "data-scientist"}
 _PHASE_DIRS = ("discovery", "prd", "tech-spec", "breakdown", "development", "qa-ship")
+# T17-18 (L3c-2d): phase 0-5 -> the real phase skill directory under skills/, and that skill's
+# learnings folder. "aid-tech" and "aid-spec" (the old split on "-") are not skills.
+_PHASE_SKILLS = ("aid-discovery", "aid-prd", "aid-tech-spec", "aid-impl-plan", "aid-development",
+                 "aid-qa-ship")
+_SKILL_PHASE_DIR = dict(zip(_PHASE_SKILLS, _PHASE_DIRS))
+_PHASE_ALIASES = {"discovery": 0, "research": 0, "prd": 1, "tech-spec": 2, "techspec": 2,
+                  "technical-spec": 2, "breakdown": 3, "impl-plan": 3, "implementation-plan": 3,
+                  "development": 4, "dev": 4, "qa-ship": 5, "qa": 5, "qa-and-ship": 5}
+
+
+def phase_skill(phase: Any) -> Optional[str]:
+    """T17-18: the phase skill directory for a phase number (0-5) or a phase name
+    ("tech-spec", "2-tech-spec", "phase-2", "aid-impl-plan"), else None."""
+    if isinstance(phase, bool):
+        return None
+    if isinstance(phase, int):
+        return _PHASE_SKILLS[phase] if 0 <= phase <= 5 else None
+    p = re.sub(r"[\s_]+", "-", str(phase or "").strip().lower())
+    if p in _PHASE_SKILLS:
+        return p
+    p = re.sub(r"^(?:aid-|phase-)", "", p)
+    m = re.match(r"^([0-5])(?:-|$)", p)
+    if m:
+        return _PHASE_SKILLS[int(m.group(1))]
+    n = _PHASE_ALIASES.get(p)
+    return _PHASE_SKILLS[n] if n is not None else None
 
 
 # Configuration. T8-3: from paths.aid_home() on every call ($AID_HOME, else ~/.aid).
@@ -77,6 +103,8 @@ def target_for(target_skill: str) -> Optional[str]:
     t = str(target_skill or "")
     if t.startswith("role-") and t[5:] in _ROLE_DIRS:
         return "roles/{}/cumulative.md".format(_ROLE_DIRS[t[5:]])
+    if t in _SKILL_PHASE_DIR:                              # T17-18: aid-impl-plan -> breakdown
+        return "phases/{}/cumulative.md".format(_SKILL_PHASE_DIR[t])
     if t.startswith("aid-") and t[4:] in _PHASE_DIRS:
         return "phases/{}/cumulative.md".format(t[4:])
     return None
@@ -147,6 +175,10 @@ class RecommendationGenerator:
 
         # From phase struggles
         recommendations.extend(self._recommendations_from_phases())
+
+        # T17-18 (L3c-2d): a proposal with no allowed learnings file cannot be applied; it is
+        # dropped here rather than queued as a dead entry.
+        recommendations = [r for r in recommendations if r.get("target_file")]
 
         # Deduplicate and prioritize
         recommendations = self._deduplicate_recommendations(recommendations)
@@ -239,6 +271,14 @@ class RecommendationGenerator:
         for mismatch in role_patterns.get('mismatched_roles', []):
             role = mismatch['role']
             weak_topics = mismatch.get('weak_topics', [])
+            # T17-18: no proposal for a role that matches the average (|gap| < 0.1), and the
+            # target is the real role skill (role-pm -> role-product-manager).
+            gap = mismatch.get('gap_from_overall')
+            if not isinstance(gap, (int, float)) or abs(gap) < 0.1:
+                continue
+            role_dir = _ROLE_DIRS.get(str(role).lower())
+            if role_dir is None:
+                continue
 
             if weak_topics:
                 change = f"Update guidance for {', '.join(weak_topics)} to be more appropriate for {role} role. "
@@ -253,7 +293,7 @@ class RecommendationGenerator:
 
             recommendations.append(self._create_recommendation(
                 priority="high" if mismatch['gap_from_overall'] > 0.7 else "medium",
-                target_skill=f"role-{role}",
+                target_skill=f"role-{role_dir}",
                 section="Role-Specific Guidance",
                 current_guidance=f"Current guidance for {role}",
                 proposed_change=change,
@@ -326,7 +366,11 @@ class RecommendationGenerator:
 
         for phase_data in phase_patterns.get('struggling_phases', []):
             phase = phase_data['phase']
-            phase_name = phase.split('-')[1] if '-' in phase else phase
+            # T17-18 (L3c-2d): "tech-spec".split('-')[1] gave "aid-spec", not a skill.
+            skill = phase_skill(phase)
+            if skill is None:
+                continue
+            phase_name = skill[len("aid-"):]
 
             weak_topics = phase_data.get('weak_topics', [])
 
@@ -339,7 +383,7 @@ class RecommendationGenerator:
 
             recommendations.append(self._create_recommendation(
                 priority="high" if phase_data['average_rating'] < 3.0 else "medium",
-                target_skill=f"aid-{phase_name}",
+                target_skill=skill,
                 section="Phase Guidance",
                 current_guidance=f"Current guidance for {phase_name} phase",
                 proposed_change=change,
@@ -464,11 +508,23 @@ def save_recommendations(recommendations: List[Dict[str, Any]]) -> Path:
     already applied or rejected is not queued again.
     """
     queue = _read_list(_queue_file())
-    seen = {r.get("id") for r in queue + _read_list(_applied_file()) + _read_list(_rejected_file())}
+    known = queue + _read_list(_applied_file()) + _read_list(_rejected_file())
+    # T15-30: an entry stored under its pre-T15 id still counts as seen under its new id.
+    seen = {r.get("id") for r in known} | {_content_id(r) for r in known if _id_matches_content(r)}
     for rec in recommendations:
-        if isinstance(rec, dict) and rec.get("id") and rec["id"] not in seen:
-            queue.append(redact_obj(rec, default_names(), skip_keys=("id", "generated_at")))
-            seen.add(rec["id"])
+        if not (isinstance(rec, dict) and rec.get("id")):
+            continue
+        # T17-18 (L3c-2d): a proposal with no allowed target_file is never queued.
+        if resolve_target(rec.get("target_file")) is None:
+            continue
+        clean = redact_obj(rec, default_names(), skip_keys=("id", "generated_at"))
+        # T16-33: a NEW entry always gets its sha256 content id, whatever id it came with, so
+        # a legacy SHA-1 id is only ever accepted from an entry queued before T15 (sunset:
+        # docs/MIGRATION.md).
+        clean["id"] = _content_id(clean)
+        if clean["id"] not in seen:
+            queue.append(clean)
+            seen.add(clean["id"])
     _write_list(_queue_file(), queue)
     return _queue_file()
 
@@ -505,13 +561,15 @@ def apply_recommendation(rec_id: str, refs_root: Optional[Path] = None) -> Dict[
         return {"ok": False, "reason": "recommendation {} has no allowed target (only "
                 "skills/memory-system/references/roles|phases/<name>/cumulative.md); apply it "
                 "by hand if you want it".format(rec.get("id"))}
-    if rec.get("id") != _content_id(rec):
+    if not _id_matches_content(rec):
         return {"ok": False, "reason": "recommendation {!r} does not match its content (the queue "
                 "was edited); run memory-preview and confirm the id it shows".format(rec.get("id"))}
     clean = redact_obj(rec, default_names(), skip_keys=("id", "generated_at"))
-    block = "\n## Applied learning ({}, recommendation {})\n\n- {}\n  - Why: {}\n".format(
+    # T16-27: no empty "- Why: " line when the proposal has no rationale.
+    why = _one_line(clean.get("rationale"))
+    block = "\n## Applied learning ({}, recommendation {})\n\n- {}\n{}".format(
         datetime.utcnow().strftime("%Y-%m-%d"), clean["id"], _one_line(clean.get("proposed_change")),
-        _one_line(clean.get("rationale")))
+        "  - Why: {}\n".format(why) if why else "")
     with open(path, "a", encoding="utf-8", newline="") as f:
         f.write(block)
     queue.pop(i)
@@ -521,20 +579,39 @@ def apply_recommendation(rec_id: str, refs_root: Optional[Path] = None) -> Dict[
     return {"ok": True, "id": clean.get("id"), "target": str(rec.get("target_file"))}
 
 
+def _content_key(rec: Dict[str, Any]) -> bytes:
+    return "|".join(str(rec.get(k)) for k in
+                    ("target_skill", "target_file", "section", "proposed_change",
+                     "rationale")).encode("utf-8")
+
+
 def _content_id(rec: Dict[str, Any]) -> str:
     """The id a recommendation's CONTENT gives it. memory-apply checks it, so the id the user
     confirms in Claude Code's prompt fixes exactly what is appended: the target file and
-    both texts that are written (T8 review r1 and r2)."""
-    key = "|".join(str(rec.get(k)) for k in
-                   ("target_skill", "target_file", "section", "proposed_change", "rationale"))
-    return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
+    both texts that are written (T8 review r1 and r2). T15-30: sha256, 32 hex chars."""
+    return hashlib.sha256(_content_key(rec)).hexdigest()[:32]
+
+
+def _legacy_content_id(rec: Dict[str, Any]) -> str:
+    """The pre-T15 id (SHA-1, 16 hex chars). Only READ, so entries queued before T15 can
+    still be applied or rejected; new ids are never made this way."""
+    return hashlib.sha1(_content_key(rec), usedforsecurity=False).hexdigest()[:16]
+
+
+def _id_matches_content(rec: Dict[str, Any]) -> bool:
+    rec_id = rec.get("id")
+    return rec_id == _content_id(rec) or rec_id == _legacy_content_id(rec)
 
 
 def _one_line(value: Any) -> str:
     """Plain text on one line: no newlines and no leading Markdown heading, quote or list
     marks, so an applied proposal cannot add headings or structure to a learnings file."""
     text = " ".join(str(value if value is not None else "").split())
-    return re.sub(r"^[#>*+\s-]+", "", text)[:1000]
+    # T16-27: a leading "**" is bold, not a list mark: keep it, so "- **Ask**: x" stays
+    # "**Ask**: x" instead of "Ask**: x". Unbalanced "**" left over are all removed.
+    lead = r"^(?:[#>+\s-]|\*(?!\*))+"
+    text = re.sub(lead, "", text)[:1000]
+    return re.sub(lead, "", text.replace("**", "")) if text.count("**") % 2 else text
 
 
 def mark_recommendation_applied(rec_id: str) -> bool:
@@ -626,17 +703,23 @@ def queue_proposals(data: Any) -> Dict[str, Any]:
     T8-2 (D3): queue the memory-analysis agent's proposals (its JSON output, or the list in
     its ``suggestions``). Each proposal is redacted; one whose target is not an allowed
     learnings file is skipped. Nothing is applied here.
+
+    I-8 (T15-29): ``skipped_targets`` lists targets that are not an allowed learnings file;
+    ``skipped_empty`` lists allowed targets whose proposal has no content.
     """
     items = data.get("suggestions", []) if isinstance(data, dict) else data
-    queued, skipped = [], []
+    queued, skipped, empty = [], [], []
     for s in items if isinstance(items, list) else []:
         if not isinstance(s, dict):
             continue
         target = s.get("target") if isinstance(s.get("target"), dict) else {}
         rel = target.get("file") or s.get("target_file")
         text = s.get("content") or s.get("proposed_change")
-        if resolve_target(rel) is None or not isinstance(text, str) or not text.strip():
+        if resolve_target(rel) is None:
             skipped.append(str(rel))
+            continue
+        if not isinstance(text, str) or not text.strip():
+            empty.append(str(rel))
             continue
         rel = str(rel).replace("\\", "/").replace("skills/memory-system/references/", "")
         rec = redact_obj({"priority": s.get("priority", "medium"), "target_skill": "memory-system",
@@ -648,7 +731,8 @@ def queue_proposals(data: Any) -> Dict[str, Any]:
                     "requires_review": True, "status": "pending", "source": "memory-analysis-agent"})
         queued.append(rec)
     save_recommendations(queued)
-    return {"queued": [r["id"] for r in queued], "skipped_targets": skipped}
+    return {"queued": [r["id"] for r in queued], "skipped_targets": skipped,
+            "skipped_empty": empty}
 
 
 def format_recommendations_report(recommendations: List[Dict[str, Any]]) -> str:

@@ -14,18 +14,19 @@ Add this section to your existing `CLAUDE.md`:
 AID includes a learning system that improves over time.
 
 ### Quick Commands
-- `/aid init` - Initialize memory system
-- `/aid start` - Start work session
-- `/aid end` - End phase with feedback
-- `/aid improve` - Run learning cycle
+- `/aid-init` - Initialize memory system
+- `/aid-start` - Start work session
+- `/aid-end` - End phase with feedback
+- `/aid-improve` - Run learning cycle
 
 ### How It Works
-At session start, Claude loads relevant skills from `memory-system/skills/`.
+At session start, Claude loads the role and phase references from `skills/memory-system/references/`.
 At phase end, feedback is collected and stored.
-Weekly, the `/aid improve` command analyzes patterns and updates skills.
+Weekly, the `/aid-improve` command analyzes patterns and proposes learnings; each one is
+applied only after you confirm it (`aid_session.py memory-apply`).
 
 ### Files
-- Skills: `memory-system/skills/`
+- Skill references: `skills/memory-system/references/`
 - Docs: `memory-system/docs/`
 - Runtime: `~/.aid/` (created on init)
 
@@ -38,7 +39,7 @@ Create/update these in your `slash-commands/` or `commands/` directory:
 
 **`/aid-init.md`**
 ```markdown
-# /aid init
+# /aid-init
 
 Initialize the AID Memory System.
 
@@ -49,12 +50,12 @@ Initialize the AID Memory System.
 4. Sets up feedback directories
 
 ## Implementation
-See: `memory-system/docs/COMMANDS.md#init`
+See: `memory-system/docs/COMMANDS.md#aid-init`
 ```
 
 **`/aid-start.md`**
 ```markdown
-# /aid start
+# /aid-start
 
 Start a new work session.
 
@@ -62,16 +63,17 @@ Start a new work session.
 1. Ask for role (PM/Developer/QA/Lead)
 2. Ask for phase (Discovery/PRD/Tech-Spec/Development/QA-Ship)
 3. Load relevant skills
-4. Update state.json
+4. Run `aid_session.py start <role> <phase>`: it records the session in `.aid/state.json`
+   (the agent never edits state.json itself; only `aid_session.py` writes it)
 5. Greet user with context
 
 ## Implementation
-See: `memory-system/docs/AGENT.md#session-start`
+See: `memory-system/docs/AGENT.md#1-session-start-flow`
 ```
 
 **`/aid-end.md`**
 ```markdown
-# /aid end
+# /aid-end
 
 End current phase and collect feedback.
 
@@ -89,7 +91,7 @@ See: `memory-system/docs/AGENT.md#3-phase-gate-flow-feedback-collection`
 
 **`/aid-improve.md`**
 ```markdown
-# /aid improve
+# /aid-improve
 
 Run the improvement analysis cycle.
 
@@ -110,7 +112,7 @@ See: `memory-system/docs/IMPROVEMENT-FLOW.md`
 
 **`/aid-status.md`**
 ```markdown
-# /aid status
+# /aid-status
 
 Show current memory system state.
 
@@ -122,12 +124,12 @@ Show current memory system state.
 - Skills loaded
 
 ## Implementation
-See: `memory-system/docs/COMMANDS.md#status`
+See: `memory-system/docs/COMMANDS.md#aid-status`
 ```
 
 **`/aid-memory.md`**
 ```markdown
-# /aid memory [list|stats]
+# /aid-memory [list|stats]
 
 Manage entries in AID's local memory (`$AID_HOME/memory/slots.json`).
 
@@ -211,7 +213,7 @@ aid-repo/
 - [ ] Add memory system section to `CLAUDE.md`
 - [ ] Create slash command files in `commands/`
 - [ ] Update `work_context.json` schema (if used)
-- [ ] Run `/aid init` to test
+- [ ] Run `/aid-init` to test
 - [ ] Commit all changes
 
 ## Files Created by This Package
@@ -220,4 +222,4 @@ aid-repo/
 - `memory-system/` - All 36 files
 
 **At runtime (not in repo):**
-- `~/.aid/` - Created by `/aid init`
+- `~/.aid/` - Created by `/aid-init`

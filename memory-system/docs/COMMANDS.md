@@ -8,23 +8,21 @@
 
 | Command | Description |
 |---------|-------------|
-| `/aid init` | Initialize system (first time) |
-| `/aid start [role] [phase]` | Start a work session |
-| `/aid status` | Show current state |
-| `/aid end` | Complete phase, collect feedback |
-| `/aid improve` | Run improvement analysis |
-| `/aid memory list` | Show AID's local memory entries |
-| `/aid memory stats` | Show memory statistics |
-| `/aid skill view [type]` | View skill content |
-| `/aid skill edit [type]` | Edit skill file |
-| `/aid skill sync` | Sync skills from repo |
-| `/aid reset --confirm` | Reset all data |
+| `/aid-init` | Initialize system (first time) |
+| `/aid-start [role] [phase]` | Start a work session |
+| `/aid-status` | Show current state |
+| `/aid-end` | Complete phase, collect feedback |
+| `/aid-improve` | Run improvement analysis |
+| `/aid-memory list` | Show AID's local memory entries |
+| `/aid-memory stats` | Show memory statistics |
+| `/aid-recommendations` | View and apply queued skill-update proposals |
+| `/aid-reset` | Reset AID runtime data ([details](#reset)) |
 
 ---
 
 ## Initialization
 
-### `/aid init`
+### `/aid-init`
 
 Initializes the AID Memory System for first-time use.
 
@@ -43,26 +41,26 @@ Initializes the AID Memory System for first-time use.
 Created:
 • ~/.aid/config.yaml - Settings
 • ~/.aid/state.json - System state
-• ~/.aid/skills/ - Skill files (4 roles × 5 phases)
+• Skill references: skills/memory-system/references/ (in the plugin, not copied)
 • ~/.aid/feedback/ - Feedback directories
 • ~/.aid/metrics/ - Metrics files
 
-Let's begin! Run /aid start [role] [phase]
+Let's begin! Run /aid-start [role] [phase]
 ```
 
 **If already initialized:**
 ```
 ✅ AID Memory System already initialized.
 
-Run /aid status to see current state.
-Run /aid start to begin a session.
+Run /aid-status to see current state.
+Run /aid-start to begin a session.
 ```
 
 ---
 
 ## Session Commands
 
-### `/aid start [role] [phase]`
+### `/aid-start [role] [phase]`
 
 Starts a new work session.
 
@@ -72,10 +70,10 @@ Starts a new work session.
 
 **Examples:**
 ```
-/aid start                    # Interactive - asks for role & phase
-/aid start pm                 # Starts as PM, asks for phase
-/aid start pm discovery       # Starts as PM in Discovery phase
-/aid start dev development    # Starts as Developer in Development phase
+/aid-start                    # Interactive - asks for role & phase
+/aid-start pm                 # Starts as PM, asks for phase
+/aid-start pm discovery       # Starts as PM in Discovery phase
+/aid-start dev development    # Starts as Developer in Development phase
 ```
 
 **Behavior:**
@@ -86,7 +84,7 @@ Starts a new work session.
 
 ---
 
-### `/aid status`
+### `/aid-status`
 
 Shows current session state and statistics.
 
@@ -105,12 +103,12 @@ Statistics:
 • Pending feedback: 8
 • Sessions since last improvement: 8
 
-💡 Recommended: Run /aid improve
+💡 Recommended: Run /aid-improve
 ```
 
 ---
 
-### `/aid end`
+### `/aid-end`
 
 Completes the current phase and collects feedback.
 
@@ -129,13 +127,13 @@ Completes the current phase and collects feedback.
 
 ## Improvement Commands
 
-### `/aid improve`
+### `/aid-improve`
 
 Runs the improvement analysis sub-agent.
 
 **Requirements:**
 - At least 3 pending feedback items recommended
-- No active session (run `/aid end` first)
+- No active session (run `/aid-end` first)
 
 **Flow:** (see `commands/aid-improve.md` for the exact calls)
 1. Preview: `aid_session.py memory-preview` (writes nothing)
@@ -159,7 +157,7 @@ Runs the improvement analysis sub-agent.
 
 ## Memory Commands
 
-### `/aid memory list`
+### `/aid-memory list`
 
 Shows all AID:* entries in AID's local memory (`$AID_HOME/memory/slots.json`).
 
@@ -182,7 +180,7 @@ Developer:
 
 ---
 
-### `/aid memory stats`
+### `/aid-memory stats`
 
 Shows memory slot allocation and usage statistics.
 
@@ -209,48 +207,20 @@ Promotion Candidates:
 
 ---
 
-## Skill Commands
+## Skill Files
 
-### `/aid skill view [type]`
+There is no skill command. The role and phase skill files are plain files in the plugin;
+read or edit them directly:
 
-Views skill file content.
+- `skills/memory-system/references/roles/{role}/QUICK-REFERENCE.md`
+- `skills/memory-system/references/roles/{role}/cumulative.md`
+- `skills/memory-system/references/phases/{phase}/QUICK-REFERENCE.md`
+- `skills/memory-system/references/phases/{phase}/cumulative.md`
 
-**Arguments:**
-- `type`: Role name or phase name
-
-**Examples:**
-```
-/aid skill view pm              # View PM role skill
-/aid skill view developer       # View Developer role skill
-/aid skill view discovery       # View Discovery phase skill
-/aid skill view tech-spec       # View Tech Spec phase skill
-```
-
----
-
-### `/aid skill edit [type]`
-
-Opens skill file for editing.
-
-**Arguments:**
-- `type`: Role name or phase name
-
-**Editable files:**
-- `~/.aid/skills/roles/{role}/QUICK-REFERENCE.md`
-- `~/.aid/skills/roles/{role}/cumulative.md`
-- `~/.aid/skills/phases/{phase}/QUICK-REFERENCE.md`
-- `~/.aid/skills/phases/{phase}/cumulative.md`
-
----
-
-### `/aid skill sync`
-
-Synchronizes skill files from the AID repository.
-
-**What it does:**
-1. Pulls latest SKILL.md files from repo
-2. Preserves local cumulative.md (learned patterns)
-3. Reports any conflicts
+Learnings reach `cumulative.md` through `/aid-improve` or `/aid-recommendations`
+(`aid_session.py memory-apply <id>`, which Claude Code asks you to confirm). New skill
+versions come with an AID update; your `cumulative.md` learnings are in those same files,
+so back them up first (see `MIGRATION.md`).
 
 ---
 
@@ -267,29 +237,44 @@ AID's local memory.
 
 ---
 
-### `/aid reset --confirm`
+<a id="reset"></a>
+### Reset
 
-Resets the AID Memory System.
+`/aid-reset` (see `commands/aid-reset.md`) runs exactly one command, which Claude Code
+asks the user to confirm:
 
-**Warning:** This deletes all feedback and statistics!
-
-**What is deleted:**
-- All feedback files (pending and processed)
-- Statistics in state.json
-- Trends data
-
-**What is preserved:**
-- Skill files (including cumulative.md learnings)
-- AID's local memory entries
-- Configuration preferences
-
-**Confirmation required:**
 ```
-⚠️ This will delete all feedback and reset statistics.
-Skill files and AID's local memory will be preserved.
-
-Type 'RESET' to confirm: ___
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" reset          # keeps memory/
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" reset --all    # also deletes memory/
 ```
+
+Use `--all` only when the user explicitly asked to delete AID's local memory too.
+Do not delete anything by hand (no `rm`, no changing into `$AID_HOME`): the command is the
+only supported way to reset.
+
+**Warning:** This deletes all feedback and statistics. It cannot be undone except from a
+backup (see "Backing up AID data" above).
+
+**What is deleted** (the fixed list of runtime entries under `$AID_HOME`, default `~/.aid`):
+- `state.json` and `agent_state.json` (session state)
+- `feedback/` (pending and processed feedback)
+- `recommendations/` (queued, applied and rejected recommendations)
+- `metrics/` (statistics and trends)
+- `reports/` (dashboard output)
+- `memory/` (AID's local memory) - only with `--all`
+
+**What is kept:**
+- `memory/` - unless `--all` is given
+- `integrity/` - the session integrity baseline, never deleted, not even with `--all`
+- The project's `.aid/` folder (state, context, QA criteria) - never touched
+- Skill files in the plugin (including cumulative.md learnings)
+- Anything else in `$AID_HOME` it does not recognise (printed as "kept")
+
+The command prints each entry it removes and each entry it keeps. It refuses, deleting
+nothing, when `$AID_HOME` is (or contains) a user home folder, a filesystem root, the
+current project root or the current folder, or is not a plain folder. In `-p` or dontAsk
+sessions the confirmation cannot be given, so it is denied. Run `/aid-init` afterwards to
+reinitialize.
 
 ---
 
@@ -313,13 +298,7 @@ The system also responds to natural language phrases:
 
 ---
 
-## Command Aliases
+## Command Names
 
-| Full Command | Aliases |
-|--------------|---------|
-| `/aid start` | `/aid s`, `/aid begin` |
-| `/aid status` | `/aid st`, `/aid info` |
-| `/aid end` | `/aid done`, `/aid finish` |
-| `/aid improve` | `/aid i`, `/aid learn` |
-| `/aid memory list` | `/aid mem`, `/aid m list` |
-| `/aid memory stats` | `/aid m stats` |
+Every command is a separate slash command named `/aid-<name>` (one file in `commands/`).
+There are no aliases, and the name is always joined with a hyphen.

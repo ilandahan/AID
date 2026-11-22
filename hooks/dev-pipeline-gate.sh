@@ -25,6 +25,12 @@
 # ─────────────────────────────────────────────────
 
 input=$(cat 2>/dev/null)
+# This plugin's root, from this script's own location (R-03): the gate.mjs a human is told to run is
+# the one that ships next to this hook, never a ~/.claude/skills copy. Captured before any `cd`.
+# Forward-slash absolute path; `pwd -W` gives the Windows form under Git Bash.
+_plugin_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && { pwd -W 2>/dev/null || pwd; })
+GATE_MJS="${_plugin_root}/skills/pipeline-orchestrator/gate.mjs"
+[ -n "$_plugin_root" ] && [ -f "$GATE_MJS" ] || GATE_MJS='${CLAUDE_PLUGIN_ROOT}/skills/pipeline-orchestrator/gate.mjs'
 # Loop guard. Whitespace is stripped first: this matched the literal
 # '"stop_hook_active":true', so any payload serialized WITH a space after the colon
 # slipped straight past the guard and the gate could re-block every turn. A loop
@@ -44,9 +50,10 @@ case "$_sha_probe" in *'"stop_hook_active":true'*) exit 0 ;; esac
 ROOT="${CLAUDE_PROJECT_DIR:-}"
 [ -n "$ROOT" ] && [ ! -d "$ROOT" ] && ROOT=""
 [ -z "$ROOT" ] && ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+# T17 I-18 (F3): bytes in and out as UTF-8, whatever the console code page (a non-ASCII cwd).
 [ -z "$ROOT" ] && ROOT=$(printf '%s' "$input" | python -c 'import json,sys
-try: print((json.load(sys.stdin).get("cwd") or ""))
-except Exception: print("")' 2>/dev/null)
+try: sys.stdout.buffer.write((json.loads(sys.stdin.buffer.read().decode("utf-8-sig")).get("cwd") or "").encode("utf-8"))
+except Exception: pass' 2>/dev/null)
 [ -n "$ROOT" ] && cd "$ROOT" 2>/dev/null || exit 0
 
 # Is git usable HERE? Not a reason to quit — only a choice of where the changed-file list comes from.
@@ -61,9 +68,46 @@ fi
 # ── To restrict the whole gate to AID projects only, uncomment this line: ──
 # [ -d "$ROOT/.aid/pipeline" ] || exit 0
 
-# JSON-encode stdin (python preferred; sed fallback).
-json_enc() { python -c 'import json,sys;print(json.dumps(sys.stdin.read()))' 2>/dev/null \
+# JSON-encode stdin (python preferred; sed fallback). The bytes are decoded as UTF-8 explicitly
+# (T16-22): Windows python decodes stdin with the locale codec (cp1252), which turned every
+# non-ASCII byte of a file name into mojibake. json.dumps escapes non-ASCII, so the output is ASCII.
+json_enc() { python -c 'import json,sys;print(json.dumps(sys.stdin.buffer.read().decode("utf-8","replace")))' 2>/dev/null \
   || { printf '"'; sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n' ' '; printf '"'; }; }
+
+# Top-level string field $1 of the JSON on stdin (node, else python); prints nothing on any problem.
+_json_str() {
+  if command -v node >/dev/null 2>&1; then
+    node -e 'let b=[];process.stdin.on("data",c=>b.push(c));process.stdin.on("end",()=>{try{const d=JSON.parse(Buffer.concat(b).toString("utf8"));const v=d&&d[process.argv[1]];if(typeof v==="string")process.stdout.write(v)}catch{}})' "$1" 2>/dev/null
+  elif command -v python >/dev/null 2>&1; then
+    python -c 'import json,sys
+try:
+    v = json.loads(sys.stdin.buffer.read().decode("utf-8-sig")).get(sys.argv[1])
+    sys.stdout.write(v if isinstance(v, str) else "")
+except Exception:
+    pass' "$1" 2>/dev/null
+  fi
+}
+
+# The AID project phase (0-5) from .aid/state.json `current_phase` (an integer, or its digit string),
+# read as aid_hooks.load_gate_state does. Prints nothing when there is no state, it is unreadable, or
+# the phase is missing or out of range. Fed on stdin, never argv (MSYS path translation).
+_aid_phase() {
+  [ -f ".aid/state.json" ] || return 0
+  local out=""
+  if command -v node >/dev/null 2>&1; then
+    out=$(node -e 'let b=[];process.stdin.on("data",c=>b.push(c));process.stdin.on("end",()=>{try{let t=Buffer.concat(b).toString("utf8");if(t.charCodeAt(0)===0xFEFF)t=t.slice(1);const d=JSON.parse(t);const p=d&&typeof d==="object"&&!Array.isArray(d)?d.current_phase:undefined;const s=typeof p==="number"&&Number.isInteger(p)?String(p):typeof p==="string"?p.trim():"";if(/^[0-5]$/.test(s))process.stdout.write(s)}catch{}})' < ".aid/state.json" 2>/dev/null)
+  elif command -v python >/dev/null 2>&1; then
+    out=$(python -c 'import json,sys
+try:
+    d = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+    p = d.get("current_phase") if isinstance(d, dict) else None
+    s = "" if isinstance(p, bool) else (str(p) if isinstance(p, int) else (p.strip() if isinstance(p, str) else ""))
+    sys.stdout.write(s if s in ("0","1","2","3","4","5") else "")
+except Exception:
+    pass' < ".aid/state.json" 2>/dev/null)
+  fi
+  case "$out" in [0-5]) printf '%s' "$out" ;; esac
+}
 
 # Block the stop with $1 as the reason. The bypass hint goes to STDERR only (A-28): the reason is
 # read by the agent, and a block that teaches the agent how to switch the gate off is not a gate.
@@ -121,16 +165,45 @@ sha256_of() {
 # code and writes ESCALATION.json; this branch makes the decision reach the HUMAN by refusing to end
 # the turn quietly. Checked before the "no changed source" early exit, because an escalation is open
 # regardless of whether this particular turn touched code.
-# Deliberately grep, not node: the block must not depend on a runtime being installed.
+# The file is PARSED (node, else python), so a multi-line "status":\n "open" is seen (Fb3); an
+# unparseable file fails closed. Only with neither runtime does it fall back to a grep on the
+# whitespace-collapsed file, so the block still never depends on a runtime being installed.
+# The file is fed on stdin, never argv (MSYS path translation, see plan-execution-pipeline.sh).
 ESC="$ROOT/.aid/pipeline/ESCALATION.json"
-if [ -f "$ESC" ] && grep -q '"status"[[:space:]]*:[[:space:]]*"open"' "$ESC" 2>/dev/null; then
-  esc_why=$(grep -o '"why"[[:space:]]*:[[:space:]]*"[^"]*"' "$ESC" 2>/dev/null | head -1 | sed 's/.*"why"[[:space:]]*:[[:space:]]*"//; s/"$//')
-  esc_step=$(grep -o '"step"[[:space:]]*:[[:space:]]*"[^"]*"' "$ESC" 2>/dev/null | head -1 | sed 's/.*"step"[[:space:]]*:[[:space:]]*"//; s/"$//')
-  reason="Stop blocked: the pipeline gate ESCALATED and it is UNRESOLVED (step: ${esc_step:-?}). ${esc_why:-below threshold with iterations exhausted}
-This is a decision only the human can make. Present it to them and let them choose: (a) keep working to clear the threshold, (b) lower it in .aid/pipeline/config.json, or (c) accept this result. Then record the choice:
-  node \"\$HOME/.claude/skills/pipeline-orchestrator/gate.mjs\" --resolve \"<what was decided>\"
-Do NOT resolve it on the human's behalf."
-  block "$reason"
+# T16-21 (E4, I-13): resolving is the USER's decision. The reason hands the user a `!` line (run
+# from the Claude Code prompt) and tells the agent to show it, never to run it.
+RESOLVE_LINE="  ! node \"$GATE_MJS\" --resolve \"<what was decided>\""
+RESOLVE_TELL="The user records the decision by running this line at the Claude Code prompt:
+$RESOLVE_LINE
+Show this line to the user. Never run it yourself and never resolve the escalation on the user's behalf."
+_esc_status() { # prints open | closed | bad
+  local out
+  if command -v node >/dev/null 2>&1; then
+    out=$(node -e 'let b=[];process.stdin.on("data",c=>b.push(c));process.stdin.on("end",()=>{let d;try{d=JSON.parse(Buffer.concat(b).toString("utf8"))}catch{process.stdout.write("bad");return}if(!d||typeof d!=="object"||Array.isArray(d)){process.stdout.write("bad");return}process.stdout.write(d.status==="open"?"open":"closed")})' < "$ESC" 2>/dev/null)
+  elif command -v python >/dev/null 2>&1; then
+    out=$(python -c 'import json,sys
+try:
+    d = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+except Exception:
+    print("bad"); raise SystemExit(0)
+print("bad" if not isinstance(d, dict) else ("open" if d.get("status") == "open" else "closed"))' < "$ESC" 2>/dev/null)
+  else
+    if tr -d ' \t\r\n' < "$ESC" 2>/dev/null | grep -q '"status":"open"'; then out=open; else out=closed; fi
+  fi
+  case "$out" in open|closed) printf '%s' "$out" ;; *) printf 'bad' ;; esac
+}
+if [ -f "$ESC" ]; then
+  esc_state=$(_esc_status)
+  if [ "$esc_state" = "bad" ]; then
+    block "Stop blocked: $ESC exists but could not be parsed as a JSON object, so the gate cannot tell whether a pipeline escalation is still open (fail closed). Show the file to the user and let them decide. If the escalation is settled, $RESOLVE_TELL"
+  fi
+  if [ "$esc_state" = "open" ]; then
+    esc_why=$(grep -o '"why"[[:space:]]*:[[:space:]]*"[^"]*"' "$ESC" 2>/dev/null | head -1 | sed 's/.*"why"[[:space:]]*:[[:space:]]*"//; s/"$//')
+    esc_step=$(grep -o '"step"[[:space:]]*:[[:space:]]*"[^"]*"' "$ESC" 2>/dev/null | head -1 | sed 's/.*"step"[[:space:]]*:[[:space:]]*"//; s/"$//')
+    reason="Stop blocked: the pipeline gate ESCALATED and it is UNRESOLVED (step: ${esc_step:-?}). ${esc_why:-below threshold with iterations exhausted}
+This is a decision only the user can make. Present it to them and let them choose: (a) keep working to clear the threshold, (b) lower it in .aid/pipeline/config.json, or (c) accept this result. $RESOLVE_TELL"
+    block "$reason"
+  fi
 fi
 
 # Files this SESSION wrote, read out of the transcript Claude Code hands the hook. The changed-file
@@ -144,8 +217,10 @@ _edited_this_session() {
   printf '%s' "$input" | python -c '
 import json, os, sys
 try:
-    d = json.load(sys.stdin)
+    d = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))   # T17 I-18
 except Exception:
+    raise SystemExit(0)
+if not isinstance(d, dict):
     raise SystemExit(0)
 tp = d.get("transcript_path") or ""
 if not tp or not os.path.isfile(tp):
@@ -194,7 +269,7 @@ try:
                     continue
 except Exception:
     raise SystemExit(0)
-print("\n".join(out))
+sys.stdout.buffer.write(("\n".join(out) + "\n").encode("utf-8") if out else b"")
 ' 2>/dev/null
 }
 
@@ -206,7 +281,10 @@ _all_changed() {
     _edited_this_session
   fi \
   | grep -vE '/dist/|/node_modules/|/vendor/|/build/|/\.next/|/__pycache__/|/target/|/\.gradle/|/out/' \
+  | grep -vE '^\.aid(/|$)' \
   | sort -u
+  # ^ AID's own outputs under .aid/ (pipeline test scaffolds, QA files, state) are not "changed
+  #   source": counting them blocked turns on tsc/UI/freshness for files the user never wrote.
 }
 
 changed_ts=$(_all_changed | grep -E '\.ts$'  | grep -vE '\.d\.ts$')
@@ -427,8 +505,10 @@ if [ "${SKIP_UI_GATE:-}" != "1" ]; then
       ui_files=$(printf '%s\n' "$changed_ui" | head -6 | sed 's/^/  - /')
       reason="Stop blocked: UI file(s) changed with no browser evidence since the change:
 $ui_files
-Per the Avoid-buggy-code rule: run the feature in a real browser (dev server up, golden path + one edge case), then \`touch .ui-verified\` in the repo root and finish. If the UI is deliberately untested, SAY SO explicitly in your reply and set SKIP_UI_GATE=1."
+Per the Avoid-buggy-code rule: run the feature in a real browser (dev server up, golden path + one edge case), then \`touch .ui-verified\` in the repo root and finish. If the UI is deliberately untested, SAY SO explicitly in your reply; whether to skip this check is the human's decision."
+      # Same rule as block(): the bypass hint is for the human (stderr), never in the reason (A-28).
       printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$reason" | json_enc)"
+      echo "dev-pipeline-gate: a human can bypass the UI-evidence check by starting Claude Code with SKIP_UI_GATE=1" >&2
       exit 0
     fi
   fi
@@ -457,7 +537,7 @@ if [ -d ".aid/pipeline" ]; then
       if [ -f "$sidecar" ]; then
         rec_hash=$(cut -d' ' -f1 < "$sidecar" 2>/dev/null)
         if [ -n "$rec_hash" ] && [ "$rec_hash" != "$cur_hash" ]; then
-          brief_warn="*** WARNING: $brief was MODIFIED mid-run — the frozen intent no longer matches the hash recorded at $sidecar (was $rec_hash, now $cur_hash). The pipeline brief is supposed to be immutable once frozen; re-confirm this change was intended. ***
+          brief_warn="*** WARNING: $brief was MODIFIED mid-run - the frozen intent no longer matches the hash recorded at $sidecar (was $rec_hash, now $cur_hash). The pipeline brief is supposed to be immutable once frozen; re-confirm this change was intended. ***
 "
         fi
       else
@@ -474,7 +554,30 @@ if [ -d ".aid/pipeline" ]; then
     # produced 30 false blocks (benign post-AR-restore mtimes, ordinary edits
     # after a finished pipeline).
     if grep -q '"pipeline_status": *"running"' "$state" 2>/dev/null; then
-      block "${brief_warn}Stop blocked: a source file is newer than .aid/pipeline/state.json while a pipeline run is ACTIVE, so changes look unvalidated. Run /pipeline (CODE_REVIEW → TDD → TEST_REVIEW) to validate, then finish. NOTE: this can also be a benign post-AR-restore state — it self-clears once /pipeline writes state.json last."
+      # G5-02: a run left "running" by ANOTHER session (crash, closed window) or untouched for more
+      # than 6 h is STALE. It must not block every later Stop forever; the human is told instead.
+      stale_why=""
+      pay_sid=$(printf '%s' "$input" | _json_str session_id)
+      run_sid=$(_json_str session_id < "$state")
+      if [ -n "$pay_sid" ] && [ -n "$run_sid" ] && [ "$pay_sid" != "$run_sid" ]; then
+        stale_why="it was started by another session"
+      elif [ "$state_m" -gt 0 ] && [ $(( $(date +%s) - state_m )) -gt 21600 ]; then
+        stale_why="it was last updated more than 6 hours ago"
+      fi
+      if [ -n "$stale_why" ]; then
+        msg="${brief_warn}dev-pipeline-gate: .aid/pipeline/state.json says a pipeline run is 'running', but it is STALE ($stale_why), so this Stop is not blocked. Run /pipeline-status to inspect it, or /pipeline to resume or finish it. $count source file(s) changed - $checks_summary."
+        printf '{"systemMessage":%s}\n' "$(printf '%s' "$msg" | json_enc)"
+        exit 0
+      fi
+      # T16-23 (g6-extra-stop-gates-p5): in an AID project at Phase 5 (QA & Ship) the freshness rule
+      # notifies instead of blocking. Only a readable .aid/state.json whose current_phase is 5 does
+      # this; no state, an unreadable state or any other phase keeps the block below (D4).
+      if [ "$(_aid_phase)" = "5" ]; then
+        msg="${brief_warn}dev-pipeline-gate: Phase 5 (QA & Ship): a source file is newer than .aid/pipeline/state.json while a pipeline run is ACTIVE, so these changes are not validated yet. Not blocking in Phase 5; run /pipeline to re-validate before you ship. $count source file(s) changed - $checks_summary."
+        printf '{"systemMessage":%s}\n' "$(printf '%s' "$msg" | json_enc)"
+        exit 0
+      fi
+      block "${brief_warn}Stop blocked: a source file is newer than .aid/pipeline/state.json while a pipeline run is ACTIVE, so changes look unvalidated. Run /pipeline (CODE_REVIEW -> TDD -> TEST_REVIEW) to validate, then finish. NOTE: this can also be a benign post-AR-restore state - it self-clears once /pipeline writes state.json last."
     fi
     msg="${brief_warn}dev-pipeline-gate: $count source file(s) newer than the last (non-running) pipeline state - $checks_summary; validate/commit at your own pace."
     printf '{"systemMessage":%s}\n' "$(printf '%s' "$msg" | json_enc)"

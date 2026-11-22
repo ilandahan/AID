@@ -47,7 +47,7 @@ Breakdown. Section 9 is identical in both and defined only in `references/agent-
 | Field | Value |
 |-------|-------|
 | **Feature** | [Name] |
-| **PRD Reference** | `docs/prd/PRD-<feature>.md` |
+| **PRD Reference** | `docs/prd/YYYY-MM-DD-<feature>.md` |
 | **Author** | [Name / Agent] |
 | **Date** | YYYY-MM-DD |
 | **Status** | Draft / In Review / Approved |

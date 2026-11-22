@@ -6,7 +6,7 @@
 
 ## Quick Diagnostics
 
-Run `/aid status` to check system health:
+Run `/aid-status` to check system health:
 
 ```
 📊 AID Status
@@ -21,7 +21,7 @@ Current session: PM / Discovery
 Pending feedback: 5
 Sessions since improvement: 8
 
-💡 Suggestion: Time to run /aid improve
+💡 Suggestion: Time to run /aid-improve
 ```
 
 ---
@@ -37,7 +37,7 @@ Sessions since improvement: 8
 
 **Solution:**
 ```
-/aid init
+/aid-init
 ```
 
 This creates:
@@ -49,10 +49,10 @@ This creates:
 **If init fails:**
 ```bash
 # Manual creation
-mkdir -p ~/.aid/{skills/roles,skills/phases,feedback/pending,feedback/processed,metrics}
+mkdir -p ~/.aid/{feedback/pending,feedback/processed,metrics}
 
 # Then run init again
-/aid init
+/aid-init
 ```
 
 ---
@@ -66,9 +66,10 @@ mkdir -p ~/.aid/{skills/roles,skills/phases,feedback/pending,feedback/processed,
 
 **Solution:**
 
-**Option A: Auto-recovery**
+**Option A: Auto-recovery** (a malformed project `.aid/state.json`; Claude Code asks you
+to confirm)
 ```
-/aid init --repair
+python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" init <role> <phase> --repair
 ```
 
 **Option B: Manual reset**
@@ -93,7 +94,7 @@ mkdir -p ~/.aid/{skills/roles,skills/phases,feedback/pending,feedback/processed,
 
 **Option C: Full reset (loses history)**
 ```
-/aid reset --confirm
+/aid-reset
 ```
 
 ---
@@ -101,7 +102,7 @@ mkdir -p ~/.aid/{skills/roles,skills/phases,feedback/pending,feedback/processed,
 ### 3. Corrupted Feedback Files
 
 **Symptoms:**
-- `/aid improve` fails
+- `/aid-improve` fails
 - "Invalid feedback file" errors
 - Improvement analysis incomplete
 
@@ -131,7 +132,7 @@ mv ~/.aid/feedback/pending/<corrupt-file>.json ~/.aid/backup/corrupted/
 ### 4. AID Local Memory Out of Sync
 
 **Symptoms:**
-- `/aid memory list` shows different entries than expected
+- `/aid-memory list` shows different entries than expected
 - Entries missing after promotion
 - Duplicate entries
 
@@ -149,7 +150,7 @@ cat ~/.aid/metrics/memory-tracking.json
 
 **Step 3: Rebuild tracking**
 ```
-/aid memory sync
+/aid-improve
 ```
 
 ---
@@ -165,21 +166,19 @@ cat ~/.aid/metrics/memory-tracking.json
 
 **Check skill files exist:**
 ```bash
-ls ~/.aid/skills/roles/*/QUICK-REFERENCE.md
-ls ~/.aid/skills/phases/*/QUICK-REFERENCE.md
+ls "${CLAUDE_PLUGIN_ROOT}"/skills/memory-system/references/roles/*/QUICK-REFERENCE.md
+ls "${CLAUDE_PLUGIN_ROOT}"/skills/memory-system/references/phases/*/QUICK-REFERENCE.md
 ```
 
-**Resync from repo:**
-```
-/aid skill sync
-```
+**Missing files:** update or reinstall AID (there is no skill sync command); the skill
+files ship with the plugin.
 
 ---
 
 ### 6. Improvement Flow Fails
 
 **Symptoms:**
-- `/aid improve` hangs or errors
+- `/aid-improve` hangs or errors
 - "Not enough data" message with plenty of feedback
 - Suggestions not being generated
 
@@ -197,7 +196,7 @@ All feedback files must have:
 
 **Force reanalysis:**
 ```
-/aid improve --force
+/aid-improve --force
 ```
 
 ---
@@ -213,7 +212,7 @@ All feedback files must have:
 
 **Explicit end:**
 ```
-/aid end
+/aid-end
 ```
 
 **Check trigger phrases:**
@@ -238,7 +237,7 @@ redacts the text and writes the file). `/phase-approve` also stores its rating.
 
 **Check current allocation:**
 ```
-/aid memory stats
+/aid-memory stats
 ```
 
 **Review lowest-scoring entries:**
@@ -252,7 +251,7 @@ Preview with `aid_session.py memory-preview`. Writes go only through
 
 **After removal:**
 ```
-/aid memory sync
+/aid-improve
 ```
 
 ---
@@ -261,9 +260,9 @@ Preview with `aid_session.py memory-preview`. Writes go only through
 
 | Error | Meaning | Solution |
 |-------|---------|----------|
-| `~/.aid/ not found` | System not initialized | Run `/aid init` |
+| `~/.aid/ not found` | System not initialized | Run `/aid-init` |
 | `Invalid state.json` | Corrupted state file | Reset or repair state.json |
-| `Skill file missing: X` | Skill file deleted/moved | Run `/aid skill sync` |
+| `Skill file missing: X` | Skill file deleted/moved | Update or reinstall AID |
 | `Feedback parse error` | Corrupted feedback file | Remove corrupted file |
 | `Memory sync failed` | Could not write `~/.aid/memory/slots.json`, or the prompt was declined | Check the reason shown; re-run `/aid-improve` |
 | `Not enough feedback` | <3 feedback items | Wait for more sessions |
@@ -280,7 +279,7 @@ Preview with `aid_session.py memory-preview`. Writes go only through
 **Warning: This loses all history!**
 
 ```
-/aid reset --confirm
+/aid-reset
 ```
 
 This will:
@@ -302,7 +301,7 @@ See `commands/aid-reset.md` for the Windows equivalent.
 
 ### Check System Health
 ```
-/aid status
+/aid-status
 ```
 
 ### View Current State
@@ -322,7 +321,7 @@ ls ~/.aid/feedback/pending/*.json
 
 ### Check Memory Entries
 ```
-/aid memory list
+/aid-memory list
 ```
 
 ---
@@ -339,8 +338,8 @@ If issues persist:
 
 2. **Reset and start fresh:**
    ```
-   /aid reset --confirm
-   /aid init
+   /aid-reset
+   /aid-init
    ```
 
 3. **Manual inspection:**

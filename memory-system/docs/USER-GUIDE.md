@@ -22,7 +22,7 @@ AID Memory is a **learning system** that helps Claude get better at helping you 
 ### First Time Setup
 
 ```
-/aid init
+/aid-init
 ```
 
 This creates your personal `~/.aid/` directory with:
@@ -35,13 +35,13 @@ AID's local memory starts empty; entries are added only by `/aid-improve` (`memo
 
 **Option 1: Interactive**
 ```
-/aid start
+/aid-start
 ```
 System asks which role and phase you're working in.
 
 **Option 2: Direct**
 ```
-/aid start pm discovery
+/aid-start pm discovery
 ```
 Starts immediately as Product Manager in Discovery phase.
 
@@ -57,7 +57,7 @@ Just work normally! The system:
 When you complete your work:
 
 ```
-/aid end
+/aid-end
 ```
 
 Or use natural phrases:
@@ -96,9 +96,9 @@ The system will:
 ### Examples
 
 ```
-/aid start pm discovery    # PM doing problem discovery
-/aid start dev tech-spec   # Developer writing technical spec
-/aid start qa qa-ship      # QA engineer testing before release
+/aid-start pm discovery    # PM doing problem discovery
+/aid-start dev tech-spec   # Developer writing technical spec
+/aid-start qa qa-ship      # QA engineer testing before release
 ```
 
 ---
@@ -154,13 +154,13 @@ The system suggests improvement when:
 You'll see:
 ```
 💡 Enough feedback for analysis.
-   Run /aid improve before we start?
+   Run /aid-improve before we start?
 ```
 
 ### Running Improvement
 
 ```
-/aid improve
+/aid-improve
 ```
 
 **The process:**
@@ -236,13 +236,13 @@ AID:QA:QA:DONT Never weaken tests to make them pass
 ### Viewing Your Memory
 
 ```
-/aid memory list
+/aid-memory list
 ```
 
 Shows all AID:* entries organized by category.
 
 ```
-/aid memory stats
+/aid-memory stats
 ```
 
 Shows slot allocation and top performers.
@@ -255,38 +255,36 @@ Shows slot allocation and top performers.
 
 | Command | Description |
 |---------|-------------|
-| `/aid init` | Initialize system (first time) |
-| `/aid start [role] [phase]` | Start new session |
-| `/aid status` | Show current state |
-| `/aid end` | Complete phase gate |
+| `/aid-init` | Initialize system (first time) |
+| `/aid-start [role] [phase]` | Start new session |
+| `/aid-status` | Show current state |
+| `/aid-end` | Complete phase gate |
 
 ### Improvement Commands
 
 | Command | Description |
 |---------|-------------|
-| `/aid improve` | Run pattern analysis |
-| `/aid stats [period]` | Show metrics |
+| `/aid-improve` | Run pattern analysis |
+| `/aid-dashboard` | Show metrics |
+| `/aid-recommendations` | View and apply queued skill-update proposals |
 
-### Skill Commands
+### Skill Files
 
-| Command | Description |
-|---------|-------------|
-| `/aid skill view [type]` | View skill content |
-| `/aid skill edit [type]` | Edit skill file |
-| `/aid skill sync` | Sync with repo |
+There is no skill command: read or edit the files in the plugin's
+`skills/memory-system/references/` directly.
 
 ### Memory Commands
 
 | Command | Description |
 |---------|-------------|
-| `/aid memory list` | Show all entries |
-| `/aid memory stats` | Show allocation |
+| `/aid-memory list` | Show all entries |
+| `/aid-memory stats` | Show allocation |
 
 ### Admin Commands
 
 | Command | Description |
 |---------|-------------|
-| `/aid reset --confirm` | Reset all data |
+| `/aid-reset` | Reset all data |
 
 ---
 
@@ -387,7 +385,7 @@ Do not type names you want to keep private.
 ### Deleting Data
 
 ```
-/aid reset --confirm
+/aid-reset
 ```
 
 Or manually delete `~/.aid/` directory.
@@ -400,13 +398,13 @@ Or manually delete `~/.aid/` directory.
 A: Yes, the rating is required. It's the primary signal for pattern detection.
 
 **Q: What if I forget to end a phase?**
-A: Run `/aid end` when you remember, or feedback won't be collected.
+A: Run `/aid-end` when you remember, or feedback won't be collected.
 
 **Q: Can I edit skill files directly?**
-A: Yes! Use `/aid skill edit [type]` or edit files directly in `~/.aid/skills/`.
+A: Yes. Edit the files directly in the plugin's `skills/memory-system/references/` (there is no skill command).
 
 **Q: How long until I see improvements?**
-A: After 10+ sessions and running `/aid improve`, you'll see patterns.
+A: After 10+ sessions and running `/aid-improve`, you'll see patterns.
 
 **Q: What if a pattern doesn't apply to my next project?**
 A: Patterns should be general. If too specific, don't approve promotion.

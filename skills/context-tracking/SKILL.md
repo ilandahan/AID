@@ -12,7 +12,7 @@ Applies: every session, whenever work starts, a step/task changes, phase changes
 1. READ context before starting work
 2. UPDATE on every significant change
 3. READ phase state from `.aid/state.json` (read-only: only `aid_session.py` writes it)
-4. INTEGRATE with feedback (`/aid end`)
+4. INTEGRATE with feedback (`/aid-end`)
 5. SAVE at conversation end
 
 ## Update Triggers
@@ -29,45 +29,21 @@ Applies: every session, whenever work starts, a step/task changes, phase changes
 
 ## Context Structure
 
+The one schema, `aid-context-v1` (field types, writers and readers:
+`references/context-schema.md`):
+
 ```json
 {
   "$schema": "aid-context-v1",
   "version": "1.0",
-  "last_updated": "ISO-8601",
-  "current_task": {
-    "key": "TASK-ID",
-    "title": "Task title",
-    "description": "What needs to be done",
-    "phase": 4,
-    "phase_note": "Additional phase context"
-  },
-  "current_step": {
-    "name": "Current step description",
-    "progress": 0,
-    "notes": "Step-specific notes"
-  },
-  "progress": {
-    "steps_completed": ["Step 1", "Step 2"],
-    "steps_pending": ["Step 3", "Step 4"]
-  },
-  "session_notes": [
-    {
-      "timestamp": "ISO-8601",
-      "note": "What happened"
-    }
-  ],
-  "blockers": [
-    {
-      "id": "BLOCKER-001",
-      "description": "What's blocking",
-      "severity": "high|medium|low",
-      "resolution": "How to resolve"
-    }
-  ]
+  "last_updated": "2026-11-20T10:00:00Z",
+  "current_task": {"id": "PROJ-123", "title": "Add login form", "jira_key": "PROJ-123"},
+  "current_step": "Implement validation",
+  "progress": {"steps_completed": ["Design form"], "steps_pending": ["Write tests"]},
+  "session_notes": ["Decided to reuse the auth hook"],
+  "blockers": [{"description": "Waiting for API keys", "severity": "medium"}]
 }
 ```
-
-Field detail: `references/context-schema.md`.
 
 ## Phase-Aware Context
 
@@ -116,7 +92,7 @@ Append to `session_notes` at these moments:
 
 ## Blocker Management
 
-Track blockers in the `blockers` array (fields: `id`, `description`, `severity` = `high|medium|low`, `resolution`; ids like `BLOCKER-001`). Remove a blocker from the array when resolved and add a session note documenting the resolution.
+Track blockers in the `blockers` array as `{"description": <text>, "severity": "low"|"medium"|"high"}` objects. Remove a blocker from the array when resolved and add a session note documenting the resolution.
 
 ## Error Handling
 
@@ -139,12 +115,7 @@ Still accurate?
 [3] Start fresh
 ```
 
-Context-State mismatch:
-```
-Context: Phase 3
-State: Phase 4
-Syncing to Phase 4...
-```
+Phase: `context.json` holds no phase. Always read the phase from `.aid/state.json`.
 
 ## File Locations
 

@@ -1,10 +1,11 @@
 AID (AI Development Methodology) - Quick Reference
 
-AID is a phase-gated methodology for Claude Code that enforces structured development: PRD → Tech Spec → Breakdown → Development → QA & Ship.
+AID is a phase-gated methodology for Claude Code that enforces structured development in 6 phases (0-5): Discovery → PRD → Tech Spec → Breakdown → Development → QA & Ship.
 
 CORE COMPONENTS
 
 1. Phase Gates (Enforced Sequential Progression)
+   - Phase 0 Discovery: Research, validation, Go/No-Go
    - Phase 1 PRD: Requirements, scope, user stories
    - Phase 2 Tech Spec: Architecture, schemas, APIs
    - Phase 3 Breakdown: Jira epics, stories, tasks

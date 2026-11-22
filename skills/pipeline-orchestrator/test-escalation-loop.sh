@@ -22,9 +22,9 @@ set -u
 # on a real POSIX box.
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && { pwd -W 2>/dev/null || pwd; })"
 GATE="$SKILL_DIR/gate.mjs"
-# The hook stays at its installed path on purpose: that IS where Claude Code loads it from, so it is
-# the real artifact under test rather than a copy.
-HOOK="$HOME/.claude/hooks/dev-pipeline-gate.sh"
+# The hook is the one that ships in this plugin, next to this skill (R-03): that IS where Claude Code
+# loads it from (the plugin registers hooks/dev-pipeline-gate.sh), so it is the real artifact under test.
+HOOK="$SKILL_DIR/../../hooks/dev-pipeline-gate.sh"
 
 # Preflight. Every assertion below that "passes" does so on output NOT containing "block" — which is
 # also what an empty string looks like. So a run where nothing executes at all still scores PASSes.

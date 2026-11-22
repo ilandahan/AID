@@ -1,7 +1,7 @@
 AID - AI Development Methodology for Claude Code
 Complete Technical Documentation
 
-VERSION: 1.0.0
+VERSION: 3.1.0
 AUTHOR: Ilan Dahan
 BUILT WITH: Claude Code (Anthropic)
 
@@ -45,7 +45,7 @@ TARGET USERS
 - Organizations needing audit trails and phase gates
 
 KEY PRINCIPLES
-1. Sequential progression through phases (no skipping)
+1. Sequential progression through phases as the method (a forward jump, which the user confirms, is the exception)
 2. Clear entry/exit criteria for each phase
 3. Real-time context preservation (never lose your place)
 4. TDD-first development (tests before code)
@@ -88,7 +88,7 @@ Exit Criteria (ALL required):
 - PRD approved (marker file: .aid/approvals/prd-approved.md)
 
 Artifacts:
-- docs/prd/ (the PRD)
+- docs/prd/YYYY-MM-DD-<feature>.md (the PRD)
 - .aid/approvals/prd-approved.md
 
 Blocked Actions:
@@ -122,7 +122,7 @@ Exit Criteria (ALL required):
 - Tech Spec approved
 
 Artifacts:
-- docs/tech-spec/
+- docs/tech-spec/YYYY-MM-DD-<feature>.md
 - .aid/approvals/tech-spec-approved.md
 
 Blocked Actions:
@@ -281,49 +281,18 @@ Context tracking maintains real-time knowledge of where you are in work:
 - What you've completed
 - What comes next
 
-FILE: .aid/context.json
+FILE: .aid/context.json (one schema, aid-context-v1, documented in
+skills/context-tracking/references/context-schema.md)
 
 {
-  "last_updated": "2025-12-10T09:30:00Z",
-  "session_id": "2025-12-10-morning",
-  "tasks": {
-    "previous": {
-      "key": "PROJ-123",
-      "title": "Create Button atom",
-      "status": "done",
-      "completed_at": "2025-12-09T16:45:00Z"
-    },
-    "current": {
-      "key": "PROJ-124",
-      "title": "Create FormField molecule",
-      "status": "in_progress",
-      "started_at": "2025-12-09T17:00:00Z"
-    },
-    "next": {
-      "key": "PROJ-125",
-      "title": "Create Card molecule",
-      "status": "todo",
-      "priority": "high"
-    }
-  },
-  "current_task_steps": {
-    "previous": {
-      "name": "Write tests",
-      "status": "done",
-      "completed_at": "2025-12-09T17:30:00Z"
-    },
-    "current": {
-      "name": "Implement component",
-      "status": "in_progress",
-      "started_at": "2025-12-09T17:35:00Z",
-      "progress": "50%"
-    },
-    "next": {
-      "name": "Style with tokens",
-      "status": "pending"
-    }
-  },
-  "session_log": []
+  "$schema": "aid-context-v1",
+  "version": "1.0",
+  "last_updated": "2026-11-20T09:30:00Z",
+  "current_task": {"id": "PROJ-124", "title": "Create FormField molecule", "jira_key": "PROJ-124"},
+  "current_step": "Implement component",
+  "progress": {"steps_completed": ["Write tests"], "steps_pending": ["Style with tokens"]},
+  "session_notes": [],
+  "blockers": []
 }
 
 CONTEXT UPDATE TRIGGERS
@@ -477,7 +446,7 @@ Configuration: .mcp.json (project root)
 JIRA / ATLASSIAN
 
 Environment Variables:
-- ATLASSIAN_SITE_URL: https://your-domain.atlassian.net
+- ATLASSIAN_SITE_NAME: your-company (subdomain only, for your-company.atlassian.net)
 - ATLASSIAN_USER_EMAIL: your-email@company.com
 - ATLASSIAN_API_TOKEN: API token from Jira
 
@@ -617,9 +586,9 @@ PHASE 5: QA & SHIP
 
 PROJECT LAYOUT
 
-aid-existing/
-├── .claude/                    # Claude Code integration
-│   └── commands/               # 44 slash commands
+AID/
+├── .claude-plugin/             # plugin.json (name, version, hooks) + marketplace.json
+├── commands/                   # 44 slash commands
 ├── skills/                     # 27 skills
 │   ├── phase-enforcement/
 │   ├── context-tracking/
@@ -627,20 +596,25 @@ aid-existing/
 │   ├── atomic-design/
 │   ├── atomic-page-builder/
 │   ├── code-review/
-│   └── test-driven/
-├── memory-system/              # Learning system
-│   ├── skills/
-│   │   ├── roles/              # 5 role quick references
-│   │   └── phases/             # 6 phase quick references
+│   ├── test-driven/
+│   └── memory-system/
+│       └── references/
+│           ├── roles/          # 5 role quick references
+│           └── phases/         # 6 phase quick references
+├── agents/                     # 42 sub-agents (flat, one .md each)
+├── agent-assets/               # Agent calibration examples + AGENT-STANDARD.md
+├── rules/                      # Rules loaded per skill
+├── references/                 # Role/phase terminology
+├── hooks/                      # Phase gates, QA gate, pipeline hooks
+├── memory-system/              # Learning system (Python package memory_system)
+│   ├── memory_system/
 │   ├── docs/
 │   └── templates/
 ├── docs/                       # Documentation
-├── integrations/               # MCP integration guides
-├── templates/                  # Project templates
-├── scripts/                    # Automation scripts
-├── prisma/                     # Database schema
-├── src/                        # Application source
-├── .mcp.json                   # MCP server config
+├── integrations/               # MCP integration guides, breather installer
+├── scripts/                    # Automation scripts (init-project.sh)
+├── testing/                    # The repository's own tests
+├── .mcp.json.example           # MCP server config template
 ├── package.json                # npm dependencies
 ├── tsconfig.json               # TypeScript config
 ├── CLAUDE.md                   # AID instructions
@@ -686,10 +660,14 @@ For Technical Users:
 git clone https://github.com/ilandahan/AID.git
 cd AID
 ./install.sh
-./scripts/init-project.sh my-app
+bash scripts/init-project.sh my-app
 cd my-app
 claude
 /aid-init
+
+(The script path above works from a clone. Plugin users type /start-project my-app, which
+runs bash "${CLAUDE_PLUGIN_ROOT}/scripts/init-project.sh" my-app. The script no longer
+writes .aid/state.json: run /aid-start to set the phase.)
 
 PREREQUISITES
 
@@ -698,13 +676,22 @@ PREREQUISITES
 - Docker 20.0.0+ (optional)
 - PostgreSQL 16+ (via Docker or local)
 
-ENVIRONMENT VARIABLES (.env)
+CREDENTIALS (never in a file)
 
-DATABASE_URL=postgresql://user:password@localhost:5432/app_db
-ATLASSIAN_SITE_URL=https://your-domain.atlassian.net
-ATLASSIAN_USER_EMAIL=your-email@company.com
-ATLASSIAN_API_TOKEN=your-api-token
-GITHUB_PERSONAL_ACCESS_TOKEN=<your-github-token>
+Preference order: SSO/OAuth > OS keystore > environment variable > never a plaintext file.
+1. SSO: Atlassian's official remote MCP server signs in with OAuth (no token stored):
+   claude mcp add --transport http atlassian https://mcp.atlassian.com/v2/mcp
+2. OS keystore: store once, load per shell
+   macOS:   security add-generic-password -s aid-github -a "$USER" -w
+            export GITHUB_PERSONAL_ACCESS_TOKEN=$(security find-generic-password -s aid-github -w)
+   Linux:   secret-tool store --label="AID GitHub" service aid-github
+            export GITHUB_PERSONAL_ACCESS_TOKEN=$(secret-tool lookup service aid-github)
+   Windows: cmdkey /generic:aid-github /user:you /pass
+            $env:GITHUB_PERSONAL_ACCESS_TOKEN = (Get-StoredCredential -Target aid-github).GetNetworkCredential().Password
+   Same pattern with aid-atlassian for ATLASSIAN_API_TOKEN.
+3. Environment variable: the MCP templates read the tokens through ${VAR} expansion.
+Not secrets (export directly): ATLASSIAN_SITE_NAME (subdomain only), ATLASSIAN_USER_EMAIL.
+See INSTALLATION.md, "MCP Integrations Setup".
 
 ================================================================================
 11. TROUBLESHOOTING
@@ -719,7 +706,7 @@ Context Not Showing
 - Fix: /context-update to manually update
 
 MCP Not Connecting
-- Check: Environment variables in .env
+- Check: the token variables are exported in the shell that started claude (from the OS keystore)
 - Check: API tokens are valid
 - Fix: Restart Claude Code after config change
 
@@ -779,15 +766,15 @@ CLAUDE.md               AID instructions
 KEY STATISTICS
 
 Files:
-- Commands: 27
-- Skills: 7 main + 9 memory system
-- Phases: 5
-- Integrations: 6 MCPs
+- Commands: 44
+- Skills: 27
+- Phases: 6 (0-5)
+- Integrations: 3 MCP servers in .mcp.json.example (the OS templates add filesystem and confluence)
 
 ================================================================================
 END OF DOCUMENTATION
 ================================================================================
 
-Version: 1.0.0
-Last Updated: 2025-12-11
+Version: 3.1.0
+Last Updated: 2026-11-22
 Created by: Ilan Dahan

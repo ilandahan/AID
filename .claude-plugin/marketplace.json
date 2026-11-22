@@ -1,6 +1,6 @@
 {
   "name": "AID",
-  "description": "The AID methodology as a Claude Code plugin: phase gates, review sub-agents and enforcement hooks for taking a product from problem to ship.",
+  "description": "The AID methodology as a Claude Code plugin: phase gates, sub-agents (7 of them reviewers that cannot write files) and enforcement hooks for taking a product from problem to ship.",
   "owner": {
     "name": "Ilan Dahan",
     "url": "https://github.com/ilandahan"
@@ -9,7 +9,7 @@
     {
       "name": "aid",
       "source": "./",
-      "description": "AI Development Methodology: 6 phase gates from discovery to ship, 27 skills, 42 review sub-agents, and WHY-first enforcement hooks."
+      "description": "AI Development Methodology: 6 phase gates from discovery to ship, 27 skills, 42 sub-agents (7 reviewers that cannot write files with the Write, Edit or Bash tools; visual-qa-agent drives a browser), and WHY-first enforcement hooks."
     }
   ]
 }

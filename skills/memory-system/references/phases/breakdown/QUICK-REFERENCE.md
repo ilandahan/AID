@@ -1,6 +1,6 @@
 # Breakdown Phase Skill
 
-> **Source**: `../../commands/jira-breakdown.md`
+> **Source**: `../../../../../commands/jira-breakdown.md`
 >
 > This file is a reference. The main prompt is in the `../../commands/` directory.
 > Use the `/jira-breakdown` command for work breakdown generation.

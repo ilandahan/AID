@@ -36,12 +36,12 @@ Performs a diagnostic check to determine if all requirements for the current pha
 | Traceability | `traceability-matrix.md` created |
 | Go/No-Go | Decision documented with justification |
 | Sub-Agent Review | Discovery review PASSED |
-| Feedback | `/aid end` completed |
+| Feedback | `/aid-end` completed |
 
 ### Phase 1: PRD
 | Check | File/Artifact |
 |-------|---------------|
-| PRD Document | `docs/prd/PRD-<feature>.md` |
+| PRD Document | `docs/prd/YYYY-MM-DD-<feature>.md` |
 | User Stories | PRD contains user stories |
 | Acceptance Criteria | Each story has AC |
 | Research Links | Requirements link to research IDs (RES-XXX) |
@@ -51,17 +51,24 @@ Performs a diagnostic check to determine if all requirements for the current pha
 | Seed Evals | `docs/prd/SEED-EVALS-<feature>.md`: 20-30 cases, or `INSUFFICIENT_EXAMPLES` resolved (real examples, SME cases tagged `source: SME:<role>`, or a recorded PM + tech lead decision) |
 | Level ADR | `docs/prd/ADR-SHAPE-<feature>.md`, its level matching the §1.5 "Signed level" line |
 | Sub-Agent Review | PRD review PASSED |
-| Feedback | `/aid end` completed |
+| Feedback | `/aid-end` completed |
 
 ### Phase 2: Tech Spec
 | Check | File/Artifact |
 |-------|---------------|
-| Tech Spec | `docs/tech-spec/YYYY-MM-DD-[feature].md` |
+| Tech Spec | `docs/tech-spec/YYYY-MM-DD-<feature>.md` |
 | Architecture | Architecture diagram (Mermaid/image) |
 | API | API contracts documented |
 | Security | Security assessment complete |
 | Sub-Agent Review | Tech Spec review PASSED |
-| Feedback | `/aid end` completed |
+| Feedback | `/aid-end` completed |
+
+**File names.** `/prd` saves `docs/prd/YYYY-MM-DD-<feature>.md` and `/tech-spec` saves
+`docs/tech-spec/YYYY-MM-DD-<feature>.md`. A legacy name from older AID versions
+(`docs/prd/PRD-<feature>.md`, `docs/tech-spec/TECH-SPEC-<feature>.md`) still counts: report it
+as a rename note ("rename to `YYYY-MM-DD-<feature>.md`"), not as a failed check. The Phase 1
+companion files (`WHY-SHAPE-BRIEF-<feature>.md`, `SEED-EVALS-<feature>.md`,
+`ADR-SHAPE-<feature>.md`) keep their fixed names with no date.
 
 ### Phase 3: Implementation Plan
 | Check | File/Artifact |
@@ -71,7 +78,7 @@ Performs a diagnostic check to determine if all requirements for the current pha
 | Dependencies | Dependencies identified |
 | Test Strategy | Test strategy defined |
 | Sub-Agent Review | Implementation Plan review PASSED |
-| Feedback | `/aid end` completed |
+| Feedback | `/aid-end` completed |
 
 ### Phase 4: Development
 | Check | File/Artifact |
@@ -81,7 +88,7 @@ Performs a diagnostic check to determine if all requirements for the current pha
 | Tests Pass | `npm test` passes |
 | Coverage | >= 70% coverage |
 | Sub-Agent Review | Development review PASSED |
-| Feedback | `/aid end` completed |
+| Feedback | `/aid-end` completed |
 
 ### Phase 5: QA & Ship
 | Check | File/Artifact |
@@ -107,7 +114,7 @@ Checks:
   [x] traceability-matrix.md created
   [x] Go/No-Go decision documented
   [x] Sub-agent review PASSED
-  [x] Feedback collected via /aid end
+  [x] Feedback collected via /aid-end
 
 Phase Approval: NOT YET APPROVED
 
@@ -140,7 +147,7 @@ To complete Discovery:
 2. Document competitive analysis
 3. Add Go/No-Go decision with justification
 4. Run sub-agent review
-5. Complete phase with /aid end
+5. Complete phase with /aid-end
 ```
 
 ## Sub-Agent Review Status
@@ -184,7 +191,7 @@ If review status is PENDING, Claude will:
 4. Spawn the phase-review-agent by name with the Task tool:
    ```
    Task(
-     subagent_type: "aid:phase-review-agent",   (fallback: "phase-review-agent")
+     subagent_type: "aid:phase-review-agent",   (link-project route only: "phase-review-agent")
      prompt: [phase {N} and its name, the deliverable paths, the checklist],
      description: "Phase {N} review"
    )
@@ -210,9 +217,11 @@ If review status is PENDING, Claude will:
      reason to the user verbatim.
    - Never edit `.aid/state.json` yourself: `aid_session.py` is its only writer.
 
-### Review Cannot Be Skipped
+### Review Is Part of the Method
 
-The sub-agent review is **mandatory** and **cannot be bypassed**. This ensures:
+The sub-agent review is the methodology's required step before `/phase-advance`. It is
+guidance, not a hard lock: the user can override a PARTIAL with a reason, and a forward
+`jump` from `/aid-start` (which the user confirms) moves the phase without it. It gives:
 - Fresh, unbiased evaluation of deliverables
 - Consistent quality gates across all phases
 - Objective checklist validation without context bias
@@ -226,4 +235,4 @@ See: `agents/phase-review-agent.md` for full details.
 | `/phase` | Show current phase overview |
 | `/phase-approve` | Approve current phase |
 | `/phase-advance` | Move to next phase |
-| `/aid end` | Complete phase with feedback |
+| `/aid-end` | Complete phase with feedback |

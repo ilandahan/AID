@@ -142,7 +142,9 @@ class QualityDashboard:
             "key_metrics": {
                 "overall_rating": ratings.get('overall_average'),
                 "acceptance_rate": acceptance.get('rate'),
-                "debate_rate": round(1 - (acceptance.get('rate') or 0), 3),
+                # T17-19 (L3c-2e): no decisions -> rate None -> n/a, never a made-up 100%.
+                "debate_rate": (round(1 - acceptance['rate'], 3)
+                                if isinstance(acceptance.get('rate'), (int, float)) else None),
                 "debate_change_rate": debates.get('change_rate'),
                 "feedback_response_rate": engagement.get('response_rate')
             },
@@ -302,6 +304,8 @@ class QualityDashboard:
                 lines.append(f"| Decision Acceptance | {key_metrics['acceptance_rate']*100:.0f}% |")
             if key_metrics.get('debate_rate') is not None:
                 lines.append(f"| Debate Rate | {key_metrics['debate_rate']*100:.0f}% |")
+            else:
+                lines.append("| Debate Rate | n/a |")
             if key_metrics.get('debate_change_rate') is not None:
                 lines.append(f"| Debate Change Rate | {key_metrics['debate_change_rate']*100:.0f}% |")
             if key_metrics.get('feedback_response_rate') is not None:
@@ -422,15 +426,22 @@ class QualityDashboard:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 
         if format == "json":
-            filepath = _reports_dir() / f"quality-report_{timestamp}.json"
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(self.generate_full_report(), f, indent=2, ensure_ascii=False)
+            text = json.dumps(self.generate_full_report(), indent=2, ensure_ascii=False)
         else:
-            filepath = _reports_dir() / f"quality-report_{timestamp}.md"
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(self.generate_markdown_report())
-
-        return filepath
+            text = self.generate_markdown_report()
+        ext = "json" if format == "json" else "md"
+        # T16-28 (L3b-2c): two saves in the same second (--analyze --save, then --dashboard
+        # --save) wrote the same name. Create exclusively; on a collision add -2, -3, ...
+        n = 1
+        while True:
+            filepath = _reports_dir() / "quality-report_{}{}.{}".format(
+                timestamp, "" if n == 1 else "-{}".format(n), ext)
+            try:
+                with open(filepath, 'x', encoding='utf-8') as f:
+                    f.write(text)
+                return filepath
+            except FileExistsError:
+                n += 1
 
 
 def generate_dashboard(days: int = 30) -> str:

@@ -37,6 +37,13 @@ Checked against the embedded files (`PAYLOAD.lock.json` pins them).
   on Windows by starting a hidden PowerShell with an encoded command, on macOS `osascript`,
   on Linux `notify-send`. Security tools may flag the encoded PowerShell.
 - **No network calls** of its own; the calendar fetch goes through Claude's connectors.
+- **`mark.mjs` in AID projects: you type it with `!`.** breather's session-start text asks
+  Claude to run `mark.mjs` (for example `ack` after it has shown the day's notice). In an AID
+  project the phase gate refuses that command to Claude in every phase and level, because it
+  runs a file under `~/.claude/hooks` (a control path). So in an AID project type it
+  yourself, with the leading `!`: `! node ~/.claude/hooks/breather/mark.mjs ack` (and
+  likewise `resumed`, `snooze <minutes>` or `skip`). The vendored payload is unchanged
+  (`PAYLOAD.lock.json` still pins it); only this instruction differs in AID projects.
 
 To keep all of this off, do not install breather, or remove it with `/breather-stop`
 (uninstall) or `node install.mjs --uninstall`.
@@ -50,6 +57,27 @@ To keep all of this off, do not install breather, or remove it with `/breather-s
 - Uninstall: `node install.mjs --uninstall`
 - Slash commands: `/breather-start` (enable), `/breather-stop` (snooze / skip today /
   uninstall)
+
+## Known limits of the pinned installer
+
+Both were reproduced against the pinned `install.mjs` (T16-60). The installer is pinned
+byte for byte (see Integrity below), so AID does not patch it; the fix belongs upstream,
+followed by a re-pin.
+
+- **Uninstall strips by substring.** `--uninstall` (and every re-install, which strips the
+  old entries first) removes every hook command in `~/.claude/settings.json` whose text
+  contains `breather`, and a status line whose command contains it, not only the entries
+  the installer added. A hook of your own such as `node /opt/my-breather-notes.mjs` is
+  removed too. The installer writes a `settings.json.bak-<timestamp>` backup first:
+  restore your own entries from it if needed.
+- **`CLAUDE_HOME` moves the files, not the hook paths.** With `CLAUDE_HOME` set, the files
+  go to `$CLAUDE_HOME/.claude/hooks/breather/` and the settings to
+  `$CLAUDE_HOME/.claude/settings.json`, but the hook and status-line commands it writes are
+  the literal `node ~/.claude/hooks/breather/<file>.mjs`. Unless `$CLAUDE_HOME` is your home
+  directory, those commands point at files that do not exist. Install without
+  `CLAUDE_HOME`, or fix the paths in that `settings.json` by hand.
+- Upstream fix needed (owner action): match only the exact commands the installer writes,
+  and write hook commands from the resolved install directory.
 
 ## Integrity (pinned)
 

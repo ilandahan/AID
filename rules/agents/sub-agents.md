@@ -47,14 +47,15 @@ Sub-agents are powerful because they have **no bias from the main conversation**
 ## Spawning Pattern
 
 All sub-agents are spawned BY NAME with the Task tool. The plugin is `aid`, so
-`agents/<agent-name>.md` is `aid:<agent-name>`; in a repo checkout without the plugin the
-bare name works. The agent's prompt, `tools:` list and model come from its own agent file,
+`agents/<agent-name>.md` is `aid:<agent-name>` (the plugin's agents). Use the bare name
+only on the link-project route, where no plugin is loaded: this linked project's
+.claude/agents is AID's linked folder. The agent's prompt, `tools:` list and model come from its own agent file,
 so the Task prompt passes only the inputs (its `{{VARIABLES}}`). Never run an AID agent's
 job as `general-purpose`: that agent has every tool, whatever the AID agent's `tools:` says.
 
 ```
 Task(
-  subagent_type: "aid:<agent-name>",   (fallback: "<agent-name>")
+  subagent_type: "aid:<agent-name>",   (link-project route only: "<agent-name>")
   prompt: [the task inputs: the agent's {{VARIABLES}}, filled in],
   description: "[Brief description]"
 )

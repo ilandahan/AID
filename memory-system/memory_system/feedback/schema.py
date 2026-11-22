@@ -79,7 +79,11 @@ def normalize_entry(raw: Any, path: Optional[Path] = None,
         if meta:
             entry["metadata"] = meta
         source = raw.get("source", "aid-end")
-        ctx = {"phase": raw.get("phase_display") or raw.get("phase"), "role": raw.get("role")}
+        # T17-18 (L3c-2d): the phase (0-5) first, so it maps to a real phase skill; the
+        # role-specific display name ("Technical Design") only when there is no phase.
+        phase_raw = raw.get("phase")
+        ctx = {"phase": phase_raw if phase_raw not in (None, "") and not isinstance(phase_raw, bool)
+               else raw.get("phase_display"), "role": raw.get("role")}
 
     entry["id"] = str(raw.get("id") or stem or ts)
     entry["timestamp"] = ts

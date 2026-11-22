@@ -39,7 +39,7 @@ block). Do NOT invent values — if a placeholder is empty, say so and stop.
 | Placeholder | Source | Meaning |
 |---|---|---|
 | `{{WORKSPACE}}` | repo root | Absolute path to the project |
-| `{{TASK_ID}}` | `.aid/context.json` → `current_task` | The task under acceptance |
+| `{{TASK_ID}}` | `.aid/context.json` → `current_task.id` (aid-context-v1) | The task under acceptance |
 | `{{CRITICALITY_PROFILE}}` | `config.json` | Risk profile (informs strictness) |
 | `{{KPI_TARGET}}` | `config.autoresearch.kpi_target` (e.g. `8.0`) | Min `why_alignment` score (0–10) |
 | `{{PASS_RATE_TARGET}}` | `config.autoresearch.ar_acceptance.pass_rate_target` (e.g. `90`) | Min acceptance-criteria pass-rate (%) |

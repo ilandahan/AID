@@ -92,7 +92,7 @@ Expected: score < 6 (auto-fail for security vulnerability)
 
 ## Report Format
 
-Generate reflection-test-report.md with:
+Generate report.md in the output folder above with:
 | Test | Expected | Actual | Pass? |
 |------|----------|--------|-------|
 | Good code | >= 8 | X.X | ✓/✗ |

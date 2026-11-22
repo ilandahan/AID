@@ -148,11 +148,11 @@ Share state across steps via a custom World class (`page`, `testUser`, `response
 ### Tag Filtering
 
 ```bash
-npx cucumber-js --tags "@critical"
+npx --no-install cucumber-js --tags "@critical"
 npm run test:smoke
-npx cucumber-js --tags "not @wip and not @manual"
-npx cucumber-js --tags "@critical and @security"
-npx cucumber-js --tags "@smoke or @critical"
+npx --no-install cucumber-js --tags "not @wip and not @manual"
+npx --no-install cucumber-js --tags "@critical and @security"
+npx --no-install cucumber-js --tags "@smoke or @critical"
 ```
 
 ## Commands

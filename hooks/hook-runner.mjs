@@ -37,13 +37,22 @@ function fail(message) {
 
 const [runtime, file, ...args] = spec;
 const script = fileURLToPath(new URL(file, import.meta.url));
-const quiet = { stdio: 'ignore', shell: false, windowsHide: true, timeout: 5000 };
+// T16-25: the probes share one budget well under the 10 s PreToolUse timeout. Three probes of
+// 5 s each took 15 s when every candidate hung, so Claude Code killed the gate instead of hearing
+// its answer. A normal probe takes 0.1-0.3 s; each now gets at most 2 s, and all of them 4.5 s.
+const PROBE_MS = 2000;
+const PROBE_BUDGET_MS = 4500;
 
 // The Windows Store python3/python stubs exit 9009 instead of ENOENT, so probe each
 // candidate and take the first that really runs Python. Nothing is cached.
 function resolvePython() {
-  return [['python3'], ['python'], ['py', '-3']]
-    .find(([exe, ...pre]) => spawnSync(exe, [...pre, '-c', 'import sys'], quiet).status === 0);
+  const start = Date.now();
+  return [['python3'], ['python'], ['py', '-3']].find(([exe, ...pre]) => {
+    const left = PROBE_BUDGET_MS - (Date.now() - start);
+    if (left <= 0) return false;
+    const opts = { stdio: 'ignore', shell: false, windowsHide: true, timeout: Math.min(PROBE_MS, left) };
+    return spawnSync(exe, [...pre, '-c', 'import sys'], opts).status === 0;
+  });
 }
 
 // On Windows, `bash` on PATH may be WSL (System32) or a WindowsApps stub, neither of

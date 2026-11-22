@@ -10,7 +10,7 @@ Session tracking, recovery, and continuity patterns.
 ┌─────────────────────────────────────────────────────────────────┐
 │  SESSION LIFECYCLE                                              │
 │                                                                 │
-│  /good-morning ──▶ Work Session ──▶ /aid end                    │
+│  /good-morning ──▶ Work Session ──▶ /aid-end                    │
 │       │                │                │                       │
 │       ▼                ▼                ▼                       │
 │    Load             Update            Save                      │
@@ -95,11 +95,9 @@ def start_session():
     context = load_context_or_create()
     context.session_id = session_id
 
-    # Sync with phase state
+    # The phase lives only in state.json (read-only here); context.json holds no phase
     state = load_state()
-    if context.phase.current != state.current_phase:
-        context.phase.current = state.current_phase
-        context.phase.name = PHASE_NAMES[state.current_phase]
+    phase = state.current_phase
 
     # Check staleness
     hours_stale = hours_since(context.last_updated)
@@ -110,7 +108,7 @@ def start_session():
     context.session_log.append({
         "timestamp": now(),
         "action": "session_started",
-        "details": f"Session {session_id}, task: {context.tasks.current.key}"
+        "details": f"Session {session_id}, task: {(context.current_task or {}).get('id')}"
     })
 
     save_context(context)
@@ -184,7 +182,7 @@ Events automatically logged to `session_log`:
 | Task completed | Finishing a task | `task_completed` |
 | Blocker noted | Encountering blocker | `blocker_noted` |
 | Phase changed | Phase transition | `phase_changed` |
-| Session ended | /aid end | `session_ended` |
+| Session ended | /aid-end | `session_ended` |
 
 ### Log Size Management
 
@@ -208,7 +206,7 @@ function trimSessionLog(log) {
 
 ## Session End Flow
 
-### /aid end Command
+### /aid-end Command
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -244,27 +242,10 @@ def end_session(rating, worked_well, to_improve):
     session_start = find_session_start_log()
     duration_minutes = minutes_since(session_start.timestamp)
 
-    # Save feedback
-    feedback = {
-        "timestamp": now(),
-        "session_id": context.session_id,
-        "phase": context.phase.current,
-        "phase_name": context.phase.name,
-        "rating": rating,
-        "worked_well": worked_well,
-        "to_improve": to_improve,
-        "duration_minutes": duration_minutes,
-        "tasks_completed": count_completed_tasks()
-    }
-    save_feedback(feedback)
+    # Feedback is saved only by `aid_session.py end` (run by /aid-end), which
+    # redacts it; never write feedback/pending/ or a feedback block yourself.
 
-    # Update context feedback tracking
-    context.feedback.last_feedback_at = now()
-    context.feedback.sessions_since_feedback = 0
-    context.feedback.tasks_completed_since_feedback = 0
-    context.feedback.pending_for_phase = False
-
-    # Log session end
+    # Log session end (session_log is an optional extra key of aid-context-v1)
     context.session_log.append({
         "timestamp": now(),
         "action": "session_ended",
@@ -280,7 +261,7 @@ def end_session(rating, worked_well, to_improve):
 
 ### Unexpected Session End
 
-If session ends without /aid end (crash, timeout, etc.):
+If session ends without /aid-end (crash, timeout, etc.):
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -290,7 +271,7 @@ If session ends without /aid end (crash, timeout, etc.):
 │                                                              │
 │  Last saved state:                                           │
 │  - Task: PROJ-124 (in_progress)                              │
-│  - Step: Implement component (60%)                           │
+│  - Step: Implement component                                 │
 │  - Time: 16:45 (2 hours ago)                                 │
 │                                                              │
 │  Would you like to:                                          │
@@ -316,8 +297,9 @@ function checkSessionRecovery() {
         needsRecovery: true,
         lastSession: {
           id: context.session_id,
-          task: context.tasks.current,
-          step: context.current_task_steps.current,
+          // aid-context-v1 (context-schema.md): read field by field, skip wrong types
+          task: (context.current_task && typeof context.current_task === 'object') ? context.current_task : null,
+          step: typeof context.current_step === 'string' ? context.current_step : null,
           lastActivity: context.last_updated
         }
       };
@@ -377,9 +359,9 @@ function calculateSessionMetrics(history) {
 |---------|-------------|
 | `/good-morning` | Start new session with full context load |
 | `/context` | Show current session state |
-| `/aid end` | End session with feedback |
-| `/session log` | Show session log entries |
-| `/session history` | Show recent session history |
+| `/aid-end` | End session with feedback |
+| `/context log` | Show session log entries (the `session_log` array in `.aid/context.json`) |
+| `/context-update` | Add a session note or blocker by hand |
 
 ---
 
@@ -396,7 +378,7 @@ function calculateSessionMetrics(history) {
 3. Note blockers with `blocker_noted` entries
 
 ### Session End
-1. Always run `/aid end` before stopping work
+1. Always run `/aid-end` before stopping work
 2. Provide honest feedback (helps improve methodology)
 3. Note what worked and what didn't
 

@@ -363,7 +363,7 @@ Sub-agent receives only: draft, phase, criteria. Returns JSON evaluation. No con
 ## Task Tool Integration
 
 ```
-Task(subagent_type: "aid:reflection-agent", prompt: <the variables below, filled in>, description: "Quality evaluation")   (fallback: "reflection-agent")
+Task(subagent_type: "aid:reflection-agent", prompt: <the variables below, filled in>, description: "Quality evaluation")   (link-project route only: "reflection-agent")
 ```
 
 **Variables to pass in the prompt** (the agent's own prompt comes from this file):

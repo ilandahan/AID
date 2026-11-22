@@ -18,7 +18,7 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 │  1. READ context before starting any work                       │
 │  2. UPDATE context on every significant change                  │
 │  3. READ phase state (.aid/state.json, read-only)               │
-│  4. INTEGRATE with feedback system (/aid end)                   │
+│  4. INTEGRATE with feedback system (/aid-end)                   │
 │  5. SAVE context at conversation end                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -27,123 +27,45 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 
 | Moment | Action | Updates |
 |--------|--------|---------|
-| Session start | Read context | Load previous/current/next |
-| Starting new task | Shift tasks | Reset steps, log entry |
-| Starting new step | Shift steps | Add to session log |
-| Completing step | Mark done | Notes, timestamp, shift |
-| Completing task | Mark done | Shift tasks, prompt feedback |
-| Progress milestone | Update % | Notes, timestamp |
-| Phase change | Sync state | Update phase in context |
+| Session start | Read context | Load current task and step |
+| Starting new task | Set `current_task` | Reset `current_step` and `progress`, log entry |
+| Starting new step | Set `current_step` | Add to session log |
+| Completing step | Move to `steps_completed` | Note, timestamp |
+| Completing task | Clear `current_task` | Prompt feedback |
+| Progress milestone | Add a session note | Timestamp |
+| Phase change | Re-read `.aid/state.json` | Nothing in context.json (it holds no phase) |
 | End of conversation | Final save | All pending changes |
 
 ## Context Structure
 
 ### `.aid/context.json`
 
+The one schema, `aid-context-v1`; field types, writers and readers are in
+`references/context-schema.md`. `session_id` and `session_log` are optional extra keys.
+
 ```json
 {
-  "last_updated": "2024-12-11T15:30:00Z",
-  "session_id": "2024-12-11-afternoon",
-
-  "phase": {
-    "current": 4,
-    "name": "development",
-    "started_at": "2024-12-10T09:00:00Z"
-  },
-
-  "development_tracking": {
-    "interaction_count": 7,
-    "last_quality_check": "2024-12-11T14:00:00Z",
-    "quality_check_threshold": 10
-  },
-
-  "project": {
-    "name": "user-authentication",
-    "documents": {
-      "prd": "docs/prd/2024-12-09-user-authentication.md",
-      "tech_spec": "docs/tech-spec/2024-12-10-user-authentication.md",
-      "implementation_plan": "docs/implementation-plan/2024-12-10-user-authentication.md"
-    }
-  },
-
-  "tasks": {
-    "previous": {
-      "key": "PROJ-123",
-      "title": "Create LoginForm component",
-      "status": "done",
-      "completed_at": "2024-12-11T14:00:00Z"
-    },
-    "current": {
-      "key": "PROJ-124",
-      "title": "Create AuthService",
-      "status": "in_progress",
-      "started_at": "2024-12-11T14:15:00Z",
-      "jira_url": "https://company.atlassian.net/browse/PROJ-124"
-    },
-    "next": {
-      "key": "PROJ-125",
-      "title": "Create SessionManager",
-      "status": "todo"
-    }
-  },
-
-  "current_task_steps": {
-    "previous": {
-      "name": "Write unit tests",
-      "status": "done",
-      "completed_at": "2024-12-11T15:00:00Z",
-      "notes": "8 tests passing, covering all auth flows"
-    },
-    "current": {
-      "name": "Implement service",
-      "status": "in_progress",
-      "started_at": "2024-12-11T15:00:00Z",
-      "progress": "60%",
-      "notes": "Login and logout done, token refresh next"
-    },
-    "next": {
-      "name": "Integration tests",
-      "status": "pending"
-    }
-  },
-
+  "$schema": "aid-context-v1",
+  "version": "1.0",
+  "last_updated": "2026-11-20T15:30:00Z",
+  "session_id": "2026-11-20-afternoon",
+  "current_task": {"id": "PROJ-124", "title": "Create AuthService", "jira_key": "PROJ-124"},
+  "current_step": "Implement service",
+  "progress": {"steps_completed": ["Write unit tests"], "steps_pending": ["Integration tests"]},
+  "session_notes": ["Login and logout done, token refresh next"],
+  "blockers": [],
   "session_log": [
-    {
-      "timestamp": "2024-12-11T14:15:00Z",
-      "action": "task_started",
-      "details": "Started PROJ-124: Create AuthService"
-    },
-    {
-      "timestamp": "2024-12-11T15:00:00Z",
-      "action": "step_completed",
-      "details": "Unit tests complete: 8 tests passing"
-    }
-  ],
-
-  "feedback": {
-    "pending_for_phase": false,
-    "last_feedback_at": "2024-12-10T18:00:00Z",
-    "sessions_since_feedback": 2
-  }
+    {"timestamp": "2026-11-20T14:15:00Z", "action": "task_started", "details": "Started PROJ-124: Create AuthService"},
+    {"timestamp": "2026-11-20T15:00:00Z", "action": "step_completed", "details": "Unit tests complete: 8 tests passing"}
+  ]
 }
 ```
 
 ## PRIORITY 2: Phase Integration
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  CONTEXT-PHASE SYNCHRONIZATION                                  │
-│                                                                 │
-│  context.json              state.json                           │
-│  ────────────              ──────────                           │
-│  phase.current    ◄─────   current_phase                        │
-│  project.documents ◄─────  documents                            │
-│  feedback.pending  ◄─────  feedback_collected                   │
-│                                                                 │
-│  On phase change: copy state.json values into context.json      │
-│  state.json is read-only here (only aid_session.py writes it)   │
-└─────────────────────────────────────────────────────────────────┘
-```
+`context.json` holds no phase. The phase, the phase documents and the feedback record live in
+`.aid/state.json`, which only `aid_session.py` writes. Read it whenever the phase matters;
+never copy it into `context.json`.
 
 ### Phase-Aware Context
 
@@ -234,7 +156,7 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 | `progress_update` | Significant progress milestone | Percentage, notes |
 | `blocker_noted` | Hit a blocker | Description |
 | `phase_changed` | Phase transition | From/to phase |
-| `feedback_collected` | /aid end completed | Rating |
+| `feedback_collected` | /aid-end completed | Rating |
 | `context_saved` | Manual context save | Reason |
 | `session_ended` | End of work session | Summary |
 
@@ -252,12 +174,12 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 │       ▼                                                         │
 │  Check: Is this phase ending?                                   │
 │       │                                                         │
-│       ├── Yes ──▶ Prompt: "/aid end for phase feedback"         │
+│       ├── Yes ──▶ Prompt: "/aid-end for phase feedback"         │
 │       │                                                         │
 │       ▼                                                         │
 │  Check: Sessions since feedback >= 3?                           │
 │       │                                                         │
-│       ├── Yes ──▶ Remind: "Consider /aid end for feedback"      │
+│       ├── Yes ──▶ Remind: "Consider /aid-end for feedback"      │
 │       │                                                         │
 │       ▼                                                         │
 │  Continue to next task                                          │
@@ -268,9 +190,9 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 
 | Condition | Reminder |
 |-----------|----------|
-| Phase ending | "Run /aid end before advancing to next phase" |
-| 3+ sessions without feedback | "Consider /aid end to share what worked" |
-| 5+ tasks completed | "Good time for /aid end checkpoint" |
+| Phase ending | "Run /aid-end before advancing to next phase" |
+| 3+ sessions without feedback | "Consider /aid-end to share what worked" |
+| 5+ tasks completed | "Good time for /aid-end checkpoint" |
 
 ## Integration with Commands
 
@@ -279,9 +201,9 @@ Maintain real-time work context in `.aid/context.json` for seamless session cont
 | `/good-morning` | Read context, display status, prompt continuation |
 | `/context` | Display current context state |
 | `/context update` | Manual context update |
-| `/phase` | Copy phase from state.json into context (read-only on state) |
-| `/aid end` | Update feedback tracking, save context |
-| `/aid improve` | Reset feedback counters |
+| `/phase` | Read the phase from state.json (context.json holds no phase) |
+| `/aid-end` | Update feedback tracking, save context |
+| `/aid-improve` | Reset feedback counters |
 
 ## Error Handling
 
@@ -305,7 +227,7 @@ Setting up context tracking:
 
 Last state:
 - Task: PROJ-124 "Create AuthService"
-- Step: Implement service (60%)
+- Step: Implement service
 
 Is this still accurate?
   [1] Yes, continue from here
@@ -313,19 +235,10 @@ Is this still accurate?
   [3] Start fresh with new task
 ```
 
-### Context-State mismatch
+### Phase
 
-```
-⚠️ Context-State mismatch detected
-
-Context shows: Phase 3 (Implementation Plan)
-State shows:  Phase 4 (Development)
-
-Syncing to Phase 4...
-[Updates context.phase]
-
-Note: You may need to update your current task steps.
-```
+`context.json` holds no phase, so it cannot disagree with `.aid/state.json`. After a phase
+change, check that `current_task` and `current_step` still fit the new phase.
 
 ## File Locations
 
@@ -382,7 +295,7 @@ During Phase 4 (Development), track significant interactions to trigger periodic
 │       ├── No ──▶ Skip                                           │
 │       │                                                         │
 │       ▼                                                         │
-│  Increment development_tracking.interaction_count               │
+│  Increment the interaction count (kept in the conversation)     │
 │       │                                                         │
 │       ▼                                                         │
 │  interaction_count >= quality_check_threshold?                  │

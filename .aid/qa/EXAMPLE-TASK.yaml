@@ -111,6 +111,9 @@ completion_protocol:
     - verdict: "PASS"
     - next_action: "proceed_to_next_task"
     - message: "All criteria satisfied. Dev agent may continue."
+    The dev agent then records the pass with the command below; Claude Code asks
+    the user to confirm it. Never create a marker or verdict file under .aid/qa/.
+      python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" qa-pass EXAMPLE-TASK --note "<short summary>"
 
   on_qa_fail: |
     QA sub-agent should return:
@@ -132,8 +135,8 @@ review_history: []
 #   - review_number: 1
 #     timestamp: "2025-01-13T14:30:00Z"
 #     verdict: "FAIL"
-#     report_file: ".aid/qa/EXAMPLE-TASK-review-1.json"
+#     report_file: ".aid/qa/reports/EXAMPLE-TASK-report-1.json"
 #   - review_number: 2
 #     timestamp: "2025-01-13T15:45:00Z"
 #     verdict: "PASS"
-#     report_file: ".aid/qa/EXAMPLE-TASK-review-2.json"
+#     report_file: ".aid/qa/reports/EXAMPLE-TASK-report-2.json"

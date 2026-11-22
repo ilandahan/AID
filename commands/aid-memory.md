@@ -2,7 +2,7 @@
 description: "Manage AID's local memory entries"
 ---
 
-# /aid memory
+# /aid-memory
 
 Manage AID's local memory entries. "Claude Memory" in AID means a LOCAL file,
 `$AID_HOME/memory/slots.json` (default `~/.aid/memory/`). Nothing is sent to Claude's
@@ -10,7 +10,7 @@ built-in memory.
 
 ## Subcommands
 
-### /aid memory list
+### /aid-memory list
 
 Show all AID-related entries in AID's local memory.
 
@@ -18,29 +18,28 @@ Show all AID-related entries in AID's local memory.
 AID Memory Entries
 ==================
 
-Universal (5/5 slots):
+user_preferences (<used>/5 slots):
   1. AID:ALL:ALL:WORKFLOW Always complete current phase before starting next
-  2. AID:ALL:ALL:CONTEXT Start each session by reading work_context.json
-  3. AID:ALL:ALL:DOCS Update documentation in real-time not at end
-  4. AID:ALL:ALL:HUMAN Get explicit approval before major decisions
-  5. AID:ALL:ALL:QUALITY Verify every artifact against requirements
+  2. AID:ALL:ALL:HUMAN Get explicit approval before major decisions
 
-Developer (4/5 slots):
+decision_patterns (<used>/8 slots):
   1. AID:DEV:TECH:DECISIONS Document why not just what for tech choices
-  2. AID:DEV:DEV:TDD Write test first then implement
-  3. AID:DEV:DEV:ATOMIC One logical change per commit
-  4. AID:DEV:ALL:DEBT Mark shortcuts with TODO-DEBT and track
 
-PM (5/5 slots):
+feedback_trends (<used>/5 slots):
   [...]
 
-Learned (3/10 slots):
-  1. AID:DEV:DEV:LEARNED When implementing auth start with session management
-  2. AID:QA:QA:LEARNED Edge cases in date handling need timezone tests
-  3. AID:PM:PRD:LEARNED Stakeholder availability affects timeline estimates
+skill_adjustments (<used>/7 slots):
+  1. AID:DEV:DEV:TDD Write test first then implement
+
+context (<used>/5 slots):
+  [...]
 ```
 
-### /aid memory stats
+The categories and their slot counts are the memory system's slot allocation
+(`SLOT_ALLOCATION` in `memory-system/memory_system/analysis/memory_sync.py`): 5 + 8 + 5 + 7 +
+5 = 30 slots. Show the counts the memory system reports, never numbers from this page.
+
+### /aid-memory stats
 
 Show memory usage statistics.
 
@@ -49,31 +48,32 @@ AID Memory Statistics
 =====================
 
 Slot Usage:
-  Universal:  5/5  [█████████████████████] 100%
-  PM:         5/5  [█████████████████████] 100%
-  Developer:  4/5  [████████████████░░░░░]  80%
-  QA:         5/5  [█████████████████████] 100%
-  Lead:       2/3  [██████████████░░░░░░░]  67%
-  Phase:      3/5  [████████████░░░░░░░░░]  60%
-  Learned:    3/10 [██████░░░░░░░░░░░░░░░]  30%
-  
-  Total: 27/38 slots used (71%)
+  user_preferences:   <used>/5
+  decision_patterns:  <used>/8
+  feedback_trends:    <used>/5
+  skill_adjustments:  <used>/7
+  context:            <used>/5
 
-Last Updated: 3 days ago
-Entries from feedback: 3
+  Total: <memory.used>/<memory.total> slots used
 ```
+
+Take the total from `memory.used` and `memory.total` in the output of exactly
+`python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" status --format json` (one plain
+command, read-only, not asked). The total is the sum of the slot allocation (30 today); an
+empty memory shows `0/30`. A value the command does not return is shown as `unknown`.
 
 ## Usage
 
 ```
-/aid memory list
-/aid memory stats
+/aid-memory list
+/aid-memory stats
 ```
 
 ## Notes
 
 - AID entries use prefix `AID:` for easy identification
-- Learned entries can be added via `/aid improve`: `aid_session.py memory-sync` writes them,
-  and Claude Code asks the user to confirm
+- Learned entries can be added via `/aid-improve`, which runs exactly
+  `python "${CLAUDE_PLUGIN_ROOT}/hooks/aid_session.py" memory-sync` (one plain command) to
+  write them; Claude Code asks the user to confirm
 - Do not edit `slots.json` by hand
 - See `memory-system/docs/MEMORY.md` for slot allocation details

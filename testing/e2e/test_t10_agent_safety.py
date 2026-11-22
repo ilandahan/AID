@@ -47,8 +47,17 @@ def test_t10_1_every_agent_declares_its_tools():
     assert missing == [], missing
 
 
+_VISUAL_QA_BROWSER_TOOLS = (   # T17 (owner 2026-11-20): I-25 replaces the wildcard grant
+    "navigate_page", "new_page", "list_pages", "select_page", "close_page", "resize_page",
+    "handle_dialog", "wait_for", "take_snapshot", "take_screenshot", "click", "hover", "fill",
+    "fill_form", "press_key", "type_text", "drag", "emulate", "list_console_messages",
+    "get_console_message", "list_network_requests", "get_network_request", "get_css_styles")
+
+
 def test_t10_1_visual_qa_agent_has_only_read_and_browser_tools():
-    assert tools_of("visual-qa-agent") == ["Read", "Grep", "Glob", "mcp__chrome-devtools__*"]
+    # T17 (owner 2026-11-20): exact I-25 list, no wildcard.
+    assert sorted(tools_of("visual-qa-agent")) == sorted(
+        ["Read", "Grep", "Glob"] + ["mcp__chrome-devtools__" + t for t in _VISUAL_QA_BROWSER_TOOLS])
 
 
 REVIEWERS = sorted(n for n in AGENTS if re.search(
@@ -149,10 +158,45 @@ def test_t10_6_aid_session_runs_only_from_the_plugin():
     bad = []
     for d in ("commands", "skills"):
         for p in (REPO / d).rglob("*.md"):
-            for n, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            text = p.read_text(encoding="utf-8", errors="replace")
+            for n, line in enumerate(text.splitlines(), 1):
                 if re.search(r"\bpy(thon3?)?\s+\S*aid_session\.py", line) and "CLAUDE_PLUGIN_ROOT" not in line:
+                    if _linked_install_line(p, text, line):
+                        continue
                     bad.append("{}:{}: {}".format(p.relative_to(REPO), n, line.strip()[:100]))
     assert bad == [], bad
+
+
+# T16 (owner 2026-11-19), I-10 / T16-64: link-project.md (user-only: disable-model-invocation:
+# true, so the agent never runs it) shows the line a user types in a terminal for a linked
+# install, which has no plugin and so no ${CLAUDE_PLUGIN_ROOT}. Same narrow shape as the
+# test_t3_5 exemption in test_aid_hooks.py; every agent-invocable command and skill keeps A-26.
+_LINKED_INSTALL_LINE = re.compile(
+    r'^python "?(?:<AID-main>|[A-Za-z]:[\\/]|~/)[^"\s]*[\\/]hooks[\\/]aid_session\.py"? '
+    r'(?:init|status|start|approve|advance)\b')
+
+
+def _linked_install_line(path, text, line):
+    if path.name != "link-project.md" or path.parent.name != "commands":
+        return False
+    front = text.split("\n---", 1)[0] if text.startswith("---") else ""
+    if not re.search(r"^disable-model-invocation:\s*true\s*$", front, re.M):
+        return False
+    return bool(_LINKED_INSTALL_LINE.match(line.strip()))
+
+
+def test_t16_63_t10_6_exemption_is_narrow():
+    """WHY (R3-04): the link-project.md exemption must not let an agent-invocable file or a
+    project-local script path through A-26."""
+    lp = REPO / "commands" / "link-project.md"
+    text = lp.read_text(encoding="utf-8")
+    ok = 'python "C:/Tools/AID/hooks/aid_session.py" status'
+    assert _linked_install_line(lp, text, ok)
+    assert not _linked_install_line(lp, text, "python hooks/aid_session.py approve")
+    assert not _linked_install_line(lp, text, 'python "<AID-main>/hooks/aid_session.py" jump 1 5')
+    assert not _linked_install_line(REPO / "commands" / "aid-start.md", text, ok)
+    no_flag = text.replace("disable-model-invocation: true", "disable-model-invocation: false", 1)
+    assert not _linked_install_line(lp, no_flag, ok)
 
 
 # Agents allowed to write or run commands, each with its reason (T10-1: exceptions are listed).
@@ -166,6 +210,29 @@ WRITERS = {
 def test_t10_1_only_the_listed_agents_can_write_or_run_commands():
     writers = {n for n in AGENTS if WRITE_TOOLS & set(tools_of(n))}
     assert writers == set(WRITERS), writers ^ set(WRITERS)
+
+
+def _readme_reviewer_table():
+    text = (REPO / "README.md").read_text(encoding="utf-8")
+    sec = text[text.index("## Sub-Agents"):]
+    sec = sec[:sec.index("\n---")]
+    return re.findall(r"^\| `([a-z0-9-]+)` \|", sec, re.M), " ".join(sec.split())
+
+
+def test_t15_33_readme_reviewers_have_no_write_tools():
+    """WHY (T15-33, R-05/A-08): the README called aid-test-agent a read-only reviewer while
+    it holds Write, Edit and Bash. Every agent in the reviewer table must be read-only."""
+    names, sec = _readme_reviewer_table()
+    assert names and "aid-test-agent" not in names, names
+    assert len(names) == 7 and "7 reviewer" in sec, (names, sec[:200])
+    bad = {n: tools_of(n) for n in names if WRITE_TOOLS & set(tools_of(n) or [])}
+    assert bad == {}, bad
+    assert "`aid-test-agent`" in sec and "test runner with write tools" in sec
+
+
+def test_t15_33_security_model_agrees_on_aid_test_agent():
+    text = " ".join((REPO / "docs" / "SECURITY-MODEL.md").read_text(encoding="utf-8").split())
+    assert "The 7 reviewers" in text and "`aid-test-agent` is not a reviewer" in text
 
 
 def test_t10_review_scorer_has_no_bare_name_fallback():

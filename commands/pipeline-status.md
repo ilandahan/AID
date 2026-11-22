@@ -16,7 +16,17 @@ Display the current state of the automated development pipeline.
    - Task ID and description
    - Iteration counts vs. maximums
    - Step history timeline
-   - Last review result summary
+   - Last review result summary, from `last_review_result`
+     (`{step, result, overall, threshold, round, timestamp}`)
+   - Cost so far, from `cost` (`total_input_tokens`, `total_output_tokens`,
+     `estimated_cost_usd`, and `per_step[<step>]` with `input_tokens`, `output_tokens`,
+     `cost_usd`, `timestamp`, `estimated`)
+
+Both are recorded in code by `gate.mjs --step` (from the `--usage` token counts of each
+review, or the documented 4000 input / 2000 output estimate when none was passed). Mark every
+`per_step` entry with `estimated: true` as an estimate, and say the total includes estimates
+when any entry does. If `cost` or `last_review_result` is missing (no review has been scored
+yet), show "none recorded yet".
 
 ## Display Format
 
@@ -37,6 +47,13 @@ Step History:
   3. FIX_CODE > done
   4. CODE_REVIEW > PASS
   ...
+
+Last Review: [last_review_result.step] > [result] ([overall]/[threshold], round [round])
+
+Cost: [cost.total_input_tokens] in / [cost.total_output_tokens] out tokens,
+      ~$[cost.estimated_cost_usd] (includes estimates)
+  CODE_REVIEW:  [input_tokens] in / [output_tokens] out, $[cost_usd]
+  TEST_REVIEW:  [input_tokens] in / [output_tokens] out, $[cost_usd] (estimated)
 ```
 
 ## Load Skills

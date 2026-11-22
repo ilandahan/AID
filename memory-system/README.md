@@ -73,7 +73,7 @@ The memory system creates a runtime directory at `~/.aid/` for user-specific dat
 ### 1. Initialize
 
 ```
-/aid init
+/aid-init
 ```
 
 This creates `~/.aid/` and copies skill templates.
@@ -81,7 +81,7 @@ This creates `~/.aid/` and copies skill templates.
 ### 2. Start Session
 
 ```
-/aid start
+/aid-start
 ```
 
 Select your role and phase.
@@ -93,7 +93,7 @@ Claude applies relevant skills automatically.
 ### 4. End Phase
 
 ```
-/aid end
+/aid-end
 ```
 
 Provide feedback on the session (1-5 rating + notes).
@@ -101,7 +101,7 @@ Provide feedback on the session (1-5 rating + notes).
 ### 5. Run Improvement (Weekly)
 
 ```
-/aid improve
+/aid-improve
 ```
 
 Analyzes feedback and proposes skill updates and memory entries. AID's own write commands
@@ -111,15 +111,15 @@ run only after you confirm them.
 
 | Command | Description |
 |---------|-------------|
-| `/aid init` | Initialize memory system |
-| `/aid start` | Start new session |
-| `/aid status` | Show current state |
-| `/aid end` | End phase, collect feedback |
-| `/aid improve` | Run improvement analysis |
-| `/aid memory list` | Show AID's local memory entries |
-| `/aid memory stats` | Memory usage statistics |
-| `/aid skill view [name]` | View skill content |
-| `/aid reset` | Full system reset |
+| `/aid-init` | Initialize memory system |
+| `/aid-start` | Start new session |
+| `/aid-status` | Show current state |
+| `/aid-end` | End phase, collect feedback |
+| `/aid-improve` | Run improvement analysis |
+| `/aid-memory list` | Show AID's local memory entries |
+| `/aid-memory stats` | Memory usage statistics |
+| `/aid-recommendations` | View and apply queued skill-update proposals |
+| `/aid-reset` | Reset AID runtime data |
 
 ## How It Works
 
@@ -237,9 +237,12 @@ AID:QA:ALL:REGRESSION Keep regression suite fast and reliable
   `aid_session.py approve` (via `/phase-approve`) write it.
 - Feedback text is redacted (best effort) before it is written and again whenever it is
   read, so older files are redacted again when they are read.
-- Redaction replaces e-mail addresses, URLs (including git remotes), absolute paths
+- Redaction replaces e-mail addresses, URLs of any scheme (including git remotes and
+  `postgres://user:pass@host`-style credentials), absolute paths
   (Windows, UNC, POSIX, `~/`), `file.ext:line` references, common secret tokens (GitHub,
-  `sk-`, Slack, AWS keys, JWTs, long hex/base64), the project's own names (cwd and
+  `sk-`, Slack, AWS keys, JWTs, long hex/base64), secret-named values (`PASSWORD=`,
+  `"api_key": "..."`, `--password V`, `--token=V`, `pass=`), `mysql -p<V>`, `sshpass -p V`,
+  `curl -u user:<V>`, `Authorization: <scheme> <V>`, the project's own names (cwd and
   project-root folder names, git remote owner and repo) and the OS user name. Placeholders:
   `[email]`, `[url]`, `[path]`, `[file-ref]`, `[token]`, `[project]`, `[user]`.
 - It does NOT catch a person's or company's name written as plain words unless it is one of

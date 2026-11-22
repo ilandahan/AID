@@ -164,14 +164,15 @@ file (`agents/{agent-name}.md`):
 
 ```
 Task(
-  subagent_type: "aid:reflection-agent",   (fallback: "reflection-agent")
+  subagent_type: "aid:reflection-agent",   (link-project route only: "reflection-agent")
   prompt: [the task inputs, with {{variables}} filled in],
   description: "[Brief description]"
 )
 ```
 
-The plugin is `aid`, so an agent is `aid:<agent-name>`; the bare name works in a repo
-checkout without the plugin. The definition brings its own prompt, `tools:` list and
+The plugin is `aid`, so an agent is `aid:<agent-name>` (the plugin's agents); the bare
+name is only for the link-project route, where this linked project's .claude/agents is
+AID's linked folder. The definition brings its own prompt, `tools:` list and
 model, so pass only the task inputs. Never run an AID agent's job as
 the built-in `general-purpose` agent: that agent has every tool, whatever the AID agent's
 `tools:` says. The autoresearch scorer is the exception to the fallback: it is spawned only

@@ -135,14 +135,12 @@ Load from skills/memory-system/references/:
 4. phases/{phase}/cumulative.md
 ```
 
-### Step 6: Update State & Begin
+### Step 6: Begin (state is already written)
 
 ```
-Update ~/.aid/state.json with:
-- current_session.active = true
-- current_session.role = role
-- current_session.phase = phase
-- current_session.started_at = now()
+Do not edit ~/.aid/state.json yourself: aid_session.py start/end updates it
+(the session role, phase, start time and active flag are set by
+`aid_session.py start`, which /aid-start runs).
 
 Greet user and ask what they're working on.
 ```
@@ -235,14 +233,11 @@ and writes `$AID_HOME/feedback/pending/` (default `~/.aid/feedback/pending/`). T
 other writer is `aid_session.py approve` (via `/phase-approve`), which stores its rating as a
 pending entry too.
 
-### Step 5: Update State
+### Step 5: State (nothing to do by hand)
 
 ```
-Update ~/.aid/state.json:
-- statistics.total_sessions += 1
-- statistics.pending_feedback_count += 1
-- statistics.sessions_since_last_improvement += 1
-- current_session.active = false
+Do not edit ~/.aid/state.json yourself: aid_session.py start/end updates it
+(session statistics and the active flag are updated by `aid_session.py end`).
 ```
 
 ---
@@ -297,7 +292,7 @@ without the conversational context that produced it.
 
 ```
 Task(
-  subagent_type: "aid:memory-analysis-agent",   # fallback: "memory-analysis-agent";
+  subagent_type: "aid:memory-analysis-agent",   # link-project route only: "memory-analysis-agent";
                                                # tools: Read, Grep, Glob (no Write)
   model: "inherit",
   prompt: [the inputs below, filled in; the agent brings its own prompt],

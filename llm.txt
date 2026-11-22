@@ -1,7 +1,7 @@
 AID - AI Development Methodology for Claude Code
 
 PROJECT OVERVIEW
-AID is a comprehensive framework that transforms raw ideas into production-ready software using Claude Code and AI assistance. It systematizes the entire development journey with structured phases, enforced phase gates, a skills system, 39 review sub-agents, and memory-based learning. Ships as a Claude Code plugin.
+AID is a comprehensive framework that transforms raw ideas into production-ready software using Claude Code and AI assistance. It systematizes the entire development journey with structured phases, enforced phase gates, a skills system, 42 sub-agents (7 reviewers that cannot write files with the Write, Edit or Bash tools; visual-qa-agent drives a browser), and memory-based learning. Ships as a Claude Code plugin.
 
 CORE PURPOSE
 Provide a methodical, enforced workflow for building full-stack applications with Claude Code assistance. The methodology stops code being written before the problem is understood, and ensures quality, consistency, and progressive disclosure of work through phase gates.
@@ -9,7 +9,7 @@ Provide a methodical, enforced workflow for building full-stack applications wit
 KEY FEATURES
 - Phase Gates (6 phases, 0-5): Discovery -> PRD -> Tech Spec -> Breakdown -> Development -> QA & Ship
 - Phase Enforcement: Work is blocked out-of-order by hooks, critical rule enforced
-- 39 Registered Sub-Agents: 8 reviewers, 2 builders, 29 phase specialists
+- 42 Registered Sub-Agents: 7 reviewers, 2 builders, 1 test runner, 32 phase specialists
 - 27 Skills: Automatic skill loading based on role and phase
 - 44 Slash Commands: Full workflow management
 - 12-Step Dev Pipeline: Automated pipeline with a hard QA gate
@@ -123,11 +123,12 @@ Loaded automatically by role and phase. Highlights:
 - role-product-manager, role-tech-lead, role-developer, role-qa-engineer, role-data-scientist: Role skills
 - nano-banana-visual: Visual QA support
 
-SUB-AGENTS (39)
+SUB-AGENTS (42)
 Flat .md files under agents/, one self-contained definition each, prompt inlined.
-- 8 reviewers: code, tests, visual QA, phase gates, QA validation, reflection, feedback analysis
+- 7 reviewers (read-only): code, tests, visual QA, phase gates, QA validation, reflection, feedback analysis
 - 2 builders: developer, test-engineer
-- 29 phase specialists: Phase 0 discovery, Phase 2 architecture, Phase 3 breakdown, Phase 4 sprint work, Phase 5 release, and the PRD pipeline
+- 1 test runner with write tools: aid-test-agent (/aid-test)
+- 32 phase specialists: Phase 0 discovery, Phase 1 PRD shaping (phase1-*), Phase 2 architecture, Phase 3 breakdown, Phase 4 sprint work, Phase 5 release, and the PRD pipeline
 All invocable by name via subagent_type.
 
 STATE FILES
@@ -174,10 +175,10 @@ the plugin root); install.sh mirrors them into .claude/ as symlinks (macOS/Linux
 junctions (Windows). The mirrors are gitignored - edit the root copies only.
 .claude-plugin/    - plugin.json (name, version, hooks) + marketplace.json
 skills/            - 27 skills
-agents/            - 39 sub-agents (FLAT - every .md here registers as an agent)
+agents/            - 42 sub-agents (FLAT - every .md here registers as an agent)
 agent-assets/      - Calibration examples + AGENT-STANDARD.md (not scanned as agents)
 commands/          - 44 slash commands
-rules/             - 23 rule files, incl. the Data Science / ML track
+rules/             - 24 rule files, incl. the Data Science / ML track
 references/        - Shared lookup data (role/phase terminology)
 hooks/             - Phase gate, QA gate, pipeline enforcement, session writer
 .claude/           - settings.json (project-mode permissions/hooks, copied on link)
@@ -185,15 +186,15 @@ docs/              - prd/, tech-spec/, implementation-plan/, research/ outputs +
 memory-system/     - Learning system (Python package: python -m memory_system)
 storybook-preview/ - Component preview workspace
 scripts/           - init-project.sh scaffolding
-testing/e2e/       - 228 tests covering AID itself
+testing/e2e/       - Tests covering AID itself
 install.sh / install.bat, link-project.sh / .bat
 CLAUDE.md          - Main AID instructions Claude loads every session
 
 FILE LOCATIONS
 .aid/state.json - Phase tracking
 .aid/context.json - Work context
-docs/prd/ - Phase 1 outputs (PRD)
-docs/tech-spec/ - Phase 2 outputs (technical specification)
+docs/prd/ - Phase 1 outputs (PRD), named docs/prd/YYYY-MM-DD-<feature>.md
+docs/tech-spec/ - Phase 2 outputs (technical specification), named docs/tech-spec/YYYY-MM-DD-<feature>.md
 docs/implementation-plan/ - Phase 3 outputs (task breakdown)
 docs/research/ - Phase 0 outputs (research reports)
 .mcp.json - MCP server configuration (from .mcp.json.mac / .windows templates)

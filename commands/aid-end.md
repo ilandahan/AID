@@ -2,7 +2,7 @@
 description: "End the current phase and record session feedback"
 ---
 
-# /aid end
+# /aid-end
 
 End current phase and collect feedback.
 
@@ -39,7 +39,7 @@ transition (option 1 in Step 5). Saving feedback does not wait for it.
 
 ```
 Agent tool:
-- subagent_type: "aid:phase-review-agent"   (fallback: "phase-review-agent")
+- subagent_type: "aid:phase-review-agent"   (link-project route only: "phase-review-agent")
 - description: "Phase [N] gate review"
 - prompt: "Phase [N] ([Phase Name]) gate review. Deliverables: [exact paths].
            Checklist: [Review Prompt for this phase, below].
@@ -152,14 +152,14 @@ An override does not change the recorded verdict: it means the user will decide 
 ## Usage
 
 ```
-/aid end
+/aid-end
 ```
 
 ## Review Prompts by Phase
 
 ### Phase 1 (PRD) Review Prompt
 ```
-Review PRD at docs/prd/PRD-<feature>.md for:
+Review PRD at docs/prd/YYYY-MM-DD-<feature>.md for:
 - Problem statement clarity
 - User stories format
 - Acceptance criteria completeness
@@ -172,7 +172,7 @@ Review PRD at docs/prd/PRD-<feature>.md for:
 
 ### Phase 2 (Tech Spec) Review Prompt
 ```
-Review Tech Spec at docs/tech-spec/[feature].md for:
+Review Tech Spec at docs/tech-spec/YYYY-MM-DD-<feature>.md for:
 - Architecture diagram
 - Component definitions
 - Data models (TypeScript)
@@ -217,7 +217,7 @@ Review implementation for:
 - Feedback is stored locally in `$AID_HOME`. AID has no collection service of its own. When
   you run `/aid-improve`, the redacted feedback is sent to Claude as part of the
   conversation, for analysis.
-- Need 3+ feedback items before `/aid improve` works
+- Need 3+ feedback items before `/aid-improve` works
 - Feedback text is redacted (best effort) before it is written, and again whenever it is read.
   E-mails, URLs, absolute paths, `file.ext:line` references, common secret tokens, the
   project's own names (folder names, git remote owner and repo) and the OS user name are

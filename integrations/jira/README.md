@@ -23,8 +23,12 @@ Linux `secret-tool store --label="AID Atlassian" service aid-atlassian`,
 Windows `cmdkey /generic:aid-atlassian /user:you@company.com /pass`) and export it
 into the shell you start `claude` from. Do not keep it in `.env` or `.mcp.json`:
 
+`ATLASSIAN_SITE_NAME` is the subdomain only (`your-company` for
+`your-company.atlassian.net`). It is the name the pinned server reads; it does not read
+`ATLASSIAN_SITE_URL`.
+
 ```bash
-export ATLASSIAN_SITE_URL=https://your-domain.atlassian.net
+export ATLASSIAN_SITE_NAME=your-company   # for your-company.atlassian.net
 export ATLASSIAN_USER_EMAIL=your-email@company.com
 export ATLASSIAN_API_TOKEN=$(security find-generic-password -s aid-atlassian -w)   # macOS
 ```
@@ -41,7 +45,7 @@ The shipped `.mcp.json.mac` / `.mcp.json.windows` already contain this entry
       "command": "npx",
       "args": ["-y", "@aashari/mcp-server-atlassian-jira@3.3.0"],
       "env": {
-        "ATLASSIAN_SITE_URL": "${ATLASSIAN_SITE_URL:-}",
+        "ATLASSIAN_SITE_NAME": "${ATLASSIAN_SITE_NAME:-}",
         "ATLASSIAN_USER_EMAIL": "${ATLASSIAN_USER_EMAIL:-}",
         "ATLASSIAN_API_TOKEN": "${ATLASSIAN_API_TOKEN:-}"
       }
@@ -52,7 +56,7 @@ The shipped `.mcp.json.mac` / `.mcp.json.windows` already contain this entry
 
 ## Installation
 
-The pinned MCP server is fetched by npx when Claude Code connects.
+The pinned MCP server is fetched by `npx` when Claude Code connects.
 
 Manual test:
 ```bash

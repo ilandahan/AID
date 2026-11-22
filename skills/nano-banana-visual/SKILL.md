@@ -8,11 +8,13 @@ description: "[OPTIONAL] AI-powered visual generation using Google Nano Banana P
 OPTIONAL SKILL - AID works without this. Apply only when a visual artifact is requested (see When to Use); otherwise skip.
 
 ## Setup
-```env
-ENABLE_NANO_BANANA=true
-NANO_BANANA_PROVIDER=google
-GOOGLE_AI_API_KEY=your-key
-```
+Non-secret settings: `ENABLE_NANO_BANANA=true`, `NANO_BANANA_PROVIDER=google`.
+The provider key is a secret: never write it to `.env` or any file. Keep it in the OS
+keystore (macOS `security add-generic-password -s aid-nano-banana -a "$USER" -w`, Linux
+`secret-tool store --label="AID Nano Banana" service aid-nano-banana`, Windows
+`cmdkey /generic:aid-nano-banana /user:you /pass`) and export it into the shell
+(`security find-generic-password -s aid-nano-banana -w`, `secret-tool lookup service aid-nano-banana`,
+`Get-StoredCredential -Target aid-nano-banana`). See SKILL.extended.md.
 
 ## When to Use
 | Phase | Trigger | Output |

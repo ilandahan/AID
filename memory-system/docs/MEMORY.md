@@ -102,7 +102,7 @@ Patterns from feedback analysis can be written to AID's local memory when **ALL*
 | Occurrences | ≥5 sessions | Pattern appeared in 5+ sessions |
 | Avg Rating | ≥4.0 | When pattern was applied |
 | Avg Revisions | ≤2.0 | When pattern was applied |
-| Human Confirmed | Yes | User confirmed the `memory-sync` prompt during /aid improve |
+| Human Confirmed | Yes | User confirmed the `memory-sync` prompt during /aid-improve |
 | Fits Limit | ≤200 chars | Entry fits character limit |
 | Not Duplicate | Unique | Not already in memory |
 | Context-Free | Yes | No project-specific references |
@@ -151,7 +151,7 @@ Replaced entries are logged in `memory-tracking.json` under `retirement_history`
 ### View All Entries
 
 ```
-/aid memory list
+/aid-memory list
 ```
 
 Output:
@@ -180,7 +180,7 @@ Learned (0/10):
 ### View Statistics
 
 ```
-/aid memory stats
+/aid-memory stats
 ```
 
 Output:
@@ -306,7 +306,9 @@ Rebuilding tracking file...
 ### Force Sync
 
 ```
-/aid memory sync
+/aid-improve
 ```
+
+(its `aid_session.py memory-sync` step, which Claude Code asks you to confirm)
 
 This rebuilds `memory-tracking.json` from the state of `$AID_HOME/memory/slots.json`.

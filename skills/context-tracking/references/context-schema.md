@@ -1,174 +1,79 @@
-# Context Schema Reference
+# Context Schema Reference: `aid-context-v1`
 
-Full JSON schema for `.aid/context.json` with validation rules.
+This is the ONE schema for `.aid/context.json` (T17, F6). Every other AID document links
+here instead of restating a different shape. The phase lives in `.aid/state.json`, never in
+`context.json`.
 
 ---
 
-## Complete Schema
+## The document
 
-```typescript
-interface AIDContext {
-  // Metadata
-  last_updated: string;      // ISO 8601 timestamp
-  session_id: string;        // Format: YYYY-MM-DD-period
-
-  // Phase Information (read from state.json, never written to it)
-  phase: PhaseInfo;
-
-  // Project Information
-  project: ProjectInfo;
-
-  // Task Tracking (previous → current → next)
-  tasks: TaskChain;
-
-  // Step Tracking within Current Task
-  current_task_steps: StepChain;
-
-  // Session Activity Log
-  session_log: LogEntry[];
-
-  // Feedback System Integration
-  feedback: FeedbackStatus;
+```json
+{
+  "$schema": "aid-context-v1",
+  "version": "1.0",
+  "last_updated": "2026-11-20T10:00:00Z",
+  "current_task": {"id": "PROJ-123", "title": "Add login form", "jira_key": "PROJ-123"},
+  "current_step": "Implement validation",
+  "progress": {"steps_completed": ["Design form"], "steps_pending": ["Write tests"]},
+  "session_notes": ["Decided to reuse the auth hook"],
+  "blockers": [{"description": "Waiting for API keys", "severity": "medium"}]
 }
 ```
 
 ---
 
-## Phase Information
+## Field types
 
-```typescript
-interface PhaseInfo {
-  current: 1 | 2 | 3 | 4 | 5;
-  name: 'prd' | 'tech-spec' | 'implementation-plan' | 'development' | 'qa-ship';
-  started_at: string;        // ISO 8601 timestamp
-}
-```
+| Field | Type |
+|-------|------|
+| `$schema` | the string `"aid-context-v1"` |
+| `version` | the string `"1.0"` |
+| `last_updated` | ISO 8601 timestamp string |
+| `current_task` | `null`, or an object with `id` (string matching `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`, no `..`), `title` (string) and optionally `jira_key` (string) |
+| `current_step` | `null`, or a string (the step name) |
+| `progress` | an object with two string arrays: `steps_completed` and `steps_pending` |
+| `session_notes` | an array of strings |
+| `blockers` | an array of objects `{"description": <string>, "severity": "low" \| "medium" \| "high"}` |
 
-### Phase Names Mapping
-
-```javascript
-const PHASE_NAMES = {
-  1: 'prd',
-  2: 'tech-spec',
-  3: 'implementation-plan',
-  4: 'development',
-  5: 'qa-ship'
-};
-```
+- Writers may keep extra top-level keys, such as `session_id` (for example
+  `"2026-11-20-morning"`) and `session_log` (an array of `{timestamp, action, details}`
+  objects). Readers ignore keys they do not know.
+- Not part of the schema: a step inside `current_task`, a number as `progress`, `key` as the
+  task id field, and the older `tasks` / `current_task_steps` / `phase` chain.
 
 ---
 
-## Project Information
+## Writers
 
-```typescript
-interface ProjectInfo {
-  name: string;              // Feature/project name (kebab-case)
-  documents: {
-    prd: string | null;              // docs/prd/PRD-<feature>.md
-    tech_spec: string | null;        // docs/tech-spec/YYYY-MM-DD-[name].md
-    implementation_plan: string | null; // docs/implementation-plan/YYYY-MM-DD-[name].md
-  };
-}
-```
-
-### Document Path Validation
-
-```javascript
-const DOCUMENT_PATH_REGEX = /^docs\/(prd|tech-spec|implementation-plan)\/\d{4}-\d{2}-\d{2}-[\w-]+\.md$/;
-
-function validateDocumentPath(path) {
-  return DOCUMENT_PATH_REGEX.test(path);
-}
-```
+| Writer | What it writes |
+|--------|----------------|
+| `aid_session.py init` (run by `/aid-init`, `/aid-start`, `/setup`) | Creates the file once, exactly this document with `current_task` and `current_step` set to `null` and empty arrays. It never overwrites an existing file. |
+| `/context-update` | Changes only the fields it owns: `current_task`, `current_step`, `progress`, `session_notes`, `blockers`, `last_updated`. |
+| `/good-morning` | Changes only `last_updated`, `session_id` and `session_log`, and writes blockers only as `{description, severity}` objects. |
 
 ---
 
-## Task Chain
+## Readers (tolerant)
 
-```typescript
-interface TaskChain {
-  previous: Task | null;
-  current: Task | null;
-  next: Task | null;
-}
+AID's SessionStart and UserPromptSubmit hooks read the file field by field and never fail on
+it:
 
-interface Task {
-  key: string;               // Jira key: PROJ-123
-  title: string;             // Task title
-  status: 'todo' | 'in_progress' | 'done' | 'blocked';
-  type?: 'feature' | 'bug' | 'task' | 'qa';
-  started_at?: string;       // ISO 8601 timestamp
-  completed_at?: string;     // ISO 8601 timestamp
-  jira_url?: string;         // Full Jira URL
-  notes?: string;            // Additional notes
-}
-```
-
-### Task Status Transitions
-
-```
-todo ────► in_progress ────► done
-              │
-              ▼
-           blocked ────► in_progress
-```
+- the task id is `id`, else `key`, else `jira_key`;
+- `current_step` is a string, or the `name` of an object;
+- each blocker is an object (`severity`, `description`) or a string (shown as `[?]`);
+- a field of any other type is skipped;
+- a file that is not a JSON object, invalid JSON, or a file with a UTF-8 BOM gives no
+  context lines, and never an error. The AID rules block is always shown.
 
 ---
 
-## Step Chain
+## Optional `session_log` entries (extra key)
 
-```typescript
-interface StepChain {
-  previous: Step | null;
-  current: Step | null;
-  next: Step | null;
-}
-
-interface Step {
-  name: string;              // Step name
-  status: 'pending' | 'in_progress' | 'done' | 'skipped';
-  order?: number;            // Step order in template
-  started_at?: string;       // ISO 8601 timestamp
-  completed_at?: string;     // ISO 8601 timestamp
-  progress?: string;         // e.g., "50%", "3/8 tests"
-  notes?: string;            // Progress notes
-}
-```
-
-### Step Status Transitions
-
-```
-pending ────► in_progress ────► done
-                  │
-                  ▼
-               skipped
-```
-
----
-
-## Session Log
-
-```typescript
-interface LogEntry {
-  timestamp: string;         // ISO 8601 timestamp
-  action: LogAction;
-  details: string;
-  metadata?: Record<string, any>;
-}
-
-type LogAction =
-  | 'session_started'
-  | 'session_ended'
-  | 'task_started'
-  | 'task_completed'
-  | 'step_started'
-  | 'step_completed'
-  | 'progress_update'
-  | 'blocker_noted'
-  | 'phase_changed'
-  | 'feedback_collected'
-  | 'context_saved';
-```
+`/good-morning` and `/context-update` may append to the optional top-level `session_log`
+array. Each entry is `{"timestamp": <ISO 8601>, "action": <string>, "details": <string>}`,
+with an optional `metadata` object. Typical actions: `session_started`, `step_completed`,
+`blocker_noted`, `context_saved`.
 
 ### Log Entry Examples
 
@@ -196,168 +101,8 @@ type LogAction =
 
 ---
 
-## Feedback Status
+## Older shapes
 
-```typescript
-interface FeedbackStatus {
-  pending_for_phase: boolean;           // True if phase complete, feedback needed
-  last_feedback_at: string | null;      // ISO 8601 timestamp
-  sessions_since_feedback: number;      // Counter
-  tasks_completed_since_feedback: number; // Counter
-  reminder_shown: boolean;              // Prevent duplicate reminders
-}
-```
-
-### Feedback Thresholds
-
-```javascript
-const FEEDBACK_THRESHOLDS = {
-  sessions: 3,        // Remind after 3 sessions without feedback
-  tasks: 5,           // Remind after 5 tasks completed
-  phase_end: true     // Always require feedback at phase end
-};
-```
-
----
-
-## Validation Functions
-
-### Full Context Validation
-
-```typescript
-function validateContext(context: unknown): context is AIDContext {
-  if (!context || typeof context !== 'object') return false;
-
-  const ctx = context as AIDContext;
-
-  // Required fields
-  if (!ctx.last_updated || !isValidISODate(ctx.last_updated)) return false;
-  if (!ctx.session_id || !isValidSessionId(ctx.session_id)) return false;
-
-  // Phase validation
-  if (!ctx.phase || !isValidPhase(ctx.phase)) return false;
-
-  // Task chain validation
-  if (!ctx.tasks) return false;
-
-  // Step chain validation
-  if (!ctx.current_task_steps) return false;
-
-  // Log validation
-  if (!Array.isArray(ctx.session_log)) return false;
-
-  // Feedback validation
-  if (!ctx.feedback) return false;
-
-  return true;
-}
-
-function isValidISODate(str: string): boolean {
-  const date = new Date(str);
-  return !isNaN(date.getTime());
-}
-
-function isValidSessionId(str: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}-(morning|afternoon|evening|night)$/.test(str);
-}
-
-function isValidPhase(phase: PhaseInfo): boolean {
-  return phase.current >= 1 && phase.current <= 5;
-}
-```
-
----
-
-## Default Context Template
-
-```json
-{
-  "last_updated": null,
-  "session_id": null,
-
-  "phase": {
-    "current": 1,
-    "name": "prd",
-    "started_at": null
-  },
-
-  "project": {
-    "name": null,
-    "documents": {
-      "prd": null,
-      "tech_spec": null,
-      "implementation_plan": null
-    }
-  },
-
-  "tasks": {
-    "previous": null,
-    "current": null,
-    "next": null
-  },
-
-  "current_task_steps": {
-    "previous": null,
-    "current": null,
-    "next": null
-  },
-
-  "session_log": [],
-
-  "feedback": {
-    "pending_for_phase": false,
-    "last_feedback_at": null,
-    "sessions_since_feedback": 0,
-    "tasks_completed_since_feedback": 0,
-    "reminder_shown": false
-  }
-}
-```
-
----
-
-## Migration Notes
-
-### From v1 (Simple Context)
-
-Old format:
-```json
-{
-  "tasks": { "previous": {}, "current": {}, "next": {} },
-  "current_task_steps": { "previous": {}, "current": {}, "next": {} },
-  "session_log": []
-}
-```
-
-Migration adds:
-- `phase` block (read from state.json)
-- `project` block (extract from current feature)
-- `feedback` block (initialize with defaults)
-
-### Migration Script
-
-```javascript
-function migrateContext(oldContext) {
-  const state = readState('.aid/state.json');
-
-  return {
-    ...oldContext,
-    phase: {
-      current: state.current_phase || 1,
-      name: PHASE_NAMES[state.current_phase || 1],
-      started_at: state.started_at || new Date().toISOString()
-    },
-    project: {
-      name: state.feature_name || 'unknown',
-      documents: state.documents || { prd: null, tech_spec: null, implementation_plan: null }
-    },
-    feedback: {
-      pending_for_phase: false,
-      last_feedback_at: null,
-      sessions_since_feedback: 0,
-      tasks_completed_since_feedback: 0,
-      reminder_shown: false
-    }
-  };
-}
-```
+Files written before T17 may hold a `tasks` / `current_task_steps` / `phase` chain, a step
+inside `current_task`, or a number as `progress`. The readers skip those fields; they never
+fail. `/context-update` rewrites the fields it owns in this shape the next time it runs.

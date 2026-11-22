@@ -25,6 +25,7 @@ Task: AUTH-123 - Email format validation on login form
       {"criterion": "Unit tests exist", "status": "PASS"}
     ]
   },
+  "warnings": [],
   "summary": {"total_criteria": 7, "passed": 7, "failed": 0},
   "can_proceed": true,
   "handoff": {"next_action": "proceed_to_next_task"}

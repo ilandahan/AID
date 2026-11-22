@@ -19,14 +19,25 @@ Enable the full AID methodology in any project by creating symbolic links to AID
 
 If no path provided, asks for the project path.
 
+The scripts behind it:
+
+```
+./link-project.sh  <path> [--force] [--role <name|number>]     # macOS / Linux / Git Bash
+link-project.bat   <path> [--force] [--copy] [--role <name|number>]   # Windows
+```
+
+`--role` is the role the project state starts with (default `1`, the first role in the
+`/aid-start` menu). Both scripts need `node` (the registered hooks run with it; without
+node they stop before writing anything) and `python` (for `aid_session.py init`).
+
 ## Directory Structure Expected
 
 ```
 Parent Folder/
-├── AID-main/           <- This AID installation
-│   ├── .claude/
-│   │   ├── commands/
-│   │   └── skills/
+├── AID-main/           <- This AID installation (components at the repo root)
+│   ├── commands/  skills/  agents/  references/  rules/  hooks/
+│   ├── scripts/link-settings.mjs
+│   ├── CLAUDE.md
 │   ├── .mcp.json.mac / .mcp.json.windows / .mcp.json.example
 │   └── ...
 │
@@ -39,11 +50,16 @@ Parent Folder/
 ```
 my-project/
 ├── .claude/
-│   ├── commands/  -> SYMLINK to AID-main/.claude/commands/
-│   └── skills/    -> SYMLINK to AID-main/.claude/skills/
+│   ├── commands/   -> link to AID-main/commands/
+│   ├── skills/     -> link to AID-main/skills/
+│   ├── agents/     -> link to AID-main/agents/
+│   ├── references/ -> link to AID-main/references/
+│   ├── rules/      -> link to AID-main/rules/
+│   ├── hooks/      -> link to AID-main/hooks/
+│   └── settings.json   (permissions + the AID hooks, absolute paths to AID-main)
 ├── .aid/
-│   ├── state.json      (project-specific, not linked)
-│   └── context.json    (project-specific, not linked)
+│   ├── state.json      (written by aid_session.py init, not linked)
+│   └── context.json    (written by aid_session.py init, not linked)
 ├── .mcp.json           (copied from template, gitignored, tokens via ${VAR})
 └── CLAUDE.md           -> SYMLINK to AID-main/CLAUDE.md
 ```
@@ -54,17 +70,26 @@ my-project/
 2. **Get Target Path**: Ask user or use provided path
 3. **Validate**: Ensure target exists and is not inside AID-main
 4. **Create .claude Directory** in target project
-5. **Create Symbolic Links**:
-   - Windows: `mklink /D` (requires Admin or Developer Mode)
+5. **Create Links**: `.claude/commands`, `skills`, `agents`, `references`, `rules` and
+   `hooks` in the project point at the folders of the same name at AID-main's root
+   - Windows: `mklink /J` directory junctions (no Admin needed); `CLAUDE.md` with `mklink /H`
    - Mac/Linux: `ln -s`
-6. **Create .aid Directory** with a fresh `context.json`. Do not write `.aid/state.json`:
-   only `aid_session.py` writes it. It is created when the user runs `/aid-start` in the
-   linked project: with no `state.json` it runs `init`, which the user confirms.
-7. **Create `.mcp.json`** in the target: the link scripts copy `.mcp.json.mac` (macOS/Linux)
+6. **Register the AID hooks**: `node scripts/link-settings.mjs <project> <AID-main>` merges
+   the SessionStart, PreToolUse (writes and commands), PostToolUse and Stop hooks of
+   `.claude-plugin/plugin.json` into the project's `.claude/settings.json`, with
+   `${CLAUDE_PLUGIN_ROOT}` replaced by AID-main's absolute path. The project gets the same
+   phase gates as the plugin (`onFailure: block`). Your own keys and hooks are kept; a second
+   run changes nothing; a settings file that cannot be parsed is left alone and the link stops.
+7. **Create the project state**: the scripts run AID-main's `hooks/aid_session.py` with
+   the arguments `init <role> 0`, using python, in the project folder. `aid_session.py` is the only
+   writer of `.aid/state.json`; `init` also creates `.aid/context.json`. The scripts never
+   write either file themselves. With no working python they print that exact command for
+   you to run and finish with a warning.
+8. **Create `.mcp.json`** in the target: the link scripts copy `.mcp.json.mac` (macOS/Linux)
    or `.mcp.json.windows` (Windows); for the minimal set, copy `.mcp.json.example` by hand
    instead (see "MCP Configuration" below)
-8. **Link CLAUDE.md** for methodology instructions
-9. **Show Success** with next steps
+9. **Link CLAUDE.md** for methodology instructions
+10. **Show Success** with next steps
 
 ## MCP Configuration
 
@@ -74,8 +99,8 @@ document, with the same names, commands and pinned versions:
 | Server | How it runs | Environment variables | Guide |
 |--------|-------------|-----------------------|-------|
 | `github` | HTTP, `https://api.githubcopilot.com/mcp/` | `GITHUB_PERSONAL_ACCESS_TOKEN` | `integrations/github/README.md` |
-| `jira` | `npx -y @aashari/mcp-server-atlassian-jira@3.3.0` | `ATLASSIAN_SITE_URL`, `ATLASSIAN_USER_EMAIL`, `ATLASSIAN_API_TOKEN` | `integrations/jira/README.md` |
-| `chrome-devtools` | `npx -y chrome-devtools-mcp@1.12.0` | none | `integrations/chrome-devtools/README.md` |
+| `jira` | `npx -y @aashari/mcp-server-atlassian-jira@3.3.0` | `ATLASSIAN_SITE_NAME` (subdomain only, e.g. `mycompany`), `ATLASSIAN_USER_EMAIL`, `ATLASSIAN_API_TOKEN` | `integrations/jira/README.md` |
+| `chrome-devtools` | `npx -y chrome-devtools-mcp@1.12.0 --no-usage-statistics --no-performance-crux` (opts out of Google usage statistics and CrUX trace-URL sending) | none | `integrations/chrome-devtools/README.md` |
 
 Every secret in the file is a placeholder such as `"${ATLASSIAN_API_TOKEN:-}"`, which
 Claude Code expands from your environment when it starts the server. **Provide your
@@ -89,16 +114,40 @@ The `link-project.sh` / `link-project.bat` scripts copy the per-OS templates
 `.mcp.json.mac` / `.mcp.json.windows` instead. Those contain the same three servers plus
 `filesystem` and `confluence`, and use the same environment-variable placeholders.
 
-## Windows Commands (Run as Admin or with Developer Mode)
+## Linking by Hand
+
+Prefer the scripts. If you link by hand, run the commands below for your OS. They link
+the same six folders the scripts link (AID-main's `commands`, `skills`, `agents`,
+`references`, `rules` and `hooks`, which sit at the repository root, not under
+`.claude/`), register the hooks (without them the project has no phase gates), and create
+the project state.
+
+The last command creates the state. Run it yourself, in the project folder, from a
+terminal or by typing it in Claude Code with a leading `!`:
+
+```
+python "<AID-main>/hooks/aid_session.py" init <role> 0
+```
+
+`<role>` is a role name or its number in the `/aid-start` menu (`1` is the first). Do not
+use `/aid-start` for this step: in a linked project (not a plugin install),
+`${CLAUDE_PLUGIN_ROOT}` is not replaced, and `/aid-start` stops.
+
+## Windows Commands (cmd; junctions need no Admin rights)
 
 ```batch
-cd "C:\Projects\my-project"
+cd /d "C:\Projects\my-project"
 mkdir .claude
-mklink /D ".claude\commands" "C:\path\to\AID-main\.claude\commands"
-mklink /D ".claude\skills" "C:\path\to\AID-main\.claude\skills"
-mklink "CLAUDE.md" "C:\path\to\AID-main\CLAUDE.md"
-mkdir .aid
-copy "C:\path\to\AID-main\.mcp.json.example" ".mcp.json"
+mklink /J ".claude\commands"   "C:\path\to\AID-main\commands"
+mklink /J ".claude\skills"     "C:\path\to\AID-main\skills"
+mklink /J ".claude\agents"     "C:\path\to\AID-main\agents"
+mklink /J ".claude\references" "C:\path\to\AID-main\references"
+mklink /J ".claude\rules"      "C:\path\to\AID-main\rules"
+mklink /J ".claude\hooks"      "C:\path\to\AID-main\hooks"
+mklink /H "CLAUDE.md" "C:\path\to\AID-main\CLAUDE.md"
+copy "C:\path\to\AID-main\.mcp.json.windows" ".mcp.json"
+node "C:\path\to\AID-main\scripts\link-settings.mjs" "C:\Projects\my-project" "C:\path\to\AID-main"
+python "C:\path\to\AID-main\hooks\aid_session.py" init 1 0
 ```
 
 ## Mac/Linux Commands
@@ -106,54 +155,130 @@ copy "C:\path\to\AID-main\.mcp.json.example" ".mcp.json"
 ```bash
 cd ~/Projects/my-project
 mkdir -p .claude
-ln -s ~/path/to/AID-main/.claude/commands .claude/commands
-ln -s ~/path/to/AID-main/.claude/skills .claude/skills
+ln -s ~/path/to/AID-main/commands   .claude/commands
+ln -s ~/path/to/AID-main/skills     .claude/skills
+ln -s ~/path/to/AID-main/agents     .claude/agents
+ln -s ~/path/to/AID-main/references .claude/references
+ln -s ~/path/to/AID-main/rules      .claude/rules
+ln -s ~/path/to/AID-main/hooks      .claude/hooks
 ln -s ~/path/to/AID-main/CLAUDE.md CLAUDE.md
-mkdir -p .aid
-cp ~/path/to/AID-main/.mcp.json.example .mcp.json
+cp ~/path/to/AID-main/.mcp.json.mac .mcp.json
+node ~/path/to/AID-main/scripts/link-settings.mjs ~/Projects/my-project ~/path/to/AID-main
+python ~/path/to/AID-main/hooks/aid_session.py init 1 0
 ```
+
+Then add `.mcp.json` and `.aid/audit/` (the hook audit log) to the project's `.gitignore`,
+each on its own line, once.
 
 ## Example Output
 
+`./link-project.sh /c/Projects/my-app` on Git Bash without symlink privilege (Windows,
+Developer Mode off). There `ln -s` makes a copy, so those items are labelled `[COPY]`, not
+`[LINK]`; on macOS, Linux, or Windows with Developer Mode every item is a `[LINK]` and the
+"Copies" block is not printed. `<AID-main>` stands for the AID path the script prints
+(here `/c/Tools/AID`).
+
 ```
-/link-project C:\Projects\my-app
+========================================
+   AID Project Linker (macOS/Linux)
+========================================
 
-AID Project Linker
-==================
+AID Installation: /c/Tools/AID
+Target Project:   /c/Projects/my-app
 
-AID Installation: C:\Tools\AID
-Target Project:   C:\Projects\my-app
+Creating .claude directory...
 
-Creating symbolic links...
-  [OK] .claude/commands -> AID commands
-  [OK] .claude/skills   -> AID skills
-  [OK] CLAUDE.md        -> AID methodology
+Creating symbolic links to AID...
+(Changes in AID will automatically apply to this project)
 
-Creating project-specific files...
-  [OK] .aid/context.json
-  [--] .aid/state.json (created by /aid-start)
-  [OK] .mcp.json (reads tokens from environment variables)
+  [COPY] .claude/commands (a copy: AID updates will not reach it; re-run link-project after updating AID)
+  [COPY] .claude/skills (a copy: AID updates will not reach it; re-run link-project after updating AID)
+  [COPY] .claude/agents (a copy: AID updates will not reach it; re-run link-project after updating AID)
+  [COPY] .claude/references (a copy: AID updates will not reach it; re-run link-project after updating AID)
+  [COPY] .claude/rules (a copy: AID updates will not reach it; re-run link-project after updating AID)
+  [COPY] .claude/hooks (a copy: AID updates will not reach it; re-run link-project after updating AID)
+
+Creating CLAUDE.md symlink...
+  [COPY] CLAUDE.md (a copy: AID updates will not reach it; re-run link-project after updating AID)
+
+Copying project-specific files...
+  [OK] .claude/settings.json registers the AID hooks (C:/Tools/AID)
+
+Creating project state directory...
+  [OK] state.json created by aid_session.py init
+
+Creating docs directories (phase outputs)...
+  [OK] docs/ structure created
+
+Copying MCP configuration...
+  [COPY] .mcp.json (reads tokens from environment variables)
   [OK] .mcp.json added to .gitignore
+  [OK] .aid/audit/ added to .gitignore
+  [INFO] More AID ignore patterns (not added automatically): C:/Tools/AID/.claude/templates/gitignore-aid-patterns.txt
 
-===========================================
-Project linked successfully!
-===========================================
+========================================
+   Project Linked Successfully
+========================================
+
+Target: /c/Projects/my-app
+
+Symbolic links (auto-update from AID): 0
+Copies (AID updates will NOT reach them; re-run link-project after updating AID): 7
+  .claude/commands
+  .claude/skills
+  .claude/agents
+  .claude/references
+  .claude/rules
+  .claude/hooks
+  CLAUDE.md
+  To get real links on Windows, enable Developer Mode (or run Git Bash as administrator)
+  and run link-project again, or use link-project.bat (junctions).
+
+Project-specific (not linked):
+  .claude/settings.json - Permissions + AID hooks (phase gates)
+  .aid/state.json       - Phase tracking (aid_session.py init)
+  .aid/context.json     - Work context (aid_session.py init)
+  .mcp.json             - MCP config (tokens come from environment variables / OS keystore, not this file)
+  docs/                 - Phase outputs
 
 Next steps:
-1. Export your API tokens from the OS keystore (see INSTALLATION.md); .mcp.json reads them
-2. Open Claude Code in C:\Projects\my-app
-3. Run /aid-start to begin working
 
-All AID commands are now available:
-  /aid-start, /aid-status, /prd, /tech-spec,
-  /design-system, /code-review, /write-tests, etc.
+1. Export your API tokens as environment variables (see INSTALLATION.md); .mcp.json reads them
+
+2. Open Claude Code in the project:
+   cd "/c/Projects/my-app"
+   claude
+
+3. /aid-start, /aid-status, /phase-approve and /phase-advance need the plugin
+   (claude plugin install aid@AID). Without it, run the session steps yourself
+   (in Claude Code, with a leading !):
+   python "<AID-main>/hooks/aid_session.py" status   (also: start, approve, advance)
 ```
+
+With real links the same run prints `[LINK] .claude/commands -> AID` (and so on) and the
+summary reads `Symbolic links (auto-update from AID): 7`, followed by one
+`  <item> -> AID` line each. An item printed as `[COPY]` is a copy: AID updates will not
+reach it, so re-run link-project after updating AID, or enable Developer Mode or use
+`link-project.bat` (junctions) to get real links.
+
+Both linkers (`link-project.sh` and `link-project.bat`) add `.mcp.json` and `.aid/audit/`
+to the project's `.gitignore` once (T17 I-26): a line is added only when no existing line
+already equals it, so running them again, or both, never duplicates it. The other patterns
+in `.claude/templates/gitignore-aid-patterns.txt` are not added automatically (state and
+context may be tracked by the team); the `[INFO]` line points at that file.
+
+The commands that call `${CLAUDE_PLUGIN_ROOT}` (`/aid-start`, `/aid-status`, `/aid-end`,
+`/phase-approve`, `/phase-advance`, `/gate-check` and the other session and memory commands)
+stop in a linked project, because only a plugin install replaces that variable. Install the
+plugin (`claude plugin install aid@AID`) to use them, or run AID-main's
+`hooks/aid_session.py` with `start`, `approve`, `advance` or `status` yourself, as in the
+`init` step above.
 
 ## What the Linked Project Gets
 
 | Feature | Description |
 |---------|-------------|
-| All Commands | /aid-start, /prd, /tech-spec, /code-review, etc. |
+| Commands | /prd, /tech-spec, /code-review, etc. The session commands (/aid-start, /aid-status, /phase-approve, /phase-advance) need the plugin; without it run `hooks/aid_session.py` yourself |
 | All Skills | atomic-design, system-architect, test-driven, etc. |
 | Phase Enforcement | PRD -> Tech Spec -> Development -> QA flow |
 | Context Tracking | Automatic progress tracking |
@@ -165,11 +290,14 @@ All AID commands are now available:
 Enable Developer Mode: Settings > Update & Security > For Developers > Developer Mode
 
 ### Symlinks not working
-Fall back to copying instead of linking (run install.bat in the target folder)
+On Git Bash without symlink privilege (Developer Mode off), `link-project.sh` reports
+`[COPY]` instead of `[LINK]`: those items are copies, and AID updates will not reach them.
+Enable Developer Mode and run link-project again, or use `link-project.bat` (junctions, no
+Admin rights needed). If you keep the copies, re-run link-project after updating AID.
 
 ## Notes
 
-- Symbolic links mean updates to AID-main automatically apply to all linked projects
+- Symbolic links (and junctions) mean updates to AID-main automatically apply to all linked projects; items reported as `[COPY]` do not update
 - Each project maintains its own .aid/state.json (phase progress is per-project)
-- .mcp.json is copied per project and added to its .gitignore; tokens come from environment variables, never the file
+- .mcp.json is copied per project; .mcp.json and .aid/audit/ are added to its .gitignore once; tokens come from environment variables, never the file
 - Run from within AID-main folder, pointing to the target project

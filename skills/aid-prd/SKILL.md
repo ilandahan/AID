@@ -36,7 +36,7 @@ Gherkin is REQUIRED because acceptance criteria become the tests; no PRD-to-QA t
 1. **WHY + shape brief** (PM, `why-driven-decision`): WHY / 5 Whys, the 6 shape questions, on whose behalf it acts, who bears an error, never-do, approvals, a level HYPOTHESIS. Saved as `docs/prd/WHY-SHAPE-BRIEF-<feature>.md`.
 2. **`/prd`:** `prd-research-aggregator` reads the Phase 0 research and the brief, and writes the research brief (alone, first).
 3. **Fan-out, in ONE message, in parallel:** `prd-writer` (§1-§7, §8-§13), `aid:phase1-solution-shaper` (§1.5 + 20-30 seed eval cases), `aid:phase1-charter-drafter` (7A.1-7A.4), `aid:phase1-eval-planner` (7A.5-7A.8, §1.4 with guardrail). Each returns a draft and writes no files.
-4. **Merge** into `docs/prd/PRD-<feature>.md` (template `references/prd-template-extended.md`) and the seed cases into `docs/prd/SEED-EVALS-<feature>.md`. Report conflicts between drafts to the PM; never resolve them silently.
+4. **Merge** into `docs/prd/YYYY-MM-DD-<feature>.md` (template `references/prd-template-extended.md`) and the seed cases into `docs/prd/SEED-EVALS-<feature>.md`. Report conflicts between drafts to the PM; never resolve them silently.
 5. **PM review.**
 6. **Shaping session:** PM + tech lead review the proposed level and the seed cases (optional time-boxed spike: run the lowest level against the seed cases; a human runs it OUTSIDE the AID project, never Claude in Phase 1 (adding the command to `extra_allowed_commands` weakens the phase gate and is only the human's call), uses de-identified seed cases only, uses a model provider setup approved for that data (7A.3), and its result is recorded in the ADR (`docs/prd/ADR-SHAPE-<feature>.md`)). The tech lead signs the level as an ADR, `docs/prd/ADR-SHAPE-<feature>.md` (the A1 decision).
 7. **`prd-validator`** (independent gate check), then `/gate-check` and `/phase-approve` (human).
@@ -184,4 +184,4 @@ Use the one template, `references/prd-template-extended.md`. Reviewers check its
 - Seed evals: `docs/prd/SEED-EVALS-<feature>.md` (20-30 cases, or a cross-reference at levels 0-1)
 - Signed level: the tech lead's ADR for the §1.5 level
 
-Save to: `docs/prd/PRD-<feature>.md` (the `/prd` merge)
+Save to: `docs/prd/YYYY-MM-DD-<feature>.md` (the `/prd` merge)

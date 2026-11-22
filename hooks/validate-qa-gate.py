@@ -9,13 +9,17 @@ ENFORCEMENT FLOW:
 1. Claude finishes coding task
 2. Claude tries to move to next task or stop
 3. This hook fires
-4. Checks for QA_PASSED marker
+4. Checks state.json qa_passed[<task>] (written only by the user-confirmed
+   `aid_session.py qa-pass`) against the sha256 of .aid/qa/<task>.yaml (T15, D3)
 5. If missing → BLOCKS with "QA required"
 6. Claude MUST spawn QA sub-agent
-7. After QA passes → allows proceeding
+7. After QA passes and the user confirms qa-pass → allows proceeding
+In an AID root the gate fails closed: unreadable inputs block (T15-16).
 """
 
+import hashlib
 import json
+import re
 import sys
 import os
 from datetime import datetime
@@ -42,94 +46,186 @@ def project_root(input_data):
 
 
 def log_debug(msg):
-    """Write debug info to log file"""
-    log_file = aid("qa", "enforcement.log")
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
-    with open(log_file, "a") as f:
-        f.write(f"[{datetime.now().isoformat()}] {msg}\n")
+    """Write debug info to log file (best effort: a log failure never decides the gate)."""
+    try:
+        log_file = aid("qa", "enforcement.log")
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().isoformat()}] {msg}\n")
+    except OSError:
+        pass
+
+
+class GateError(Exception):
+    """T15-16 (A-16): an input the gate cannot trust. In an AID root it BLOCKS (fail closed)."""
+
+
+# T15 I-2: the same task-id rule aid_session.py qa-pass enforces.
+TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+def read_object(path, what, fix):
+    """The JSON object in path, None when the file is missing; GateError when it exists
+    but cannot be read or is not a JSON object."""
+    if not os.path.lexists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as e:
+        raise GateError(f"cannot read {path} ({e}). {fix}")
+    if not isinstance(data, dict):
+        raise GateError(f"{path} is not a JSON object. {fix}")
+    return data
+
+
+def read_state():
+    return read_object(aid("state.json"), "state",
+                       "Ask the user to repair it with `init --repair` (`aid_session.py init <role> "
+                       "<phase> --repair`, which the user confirms); do not edit the file.")
+
 
 def get_current_task():
-    """Get current task from .aid/context.json"""
-    context_file = aid("context.json")
-    if os.path.exists(context_file):
-        try:
-            with open(context_file) as f:
-                context = json.load(f)
-                # T3-6 (A-17, D-06): the context writer stores "key" (Jira-style), older
-                # files "id"; the installers seed "current_task": null.
-                task = context.get("current_task") if isinstance(context, dict) else None
-                if isinstance(task, dict):
-                    return task.get("id") or task.get("key")
-        except:
-            pass
+    """T15 I-3: the first non-empty string of current_task.id, .key, .jira_key, or None.
+    T3-6 (A-17, D-06): /context-update writes "id" (older files "key", Jira flows
+    "jira_key"); the installers seed "current_task": null."""
+    context = read_object(aid("context.json"), "context",
+                          "Fix it with /context-update (it rewrites .aid/context.json).")
+    if context is None:
+        return None
+    task = context.get("current_task")
+    if task is None:
+        return None
+    if not isinstance(task, dict):
+        raise GateError(f"{aid('context.json')}: current_task is not an object. "
+                        "Fix it with /context-update.")
+    for field in ("id", "key", "jira_key"):
+        value = task.get(field)
+        if isinstance(value, str) and value.strip():
+            return value
     return None
 
-def check_qa_passed(task_id):
-    """Check if QA has passed for the given task"""
-    if not task_id:
-        return True  # No task tracking, allow
 
-    # Check 1: Look for QA review file with PASS verdict
-    qa_dir = aid("qa")
+def criteria_sha256(task_id):
+    """sha256 hex of .aid/qa/<task_id>.yaml, None when it does not exist."""
+    path = aid("qa", f"{task_id}.yaml")
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except OSError as e:
+        raise GateError(f"cannot read the QA criteria file {path} ({e}).")
 
-    if os.path.exists(qa_dir):
-        for filename in os.listdir(qa_dir):
-            if filename.startswith(f"{task_id}-review") and filename.endswith(".json"):
-                review_file = os.path.join(qa_dir, filename)
-                try:
-                    with open(review_file) as f:
-                        review = json.load(f)
-                        if review.get("verdict") == "PASS":
-                            return True
-                except:
-                    pass
 
-    # Check 2: Look for .qa-passed marker file
-    marker_file = aid("qa", f"{task_id}.qa-passed")
-    if os.path.exists(marker_file):
-        return True
+def check_qa_passed(state, task_id, digest):
+    """T15 I-3 (D3, R-07): ONLY a state.json qa_passed record whose criteria_sha256 matches
+    the current criteria file passes. The record is written by `aid_session.py qa-pass`,
+    which the user confirms; .qa-passed files, *-review*.json files and the legacy
+    current_task_qa key are agent-writable and are ignored."""
+    passed = state.get("qa_passed")
+    record = passed.get(task_id) if isinstance(passed, dict) else None
+    return isinstance(record, dict) and record.get("criteria_sha256") == digest
 
-    # Check 3: Check state.json for qa_status
-    state_file = aid("state.json")
-    if os.path.exists(state_file):
-        try:
-            with open(state_file) as f:
-                state = json.load(f)
-                current_task_qa = state.get("current_task_qa", {})
-                if current_task_qa.get("task_id") == task_id:
-                    if current_task_qa.get("status") == "passed":
-                        return True
-        except:
-            pass
 
-    return False
-
-def is_in_development_phase():
+def is_in_development_phase(state):
     """Check if currently in development phase (Phase 4)"""
-    state_file = aid("state.json")
-    if os.path.exists(state_file):
-        try:
-            with open(state_file) as f:
-                state = json.load(f)
-                phase = state.get("current_phase")
-                if phase in [4, "4", "development", "Development"]:
-                    return True
-        except:
-            pass
-    return False
+    return state.get("current_phase") in [4, "4", "development", "Development"]
 
-def has_qa_criteria_file(task_id):
-    """Check if QA criteria file exists for this task"""
+
+def qa_pass_command(task_id):
+    """T15 I-7: the exact ask-confirmed call, with this plugin's absolute script path."""
+    script = (HERE / "aid_session.py").as_posix()
+    return f'python "{script}" qa-pass {task_id} --note "<short summary>"'
+
+
+def qa_agent_name():
+    """T17 I-19 (F4): the plugin's reviewer (aid:qa-validator-agent) on the plugin route
+    (CLAUDE_PLUGIN_ROOT set); the bare name only on the link-project route."""
+    return "aid:qa-validator-agent" if os.environ.get("CLAUDE_PLUGIN_ROOT") else "qa-validator-agent"
+
+
+def qa_agent_note():
+    if os.environ.get("CLAUDE_PLUGIN_ROOT"):
+        return " (the plugin's agent)"
+    return " (this linked project's .claude/agents is AID's linked folder)"
+
+
+def block(reason):
+    # Stop hook block schema: {"decision": "block", "reason": ...}. The reason is fed
+    # back to Claude as the instruction for what to do next.
+    print(json.dumps({"decision": "block", "reason": reason}))
+    sys.exit(0)
+
+
+def evaluate():
+    """The gate decision for an AID root; returns to allow, calls block() to block."""
+    state = read_state()
+    if state is None:
+        log_debug("No state.json, allowing stop")
+        return
+
+    # Only enforce in development phase
+    if not is_in_development_phase(state):
+        log_debug("Not in development phase, allowing stop")
+        return  # allow: silent exit 0 is how a Stop hook approves
+
+    task_id = get_current_task()
+    log_debug(f"Current task: {task_id!r}")
     if not task_id:
-        return False
-    qa_file = aid("qa", f"{task_id}.yaml")
-    return os.path.exists(qa_file)
+        log_debug("No task ID found, allowing stop")
+        return
+
+    if not TASK_ID_RE.match(task_id) or ".." in task_id:
+        raise GateError(f"the current task id {task_id!r} in {aid('context.json')} is not a valid "
+                        "task id (letters, digits, . _ -; max 64; no ..). Fix it with /context-update.")
+
+    # Check if this task has QA criteria (if not, no gate needed)
+    digest = criteria_sha256(task_id)
+    if digest is None:
+        log_debug(f"No QA criteria file for {task_id}, allowing stop")
+        return
+
+    if check_qa_passed(state, task_id, digest):
+        log_debug(f"QA PASSED for {task_id}, allowing stop")
+        return
+
+    log_debug(f"QA NOT PASSED for {task_id}, BLOCKING stop")
+    block(f"""QA Gate BLOCKED: task {task_id} requires QA validation before you stop.
+
+ACTION REQUIRED:
+1. Spawn the QA validator sub-agent{qa_agent_note()}:
+
+   Task(
+     subagent_type="{qa_agent_name()}",
+     prompt="Validate task {task_id}. Criteria: .aid/qa/{task_id}.yaml",
+     description="QA validation for {task_id}"
+   )
+
+2. If it returns FAIL, fix the issues and re-run it.
+3. Once it returns PASS, record the pass with this exact command (Claude Code asks the
+   user to confirm it):
+
+   {qa_pass_command(task_id)}
+
+   Replace <short summary> (brackets included) with a short note using ONLY letters,
+   digits, spaces and . _ : - (no commas, slashes, quotes or brackets), for example:
+   --note "QA PASS all criteria met". Any other character makes the call non-canonical
+   and it is denied.
+
+   Only that confirmed record lets this gate through. If the criteria file changes
+   afterwards, QA must pass again.
+
+QA criteria file: .aid/qa/{task_id}.yaml
+""")
+
 
 def main():
     try:
-        # Read hook input from stdin
-        input_data = json.load(sys.stdin)
-    except:
+        # Read hook input from stdin. T17 I-18 (F3): decoded as UTF-8 whatever the locale, so a
+        # non-ASCII project path resolves; invalid UTF-8 (a ValueError) is malformed input.
+        input_data = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+    except (OSError, ValueError):
         input_data = {}
     if not isinstance(input_data, dict):
         input_data = {}
@@ -147,56 +243,17 @@ def main():
         log_debug("stop_hook_active set, allowing stop to avoid a block loop")
         sys.exit(0)
 
-    # Only enforce in development phase
-    if not is_in_development_phase():
-        log_debug("Not in development phase, allowing stop")
-        sys.exit(0)  # allow: silent exit 0 is how a Stop hook approves
-
-    # Get current task
-    task_id = get_current_task()
-    log_debug(f"Current task: {task_id}")
-
-    if not task_id:
-        log_debug("No task ID found, allowing stop")
-        sys.exit(0)  # allow: silent exit 0 is how a Stop hook approves
-
-    # Check if this task has QA criteria (if not, no gate needed)
-    if not has_qa_criteria_file(task_id):
-        log_debug(f"No QA criteria file for {task_id}, allowing stop")
-        sys.exit(0)  # allow: silent exit 0 is how a Stop hook approves
-
-    # Check if QA has passed
-    if check_qa_passed(task_id):
-        log_debug(f"QA PASSED for {task_id}, allowing stop")
-        sys.exit(0)  # allow: silent exit 0 is how a Stop hook approves
-
-    # QA NOT passed - BLOCK
-    log_debug(f"QA NOT PASSED for {task_id}, BLOCKING stop")
-
-    # Stop hook block schema: {"decision": "block", "reason": ...}. The reason is fed
-    # back to Claude as the instruction for what to do next.
-    output = {
-        "decision": "block",
-        "reason": f"""QA Gate BLOCKED: task {task_id} requires QA validation before you stop.
-
-ACTION REQUIRED:
-1. Spawn the QA validator sub-agent:
-
-   Task(
-     subagent_type="qa-validator-agent",
-     prompt="Validate task {task_id}. Criteria: .aid/qa/{task_id}.yaml",
-     description="QA validation for {task_id}"
-   )
-
-2. If it returns FAIL, fix the issues and re-run it.
-3. Once it returns PASS, write the verdict to .aid/qa/{task_id}-review.json
-   (or .aid/qa/{task_id}.qa-passed) so this gate can see it, then stop.
-
-QA criteria file: .aid/qa/{task_id}.yaml
-"""
-    }
-
-    print(json.dumps(output))
+    # T15-16 (A-16): in an AID root the gate fails CLOSED. An input it cannot trust, or an
+    # unexpected error, blocks with a reason instead of silently letting the stop through.
+    try:
+        evaluate()
+    except GateError as e:
+        log_debug(f"QA gate input problem, BLOCKING stop: {e}")
+        block(f"QA Gate BLOCKED: {e}")
+    except Exception as e:  # noqa: BLE001  (fail closed on anything unexpected)
+        log_debug(f"QA gate error, BLOCKING stop: {e!r}")
+        block(f"QA Gate BLOCKED: the QA gate could not check this stop ({type(e).__name__}: {e}). "
+              "Check .aid/state.json and .aid/context.json.")
 
 if __name__ == "__main__":
     main()

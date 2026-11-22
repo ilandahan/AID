@@ -60,7 +60,7 @@ Ask:
 **Outputs**: WHY + shape brief, PRD document, user stories, acceptance criteria, §7A.1 Charter, §7A.5 Why-Chain, metric set with guardrails
 **How (A9 Phase 1 flow; agents draft in parallel, humans review and decide once)**:
 1. Run the WHY + shape conversation (`why-driven-decision`): WHY / 5 Whys, then the 6 shape questions, on whose behalf the solution acts, who bears the cost of an error, what must never happen and who approves actions. Save `docs/prd/WHY-SHAPE-BRIEF-<feature>.md`; its level is a HYPOTHESIS.
-2. Run the `/prd` flow: `prd-research-aggregator` first, then in parallel `prd-writer`, `aid:phase1-solution-shaper`, `aid:phase1-charter-drafter` and `aid:phase1-eval-planner`, then the merge into `docs/prd/PRD-<feature>.md` and `docs/prd/SEED-EVALS-<feature>.md`.
+2. Run the `/prd` flow: `prd-research-aggregator` first, then in parallel `prd-writer`, `aid:phase1-solution-shaper`, `aid:phase1-charter-drafter` and `aid:phase1-eval-planner`, then the merge into `docs/prd/YYYY-MM-DD-<feature>.md` and `docs/prd/SEED-EVALS-<feature>.md`.
 3. Review the merged PRD and resolve every conflict the merge reported.
 4. Join the shaping session with the tech lead, who decides and signs the level (ADR). Then `prd-validator`, `/gate-check` and `/phase-approve`.
 **Key Questions to Ask**:

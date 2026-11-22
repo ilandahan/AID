@@ -34,6 +34,7 @@ def set_project_root(root):
     global PROJECT_ROOT, STATE_FILE, CONTEXT_FILE, HOOKS_CONFIG_FILE, AUDIT_DIR, AUDIT_FILE
     global ERROR_LOG, MARKERS_DIR, REFLECTION_MARKER
     PROJECT_ROOT = Path(root)
+    aid_guard.set_project(PROJECT_ROOT)      # T17-9: live-root protection on the link route
     STATE_FILE = PROJECT_ROOT / ".aid" / "state.json"
     CONTEXT_FILE = PROJECT_ROOT / ".aid" / "context.json"
     HOOKS_CONFIG_FILE = PROJECT_ROOT / ".aid" / "hooks" / "config.json"
@@ -162,8 +163,10 @@ def load_json(path):
         if path.exists():
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
-    except (json.JSONDecodeError, OSError, PermissionError):
+    except (ValueError, OSError):       # JSONDecodeError and UnicodeDecodeError are ValueErrors
         pass
+    except RecursionError:              # R1-02 (T17 fix cycle 1): `[[[[...` nested too deep is
+        pass                            # invalid JSON too (json.load does not raise ValueError)
     return None
 
 
@@ -226,12 +229,103 @@ def now_iso():
 # Utility: Audit logging
 # ---------------------------------------------------------------------------
 
+_AUDIT_TEXT_KEYS = ("command", "file", "reason", "enforcement_message", "agent_description")
+# T16-15 fallback when memory_system is not importable: the I-14 key rule and the T8 tokens.
+# T17 I-20 (F5): it mirrors the redactor's added forms (any URL scheme, CLI flags, mysql -p,
+# sshpass -p, curl -u, quoted names and values, the exact name `pass`, any Authorization).
+_FB_KEYS = (r"password|passwd|pwd|secret|api[_-]?key|access[_-]?key|private[_-]?key|token"
+            r"|credential")
+
+
+def _fb_url(m):
+    url = m.group(0)
+    tail = re.search(r"[.,;:!?)\]}]+$", url)
+    return "[url]" + (tail.group(0) if tail else "")
+
+
+_FB_MAX = 100_000      # the redactor's _MAX_LEN bound; every repeat below is bounded too
+_FB_QVAL = r"(?:(\")[^\"\n]{1,256}\"|(')[^'\n]{1,256}'|[\"']?[^\s,;\"']+)"
+
+
+def _fb_value(m):
+    q = m.group(2) or m.group(3) or ""
+    return m.group(1) + q + "[token]" + q
+
+
+def _fb_quoted(m):
+    """R2-03: the redactor's _quoted_token: the value's quotes kept around [token]."""
+    s = m.group(2)
+    q = s[0] if s[0] in "\"'" else ""
+    return m.group(1) + q + "[token]" + (q if q and len(s) >= 2 and s.endswith(q) else "")
+
+
+_FALLBACK_SECRETS = (
+    # I-20 rule 7: any URL scheme; the start is a lookbehind (as the redactor), not \b.
+    (re.compile(r"(?i)(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*://[^\s\"'<>]+|\bwww\.[^\s\"'<>]+"), _fb_url),
+    # rule 4: curl -u / --user / --user= user:pass -> user:[token]
+    (re.compile(r"((?i:(?<![\w-])curl\b)[^\n;|&]{0,300}?(?<![\w-])(?:-u[ \t]*|--user(?:=|[ \t]+))"
+                r"[\"']?[^\s:\"']+:)(?!\[token\])[^\s\"']+"), r"\1[token]"),
+    # rule 3: -p<V> attached after a MySQL/MariaDB client; sshpass -p V (-P is a port: not -i).
+    # R2-03 (T17 fix cycle 2): as memory_system.redact's _MYSQL_P / _SSHPASS (R1-04): a quoted
+    # attached value (-p'V', -p"V"), and sshpass -pV / -p'V' / -p "V"; the quotes are kept.
+    (re.compile(r"((?i:(?<![\w-])(?:mysqldump|mysqladmin|mysql|mariadb-dump|mariadb)\b)"
+                r"[^\n;|&]{0,300}?(?<![\w-])-p)"
+                r"(?![\"']?\[)(\"[^\"\n]{1,256}\"|'[^'\n]{1,256}'|[\"']?[^\s\"',;]+)"), _fb_quoted),
+    (re.compile(r"((?i:(?<![\w-])sshpass)[ \t]+-p[ \t]*)(?![\"']?\[token\])(\"[^\"\n]{1,256}\""
+                r"|'[^'\n]{1,256}'|[\"']?[^\s\"',;]+)"), _fb_quoted),
+    # rule 2: --<name with a keyword, or exactly pass> =V / V (V not starting with -)
+    (re.compile(r"(?i)((?<![\w-])--(?:[A-Za-z0-9_-]{0,64}?(?:" + _FB_KEYS + r")[A-Za-z0-9_-]{0,64}|pass)"
+                r"(?:=|[ \t]+(?=[^\s-])))" + _FB_QVAL), _fb_value),
+    # rules 1 and 5: NAME / "NAME" / 'NAME' then : or = then V, "V words" or 'V'; exact `pass`
+    (re.compile(r"(?i)((?:(?:" + _FB_KEYS + r")[A-Za-z0-9_.-]{0,64}"
+                r"|(?<![A-Za-z0-9_.-])pass(?![A-Za-z0-9_.-]))[\"']?\s*[:=]\s*)" + _FB_QVAL), _fb_value),
+    # rule 6: Authorization: <any scheme word> V
+    (re.compile(r"(?i)\b(authorization[\"']?\s*[:=]\s*[\"']?[A-Za-z][\w-]{0,30})[ \t]+[^\s\"',;]+"),
+     r"\1 [token]"),
+    (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{16,}"
+                r"|(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{10,}|glpat-[A-Za-z0-9_-]{16,}|npm_[A-Za-z0-9]{20,}"
+                r"|AIza[0-9A-Za-z_-]{30,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}"
+                r"|eyJ[\w-]{8,}\.[\w-]{8,}\.[\w-]{2,})"), "[token]"),
+    (re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}"), r"\1 [token]"),
+)
+_REDACT = []
+
+
+def audit_redact(text):
+    """T16-15 (audit L17): memory_system.redact.redact (the ONE redactor, INV-1), loaded from
+    the plugin's memory-system/ without its package __init__; else the fallback rules."""
+    if not _REDACT:
+        try:
+            import importlib.util
+            path = Path(__file__).resolve().parent.parent / "memory-system" / "memory_system" / "redact.py"
+            spec = importlib.util.spec_from_file_location("aid_audit_redact", str(path))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _REDACT.append(mod.redact)
+        except Exception:
+            _REDACT.append(None)
+    if _REDACT[0] is not None:
+        try:
+            return _REDACT[0](text)
+        except Exception:
+            pass
+    if not isinstance(text, str):
+        return text
+    text = text[:_FB_MAX]
+    for rx, repl in _FALLBACK_SECRETS:
+        text = rx.sub(repl, text)
+    return text
+
+
 def audit_log_entry(entry):
     """Append a JSONL entry to the audit log (never in a non-AID project: AC-27).
     A latched root (AC-43) still logs while its .aid/audit exists, but never recreates it."""
     if not aid_in_use() and not (LATCHED and AUDIT_DIR.is_dir()):
         return
     try:
+        for k in _AUDIT_TEXT_KEYS:          # T16-15: never store a secret in the audit log
+            if isinstance(entry.get(k), str):
+                entry[k] = audit_redact(entry[k])
         AUDIT_DIR.mkdir(parents=True, exist_ok=True)
         entry["timestamp"] = now_iso()
         with open(AUDIT_FILE, "a", encoding="utf-8") as f:
@@ -322,21 +416,23 @@ def clear_markers():
 EVENT = ""
 
 
-def output_allow(additional_context=""):
+def output_allow(additional_context="", system_message=None):
     """
-    Allow the action, optionally injecting context.
+    Allow the action, optionally injecting context (and, T15-11, a top-level systemMessage
+    the user sees).
 
     WHY hookEventName: without it Claude Code cannot route hookSpecificOutput and
     silently drops additionalContext -- which made every SessionStart context injection
     and every "warn" enforcement level a no-op.
     """
-    if additional_context:
-        print(json.dumps({
-            "hookSpecificOutput": {
-                "hookEventName": EVENT,
-                "additionalContext": additional_context
-            }
-        }))
+    if additional_context or system_message:
+        out = {}
+        if system_message:
+            out["systemMessage"] = system_message
+        if additional_context:
+            out["hookSpecificOutput"] = {"hookEventName": EVENT,
+                                         "additionalContext": additional_context}
+        print(json.dumps(out))
     # Allowing with nothing to say = stay silent, exit 0. The old {"ok": true} body was
     # not a shape Claude Code reads.
     sys.exit(0)
@@ -355,6 +451,22 @@ def output_deny(reason):
         "hookSpecificOutput": {
             "hookEventName": EVENT or "PreToolUse",
             "permissionDecision": "deny",
+            "permissionDecisionReason": reason
+        }
+    }))
+    sys.exit(0)
+
+
+def output_ask(reason):
+    """
+    T15 I-6: ask the user to confirm the call. A human confirmation, not a phase rule, so it
+    is emitted at every gate level. Where nobody can answer (-p / dontAsk) Claude Code
+    denies it.
+    """
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "ask",
             "permissionDecisionReason": reason
         }
     }))
@@ -417,6 +529,61 @@ AID_RULES = (
 )
 
 
+def _linked_hint(*subcommands):
+    """R2-A1: Claude Code sets CLAUDE_PLUGIN_ROOT for a plugin's hooks. Without it the hook
+    runs from a link-project install, where the /aid-* commands stop (they need
+    ${CLAUDE_PLUGIN_ROOT}): name the `! python "<AID>/hooks/aid_session.py" ...` lines."""
+    if os.environ.get("CLAUDE_PLUGIN_ROOT"):
+        return ""
+    script = str(aid_guard.SESSION_SCRIPT).replace("\\", "/")
+    return (" This project is linked to AID without the plugin, so the user types these "
+            "instead (typing the line is the user's confirmation): {}.".format(
+                "; ".join('! python "{}" {}'.format(script, s) for s in subcommands)))
+
+
+def context_task_id(context):
+    """T17 I-21: the task id (id, then key, then jira_key, as I-3), or ""."""
+    task = context.get("current_task") if isinstance(context, dict) else None
+    if not isinstance(task, dict):
+        return ""
+    for field in ("id", "key", "jira_key"):
+        v = task.get(field)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return ""
+
+
+def context_lines(context):
+    """T17 I-21 (F6): the banner lines for .aid/context.json, read field by field. Any field
+    of an unexpected type is skipped; a non-object document gives no lines."""
+    if not isinstance(context, dict):
+        return []
+    lines = []
+    task = context.get("current_task")
+    title = task.get("title") if isinstance(task, dict) else None
+    parts = [p for p in (context_task_id(context), title if isinstance(title, str) else "") if p.strip()]
+    if parts:
+        lines.append("\nCurrent Task: {}".format(" - ".join(parts)))
+    step = context.get("current_step")
+    if isinstance(step, dict):
+        step = step.get("name")
+    if isinstance(step, str) and step.strip():
+        lines.append("Current Step: {}".format(step))
+    blockers = context.get("blockers")
+    shown = []
+    for b in (blockers if isinstance(blockers, list) else []):
+        if isinstance(b, str) and b.strip():
+            shown.append(("?", b))
+        elif isinstance(b, dict) and isinstance(b.get("description"), str):
+            sev = b.get("severity")
+            shown.append((sev if isinstance(sev, str) and sev else "?", b["description"]))
+    if shown:
+        lines.append("Blockers: {}".format(len(shown)))
+        for sev, desc in shown[:3]:  # show max 3
+            lines.append("  - [{}] {}".format(sev, desc[:80]))
+    return lines
+
+
 def handle_session_start(input_data, config):
     """
     Inject current AID phase/role/skills/task into Claude's context.
@@ -436,6 +603,9 @@ def handle_session_start(input_data, config):
     if aid_in_use():
         clear_markers()
         notes.append(AID_RULES)   # T13-4 (A-52): plugin users never load the root CLAUDE.md
+        hint = _linked_hint("approve", "advance")
+        if hint:
+            notes.append("Phase moves (rule 4):" + hint)
         added, err = aid_guard.ensure_permissions(PROJECT_ROOT)   # AC-38ext: config-only roots too
         if added:
             notes.append("AID added {} permission rules (deny, and ask-the-user for phase changes) to .claude/settings.json "
@@ -468,8 +638,20 @@ def handle_session_start(input_data, config):
                          "permission rules only apply when Claude Code is started in the AID "
                          "project folder.".format(env_dir, PROJECT_ROOT))
 
+    # T15-11 (R-14): every SessionStart in an AID project names each gate below block,
+    # whether or not it changed since the last session, to the user and to the agent.
+    lowered = ["{}: {}".format(g, lv) for g, lv in sorted(gate_levels(config).items())
+               if lv != "block"] if aid_in_use() else []
+    system_message = None
+    if lowered:
+        notes.append("AID gates below block in this project: {}. At log/warn out-of-phase code "
+                     "and commands are not stopped; control files stay refused."
+                     .format(", ".join(lowered)))
+        system_message = ("AID: phase gates below block in this project ({}); out-of-phase "
+                          "work is not stopped.".format(", ".join(lowered)))
+
     def say(text):
-        output_allow("\n".join(notes + [text]))
+        output_allow("\n".join(notes + [text]), system_message=system_message)
 
     state = load_state()
     context = load_context()
@@ -485,6 +667,7 @@ def handle_session_start(input_data, config):
         say(
             "NOTE: No AID state found (.aid/state.json missing). "
             "Run /aid-start to initialize your AID session with role and phase selection."
+            + _linked_hint("init <role> <phase>")
         )
         return
 
@@ -492,6 +675,7 @@ def handle_session_start(input_data, config):
     if not session.get("active"):
         say(
             "NOTE: No active AID session. Run /aid-start to select your role and phase."
+            + _linked_hint("start <role> <phase>")
         )
         return
 
@@ -510,21 +694,12 @@ def handle_session_start(input_data, config):
         "Skills Loaded: {}".format(", ".join(skills) if skills else "none"),
     ]
 
-    # Add task context if available
-    if context:
-        task = context.get("current_task", {})
-        step = context.get("current_step", {})
-        blockers = context.get("blockers", [])
-        if task:
-            lines.append("\nCurrent Task: {} - {}".format(
-                task.get("key", "?"), task.get("title", "?")))
-        if step:
-            lines.append("Current Step: {}".format(step.get("name", "?")))
-        if blockers:
-            lines.append("Blockers: {}".format(len(blockers)))
-            for b in blockers[:3]:  # show max 3
-                lines.append("  - [{}] {}".format(
-                    b.get("severity", "?"), b.get("description", "?")[:80]))
+    # Add task context if available (T17 I-21: tolerant field by field, never a crash)
+    try:
+        lines.extend(context_lines(context))
+    except Exception as e:  # noqa: BLE001  (the rules block and notes are still emitted)
+        log_error("context.json could not be read into the SessionStart banner: {}: {}".format(
+            type(e).__name__, e))
 
     # Add enforcement status
     enforcement = config["enforcement"]
@@ -543,14 +718,25 @@ def handle_session_start(input_data, config):
 
     if phase_int < min_phase:
         allowed = ", ".join(config["phase_gate_rules"].get("allowed_write_prefixes", []))
+        # T17-10 (U-26): at log/warn the gate does not stop out-of-phase work; say so.
+        below = ["{}: {}".format(g, lv) for g, lv in sorted(gate_levels(config).items()) if lv != "block"]
+        if below:
+            head = ("\n⚠️ PHASE RESTRICTION: code writing/execution belongs to Phase {} and later, "
+                    "but the phase gates are at {} here, so out-of-phase work is NOT stopped; "
+                    "follow the phases yourself. ".format(min_phase, ", ".join(below)))
+        else:
+            head = "\n⚠️ PHASE RESTRICTION: Code writing/execution NOT allowed until Phase {}. ".format(min_phase)
         lines.append(
-            "\n⚠️ PHASE RESTRICTION: Code writing/execution NOT allowed until Phase {}. "
-            "Allowed write paths: {}".format(min_phase, allowed)
+            head +
+            "Allowed write paths: {} (except AID control files (.aid/state.json, .aid/hooks/, "
+            "QA markers, pipeline escalation) and Claude Code's executable .claude/ paths; see "
+            "{}/docs/SECURITY-MODEL.md)".format(
+                allowed, str(aid_guard.LIVE_ROOT).replace("\\", "/"))
         )
 
     # Check for active pipeline
     pipeline_state = load_json(PROJECT_ROOT / ".aid" / "pipeline" / "state.json")
-    if pipeline_state and pipeline_state.get("pipeline_status") in ("running", "paused"):
+    if isinstance(pipeline_state, dict) and pipeline_state.get("pipeline_status") in ("running", "paused"):
         lines.append(
             "\nACTIVE PIPELINE: Task {} at step {} (status: {})".format(
                 pipeline_state.get("task_id", "?"),
@@ -591,11 +777,7 @@ def handle_user_prompt_submit(input_data, config):
     phase = state.get("current_phase", "?")
     role = session.get("role_display", session.get("role", "?"))
 
-    context = load_context()
-    task_key = ""
-    if context:
-        task = context.get("current_task", {})
-        task_key = task.get("key", "")
+    task_key = context_task_id(load_context())     # T17 I-21: any context.json shape
 
     tag = "[AID: Phase {} | {}".format(phase, role)
     if task_key:
@@ -631,18 +813,26 @@ def load_gate_state(config):
     if phase is None:
         return state, (0 if blocking else None)
     try:
-        return state, int(str(phase).strip())
+        if isinstance(phase, bool):
+            raise TypeError
+        value = int(str(phase).strip())
     except (ValueError, TypeError):
         raise GateInputError("current_phase {!r} is not an integer".format(phase))
+    if not 0 <= value <= 5:
+        # T15-9: phases are 0-5; 99 used to read as "past every gate".
+        raise GateInputError("current_phase {!r} is outside 0-5".format(phase))
+    return state, value
 
 
 ACTION = None  # set by main(); read by fail_closed()
+PENDING_ASK = None  # T15: a human-confirmed call being judged; never allowed silently
 
 
 def fail_closed(reason):
     """
     A PreToolUse gate could not evaluate the call. In block mode deny it (fail CLOSED);
-    in log/warn mode, and for every other hook, log the error and allow.
+    in log/warn mode, and for every other hook, log the error and allow -- except a
+    human-confirmed call (PENDING_ASK), which is still asked.
     """
     log_error(reason)
     if EVENT == "PreToolUse" and ACTION in GATES:
@@ -653,6 +843,8 @@ def fail_closed(reason):
         if level == "block":
             output_deny("🚫 AID ENFORCEMENT BLOCK: the phase gate could not evaluate "
                         "this call ({}), so it is denied.".format(reason))
+        if PENDING_ASK:
+            output_ask(PENDING_ASK)
     sys.exit(0)
 
 
@@ -670,12 +862,15 @@ def gate_cwd(input_data):
     return cwd if isinstance(cwd, str) and cwd else str(PROJECT_ROOT)
 
 
-def check_integrity_or_deny(input_data, config, hook_name, phase):
-    """Layer B: deny (per the BASELINE's level) when the gate config or deny rules changed."""
+def check_integrity_or_deny(input_data, config, hook_name, phase, ask=None):
+    """Layer B: deny (per the BASELINE's level) when the gate config or deny rules changed.
+    T15: for a human-confirmed call (ask) a log/warn baseline still asks, never allows."""
     reason, base_levels = aid_guard.check_integrity(
         PROJECT_ROOT, input_data.get("session_id"), gate_levels(config), markers_missing=LATCHED)
     if reason:
         level = base_levels.get(hook_name, get_enforcement_level(config, hook_name))
+        if ask and level != "block":
+            output_ask("{} (AID integrity note: {})".format(ask, reason))
         enforce(level, reason, {"event": "PreToolUse", "hook": hook_name, "integrity": True,
                                 "phase": phase, "violation": True})
 
@@ -727,7 +922,16 @@ def handle_phase_gate_write(input_data, config):
     Refuse writes to AID control files in every phase, and source writes before
     code_write_min_phase. Allowed before then: docs/, .aid/, .claude/, features/,
     testing/, tests/ and Claude Code's own plan files. Rules: aid_guard.write_target_verdict.
+    T16-1 (E2): a project .aid/state.json is refused first, in EVERY folder.
+    T16-4: an existing .aid/pipeline/config.json is asked (it holds the pass thresholds).
     """
+    raw_input = input_data.get("tool_input")
+    for k in ("file_path", "notebook_path"):
+        p = raw_input.get(k) if isinstance(raw_input, dict) else None
+        if aid_guard.write_tool_state_target(p, gate_cwd(input_data)):
+            enforce("block", aid_guard.state_file_reason(p), {
+                "event": "PreToolUse", "hook": "phase_gate_write",
+                "tool": input_data.get("tool_name", "Write"), "file": p[:300], "violation": True})
     if not aid_in_use() and not LATCHED:
         output_allow()  # AID not used in this project -- stay out of the way
         return
@@ -751,6 +955,15 @@ def handle_phase_gate_write(input_data, config):
             file_path = p
             break
     if not reason:
+        cfg = os.path.realpath(str(PROJECT_ROOT / ".aid" / "pipeline" / "config.json"))
+        for p in paths:
+            n = aid_guard.normalize(p, gate_cwd(input_data), literal=True) if p else None
+            if n == aid_guard._key(cfg) and os.path.isfile(cfg):
+                audit_log_entry({"event": "PreToolUse", "hook": "phase_gate_write",
+                                 "tool": input_data.get("tool_name", "Write"), "file": p[:300],
+                                 "ask": True})
+                output_ask("AID asks before .aid/pipeline/config.json changes: it holds the "
+                           "pipeline's pass thresholds, so the user must confirm the change.")
         output_allow()
         return
 
@@ -790,27 +1003,67 @@ def handle_phase_gate_bash(input_data, config):
     only a best-effort literal control-file check runs (layers A and B are the real
     protection). The human extends the pre-Phase-4 list with
     phase_gate_rules.extra_allowed_commands in .aid/hooks/config.json (a protected file).
+
+    T15 (D1, D2) first, in EVERY folder: human-confirmed aid_session.py calls and the plugin
+    scripts are asked (aid_guard.session_ask_verdict), whatever the phase or level.
     """
+    global PENDING_ASK
+    tool_name = input_data.get("tool_name") or "Bash"
+    if isinstance(tool_name, str) and tool_name.casefold() == "powershell":
+        tool_name = "PowerShell"          # T7 review r1: defence in depth
+    tool_input = input_data.get("tool_input")
+    shown = tool_input.get("command") if isinstance(tool_input, dict) else None
+    # T17 I-17 (F1): a direct `"<S>" approve` / `"<P>" --resolve` is judged exactly like the
+    # python / node call (the twin); messages and the audit log show what was typed.
+    raw_cmd = aid_guard.direct_exec_twin(shown, powershell=tool_name == "PowerShell")
+    kind, why = None, None
+    if isinstance(raw_cmd, str) and raw_cmd.strip():
+        kind, why = aid_guard.session_ask_verdict(raw_cmd, str(PROJECT_ROOT),
+                                                  powershell=tool_name == "PowerShell")
+        # T16-2 (E2): a write to a project .aid/state.json, in EVERY folder. T16 B1: outside
+        # AID projects only a command whose text literally names .aid/state.json.
+        state_why = None if kind else aid_guard.state_write_reason(
+            raw_cmd, gate_cwd(input_data), powershell=tool_name == "PowerShell",
+            in_aid=bool(aid_in_use() or LATCHED))
+        if state_why:
+            enforce("block", state_why, {"event": "PreToolUse", "hook": "phase_gate_bash",
+                                         "tool": tool_name, "command": shown[:200], "violation": True})
     if not aid_in_use() and not LATCHED:
+        if kind in ("ask", "foreign"):
+            output_ask(why)
+        if kind == "deny":
+            output_deny("🚫 AID: " + why)
         output_allow()
         return
+    asking = why if kind in ("ask", "foreign") else None
+    PENDING_ASK = asking
     # INV-3: layer B before the state is read, so a broken state.json cannot skip it.
-    check_integrity_or_deny(input_data, config, "phase_gate_bash", None)
+    check_integrity_or_deny(input_data, config, "phase_gate_bash", None, ask=asking)
+    if kind == "ask":
+        audit_log_entry({"event": "PreToolUse", "hook": "phase_gate_bash", "tool": tool_name,
+                         "command": shown[:200], "ask": True})
+        output_ask(why)
+    if kind is None and isinstance(raw_cmd, str) and aid_guard.resolve_denied(
+            raw_cmd, powershell=tool_name == "PowerShell"):
+        # T16-3 (E4, I-13): resolving an escalation is the user's decision, at every level.
+        enforce("block", "Phase gate: '{}' resolves a pipeline escalation, a decision only the "
+                "user makes. Show the user this line to run, and never run it yourself: {}".format(
+                    shown[:100], aid_guard.resolve_user_line()),
+                {"event": "PreToolUse", "hook": "phase_gate_bash", "tool": tool_name,
+                 "command": shown[:200], "violation": True})
     state, phase = load_gate_state(config)
 
-    command = input_data["tool_input"].get("command") or ""
+    command = input_data["tool_input"].get("command") or ""     # malformed input fails closed
     if not isinstance(command, str):
         raise GateInputError("command is not a string")
     if not command.strip():
         output_allow()
         return
+    command = raw_cmd                                           # T17 I-17: judge the twin
 
     rules = config["phase_gate_rules"]
-    tool_name = input_data.get("tool_name") or "Bash"
-    if isinstance(tool_name, str) and tool_name.casefold() == "powershell":
-        tool_name = "PowerShell"          # T7 review r1: defence in depth
     min_phase = rules.get("code_execute_min_phase", 4)
-    cmd_display = command[:100] + ("..." if len(command) > 100 else "")
+    cmd_display = shown[:100] + ("..." if len(shown) > 100 else "")
     if tool_name == "PowerShell":
         # T7 (D1-D3): its own rules; the bash read-only list is never applied to it.
         def verdict(ph):
@@ -823,6 +1076,8 @@ def handle_phase_gate_bash(input_data, config):
                                            extra if ph is not None else ())
     reason = verdict(phase)
     if not reason:
+        if asking:
+            output_ask(asking)        # "foreign": the existing rules allow, the user still confirms
         output_allow()
         return
 
@@ -843,19 +1098,23 @@ def handle_phase_gate_bash(input_data, config):
     elif phase is not None and phase < min_phase:
         message = (
             "Phase gate: '{}' — {}. Phase {} ({}); running code needs Phase {} (Development). "
-            "Until then Bash runs only read-only commands (ls, cat, grep, git status/log/diff/"
-            "add/commit, mkdir in docs/...). To create or change files use the Write tool. "
+            "Until then Bash runs only read-only commands (ls, cat, grep, git status/log/diff), "
+            "plus git add/commit and mkdir in docs/... (git add/commit are allowed; your own git "
+            "hooks (pre-commit, core.hooksPath) still run when you commit). To create or "
+            "change files use the Write tool. "
             "When this phase's work is done, use /gate-check, then /phase-advance. If the "
             "project needs a specific command earlier, ask the user to add it to "
             "phase_gate_rules.extra_allowed_commands in .aid/hooks/config.json.".format(
                 cmd_display, reason, phase, (state or {}).get("phase_name", "?"), min_phase))
     else:
         message = "Phase gate: '{}' — {}. {}".format(cmd_display, reason, CONTROL_FILE_HINT)
+    if asking and gate_level(config, "phase_gate_bash", control) != "block":
+        output_ask(asking)            # a lowered gate relaxes phase rules, never the confirmation
     enforce(gate_level(config, "phase_gate_bash", control), message, {
         "event": "PreToolUse",
         "hook": "phase_gate_bash",
         "tool": tool_name,
-        "command": command[:200],
+        "command": shown[:200],
         "reason": reason[:200],
         "phase": phase,
         "violation": True,
@@ -993,9 +1252,11 @@ def main():
     ACTION = args.action
 
     # Read stdin (hook input data)
+    # T17 I-18 (F3): bytes decoded as UTF-8 whatever the locale (cp1252 on Windows turned a
+    # non-ASCII project path into mojibake). Invalid UTF-8 (a ValueError) is malformed input.
     try:
-        input_data = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
+        input_data = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+    except (OSError, ValueError):
         input_data = {}
     if not isinstance(input_data, dict):
         input_data = {}

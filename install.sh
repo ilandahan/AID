@@ -66,10 +66,11 @@ check_prerequisites() {
 install_npm_deps() {
     echo ""
     echo "[STEP 1/10] Installing npm dependencies..."
-    if npm install; then
+    # npm ci: install exactly what package-lock.json pins (no silent upgrades).
+    if npm ci; then
         log_success "npm dependencies installed"
     else
-        log_warning "npm install had issues, continuing..."
+        log_warning "npm ci had issues, continuing..."
     fi
 }
 
@@ -163,45 +164,12 @@ create_state_files() {
 
     CURRENT_DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
-    # Create state.json if it doesn't exist
-    if [ ! -f ".aid/state.json" ]; then
-        cat > ".aid/state.json" << EOF
-{
-  "\$schema": "aid-state-v1",
-  "version": "1.0",
-  "initialized_at": "$CURRENT_DATE",
-  "last_updated": "$CURRENT_DATE",
-  "current_phase": 0,
-  "phase_name": "Discovery",
-  "phase_approved": false,
-  "current_session": {
-    "active": false,
-    "role": null,
-    "phase": null,
-    "started_at": null,
-    "revision_count": 0
-  },
-  "last_session": {
-    "role": null,
-    "phase": null,
-    "completed_at": null
-  },
-  "statistics": {
-    "total_sessions": 0,
-    "total_feedback_collected": 0,
-    "pending_feedback_count": 0,
-    "last_improvement_run": null,
-    "sessions_since_last_improvement": 0
-  },
-  "notifications": {
-    "improvement_suggested": false,
-    "reason": null
-  }
-}
-EOF
-        log_success "State file created"
-    else
+    # .aid/state.json is NOT written here (T16-64, E3): hooks/aid_session.py is its only
+    # writer. /aid-start runs `aid_session.py init`, which the user confirms.
+    if [ -f ".aid/state.json" ]; then
         log_success "State file already exists"
+    else
+        log_info "State file: created by /aid-start (aid_session.py init), not by the installer"
     fi
 
     # Create context.json if it doesn't exist
@@ -258,7 +226,7 @@ setup_mcp_and_env() {
             echo ""
             echo "  NOTE: .mcp.json reads tokens from environment variables. Do NOT paste"
             echo "  tokens into it. Export them from your OS keystore (see INSTALLATION.md):"
-            echo "    - ATLASSIAN_SITE_URL, ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (Jira/Confluence)"
+            echo "    - ATLASSIAN_SITE_NAME (subdomain only), ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (Jira/Confluence)"
             echo "    - GITHUB_PERSONAL_ACCESS_TOKEN (GitHub)"
         else
             log_error ".mcp.json.mac template not found!"
@@ -272,15 +240,10 @@ setup_mcp_and_env() {
         log_success "MCP configuration already exists"
     fi
 
-    # Create .env if not exists
-    if [ ! -f ".env" ]; then
-        if [ -f ".env.example" ]; then
-            cp ".env.example" ".env"
-            log_success "Created .env from template"
-        fi
-    else
-        log_success ".env already exists"
-    fi
+    # No .env is created: tokens never go into a plaintext file.
+    # Preference order: SSO/OAuth > OS keystore > environment variable.
+    log_info "Tokens: store them in your OS keystore, not in a .env file."
+    echo "  See INSTALLATION.md, section \"MCP Integrations Setup\" (OS keystore table)."
 }
 
 # Verify MCP configuration
@@ -320,10 +283,10 @@ setup_storybook() {
         cd storybook-preview
 
         # Install npm dependencies
-        if npm install; then
+        if npm ci; then
             log_success "Storybook dependencies installed"
         else
-            log_warning "Storybook install had issues - try manually: cd storybook-preview && npm install"
+            log_warning "Storybook install had issues - try manually: cd storybook-preview && npm ci"
         fi
 
         # Create atomic design component directories
@@ -518,7 +481,7 @@ print_next_steps() {
     echo "Next steps:"
     echo ""
     echo "1. Export your API tokens as environment variables (do not edit them into .mcp.json):"
-    echo "   - ATLASSIAN_SITE_URL, ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (for Jira/Confluence)"
+    echo "   - ATLASSIAN_SITE_NAME (subdomain only), ATLASSIAN_USER_EMAIL, ATLASSIAN_API_TOKEN (for Jira/Confluence)"
     echo "   - GITHUB_PERSONAL_ACCESS_TOKEN (for GitHub)"
     echo "   Load them from your OS keystore, e.g.:"
     echo "     export ATLASSIAN_API_TOKEN=\"\$(security find-generic-password -s aid-atlassian -w)\"   # macOS"

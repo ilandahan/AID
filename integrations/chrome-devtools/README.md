@@ -40,8 +40,11 @@ npm install
 ### Claude Code CLI
 
 ```bash
-claude mcp add chrome-devtools npx chrome-devtools-mcp@1.12.0
+claude mcp add chrome-devtools -- npx chrome-devtools-mcp@1.12.0 --no-usage-statistics --no-performance-crux
 ```
+
+The `--` makes `claude` pass the flags through to the server. See [Privacy](#privacy) for
+what the two flags turn off.
 
 ### Configuration File (.mcp.json)
 
@@ -50,7 +53,7 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@1.12.0
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@1.12.0"]
+      "args": ["-y", "chrome-devtools-mcp@1.12.0", "--no-usage-statistics", "--no-performance-crux"]
     }
   }
 }
@@ -66,6 +69,8 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@1.12.0
       "args": [
         "-y",
         "chrome-devtools-mcp@1.12.0",
+        "--no-usage-statistics",
+        "--no-performance-crux",
         "--browser-url=http://127.0.0.1:9222"
       ]
     }
@@ -90,7 +95,7 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@1.12.0
 
 ## Usage by Phase
 
-### Phase 5: Development
+### Phase 4: Development
 
 ```
 "Navigate to localhost:3000 and take a screenshot of the homepage"
@@ -98,7 +103,7 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@1.12.0
 "Fill in the login form with test credentials and verify redirect"
 ```
 
-### Phase 6: Testing
+### Phase 5: QA & Ship (testing)
 
 ```
 "Take screenshots of all main pages for visual regression"
@@ -106,7 +111,7 @@ claude mcp add chrome-devtools npx chrome-devtools-mcp@1.12.0
 "Verify all API calls complete successfully on the checkout flow"
 ```
 
-### Phase 7: Code Review
+### Phases 4-5: Code Review
 
 ```
 "Analyze the network requests on page load - are there any unnecessary calls?"
@@ -143,7 +148,7 @@ Delete the temporary profile directory when you are done.
 ### Headless Mode (CI/CD)
 
 ```bash
-npx chrome-devtools-mcp@1.12.0 --headless
+npx chrome-devtools-mcp@1.12.0 --no-usage-statistics --no-performance-crux --headless
 ```
 
 ### Isolated Session (recommended default)
@@ -152,7 +157,7 @@ Uses a temporary profile that is deleted when the browser closes. Add `--isolate
 the `args` in `.mcp.json` unless you need a manual instance as above.
 
 ```bash
-npx chrome-devtools-mcp@1.12.0 --isolated
+npx chrome-devtools-mcp@1.12.0 --no-usage-statistics --no-performance-crux --isolated
 ```
 
 ## Example Workflows
@@ -196,6 +201,25 @@ npx chrome-devtools-mcp@1.12.0 --isolated
 - Avoid production data during debugging
 - Review AI assistant data handling policies
 
+## Privacy
+
+What `chrome-devtools-mcp@1.12.0` sends to Google by default, and how AID's templates opt out:
+
+| Data flow | Default | Opt-out used by AID |
+|-----------|---------|---------------------|
+| Usage statistics (tool success rates, latency, environment information) sent to Google | On | `--no-usage-statistics` |
+| Trace URLs from the performance tools sent to the Google CrUX API (field performance data) | On | `--no-performance-crux` |
+| Update check against the npm registry | On | set `CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS=1` in your environment |
+
+- AID's templates (`.mcp.json.example`, `.mcp.json.mac`, `.mcp.json.windows`), the
+  `/link-project` table and every snippet on this page pass `--no-usage-statistics` and
+  `--no-performance-crux` after the package spec.
+- If you add the server yourself, keep both flags. With `claude mcp add`, put them after `--`
+  so `claude` passes them through to the server.
+- Google handles usage statistics under the
+  [Google Privacy Policy](https://policies.google.com/privacy).
+- The pages you open (and anything your clicks and form fills send) still reach those sites.
+
 ## Troubleshooting
 
 ### Connection Issues
@@ -206,7 +230,7 @@ curl http://127.0.0.1:9222/json/version
 
 # Remove and re-add server
 claude mcp remove chrome-devtools
-claude mcp add chrome-devtools npx chrome-devtools-mcp@1.12.0
+claude mcp add chrome-devtools -- npx chrome-devtools-mcp@1.12.0 --no-usage-statistics --no-performance-crux
 ```
 
 ### Sandbox Issues
@@ -217,7 +241,7 @@ test), use:
 
 ```bash
 # CI only - never on a developer machine; it disables Chrome's process sandbox
-npx chrome-devtools-mcp@1.12.0 --headless --isolated --no-sandbox
+npx chrome-devtools-mcp@1.12.0 --no-usage-statistics --no-performance-crux --headless --isolated --no-sandbox
 ```
 
 ### Timeout Issues

@@ -6,7 +6,7 @@ version: "1.0"
 
 # User identification
 user:
-  name: ""                          # Set during /aid init
+  name: ""                          # Set during /aid-init
   preferred_language: "he"          # he | en
   default_role: null                # Learned from usage
 
@@ -28,7 +28,7 @@ feedback:
 
 # Improvement triggers
 improvement:
-  auto_prompt_after_sessions: 10    # Suggest /aid improve after N sessions
+  auto_prompt_after_sessions: 10    # Suggest /aid-improve after N sessions
   auto_prompt_after_days: 7         # Or after N days
   
   min_feedback_for_pattern: 3       # Need 3+ occurrences for pattern

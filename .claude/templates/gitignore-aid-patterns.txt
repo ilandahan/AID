@@ -7,8 +7,12 @@
 .aid/test-outputs/
 .aid/agent-tests/
 
-# QA review files (generated during development)
-.aid/qa/*-review-*.json
+# QA validator reports (generated during development: <task>-report-<N>.json).
+# A QA pass is recorded in .aid/state.json by `aid_session.py qa-pass`, not in a file.
+.aid/qa/reports/
+
+# Hook audit log (written by the AID hooks; may name paths and commands)
+.aid/audit/
 
 # Keep templates and example files
 !.aid/qa/EXAMPLE-TASK.yaml

@@ -95,7 +95,7 @@ For each checklist item:
 
 | Deliverable | Location |
 |-------------|----------|
-| PRD (requirements + scope) | `docs/prd/PRD-<feature>.md` |
+| PRD (requirements + scope) | `docs/prd/YYYY-MM-DD-<feature>.md` |
 | WHY + shape brief | `docs/prd/WHY-SHAPE-BRIEF-<feature>.md` |
 | Seed eval cases | `docs/prd/SEED-EVALS-<feature>.md` |
 | Level ADR | `docs/prd/ADR-SHAPE-<feature>.md` |
@@ -284,7 +284,7 @@ For each checklist item:
 
 ## Expected Files
 
-- `docs/prd/PRD-<feature>.md` (required)
+- `docs/prd/YYYY-MM-DD-<feature>.md` (required). A legacy name from older AID versions (`docs/prd/PRD-<feature>.md`) still counts: report it as a rename note ("rename to `YYYY-MM-DD-<feature>.md`"), not as a failed check
 - `docs/prd/WHY-SHAPE-BRIEF-<feature>.md` (required)
 - `docs/prd/SEED-EVALS-<feature>.md` (required; at levels 0-1 it may be a cross-reference)
 - `docs/prd/ADR-SHAPE-<feature>.md`: the tech lead's ADR signing the §1.5 level (required)

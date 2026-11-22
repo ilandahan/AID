@@ -8,18 +8,29 @@ disable-model-invocation: true
 Three levels of "stop". Ask the user which one they want if the request is
 ambiguous (default to the lightest that matches their words):
 
+Snooze and skip run breather's `mark.mjs` under `~/.claude/hooks/`. In an AID project the
+phase gate refuses that command to Claude in every phase (it runs a file under
+`~/.claude/hooks`, a control path), and that rule stays. So do not run these two yourself:
+show the user the line and ask them to type it, with the leading `!`. The same holds for the
+`ack` that breather's session-start text asks for: in an AID project the user types
+`! node ~/.claude/hooks/breather/mark.mjs ack`.
+
 ## 1. Snooze — quiet for N minutes
 
-```bash
-node ~/.claude/hooks/breather/mark.mjs snooze 90
+The user types:
+
+```
+! node ~/.claude/hooks/breather/mark.mjs snooze 90
 ```
 
 No offers for the given minutes. Presence tracking continues.
 
 ## 2. Skip today — no more offers until tomorrow
 
-```bash
-node ~/.claude/hooks/breather/mark.mjs skip
+The user types:
+
+```
+! node ~/.claude/hooks/breather/mark.mjs skip
 ```
 
 Day plan questions and offers stop for the rest of the day.
@@ -27,8 +38,13 @@ Day plan questions and offers stop for the rest of the day.
 ## 3. Uninstall — remove breather entirely
 
 ```bash
-node <installer-path> --uninstall
+node "${CLAUDE_PLUGIN_ROOT}/integrations/breather/install.mjs" --uninstall
 ```
+
+Claude Code asks the user before the installer runs (AID's gate answers "ask" for this exact
+command in every folder; in `-p` or dontAsk sessions it is denied). Under
+`--dangerously-skip-permissions` Claude Code does not document that a hook's "ask" still
+prompts, so do not count on a prompt in that mode.
 
 Installer path (first match wins):
 - `${CLAUDE_PLUGIN_ROOT}/integrations/breather/install.mjs` only (plugin install). Never run an

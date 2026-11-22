@@ -157,9 +157,9 @@ The `state.json` file tracks:
 | `current_step` | Current step in the sequence |
 | `current_task_id` | Task being worked on |
 | `iterations` | Retry counters per step type |
-| `cost` | Token counts and USD estimates per step and cumulative |
+| `cost` | Token counts and USD estimates per step and cumulative; written by `gate.mjs --step` (`--usage`, else the estimate marked `estimated`) |
 | `step_summaries` | Compressed context summaries per completed step |
-| `last_review_result` | Full JSON from last sub-agent (including scores) |
+| `last_review_result` | `{step, result, overall, threshold, round, timestamp}` of the last scored review; written by `gate.mjs --step` |
 | `step_history` | Ordered log of all step transitions with scores and timestamps |
 
 ---

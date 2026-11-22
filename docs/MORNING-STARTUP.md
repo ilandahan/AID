@@ -4,7 +4,9 @@ The `/good-morning` command runs a daily startup sequence to load context, check
 
 ## What It Does
 
-1. **Load context** — Read `.aid/context.json` to understand current task and progress
+1. **Load context** — Read `.aid/context.json` (the one `aid-context-v1` schema, see
+   [context-schema.md](../skills/context-tracking/references/context-schema.md)) to understand
+   the current task and progress
 2. **Check phase** — Read `.aid/state.json` to verify current phase
 3. **Check pipeline** — If `.aid/pipeline/state.json` exists with `running` status, offer to resume
 4. **Check blockers** — Display any open blockers from context

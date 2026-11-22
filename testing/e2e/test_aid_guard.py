@@ -790,7 +790,10 @@ AC25_CONTROL_FILE = {
     'echo {} > .claude/settings.json', 'sort --out=.claude/settings.local.json docs/x',
     'sed -n --in-pl 1p .claude/settings.json', 'git log -1 --outp=.claude/settings.local.json',
     'git log -1 {--output=.claude/settings.local.json,}', 'git diff {--output=.claude/settings.local.json,}',
-    'git checkout -- .claude/settings.json'}
+    'git checkout -- .claude/settings.json',
+    # T16 (owner 2026-11-19), fix cycle 2 R2-01: bash expands the braces before tee runs, so
+    # this writes .claude/settings.local.json: a control-file refusal at every level.
+    'tee .claude/settings.local.js{on,}'}
 
 
 def test_ac_25_control_file_inputs_are_ac_inputs():

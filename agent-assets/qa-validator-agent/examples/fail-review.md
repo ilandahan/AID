@@ -19,6 +19,9 @@ Task: AUTH-123 - Same task, but with issues
       {"criterion": "Unit tests exist", "status": "FAIL", "finding": "No test file found", "suggestion": "Create LoginForm.test.tsx"}
     ]
   },
+  "warnings": [
+    {"criterion": "Unit tests exist", "finding": "No test file found", "suggestion": "Create LoginForm.test.tsx"}
+  ],
   "summary": {"total_criteria": 7, "passed": 4, "failed": 3},
   "action_required": [
     "1. Add disabled={!isValid} to submit button (LoginForm.tsx:45)",

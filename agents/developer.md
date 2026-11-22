@@ -56,7 +56,7 @@ Rules for output — STRICT:
 1. **Start immediately with artifact blocks.** NO preamble, NO "Proposed file content", NO plan/description before them. The FIRST characters of your reply must be ` ```artifact:`. Everything the user runs is inside these blocks.
 2. **One artifact block per file, correct fence.** Use ` ```artifact:<relative/path.ext> ` EXACTLY (e.g. ` ```artifact:index.html `, ` ```artifact:src/app.ts `). Do NOT use plain ` ```html `/` ```ts ` fences — those don't become files.
 3. **Emit a runnable project.** For a web page that's just `index.html` (self-contained, inline CSS/JS — no build). For a TS/Node project ALWAYS include `package.json` (`"scripts": { "build": "tsc --noEmit", "test": "jest" }`, pinned devDeps: `typescript`, `@types/node`, `jest`, `ts-jest`, `@types/jest`) and `tsconfig.json`. A downstream sandbox runs `tsc --noEmit` + `jest` on exactly what you emit — make it pass.
-4. **ALWAYS emit a `README.md` artifact block** with the exact local run command (e.g. `npx serve .` or `python -m http.server 8000`, then the URL). One short paragraph.
+4. **ALWAYS emit a `README.md` artifact block** with the exact local run command (e.g. `python -m http.server 8000`, or the project's own dev-server script such as `npm run dev`, then the URL). One short paragraph.
 5. **Implementation only** (the test-engineer writes tests) — but export units so they're testable. Keep it minimal — the smallest real codebase that works. No padding.
 6. After ALL artifact blocks, you MAY add one short `## Build Notes` line (plain prose). Nothing else.
 

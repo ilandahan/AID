@@ -323,12 +323,55 @@ AC10_ALLOWED = [
     # per-task stage records written after an AR pass in the same session (FIX_TEST_CODE,
     # SELF_REVIEW); R8 must not deny them
     '.aid/pipeline/T6/fix-1.json', '.aid/pipeline/T6/self-review-2.json',
-    # QA-gate verdicts the stop-qa hook tells the agent to write (validate-qa-gate.py:161);
-    # not AR-3 acceptance sources, so neither R8 nor R9 may deny them
-    '.aid/qa/T6-review.json', '.aid/qa/T6-review-1.json', '.aid/qa/T6.qa-passed',
     # frozen per-task config created once at a NEW pipeline kickoff (R10 existing-only)
     '.aid/pipeline/T7/config.frozen.json',
 ]
+
+# T15 (owner 2026-11-19, T15-7 / I-4): these QA verdict markers were listed in AC10_ALLOWED as
+# files "the stop-qa hook tells the agent to write" (old validate-qa-gate.py:161). The gate no
+# longer reads or asks for them (I-3: only a state.json qa_passed record passes) and I-4 makes
+# them control files. They are NOT AR-3 acceptance sources, so this autoresearch guard still
+# does not deny them (R8/R9 unchanged; one protected set lives in aid_guard.is_protected,
+# INV-1); the AID phase gate is the layer that denies them, asserted below.
+AC10_QA_MARKERS = ['.aid/qa/T6-review.json', '.aid/qa/T6-review-1.json', '.aid/qa/T6.qa-passed']
+
+
+@pytest.mark.parametrize('tool', TOOLS)
+@pytest.mark.parametrize('rel', AC10_QA_MARKERS)
+def test_ac_10_qa_markers_not_an_autoresearch_role(F, rel, tool):
+    """The autoresearch guard has no QA-marker role; it must not grow a second protected set."""
+    _allowed(_call(tool, rel, F['P']), rel)
+
+
+def _aid_gate_write(project, home, tool, rel):
+    runner = os.path.join(REPO_ROOT, 'hooks', 'hook-runner.mjs')
+    env = {k: v for k, v in os.environ.items() if k not in ('CLAUDE_PROJECT_DIR', 'CLAUDE_CONFIG_DIR')}
+    env.update(HOME=str(home), USERPROFILE=str(home), AID_HOME=os.path.join(str(home), '.aid'))
+    payload = {'session_id': 's-qa-marker-' + tool, 'cwd': str(project), 'tool_name': tool,
+               'hook_event_name': 'PreToolUse', 'tool_input': _input(tool, rel)}
+    return subprocess.run(['node', runner, 'phase-gate-write'], input=json.dumps(payload),
+                          capture_output=True, text=True, cwd=str(project), env=env, timeout=60)
+
+
+@pytest.mark.parametrize('tool', TOOLS)
+@pytest.mark.parametrize('rel', AC10_QA_MARKERS)
+def test_ac_10_qa_markers_denied_by_aid_gate_t15(tmp_path, rel, tool):
+    """T15 flip: the same paths, in an AID project at Phase 4 (block), are denied by the AID
+    phase gate as control files, so the agent cannot forge a QA verdict."""
+    project, home = tmp_path / 'proj', tmp_path / 'home'
+    (project / '.aid' / 'hooks').mkdir(parents=True)
+    (project / '.claude').mkdir()
+    (project / '.claude' / 'settings.json').write_text('{}', encoding='utf-8')
+    (project / '.aid' / 'state.json').write_text(json.dumps({'current_phase': 4}), encoding='utf-8')
+    (project / '.aid' / 'hooks' / 'config.json').write_text(json.dumps(
+        {'enforcement': {'phase_gate_write': 'block', 'phase_gate_bash': 'block'}}), encoding='utf-8')
+    (home / '.claude').mkdir(parents=True)
+    r = _aid_gate_write(project, home, tool, rel)
+    assert r.returncode == 0, r.stderr[-600:]
+    assert r.stdout.strip(), f'{rel} was ALLOWED by the AID gate; expected DENY (T15-7)'
+    hso = json.loads(r.stdout)['hookSpecificOutput']
+    assert hso['permissionDecision'] == 'deny', r.stdout
+    assert 'control file' in hso['permissionDecisionReason'], r.stdout
 
 
 @pytest.mark.parametrize('tool', TOOLS)

@@ -39,6 +39,30 @@ LINKED_DIRS = ['commands', 'skills', 'agents', 'references', 'rules', 'hooks']
 SENTINEL = 'do-not-delete-me\n'
 
 
+def _posix_bash():
+    """T16 (owner 2026-11-19): link-project now needs node (it registers the AID hooks,
+    I-9), and the System32 bash.exe is WSL, which has no node here and cannot run the
+    Windows one on these paths. On Windows use Git Bash, with native symlinks so `ln -s`
+    links instead of copying (MSYS copies by default)."""
+    if os.name == 'nt':
+        git = shutil.which('git')
+        here = os.path.realpath(git) if git else None
+        for up in (2, 3):
+            if not here:
+                break
+            root = here
+            for _ in range(up):
+                root = os.path.dirname(root)
+            cand = os.path.join(root, 'bin', 'bash.exe')
+            if os.path.isfile(cand):
+                return cand
+    return 'bash'
+
+
+BASH = _posix_bash()
+BASH_ENV = dict(os.environ, MSYS='winsymlinks:nativestrict') if os.name == 'nt' else None
+
+
 def _make_aid_fixture(root):
     """Build a minimal but realistic AID install with detectable content.
 
@@ -63,6 +87,19 @@ def _make_aid_fixture(root):
         f.write('{}\n')
     for template in ('.mcp.json.mac', '.mcp.json.windows'):
         shutil.copy(os.path.join(REPO_ROOT, template), os.path.join(root, template))
+    # T16 (owner 2026-11-19): link-project now registers the hooks through
+    # scripts/link-settings.mjs (reads .claude-plugin/plugin.json, I-9) and creates the state
+    # through hooks/aid_session.py init (I-10), so the fixture carries those real files.
+    for rel in (os.path.join('.claude-plugin', 'plugin.json'),
+                os.path.join('scripts', 'link-settings.mjs'),
+                # T17 (owner 2026-11-20): both linkers add the I-26 .gitignore lines through it.
+                os.path.join('scripts', 'ensure-gitignore.mjs'),
+                os.path.join('references', 'role-phase-terminology.json')):
+        os.makedirs(os.path.dirname(os.path.join(root, rel)), exist_ok=True)
+        shutil.copy(os.path.join(REPO_ROOT, rel), os.path.join(root, rel))
+    for name in os.listdir(os.path.join(REPO_ROOT, 'hooks')):
+        if name.endswith(('.py', '.mjs')):
+            shutil.copy(os.path.join(REPO_ROOT, 'hooks', name), os.path.join(root, 'hooks', name))
     shutil.copy(LINK_SCRIPT, os.path.join(root, 'link-project.sh'))
     shutil.copy(os.path.join(REPO_ROOT, 'link-project.bat'),
                 os.path.join(root, 'link-project.bat'))
@@ -78,8 +115,8 @@ def _bash_abs(cwd, rel):
     first on PATH, not on whether the guard works.
     """
     out = subprocess.run(
-        ['bash', '-c', f'cd "{rel}" && pwd'],
-        capture_output=True, text=True, cwd=cwd, timeout=60,
+        [BASH, '-c', f'cd "{rel}" && pwd'],
+        capture_output=True, text=True, cwd=cwd, timeout=60, env=BASH_ENV,
     )
     assert out.returncode == 0, f"could not resolve {rel}: {out.stderr}"
     return out.stdout.strip()
@@ -100,8 +137,8 @@ def _run_link(aid_root, target_rel, home=None, timeout=120):
     prefix = f'HOME={shlex.quote(home)} ' if home else ''
     command = f'{prefix}./link-project.sh {shlex.quote(target_rel)} --force'
     result = subprocess.run(
-        ['bash', '-c', command],
-        capture_output=True, text=True, timeout=timeout,
+        [BASH, '-c', command],
+        capture_output=True, text=True, timeout=timeout, env=BASH_ENV,
         stdin=subprocess.DEVNULL, cwd=aid_root,
     )
     # 127 == bash never found the script. Fail loudly instead of letting it look
@@ -121,8 +158,8 @@ def _read_via_bash(cwd, rel_path):
     Python happens to run the suite.
     """
     out = subprocess.run(
-        ['bash', '-c', f'cat {shlex.quote(rel_path)}'],
-        capture_output=True, text=True, cwd=cwd, timeout=60,
+        [BASH, '-c', f'cat {shlex.quote(rel_path)}'],
+        capture_output=True, text=True, cwd=cwd, timeout=60, env=BASH_ENV,
     )
     return out.stdout
 
@@ -269,7 +306,8 @@ class TestWindowsLinkerRefusesSelfTarget:
             assert result.returncode == 0, result.stdout
 
         lines = [l.strip() for l in (target / '.gitignore').read_text().splitlines()]
-        assert [l for l in lines if l] == ['node_modules', '.mcp.json'], lines
+        # T17 (owner 2026-11-20): I-26 also adds .aid/audit/, and no blank line is inserted.
+        assert lines == ['node_modules', '.mcp.json', '.aid/audit/'], lines
 
     def test_bat_propagates_aid_updates_to_linked_project(self, tmp_path):
         """
@@ -398,9 +436,11 @@ class TestLegitimateLinkStillWorks:
         target = tmp_path / 'project'
         target.mkdir()
 
-        _run_link(aid, '../project')
+        result = _run_link(aid, '../project')
 
-        assert (target / '.aid' / 'state.json').is_file()
+        # T16 (owner 2026-11-19): written by aid_session.py init, not by the script.
+        assert (target / '.aid' / 'state.json').is_file(), result.stdout + result.stderr
+        assert 'state.json created by aid_session.py init' in result.stdout, result.stdout
         assert (target / '.mcp.json').is_file()
 
     def test_gitignores_mcp_json_once(self, tmp_path):
@@ -416,7 +456,8 @@ class TestLegitimateLinkStillWorks:
         _run_link(aid, '../project')
 
         lines = (target / '.gitignore').read_text().splitlines()
-        assert lines == ['node_modules', '.mcp.json'], lines
+        # T17 (owner 2026-11-20): I-26 also adds .aid/audit/.
+        assert lines == ['node_modules', '.mcp.json', '.aid/audit/'], lines
 
 
 class TestNoRealSecretsInTrackedTemplates:
@@ -441,7 +482,8 @@ class TestNoRealSecretsInTrackedTemplates:
         r'AKIA[0-9A-Z]{16}',
     ]
 
-    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac'])
+    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac',
+                                          '.mcp.json.example'])
     def test_template_has_no_real_credentials(self, template):
         path = os.path.join(REPO_ROOT, template)
         with open(path) as f:
@@ -455,7 +497,8 @@ class TestNoRealSecretsInTrackedTemplates:
                 f"value from the OS keystore - never put it in a tracked template."
             )
 
-    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac'])
+    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac',
+                                          '.mcp.json.example'])
     def test_template_credentials_come_from_environment(self, template):
         """Every env value and header must be a ${VAR} reference, so the file a
         user copies never invites them to paste a token into it."""
@@ -473,7 +516,8 @@ class TestNoRealSecretsInTrackedTemplates:
                         f"use ${{{key}}} env expansion"
                     )
 
-    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac'])
+    @pytest.mark.parametrize('template', ['.mcp.json.windows', '.mcp.json.mac',
+                                          '.mcp.json.example'])
     def test_template_npx_packages_are_pinned(self, template):
         """npx -y fetches whatever is newest and runs it with the user's tokens;
         every package must carry an exact x.y.z version."""

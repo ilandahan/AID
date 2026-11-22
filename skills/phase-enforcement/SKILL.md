@@ -22,7 +22,7 @@ Before any work:
 4. Check if work is allowed in current phase
 5. REFUSE if not allowed (show violation)
 6. At phase completion: mandatory sub-agent review
-7. After review passes: collect feedback via /aid end
+7. After review passes: collect feedback via /aid-end
 
 ## Mandatory: Sub-Agent Review at Transitions
 
@@ -31,7 +31,7 @@ Before Phase N -> N+1:
 1. Spawn the **phase-review-agent** using the Task tool:
    ```
    Task(
-     subagent_type: "aid:phase-review-agent",   (fallback: "phase-review-agent")
+     subagent_type: "aid:phase-review-agent",   (link-project route only: "phase-review-agent")
      prompt: [the inputs only: {{PHASE_NUMBER}}, {{PHASE_NAME}}, {{PHASE_CHECKLIST}}, {{DELIVERABLES}}],
      description: "Phase gate validation"
    )
@@ -147,7 +147,7 @@ This work belongs to Phase [X].
 
 Complete first: [List]
 
-Commands: /phase, /gate-check, /aid end
+Commands: /phase, /gate-check, /aid-end
 ```
 
 ## Sub-Agent Review Prompts
@@ -221,12 +221,16 @@ Read both before enforcing gates: `state.json` determines the phase, `context.js
 }
 ```
 
-`.aid/context.json`
+`.aid/context.json` (the one `aid-context-v1` schema: `skills/context-tracking/references/context-schema.md`)
 ```json
 {
-  "current_task": "Design authentication API",
+  "$schema": "aid-context-v1",
+  "version": "1.0",
+  "last_updated": "2026-11-20T10:00:00Z",
+  "current_task": {"id": "AUTH-12", "title": "Design authentication API"},
   "current_step": "Define API contracts",
-  "progress": "in-progress",
-  "last_updated": "2024-12-21T10:00:00Z"
+  "progress": {"steps_completed": [], "steps_pending": ["Review API contracts"]},
+  "session_notes": [],
+  "blockers": []
 }
 ```

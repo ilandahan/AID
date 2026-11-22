@@ -1,8 +1,8 @@
 # Data Scientist Role Skill
 
-> **Source**: `../role-data-scientist/SKILL.md`
+> **Source**: `../../../../role-data-scientist/SKILL.md`
 >
-> This file is a reference. The main skill definition is in the `.claude/skills/` directory.
+> This file is a reference. The main skill definition is in the plugin's `skills/` directory (the **Source** link above).
 
 ## Quick Reference
 

@@ -404,6 +404,25 @@ test("disjoint findings compose to the union of caps", () => {
   assert.equal(m.cap, 6);
 });
 
+test("T18: a MAJOR reported only in a reviewer's summary counts caps the merge", () => {
+  // Gate run 4 (g5-x-merge-drops-major): the orchestrator passed a condensed review B
+  // ({dims, overall 6.0, summary:{major:1}}, no findings list); the merge ignored it and gave 9.85.
+  const condensed = { overall: 6.0, security: 9.8, code_quality: 9.7, architecture: 9.8, documentation: 9.7, summary: { major: 1 } };
+  const m = mergeReviews([clean(9.9), condensed]);
+  assert.equal(m.cap, 6, "a summary MAJOR count must cap like a MAJOR finding");
+  assert.ok(m.overall <= 6, `expected <= 6, got ${m.overall}`);
+  assert.equal(decide({ step: "CODE_REVIEW", scores: m, config: CONFIG }).result, "FIX");
+  const crit = mergeReviews([clean(9.9), { ...condensed, summary: { critical: 1, major: 0 } }]);
+  assert.equal(crit.cap, 4, "a summary CRITICAL count caps at 4");
+  const solo = mergeReviews([condensed, null]);
+  assert.equal(solo.cap, 6, "the one-reviewer path reads the summary too");
+  const soloHigh = mergeReviews([{ ...condensed, overall: 9.8 }, null]);
+  assert.ok(soloHigh.overall <= 6, `the one-reviewer cap must lower overall, got ${soloHigh.overall}`);
+  assert.equal(decide({ step: "CODE_REVIEW", scores: soloHigh, config: CONFIG }).result, "FIX");
+  assert.equal(mergeReviews([clean(9.9), { ...clean(9.8), summary: { major: 0, minor: 2 } }]).cap, null,
+    "zero blocking counts cap nothing");
+});
+
 test("findings are collected from every shape the agents actually emit", () => {
   const nested = { overall: 7, categories: { security: { issues: [{ severity: "MAJOR", file: "s.ts", pattern: "leak" }] } } };
   assert.equal(collectFindings(nested).length, 1);
@@ -581,6 +600,95 @@ test("--should-spawn-dual: a malformed --round exits 3 (usage error), never fold
     const r = runGate(["--should-spawn-dual", "--step", "CODE_REVIEW", "--round", "not-a-number"], root);
     assert.equal(r.status, 3);
     assert.match(r.out, /--round must be a number/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── T17-20 (I-23, G5-X1): the gate records the review result and the cost ──
+function t17Root(prefix) {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  mkdirSync(join(root, ".aid/pipeline"), { recursive: true });
+  // No cost_limits in CONFIG: the pricing comes from config.default.json (5 / 25 per Mtok).
+  writeFileSync(join(root, ".aid/pipeline/config.json"), JSON.stringify(CONFIG));
+  return root;
+}
+const t17State = (root) => JSON.parse(readFileSync(join(root, ".aid/pipeline/state.json"), "utf8"));
+const T17_USAGE = JSON.stringify({ input_tokens: 4000, output_tokens: 2000 });
+const T17_USD = (4000 / 1e6) * 5 + (2000 / 1e6) * 25;
+
+test("t17_20: --usage records last_review_result and the cost with default pricing", () => {
+  const root = t17Root("gate-t17-cost-");
+  try {
+    const r = runGate(["--step", "CODE_REVIEW", "--scores", '{"overall":9.6}', "--usage", T17_USAGE], root);
+    assert.equal(r.status, 0, r.out);
+    const s = t17State(root);
+    assert.equal(s.last_review_result.step, "CODE_REVIEW");
+    assert.equal(s.last_review_result.result, "PASS");
+    assert.equal(s.last_review_result.overall, 9.6);
+    assert.equal(s.last_review_result.threshold, 9.5);
+    assert.equal(s.last_review_result.round, 1);
+    assert.equal(typeof s.last_review_result.timestamp, "string");
+    assert.equal(s.cost.total_input_tokens, 4000);
+    assert.equal(s.cost.total_output_tokens, 2000);
+    assert.ok(Math.abs(s.cost.estimated_cost_usd - T17_USD) < 1e-12);
+    assert.equal(s.cost.per_step.CODE_REVIEW.input_tokens, 4000);
+    assert.equal(s.cost.per_step.CODE_REVIEW.estimated, false);
+    assert.equal(s.step_history.length, 1, "same write as recordDecision");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("t17_20: a second call accumulates the totals and the per-step entry", () => {
+  const root = t17Root("gate-t17-acc-");
+  try {
+    runGate(["--step", "CODE_REVIEW", "--scores", '{"overall":8}', "--usage", T17_USAGE], root);
+    runGate(["--step", "CODE_REVIEW", "--scores", '{"overall":9.6}', "--usage", T17_USAGE], root);
+    const s = t17State(root);
+    assert.equal(s.cost.total_input_tokens, 8000);
+    assert.equal(s.cost.total_output_tokens, 4000);
+    assert.ok(Math.abs(s.cost.estimated_cost_usd - 2 * T17_USD) < 1e-12);
+    assert.equal(s.cost.per_step.CODE_REVIEW.output_tokens, 4000);
+    assert.equal(s.last_review_result.result, "PASS");
+    assert.equal(s.last_review_result.round, 2);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("t17_20: without --usage the documented estimate is recorded, marked estimated", () => {
+  const root = t17Root("gate-t17-est-");
+  try {
+    runGate(["--step", "TEST_REVIEW", "--scores", '{"overall":9.6}'], root);
+    const s = t17State(root);
+    assert.equal(s.cost.per_step.TEST_REVIEW.estimated, true);
+    assert.equal(s.cost.total_input_tokens, 4000);
+    assert.ok(s.cost.estimated_cost_usd > 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("t17_20: a bad --usage exits 3 and writes nothing", () => {
+  for (const bad of ["[1,2]", "7", "not json", '{"input_tokens":-1,"output_tokens":2}', '{"input_tokens":1}']) {
+    const root = t17Root("gate-t17-bad-");
+    try {
+      const r = runGate(["--step", "CODE_REVIEW", "--scores", '{"overall":9.6}', "--usage", bad], root);
+      assert.equal(r.status, 3, bad);
+      assert.equal(existsSync(join(root, ".aid/pipeline/state.json")), false, bad);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("t17_20: --dry-run writes nothing", () => {
+  const root = t17Root("gate-t17-dry-");
+  try {
+    const r = runGate(["--step", "CODE_REVIEW", "--scores", '{"overall":9.6}', "--usage", T17_USAGE, "--dry-run"], root);
+    assert.equal(r.status, 0);
+    assert.equal(existsSync(join(root, ".aid/pipeline/state.json")), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

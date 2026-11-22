@@ -12,43 +12,12 @@ When a session ends or context is lost, the tracker ensures work can resume seam
 
 ## Schema
 
-```json
-{
-  "$schema": "aid-context-v1",
-  "version": "1.0",
-  "last_updated": "ISO-8601",
-  "current_task": {
-    "key": "TASK-ID",
-    "title": "Task title",
-    "description": "What needs to be done",
-    "phase": 4,
-    "phase_note": "Additional phase context"
-  },
-  "current_step": {
-    "name": "Current step description",
-    "progress": 0,
-    "notes": "Step-specific notes"
-  },
-  "progress": {
-    "steps_completed": ["Step 1", "Step 2"],
-    "steps_pending": ["Step 3", "Step 4"]
-  },
-  "session_notes": [
-    {
-      "timestamp": "ISO-8601",
-      "note": "What happened"
-    }
-  ],
-  "blockers": [
-    {
-      "id": "BLOCKER-001",
-      "description": "What's blocking",
-      "severity": "high|medium|low",
-      "resolution": "How to resolve"
-    }
-  ]
-}
-```
+One schema, `aid-context-v1`, documented in one place:
+[skills/context-tracking/references/context-schema.md](../skills/context-tracking/references/context-schema.md)
+(the example, the field types, which command writes which field, and how the hooks read it).
+In short: `current_task` is `null` or `{id, title, jira_key?}`, `current_step` is `null` or
+a string, `progress` holds `steps_completed` and `steps_pending` string arrays,
+`session_notes` is a string array, and `blockers` holds `{description, severity}` objects.
 
 ## When Context Updates
 

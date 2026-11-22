@@ -150,7 +150,7 @@ npm test -- --testNamePattern="calculateTotal"
 npm install --save-dev @stryker-mutator/core
 
 # Run mutation testing
-npx stryker run
+npx --no-install stryker run
 
 # For Python
 pip install mutmut
