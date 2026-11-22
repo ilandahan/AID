@@ -578,15 +578,18 @@ export function mergeReviews(reviews) {
 
   if (present.length === 1) {
     const only = present[0];
-    return { ...only, reviewers_used: 1, reviewers: [{ overall: only.overall }], spread: null,
+    const soloCap = minCap(capFromFindings(collectFindings(only)), capFromSummary(only));
+    return { ...only, overall: Math.min(only.overall, soloCap ?? 10), reviewers_used: 1,
+      reviewers: [{ overall: only.overall }], spread: null,
       findings: collectFindings(only), critical_security: hasCriticalSecurity(only),
-      cap: capFromFindings(collectFindings(only)),
+      cap: soloCap,
       merge_note: "one reviewer only — used as-is, never averaged against a phantom" };
   }
 
   const [a, b] = present;
   const findings = unionFindings(collectFindings(a), collectFindings(b));
-  const cap = capFromFindings(findings);
+  // T18: a reviewer may report a blocking severity only in its summary counts (no findings list).
+  const cap = minCap(capFromFindings(findings), capFromSummary(a), capFromSummary(b));
 
   const dims = {};
   for (const d of Object.keys(REVIEW_WEIGHTS)) {
@@ -622,7 +625,7 @@ export function mergeReviews(reviews) {
     spread: Math.round(Math.abs(a.overall - b.overall) * 100) / 100,
     merge_note: cap === null
       ? "no blocking severity in the union; composite is the weighted mean of both reviewers"
-      : `capped at ${cap} by the UNION of findings — one reviewer's blocking finding caps the merged review`,
+      : `capped at ${cap} by the UNION of findings and summary counts — one reviewer's blocking finding caps the merged review`,
   };
 }
 
@@ -634,6 +637,20 @@ export function capFromFindings(findings) {
   if (worst === 2) return 6;
   return null;
 }
+
+/** T18: the same step function on a review's summary counts ({critical, major}). */
+export function capFromSummary(review) {
+  const s = review?.summary;
+  if (!s || typeof s !== "object") return null;
+  if (Number(s.critical) > 0) return 4;
+  if (Number(s.major) > 0) return 6;
+  return null;
+}
+
+const minCap = (...caps) => {
+  const set = caps.filter((c) => c !== null);
+  return set.length ? Math.min(...set) : null;
+};
 
 /**
  * Union of two finding lists, deduped on file + pattern and NEVER on line number.

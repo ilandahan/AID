@@ -404,6 +404,25 @@ test("disjoint findings compose to the union of caps", () => {
   assert.equal(m.cap, 6);
 });
 
+test("T18: a MAJOR reported only in a reviewer's summary counts caps the merge", () => {
+  // Gate run 4 (g5-x-merge-drops-major): the orchestrator passed a condensed review B
+  // ({dims, overall 6.0, summary:{major:1}}, no findings list); the merge ignored it and gave 9.85.
+  const condensed = { overall: 6.0, security: 9.8, code_quality: 9.7, architecture: 9.8, documentation: 9.7, summary: { major: 1 } };
+  const m = mergeReviews([clean(9.9), condensed]);
+  assert.equal(m.cap, 6, "a summary MAJOR count must cap like a MAJOR finding");
+  assert.ok(m.overall <= 6, `expected <= 6, got ${m.overall}`);
+  assert.equal(decide({ step: "CODE_REVIEW", scores: m, config: CONFIG }).result, "FIX");
+  const crit = mergeReviews([clean(9.9), { ...condensed, summary: { critical: 1, major: 0 } }]);
+  assert.equal(crit.cap, 4, "a summary CRITICAL count caps at 4");
+  const solo = mergeReviews([condensed, null]);
+  assert.equal(solo.cap, 6, "the one-reviewer path reads the summary too");
+  const soloHigh = mergeReviews([{ ...condensed, overall: 9.8 }, null]);
+  assert.ok(soloHigh.overall <= 6, `the one-reviewer cap must lower overall, got ${soloHigh.overall}`);
+  assert.equal(decide({ step: "CODE_REVIEW", scores: soloHigh, config: CONFIG }).result, "FIX");
+  assert.equal(mergeReviews([clean(9.9), { ...clean(9.8), summary: { major: 0, minor: 2 } }]).cap, null,
+    "zero blocking counts cap nothing");
+});
+
 test("findings are collected from every shape the agents actually emit", () => {
   const nested = { overall: 7, categories: { security: { issues: [{ severity: "MAJOR", file: "s.ts", pattern: "leak" }] } } };
   assert.equal(collectFindings(nested).length, 1);

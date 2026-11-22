@@ -359,6 +359,15 @@ These limits are accepted on purpose. The next section lists what covers them.
   `warn` they are writable from Phase 0. `.claude/hooks/` stays a control file in every phase.
   Other `.claude/` files, such as `.claude/plans/` and `.claude/notes.md`, stay writable
   before Phase 4.
+- **The audit log's secret redaction is best effort.** On a deny, ask or violation the gate
+  records the first 200 characters of the command in `.aid/audit/` (gitignored). Common
+  secret shapes are redacted (Authorization and API-key headers, `--password`, URL
+  credentials, `curl -u`, variables such as `PGPASSWORD` and `AWS_SECRET_ACCESS_KEY`, quoted
+  JSON keys), but not every
+  spelling: for example a `-p`/`-k`/`-a` value after `docker login`, `openssl`, `redis-cli`
+  or `mysql -p <value>`, `gpg --passphrase`, a `Cookie:` header, or a key and value split by
+  a space. Do not put secrets in commands; read them from a keystore or an environment
+  variable instead.
 - **`.aid/state.json` written through a name built at run time, outside AID projects.** The
   every-folder refusal of `.aid/state.json` reads the command text. In a folder that is not
   an AID project, a Bash or PowerShell write whose target name is built at run time (from

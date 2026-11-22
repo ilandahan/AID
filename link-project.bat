@@ -492,6 +492,7 @@ if "!COPY_MODE!"=="1" (
     echo   .claude\agents\     - Sub-agents
     echo   .claude\references\ - Reference docs
     echo   .claude\rules\      - Rules
+    echo   .claude\hooks\      - Phase gate hooks
     echo   CLAUDE.md           - AID instructions
     echo.
     echo NOTE: Files were COPIED, not linked.
@@ -503,6 +504,7 @@ if "!COPY_MODE!"=="1" (
     echo   .claude\agents\     -^> AID
     echo   .claude\references\ -^> AID
     echo   .claude\rules\      -^> AID
+    echo   .claude\hooks\      -^> AID
     echo   CLAUDE.md           -^> AID
 )
 echo.

@@ -658,12 +658,14 @@ def _runs_session(command, powershell=False):
     counts. Prose, commit messages, echo/printf/grep text and heredoc bodies that only NAME
     aid_session do not (HEAD 2db6933 allowed them outside AID). Inside an AID project
     evaluate_bash keeps the wider T3 text check (_confirmed_intent).
-    PowerShell: backtick escapes and `+` joins are removed first; a bare variable script
+    PowerShell: backtick escapes and `+` joins are removed first and `\` reads as `/` (T18); a bare variable script
     operand (`$env:SCRIPT`) is not judged (R4-C3); built paths are _ps_built_session_call's.
     """
     text = command
     if powershell:
-        text = re.sub(r"[`]", "", command)
+        # T18 (gate run 4): `\` is a path separator in PowerShell, not an escape; lexed as bash,
+        # `.\aid_session.py` read as `.aid_session.py` and the call went unjudged (silent allow).
+        text = re.sub(r"[`]", "", command).replace("\\", "/")
     elif _unresolved_session_call(command) or _inline_session_call(command):
         return True
     segments = _shell_segments(text)
@@ -678,7 +680,8 @@ def _runs_session(command, powershell=False):
             if rest and _runs_session(direct_exec_twin(" ".join(rest), powershell), powershell):
                 return True
             continue
-        if not powershell and any(_runs_session(p) for p in _carried_lines(words)):
+        # T18 (narrow audit 1): a direct call in the carried line gets its python twin (I-17).
+        if not powershell and any(_runs_session(direct_exec_twin(p)) for p in _carried_lines(words)):
             return True                          # R2-04: git alias, script -c, su -c, ...
         # R1-03 (T17 fix cycle 1): a direct call in the -c payload (`sh -c "\"<S>\" approve"`)
         # is judged like its python twin (I-17).
