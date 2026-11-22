@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**Transform raw requirements into production-ready software using Claude Code**
+**The agentic harness for the code factory. You decide the strategy. AID runs the tactics. A human stays in the loop.**
 
 [![Claude Code](https://img.shields.io/badge/Claude-Code-orange)](https://claude.ai)
 [![License](https://img.shields.io/badge/License-AID%20Community%20v1.0-blue.svg)](LICENSE)
@@ -12,7 +12,7 @@
 [![Tests](https://img.shields.io/badge/Tests-pytest%20%2B%20node-brightgreen)](#testing)
 [![Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-blueviolet)](#install-as-a-plugin)
 
-*A complete AI-powered software development lifecycle framework*
+*The dark factory for software, already built: on GitHub since December 2025*
 
 *Created by Ilan Dahan*
 
@@ -20,8 +20,77 @@
 
 ---
 
+## The dark factory, already built
+
+Everyone is now talking about the **dark factory** for software: a code factory where AI agents
+plan, write, review and test code with the lights off, and people only step in where it
+matters. Most of what you read describes it as something coming.
+
+AID has been building it in the open since **December 2025**. It is not a prompt pack or a
+chat persona. It is the harness around the agents: the gates, the pipeline, the reviewers, the
+brake and the memory that make it safe to let them run.
+
+| What a code factory needs | What AID ships today |
+|---|---|
+| A production line from idea to release | 6 phases: Discovery, PRD, Tech Spec, Implementation Plan, Development, QA & Ship |
+| Quality gates that cannot be talked past | Phase gates enforced by Claude Code hooks: out-of-phase writes and commands are refused, not just discouraged |
+| Machines that build and inspect their own work | A dev pipeline: DEVELOP, CODE_REVIEW, TDD, TEST_REVIEW, PHASE_GATE, CERTIFICATION, each scored by isolated reviewer agents through `gate.mjs` |
+| Specialists, not one generalist | 42 sub-agents and 27 skills: phase specialists, reviewers, validators, test engineers |
+| A stop button for runaway spend | A $ brake enforced in code: the gate escalates to a human when the running cost reaches your limit |
+| A factory that gets better | A memory and learning system: session feedback becomes reviewed proposals that improve the skills |
+| Inspection before anything ships | Eval-first development, an eval release gate, a staged rollout with a tested kill switch (3.1) |
+| A security model you can audit | A written threat model per control, Claude Code permission rules, and the limits stated openly ([SECURITY-MODEL](docs/SECURITY-MODEL.md)) |
+
+## Strategy for you, tactics for AID
+
+AID is the **agentic harness layer** between you and the agents. You work at the level of
+purpose and decisions. AID turns them into work, runs it, checks it, and stops at the points
+that need you.
+
+| You (strategic) | AID (tactical) |
+|---|---|
+| Say WHY the work matters and who it is for | Holds every output to that WHY, from the PRD to the last test |
+| Approve each phase (`/phase-approve`, `/phase-advance`) | Prepares the deliverables, runs the gate check, shows the evidence |
+| Choose the solution shape (how much autonomy) | Fans out drafter agents, writes the spec, plans the tasks |
+| Set the budget and the quality bar | Runs develop, review, fix and test loops until the bar is met or the brake trips |
+| Resolve escalations | Escalates instead of guessing: score caps, cost brake, open questions |
+| Release | Certifies against acceptance criteria and evals, then hands you the release |
+
+The human is never removed from the loop. The steps that only you can take (approving a phase,
+moving to the next one, resolving an escalation, setting up the project) are confirmed by you
+in Claude Code; the agent cannot take them for you.
+
+## A year of building it in the open
+
+| When | Release | What it added |
+|---|---|---|
+| Dec 2025 | First public version on GitHub | The 6-phase methodology, WHY-first thinking, phase gates |
+| Jan 2026 | v2.0 and v2.1 | Major methodology update, installation and project linking |
+| Aug 2026 | v3 public release | Rebuilt as a Claude Code plugin; dev pipeline, hooks and permissions hardened |
+| Nov 2026 | 3.0.8 | Security hardening: gates block by default, control files protected in every phase |
+| Nov 2026 | 3.1 | **The agentic layer**: solution-shape ladder, §7A Agentic Design, parallel drafter agents, eval-first development |
+| Nov 2026 | 3.1.1 | The $ brake enforced in code, a threat model per control, redaction and reliability fixes |
+
+## Proof, not adjectives
+
+- **3,500+ automated tests** (pytest and node) run in CI on every push, alongside a Windows
+  install check, a full-history secret scan, dependency audits and a plugin security scan.
+- **Every gate is a hook**, so it holds whatever the model decides. What is enforced and what
+  is guidance is written down in [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md), together
+  with what AID does not promise.
+- **Reviews are isolated**: reviewer and validator agents see the work and the criteria, never
+  the conversation that produced it.
+- **The brake is real**: a looping pipeline is stopped by the gate itself, and ordinary git
+  cleanup cannot roll the total back.
+
+---
+
 ## Table of Contents
 
+- [The dark factory, already built](#the-dark-factory-already-built)
+- [Strategy for you, tactics for AID](#strategy-for-you-tactics-for-aid)
+- [A year of building it in the open](#a-year-of-building-it-in-the-open)
+- [Proof, not adjectives](#proof-not-adjectives)
 - [What's New](#whats-new)
 - [What is AID?](#what-is-aid)
 - [Research & Methodology](#research--methodology)
@@ -43,6 +112,19 @@
 ---
 
 ## What's New
+
+### 3.1.1 — the $ brake, enforced in code
+
+- The pipeline cost brake (`cost_limits.max_per_run_usd`) is now enforced by `gate.mjs`
+  itself: at the limit the gate returns ESCALATE and opens `ESCALATION.json`, and only you
+  resolve it. The running total lives in a cost ledger that agent tools cannot write; inside a
+  git repository it sits in the git directory, per project, where checkout, stash, reset and
+  clean never reach.
+- [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md) gains a **threat model per control**: which
+  controls stop a cooperating agent that loops, which stop an adversarial one, and the closed
+  list of bypass classes that are documented rather than patched.
+- Hooks tell Claude the current UTC time, so context files no longer carry invented times;
+  more secret patterns are redacted, and memory lists are shown redacted.
 
 ### 3.1.0 — the agentic layer
 
