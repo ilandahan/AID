@@ -46,7 +46,7 @@
   ],
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "eslint": "9.39.5",
+    "eslint": "10.15.0",
     "prettier": "3.9.10",
     "ts-node": "^10.9.2"
   },
